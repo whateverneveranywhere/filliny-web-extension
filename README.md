@@ -74,7 +74,7 @@ This boilerplate is made for creating chrome extensions using React and Typescri
    - `git config --global core.autocrlf input`
    #### This will change eol(End of line) to the same as on Linux/Mac, without this, you will have conflicts with your teammates with those systems and our bash script won't work
 2. Clone this repository.
-3. Change `extensionDescription` and `extensionName` in `messages.json` file.
+3. Change `extensionDescription` and `extensionName` in `messages.json` file in `packages/i18n/locales` folder.
 4. Install pnpm globally: `npm install -g pnpm` (check your node version >= 18.19.1))
 5. Run `pnpm install`
 
@@ -120,7 +120,7 @@ You have to do it on every browser launch.</i>
 
 ## Env Variables
 
-1. Copy `.example.env` and past it as `.env` in the same path
+1. Copy `.example.env` and paste it as `.env` in the same path
 2. Add a new record inside `.env`
 3. Add this key with type for value to `vite-env.d.ts` (root) to `ImportMetaEnv`
 4. Then you can use it with `import.meta.env.{YOUR_KEY}` like with standard [Vite Env](https://vitejs.dev/guide/env-and-mode)
