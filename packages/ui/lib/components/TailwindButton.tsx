@@ -1,11 +1,11 @@
 import type { ComponentPropsWithoutRef } from 'react';
 import { cn } from '../utils';
 
-export type ButtonProps = {
+export type TWButtonProps = {
   theme?: 'light' | 'dark';
 } & ComponentPropsWithoutRef<'button'>;
 
-export function Button({ theme, className, children, ...props }: ButtonProps) {
+export function TailwindButton({ theme, className, children, ...props }: TWButtonProps) {
   return (
     <button
       className={cn(

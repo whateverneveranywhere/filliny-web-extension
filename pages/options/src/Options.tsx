@@ -1,7 +1,7 @@
 import '@src/Options.css';
 import { useStorage, withErrorBoundary, withSuspense } from '@extension/shared';
 import { exampleThemeStorage } from '@extension/storage';
-import { Button } from '@extension/ui';
+import { TailwindButton } from '@extension/ui';
 
 const Options = () => {
   const theme = useStorage(exampleThemeStorage);
@@ -18,9 +18,9 @@ const Options = () => {
       <p>
         Edit <code>pages/options/src/Options.tsx</code>
       </p>
-      <Button className="mt-4" onClick={exampleThemeStorage.toggle} theme={theme}>
+      <TailwindButton className="mt-4" onClick={exampleThemeStorage.toggle} theme={theme}>
         Toggle theme
-      </Button>
+      </TailwindButton>
     </div>
   );
 };
