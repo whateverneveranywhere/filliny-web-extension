@@ -1,4 +1,5 @@
 import { WebappEnvs } from '@extension/shared';
+import { BackgroundActions, type ErrorResponse, type GetAuthTokenResponse, type Request } from './types/actions';
 
 // Interface for config entries
 interface ConfigEntry {
@@ -22,7 +23,34 @@ const config: Record<WebappEnvs, ConfigEntry> = {
   },
 };
 
-// Function to get config based on environment
+const handleGetAuthToken = (
+  envConfig: { baseURL: string; cookieName: string },
+  sendResponse: (response: GetAuthTokenResponse) => void,
+) => {
+  chrome.cookies.get({ url: envConfig.baseURL, name: envConfig.cookieName }, cookie => {
+    sendResponse({
+      success: { token: cookie ? cookie.value : null },
+    });
+  });
+};
+
 export const getConfig = (webappEnv: WebappEnvs = WebappEnvs.LOCAL): ConfigEntry => {
   return config[webappEnv];
+};
+
+export const handleAction = (
+  request: Request,
+  sendResponse: (response: GetAuthTokenResponse | ErrorResponse) => void,
+): boolean => {
+  const envConfig = getConfig();
+
+  switch (request.action) {
+    case BackgroundActions.GET_AUTH_TOKEN:
+      handleGetAuthToken(envConfig, sendResponse);
+      return true; // Keep the message channel open for sendResponse
+
+    default:
+      sendResponse({ error: { error: 'Invalid action' } }); // Error follows ErrorResponse structure
+      return false;
+  }
 };

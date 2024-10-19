@@ -5,7 +5,3 @@ export enum WebappEnvs {
   DEV = 'dev',
   PROD = 'prod',
 }
-
-export enum BackgroundActons {
-  GET_AUTH_TOKEN = 'getAuthToken',
-}
