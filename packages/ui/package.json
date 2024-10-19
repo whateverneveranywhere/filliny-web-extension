@@ -52,6 +52,7 @@
     "framer-motion": "^11.11.9",
     "lucide-react": "^0.453.0",
     "react-day-picker": "8.10.1",
+    "react-draggable": "^4.4.6",
     "tailwind-merge": "^2.4.0",
     "tailwindcss-animate": "^1.0.7"
   }

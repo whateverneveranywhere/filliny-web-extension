@@ -11,7 +11,8 @@ const Options = () => {
     chrome.tabs.create({ url: 'https://github.com/Jonghakseo/chrome-extension-boilerplate-react-vite' });
 
   return (
-    <div className={`App ${isLight ? 'bg-slate-50 text-gray-900' : 'bg-gray-800 text-gray-100'}`}>
+    <div
+      className={`App ${isLight ? 'filliny-bg-slate-50 filliny-text-gray-900' : 'filliny-bg-gray-800 filliny-text-gray-100'}`}>
       <button onClick={goGithubSite}>
         <img src={chrome.runtime.getURL(logo)} className="App-logo" alt="logo" />
       </button>
