@@ -64,7 +64,7 @@ const Popup = () => {
 const ToggleButton = (props: ComponentPropsWithoutRef<'button'>) => {
   // const theme = useStorage(exampleThemeStorage);
   return (
-    <Button variant={'default'} onClick={exampleThemeStorage.toggle}>
+    <Button variant={'default'} className="filliny-bg-green-300" onClick={exampleThemeStorage.toggle}>
       {props.children}
     </Button>
   );

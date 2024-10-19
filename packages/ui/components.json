@@ -8,7 +8,7 @@
     "css": "lib/global.css",
     "baseColor": "neutral",
     "cssVariables": true,
-    "prefix": "filliny"
+    "prefix": "filliny-"
   },
   "aliases": {
     "components": "@/lib/components",

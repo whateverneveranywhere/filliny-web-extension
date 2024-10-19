@@ -2,7 +2,7 @@ import * as React from 'react';
 import * as AlertDialogPrimitive from '@radix-ui/react-alert-dialog';
 
 import { cn } from '@/lib/utils';
-import { buttonVariants } from '@/components/ui/button';
+import { buttonVariants } from '@/lib/components/ui/button';
 
 const AlertDialog = AlertDialogPrimitive.Root;
 
@@ -16,7 +16,7 @@ const AlertDialogOverlay = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <AlertDialogPrimitive.Overlay
     className={cn(
-      'fillinyfixed fillinyinset-0 fillinyz-50 fillinybg-black/80 filliny data-[state=open]:fillinyanimate-in data-[state=closed]:fillinyanimate-out data-[state=closed]:fillinyfade-out-0 data-[state=open]:fillinyfade-in-0',
+      'filliny-fixed filliny-inset-0 filliny-z-50 filliny-bg-black/80 filliny- data-[state=open]:filliny-animate-in data-[state=closed]:filliny-animate-out data-[state=closed]:filliny-fade-out-0 data-[state=open]:filliny-fade-in-0',
       className,
     )}
     {...props}
@@ -34,7 +34,7 @@ const AlertDialogContent = React.forwardRef<
     <AlertDialogPrimitive.Content
       ref={ref}
       className={cn(
-        'fillinyfixed fillinyleft-[50%] fillinytop-[50%] fillinyz-50 fillinygrid fillinyw-full fillinymax-w-lg fillinytranslate-x-[-50%] fillinytranslate-y-[-50%] fillinygap-4 fillinyborder fillinybg-background fillinyp-6 fillinyshadow-lg fillinyduration-200 data-[state=open]:fillinyanimate-in data-[state=closed]:fillinyanimate-out data-[state=closed]:fillinyfade-out-0 data-[state=open]:fillinyfade-in-0 data-[state=closed]:fillinyzoom-out-95 data-[state=open]:fillinyzoom-in-95 data-[state=closed]:fillinyslide-out-to-left-1/2 data-[state=closed]:fillinyslide-out-to-top-[48%] data-[state=open]:fillinyslide-in-from-left-1/2 data-[state=open]:fillinyslide-in-from-top-[48%] sm:fillinyrounded-lg',
+        'filliny-fixed filliny-left-[50%] filliny-top-[50%] filliny-z-50 filliny-grid filliny-w-full filliny-max-w-lg filliny-translate-x-[-50%] filliny-translate-y-[-50%] filliny-gap-4 filliny-border filliny-bg-background filliny-p-6 filliny-shadow-lg filliny-duration-200 data-[state=open]:filliny-animate-in data-[state=closed]:filliny-animate-out data-[state=closed]:filliny-fade-out-0 data-[state=open]:filliny-fade-in-0 data-[state=closed]:filliny-zoom-out-95 data-[state=open]:filliny-zoom-in-95 data-[state=closed]:filliny-slide-out-to-left-1/2 data-[state=closed]:filliny-slide-out-to-top-[48%] data-[state=open]:filliny-slide-in-from-left-1/2 data-[state=open]:filliny-slide-in-from-top-[48%] sm:filliny-rounded-lg',
         className,
       )}
       {...props}
@@ -45,7 +45,10 @@ AlertDialogContent.displayName = AlertDialogPrimitive.Content.displayName;
 
 const AlertDialogHeader = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
   <div
-    className={cn('fillinyflex fillinyflex-col fillinyspace-y-2 fillinytext-center sm:fillinytext-left', className)}
+    className={cn(
+      'filliny-flex filliny-flex-col filliny-space-y-2 filliny-text-center sm:filliny-text-left',
+      className,
+    )}
     {...props}
   />
 );
@@ -54,7 +57,7 @@ AlertDialogHeader.displayName = 'AlertDialogHeader';
 const AlertDialogFooter = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
   <div
     className={cn(
-      'fillinyflex fillinyflex-col-reverse sm:fillinyflex-row sm:fillinyjustify-end sm:fillinyspace-x-2',
+      'filliny-flex filliny-flex-col-reverse sm:filliny-flex-row sm:filliny-justify-end sm:filliny-space-x-2',
       className,
     )}
     {...props}
@@ -66,7 +69,7 @@ const AlertDialogTitle = React.forwardRef<
   React.ElementRef<typeof AlertDialogPrimitive.Title>,
   React.ComponentPropsWithoutRef<typeof AlertDialogPrimitive.Title>
 >(({ className, ...props }, ref) => (
-  <AlertDialogPrimitive.Title ref={ref} className={cn('fillinytext-lg fillinyfont-semibold', className)} {...props} />
+  <AlertDialogPrimitive.Title ref={ref} className={cn('filliny-text-lg filliny-font-semibold', className)} {...props} />
 ));
 AlertDialogTitle.displayName = AlertDialogPrimitive.Title.displayName;
 
@@ -76,7 +79,7 @@ const AlertDialogDescription = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <AlertDialogPrimitive.Description
     ref={ref}
-    className={cn('fillinytext-sm fillinytext-muted-foreground', className)}
+    className={cn('filliny-text-sm filliny-text-muted-foreground', className)}
     {...props}
   />
 ));
@@ -96,7 +99,7 @@ const AlertDialogCancel = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <AlertDialogPrimitive.Cancel
     ref={ref}
-    className={cn(buttonVariants({ variant: 'outline' }), 'fillinymt-2 sm:fillinymt-0', className)}
+    className={cn(buttonVariants({ variant: 'outline' }), 'filliny-mt-2 sm:filliny-mt-0', className)}
     {...props}
   />
 ));

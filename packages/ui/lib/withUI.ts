@@ -14,6 +14,7 @@ export function withUI(tailwindConfig: Config): Config {
 
 const shadcnConfig = {
   darkMode: ['class'],
+  prefix: 'filliny-',
   theme: {
     container: {
       center: true,

@@ -11,13 +11,13 @@ const Checkbox = React.forwardRef<
   <CheckboxPrimitive.Root
     ref={ref}
     className={cn(
-      'fillinypeer fillinyh-4 fillinyw-4 fillinyshrink-0 fillinyrounded-sm fillinyborder fillinyborder-primary fillinyring-offset-background focus-visible:fillinyoutline-none focus-visible:fillinyring-2 focus-visible:fillinyring-ring focus-visible:fillinyring-offset-2 disabled:fillinycursor-not-allowed disabled:fillinyopacity-50 data-[state=checked]:fillinybg-primary data-[state=checked]:fillinytext-primary-foreground',
+      'filliny-peer filliny-h-4 filliny-w-4 filliny-shrink-0 filliny-rounded-sm filliny-border filliny-border-primary filliny-ring-offset-background focus-visible:filliny-outline-none focus-visible:filliny-ring-2 focus-visible:filliny-ring-ring focus-visible:filliny-ring-offset-2 disabled:filliny-cursor-not-allowed disabled:filliny-opacity-50 data-[state=checked]:filliny-bg-primary data-[state=checked]:filliny-text-primary-foreground',
       className,
     )}
     {...props}>
     <CheckboxPrimitive.Indicator
-      className={cn('fillinyflex fillinyitems-center fillinyjustify-center fillinytext-current')}>
-      <Check className="fillinyh-4 fillinyw-4" />
+      className={cn('filliny-flex filliny-items-center filliny-justify-center filliny-text-current')}>
+      <Check className="filliny-h-4 filliny-w-4" />
     </CheckboxPrimitive.Indicator>
   </CheckboxPrimitive.Root>
 ));

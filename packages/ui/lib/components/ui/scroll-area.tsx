@@ -7,8 +7,8 @@ const ScrollArea = React.forwardRef<
   React.ElementRef<typeof ScrollAreaPrimitive.Root>,
   React.ComponentPropsWithoutRef<typeof ScrollAreaPrimitive.Root>
 >(({ className, children, ...props }, ref) => (
-  <ScrollAreaPrimitive.Root ref={ref} className={cn('fillinyrelative fillinyoverflow-hidden', className)} {...props}>
-    <ScrollAreaPrimitive.Viewport className="fillinyh-full fillinyw-full fillinyrounded-[inherit]">
+  <ScrollAreaPrimitive.Root ref={ref} className={cn('filliny-relative filliny-overflow-hidden', className)} {...props}>
+    <ScrollAreaPrimitive.Viewport className="filliny-h-full filliny-w-full filliny-rounded-[inherit]">
       {children}
     </ScrollAreaPrimitive.Viewport>
     <ScrollBar />
@@ -25,15 +25,15 @@ const ScrollBar = React.forwardRef<
     ref={ref}
     orientation={orientation}
     className={cn(
-      'fillinyflex fillinytouch-none fillinyselect-none fillinytransition-colors',
+      'filliny-flex filliny-touch-none filliny-select-none filliny-transition-colors',
       orientation === 'vertical' &&
-        'fillinyh-full fillinyw-2.5 fillinyborder-l fillinyborder-l-transparent fillinyp-[1px]',
+        'filliny-h-full filliny-w-2.5 filliny-border-l filliny-border-l-transparent filliny-p-[1px]',
       orientation === 'horizontal' &&
-        'fillinyh-2.5 fillinyflex-col fillinyborder-t fillinyborder-t-transparent fillinyp-[1px]',
+        'filliny-h-2.5 filliny-flex-col filliny-border-t filliny-border-t-transparent filliny-p-[1px]',
       className,
     )}
     {...props}>
-    <ScrollAreaPrimitive.ScrollAreaThumb className="fillinyrelative fillinyflex-1 fillinyrounded-full fillinybg-border" />
+    <ScrollAreaPrimitive.ScrollAreaThumb className="filliny-relative filliny-flex-1 filliny-rounded-full filliny-bg-border" />
   </ScrollAreaPrimitive.ScrollAreaScrollbar>
 ));
 ScrollBar.displayName = ScrollAreaPrimitive.ScrollAreaScrollbar.displayName;

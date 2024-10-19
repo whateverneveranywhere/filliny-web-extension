@@ -5,22 +5,23 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '@/lib/utils';
 
 const buttonVariants = cva(
-  'ring-offset-background focus-visible:ring-ring inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0',
+  'filliny-inline-flex filliny-items-center filliny-justify-center filliny-gap-2 filliny-whitespace-nowrap filliny-rounded-md filliny-text-sm filliny-font-medium filliny-ring-offset-background filliny-transition-colors focus-visible:filliny-outline-none focus-visible:filliny-ring-2 focus-visible:filliny-ring-ring focus-visible:filliny-ring-offset-2 disabled:filliny-pointer-events-none disabled:filliny-opacity-50 [&_svg]:filliny-pointer-events-none [&_svg]:filliny-size-4 [&_svg]:filliny-shrink-0',
   {
     variants: {
       variant: {
-        default: 'bg-primary text-primary-foreground hover:bg-primary/90',
-        destructive: 'bg-destructive text-destructive-foreground hover:bg-destructive/90',
-        outline: 'border-input bg-background hover:bg-accent hover:text-accent-foreground border',
-        secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary/80',
-        ghost: 'hover:bg-accent hover:text-accent-foreground',
-        link: 'text-primary underline-offset-4 hover:underline',
+        default: 'filliny-bg-primary filliny-text-primary-foreground hover:filliny-bg-primary/90',
+        destructive: 'filliny-bg-destructive filliny-text-destructive-foreground hover:filliny-bg-destructive/90',
+        outline:
+          'filliny-border filliny-border-input filliny-bg-background hover:filliny-bg-accent hover:filliny-text-accent-foreground',
+        secondary: 'filliny-bg-secondary filliny-text-secondary-foreground hover:filliny-bg-secondary/80',
+        ghost: 'hover:filliny-bg-accent hover:filliny-text-accent-foreground',
+        link: 'filliny-text-primary filliny-underline-offset-4 hover:filliny-underline',
       },
       size: {
-        default: 'h-10 px-4 py-2',
-        sm: 'h-9 rounded-md px-3',
-        lg: 'h-11 rounded-md px-8',
-        icon: 'size-10',
+        default: 'filliny-h-10 filliny-px-4 filliny-py-2',
+        sm: 'filliny-h-9 filliny-rounded-md filliny-px-3',
+        lg: 'filliny-h-11 filliny-rounded-md filliny-px-8',
+        icon: 'filliny-h-10 filliny-w-10',
       },
     },
     defaultVariants: {
