@@ -1,7 +1,6 @@
 import { apiEndpoints } from '../../endpoints';
-// import { AuthHealthCheck } from './types';
 import { httpService } from '../../httpService';
-import type { DTOAIModel } from './types';
+import type { DTOAIModel } from '../../types';
 
 const {
   auth: {

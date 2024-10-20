@@ -1,6 +1,12 @@
+import type {
+  DTOFillingProfileItem,
+  DTOpov,
+  DTOProfileFillingForm,
+  DTOSuggestedWebsite,
+  DTOTone,
+} from '@extension/storage';
 import { apiEndpoints } from '../../endpoints';
 import { httpService } from '../../httpService';
-import type { DTOFillingProfileItem, DTOProfileFillingForm, DTOSuggestedWebsite, DTOTone, DTOpov } from './types';
 
 const {
   auth: {

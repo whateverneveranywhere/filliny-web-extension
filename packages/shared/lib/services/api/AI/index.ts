@@ -1,5 +1,5 @@
 import { apiEndpoints } from '../../endpoints';
-import type { DTOFillPayload, Field } from './types';
+import type { DTOFillPayload, Field } from '../../types';
 import { httpService } from '../../httpService';
 
 const {

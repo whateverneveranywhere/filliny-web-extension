@@ -1,7 +1,10 @@
 import { createRoot } from 'react-dom/client';
 import '@src/index.css';
 import '@extension/ui/lib/global.css';
-import Popup from '@src/Popup';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Toaster } from '@extension/ui';
+import App from './App';
+const queryClient = new QueryClient();
 
 function init() {
   const appContainer = document.querySelector('#app-container');
@@ -10,7 +13,12 @@ function init() {
   }
   const root = createRoot(appContainer);
 
-  root.render(<Popup />);
+  root.render(
+    <QueryClientProvider client={queryClient}>
+      <App />
+      <Toaster />
+    </QueryClientProvider>,
+  );
 }
 
 init();

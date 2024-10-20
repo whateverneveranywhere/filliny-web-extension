@@ -1,4 +1,4 @@
-import type { DTOFillingPrefrences } from '../../Profiles/types';
+import type { DTOFillingPrefrences } from '@extension/storage';
 
 export interface Field {
   id: string;

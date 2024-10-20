@@ -1,7 +1,7 @@
 import 'webextension-polyfill';
 import { exampleThemeStorage } from '@extension/storage';
-import { handleAction } from '../helpers';
-import type { Request } from '@src/types/actions';
+import type { Request } from '@extension/shared';
+import { handleAction } from '@extension/shared';
 
 exampleThemeStorage.get().then(theme => {
   console.log('theme', theme);

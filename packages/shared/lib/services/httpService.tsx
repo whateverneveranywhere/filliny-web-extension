@@ -1,5 +1,6 @@
 import { authStorage } from '@extension/storage';
 import { apiEndpoints } from './endpoints';
+import { getConfig } from '../utils';
 
 export interface ApiDefaultError {
   message: string;
@@ -13,14 +14,13 @@ interface CustomFetchConfig extends RequestInit {
   isStream?: boolean;
 }
 
-const processEnvApiBaseUrl = 'http://localhost:3000';
-// const processEnvApiBaseUrl = 'https://dev.filliny.io';
+const config = getConfig();
 
 class HttpService {
   private baseUrl: string;
 
   constructor(baseUrl?: string) {
-    this.baseUrl = baseUrl || `${processEnvApiBaseUrl}${apiEndpoints.version}` || '';
+    this.baseUrl = baseUrl || `${config.baseURL}${apiEndpoints.version}` || '';
   }
 
   private async request<T>(url: string, config?: CustomFetchConfig): Promise<T> {
