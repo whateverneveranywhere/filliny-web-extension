@@ -3,14 +3,17 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '@/lib/utils';
 
 const badgeVariants = cva(
-  'inline-flex items-center rounded-md border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
+  'filliny-inline-flex filliny-items-center filliny-rounded-md filliny-border filliny-px-2.5 filliny-py-0.5 filliny-text-xs filliny-font-semibold filliny-transition-colors focus:filliny-outline-none focus:filliny-ring-2 focus:filliny-ring-ring focus:filliny-ring-offset-2',
   {
     variants: {
       variant: {
-        default: 'border-transparent bg-primary text-primary-foreground shadow hover:bg-primary/80',
-        secondary: 'border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80',
-        destructive: 'border-transparent bg-destructive text-destructive-foreground shadow hover:bg-destructive/80',
-        outline: 'text-foreground',
+        default:
+          'filliny-border-transparent filliny-bg-primary filliny-text-primary-foreground filliny-shadow hover:filliny-bg-primary/80',
+        secondary:
+          'filliny-border-transparent filliny-bg-secondary filliny-text-secondary-foreground hover:filliny-bg-secondary/80',
+        destructive:
+          'filliny-border-transparent filliny-bg-destructive filliny-text-destructive-foreground filliny-shadow hover:filliny-bg-destructive/80',
+        outline: 'filliny-text-foreground',
       },
     },
     defaultVariants: {

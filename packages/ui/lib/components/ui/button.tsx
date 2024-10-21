@@ -49,7 +49,14 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         ref={ref}
         {...props}>
         <>
-          {loading && <Loader2 className={cn('h-4 w-4 animate-spin', props.children && size !== 'icon' && 'mr-2')} />}
+          {loading && (
+            <Loader2
+              className={cn(
+                'filliny-h-4 filliny-w-4 filliny-animate-spin',
+                props.children && size !== 'icon' && 'mr-2',
+              )}
+            />
+          )}
           {size === 'icon' && loading ? <></> : props.children}
         </>
       </Comp>

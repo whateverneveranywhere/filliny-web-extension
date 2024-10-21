@@ -37,7 +37,10 @@ function RHFShadcnDatePicker({
               <FormControl>
                 <Button
                   variant="outline"
-                  className={cn('pl-3 text-left font-normal w-full', !field.value && 'filliny-text-muted-foreground')}>
+                  className={cn(
+                    'filliny-pl-3 filliny-text-left filliny-font-normal filliny-w-full',
+                    !field.value && 'filliny-text-muted-foreground',
+                  )}>
                   {field.value ? format(field.value, 'PPP') : <span>{placeholder || 'Pick a date'}</span>}
                   <CalendarIcon className="filliny-ml-auto filliny-size-4 filliny-opacity-50" />
                 </Button>

@@ -156,8 +156,8 @@ function ProfileForm(props: Props) {
   };
 
   return isLoadingEditingItem ? (
-    <div className="flex size-full items-center justify-center p-20">
-      <Loader2 className={cn('mr-2 h-10 w-10 animate-spin')} />
+    <div className="filliny-flex filliny-size-full filliny-items-center filliny-justify-center filliny-p-20">
+      <Loader2 className={cn('filliny-mr-2 filliny-h-10 filliny-w-10 filliny-animate-spin')} />
     </div>
   ) : (
     <FormProvider methods={methods} onSubmit={onSubmit}>

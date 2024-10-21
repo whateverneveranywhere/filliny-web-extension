@@ -12,7 +12,7 @@ interface Props {
 function QuickAddWebsiteToProfile(props: Props) {
   const { currentUrl, onQuickAdd, isLoading } = props;
   return (
-    <div className="flex w-full flex-col items-center justify-center">
+    <div className="filliny-flex filliny-w-full filliny-flex-col filliny-items-center filliny-justify-center">
       <Card>
         <CardHeader>
           <CardTitle>Want Filliny here?</CardTitle>

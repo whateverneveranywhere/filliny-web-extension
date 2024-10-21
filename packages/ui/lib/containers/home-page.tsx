@@ -109,21 +109,25 @@ function HomePage() {
 
   return (
     <PageLayout>
-      <div className="flex size-full flex-col gap-2">
+      <div className="filliny-flex filliny-size-full filliny-flex-col filliny-gap-2">
         {!loadingAuthHealthCheck && !authHealthCheckData?.limitations.plan && (
-          <div className="z-50 w-full">
+          <div className="filliny-z-50 filliny-w-full">
             <Badge
               variant="outline"
-              className="flex w-full flex-col items-center justify-center gap-1 bg-yellow-400 py-2 text-black">
-              <span className="inline">
+              className="filliny-flex filliny-w-full filliny-flex-col filliny-items-center filliny-justify-center filliny-gap-1 filliny-bg-yellow-400 filliny-py-2 filliny-text-black">
+              <span className="filliny-inline">
                 {authHealthCheckData?.user.formFillingsCredit === 0
                   ? 'You have ran out of free form filling credits'
                   : `You have ${authHealthCheckData?.user.formFillingsCredit} free form filling credits left.`}
               </span>
               {authHealthCheckData?.user.formFillingsCredit === 0 && (
-                <span className="inline">
+                <span className="filliny-inline">
                   To upgrade your plan, visit
-                  <a href="https://filliny.io/plans" target="_blank" rel="noreferrer" className="ml-1 underline">
+                  <a
+                    href="https://filliny.io/plans"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="filliny-ml-1 filliny-underline">
                     Filliny plans
                   </a>
                   .
@@ -133,13 +137,13 @@ function HomePage() {
           </div>
         )}
         {isLoading && (
-          <div className="m-auto mt-44 flex size-full items-center justify-center">
+          <div className="filliny-m-auto filliny-mt-44 filliny-flex filliny-size-full filliny-items-center filliny-justify-center">
             <Loader2 className={cn('h-20 w-20 animate-spin')} />
           </div>
         )}
         {!isLoading && !hasConfiggedAccessToken && (
           <Alert>
-            <AlertTitle className="text-lg">Model config needed!</AlertTitle>
+            <AlertTitle className="filliny-text-lg">Model config needed!</AlertTitle>
             <AlertDescription>
               {`Don't forget to pick and setup a default AI model config to fill forms with.`}{' '}
             </AlertDescription>
@@ -147,7 +151,7 @@ function HomePage() {
         )}
         {!isLoading && !defaultProfile && (
           <Alert>
-            <AlertTitle className="text-lg">Heads up!</AlertTitle>
+            <AlertTitle className="filliny-text-lg">Heads up!</AlertTitle>
             <AlertDescription>
               No active filling profiles found, start by clicking the plus button above to create your first profile
             </AlertDescription>
@@ -172,7 +176,7 @@ function HomePage() {
         {!isLoading && !isVisitingUrlValid && (
           <>
             <Alert variant={'destructive'}>
-              <AlertTitle className="text-lg">Error</AlertTitle>
+              <AlertTitle className="filliny-text-lg">Error</AlertTitle>
               <AlertDescription>
                 URL is not valid <br />
                 detected URL: {currentVisitingWebsiteUrl}

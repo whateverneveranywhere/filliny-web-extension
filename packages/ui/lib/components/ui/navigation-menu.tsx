@@ -53,7 +53,7 @@ const NavigationMenuTrigger = React.forwardRef<
     {...props}>
     {children}{' '}
     <ChevronDown
-      className="filliny-relative filliny-top-[1px] filliny-ml-1 filliny-h-3 filliny-w-3 filliny-transition filliny-duration-200 group-data-[state=open]:filliny-rotate-180"
+      className="filliny-relative -filliny-top-[1px] filliny-ml-1 filliny-h-3 filliny-w-3 filliny-transition filliny-duration-200 group-data-[state=open]:filliny-rotate-180"
       aria-hidden="true"
     />
   </NavigationMenuPrimitive.Trigger>

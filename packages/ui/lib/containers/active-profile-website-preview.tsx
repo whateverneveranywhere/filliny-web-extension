@@ -26,8 +26,12 @@ const ActiveProfileWebsitePreview: React.FC<Props> = ({ matchingWebsite, prefere
 
   const renderBadge = useCallback(
     (condition: boolean) => (
-      <Badge className="flex items-center justify-center" variant={'outline'}>
-        {condition ? <Check className="mr-2 text-green-500" /> : <X className="mr-2 text-red-500" />}
+      <Badge className="filliny-flex filliny-items-center filliny-justify-center" variant={'outline'}>
+        {condition ? (
+          <Check className="filliny-mr-2 filliny-text-green-500" />
+        ) : (
+          <X className="filliny-mr-2 filliny-text-red-500" />
+        )}
         {condition ? 'Yes' : 'No'}
       </Badge>
     ),
@@ -37,29 +41,29 @@ const ActiveProfileWebsitePreview: React.FC<Props> = ({ matchingWebsite, prefere
   return (
     <>
       <WebsitePreviewCard websiteURL={websiteUrl} isRootLoad={isRootLoad} hideExpandTrigger defaultExpanded>
-        <div className="flex flex-col items-center justify-center gap-4">
-          <div className="flex w-full max-w-md flex-col items-start justify-start gap-2">
-            <Label className="w-full text-center font-semibold">Filling Context</Label>
-            <p className="w-full">{fillingContext}</p>
+        <div className="filliny-flex filliny-flex-col filliny-items-center filliny-justify-center filliny-gap-4">
+          <div className="filliny-flex filliny-w-full filliny-max-w-md filliny-flex-col filliny-items-start filliny-justify-start filliny-gap-2">
+            <Label className="filliny-w-full filliny-text-center filliny-font-semibold">Filling Context</Label>
+            <p className="filliny-w-full">{fillingContext}</p>
           </div>
-          <div className="flex w-full max-w-md items-center justify-between">
-            <Label className="font-semibold">Root Load:</Label>
+          <div className="filliny-flex filliny-w-full filliny-max-w-md filliny-items-center filliny-justify-between">
+            <Label className="filliny-font-semibold">Root Load:</Label>
             {renderBadge(isRootLoad)}
           </div>
-          <div className="flex w-full max-w-md items-center justify-between">
-            <Label className="font-semibold">Formal Tone:</Label>
+          <div className="filliny-flex filliny-w-full filliny-max-w-md filliny-items-center filliny-justify-between">
+            <Label className="filliny-font-semibold">Formal Tone:</Label>
             {renderBadge(preferences.isFormal)}
           </div>
-          <div className="flex w-full max-w-md items-center justify-between">
-            <Label className="font-semibold">Gap Filling Allowed:</Label>
+          <div className="filliny-flex filliny-w-full filliny-max-w-md filliny-items-center filliny-justify-between">
+            <Label className="filliny-font-semibold">Gap Filling Allowed:</Label>
             {renderBadge(preferences.isGapFillingAllowed)}
           </div>
-          <div className="flex w-full max-w-md items-center justify-between">
-            <Label className="font-semibold">Tone:</Label>
+          <div className="filliny-flex filliny-w-full filliny-max-w-md filliny-items-center filliny-justify-between">
+            <Label className="filliny-font-semibold">Tone:</Label>
             <span>{toneLabel}</span>
           </div>
-          <div className="flex w-full max-w-md items-center justify-between">
-            <Label className="font-semibold">Point of View:</Label>
+          <div className="filliny-flex filliny-w-full filliny-max-w-md filliny-items-center filliny-justify-between">
+            <Label className="filliny-font-semibold">Point of View:</Label>
             <span>{povLabel}</span>
           </div>
         </div>

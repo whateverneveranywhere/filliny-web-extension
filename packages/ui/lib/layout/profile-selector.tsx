@@ -78,7 +78,7 @@ function ProfileSelector() {
 
   return (
     <>
-      <div className="-mt-1 flex items-center justify-center">
+      <div className="-filliny-mt-1 filliny-flex filliny-items-center filliny-justify-center">
         <FormProvider methods={methods} onSubmit={onSubmit}>
           <RHFShadcnComboBox
             disabled={isDeleting || isUpdatingDefault}
@@ -119,7 +119,7 @@ function ProfileSelector() {
           open={isAddNewProfileModalOpen.value}
           title={editingTempId ? 'Edit profile form' : 'New profile form'}
           onConfirm={onSubmit}>
-          <div className="h-[70vh]">
+          <div className="filliny-h-[70vh]">
             <ProfileForm
               id={editingTempId}
               onFormSubmit={() => {
