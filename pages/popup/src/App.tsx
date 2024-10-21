@@ -6,11 +6,16 @@ import { useEffect } from 'react';
 const HomePage = () => {
   const auth = useStorage(authStorage);
 
+  // In your React component
   useEffect(() => {
     chrome.runtime.sendMessage({ action: BackgroundActions.GET_AUTH_TOKEN }, response => {
-      console.log('woooooooooo', response);
+      console.log('Response received in frontend:', response);
 
-      authStorage.setToken(response.token || '');
+      if (response && response.success && response.success.token) {
+        authStorage.setToken(response.success.token);
+      } else {
+        console.error('Failed to get auth token:', response);
+      }
     });
   }, []);
 

@@ -77,8 +77,12 @@ const handleGetAuthToken = (
   envConfig: { baseURL: string; cookieName: string },
   sendResponse: (response: GetAuthTokenResponse) => void,
 ) => {
-  chrome.cookies.get({ url: envConfig.baseURL, name: envConfig.cookieName }, cookie => {
-    sendResponse({
+  const getFromConfig = { url: envConfig.baseURL, name: envConfig.cookieName };
+
+  chrome.cookies.get(getFromConfig, cookie => {
+    console.log('woooo', cookie);
+
+    return sendResponse({
       success: { token: cookie ? cookie.value : null },
     });
   });
@@ -90,21 +94,18 @@ export const getConfig = (webappEnv: WebappEnvs = WebappEnvs.LOCAL): ConfigEntry
 
 export const handleAction = (
   request: Request,
+  sender: chrome.runtime.MessageSender,
   sendResponse: (response: GetAuthTokenResponse | ErrorResponse) => void,
 ): boolean => {
   const envConfig = getConfig();
 
-  switch (request.action) {
-    case BackgroundActions.GET_AUTH_TOKEN:
-      console.log('woooooooo', chrome, envConfig);
-
-      handleGetAuthToken(envConfig, sendResponse);
-      return true; // Keep the message channel open for sendResponse
-
-    default:
-      sendResponse({ error: { error: 'Invalid action' } }); // Error follows ErrorResponse structure
-      return false;
+  if (request.action === BackgroundActions.GET_AUTH_TOKEN) {
+    handleGetAuthToken(envConfig, sendResponse);
+    return true; // Keep the message channel open for sendResponse
   }
+
+  sendResponse({ error: { error: 'Invalid action' } });
+  return false;
 };
 
 export const getCurrentVistingUrl = () => {

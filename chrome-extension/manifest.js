@@ -4,6 +4,7 @@ import deepmerge from 'deepmerge';
 const packageJson = JSON.parse(fs.readFileSync('../package.json', 'utf8'));
 
 const isFirefox = process.env.__FIREFOX__ === 'true';
+const isDev = process.env.__DEV__ === 'true';
 
 const sidePanelConfig = {
   side_panel: {
@@ -27,8 +28,8 @@ const manifest = deepmerge(
     name: '__MSG_extensionName__',
     version: packageJson.version,
     description: '__MSG_extensionDescription__',
-    host_permissions: ['<all_urls>'],
-    permissions: ['storage', 'scripting', 'tabs', 'notifications'],
+    host_permissions: ['https://dev.filliny.io/*', 'https://filliny.io/*', isDev && 'http://localhost:3000/*'],
+    permissions: ['storage', 'scripting', 'tabs', 'cookies', 'activeTab', 'notifications'],
     options_page: 'options/index.html',
     background: {
       service_worker: 'background.iife.js',
