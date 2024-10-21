@@ -1,15 +1,14 @@
 // components/TextInput.tsx
-import { Check, ChevronsUpDown, Command, Edit, Loader2, Trash } from 'lucide-react';
+import { Check, ChevronsUpDown, Edit, Loader2, Trash } from 'lucide-react';
 import React, { useState } from 'react';
 import { useFormContext } from 'react-hook-form';
 
 import { Button } from '../ui/button';
-
-import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
-import { cn } from '@/lib/utils';
-import type { FormOptions, GeneralFormProps } from '@extension/shared';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../ui/command';
 import { FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '../ui/form';
-import { CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../ui/command';
+import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
+import type { FormOptions, GeneralFormProps } from '@extension/shared';
+import { cn } from '@/lib/utils';
 
 interface Props extends GeneralFormProps {
   options: FormOptions;
@@ -61,7 +60,7 @@ function RHFShadcnComboBox({
                   role="combobox"
                   className={cn(
                     'filliny-w-[200px] filliny-justify-between',
-                    !field.value && 'filliny-ext-muted-foreground',
+                    !field.value && 'filliny-text-muted-foreground',
                     isFullWidth && 'filliny-w-full',
                   )}>
                   <p className="filliny-w-full filliny-truncate filliny-text-left">
@@ -88,10 +87,7 @@ function RHFShadcnComboBox({
                           onSelect={() => handleSelect(option.value)}>
                           <div className="filliny-flex filliny-w-full filliny-items-center filliny-justify-center filliny-truncate">
                             <Check
-                              className={cn(
-                                'filliny-mr-2 filliny-h-4 filliny-w-4',
-                                option.value === field.value ? 'filliny-opacity-100' : 'filliny-opacity-0',
-                              )}
+                              className={cn('mr-2 h-4 w-4', option.value === field.value ? 'opacity-100' : 'opacity-0')}
                             />
                             <p className="filliny-w-full filliny-truncate">{option.label}</p>{' '}
                           </div>
@@ -101,7 +97,7 @@ function RHFShadcnComboBox({
                               <Button
                                 variant="outline"
                                 size="icon"
-                                className="filliny-size-8 filliny-p-1"
+                                className="filliny-h-8 filliny-w-8 filliny-p-1"
                                 onClick={e => {
                                   e.stopPropagation();
                                   onEdit(option.value);
@@ -114,7 +110,7 @@ function RHFShadcnComboBox({
                               <Button
                                 variant="outline"
                                 size="icon"
-                                className="filliny-size-8 filliny-p-1"
+                                className="filliny-h-8 filliny-w-8 filliny-p-1"
                                 onClick={e => {
                                   e.stopPropagation();
                                   onDelete(option.value);
