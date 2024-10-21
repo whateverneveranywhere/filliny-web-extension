@@ -19,6 +19,8 @@ export default function App() {
   );
 
   const setVisitingUrl = async () => {
+    console.log('fuck');
+
     try {
       const visitingUrl = window.location.href as string;
       if (visitingUrl && isValidUrl(visitingUrl)) {
@@ -37,6 +39,8 @@ export default function App() {
   useEffect(() => {
     setVisitingUrl();
   }, []);
+
+  console.log('wooooooo', { isLoading, defaultProfile, isVisitingUrlValid, matchingWebsite });
 
   return (
     !isLoading &&
