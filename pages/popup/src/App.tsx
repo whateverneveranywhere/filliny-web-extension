@@ -1,4 +1,4 @@
-import { useStorage, withErrorBoundary, withSuspense } from '@extension/shared';
+import { BackgroundActions, useStorage, withErrorBoundary, withSuspense } from '@extension/shared';
 import { authStorage } from '@extension/storage';
 import { RouterProvider, SigninPage } from '@extension/ui';
 import { useEffect } from 'react';
@@ -7,7 +7,9 @@ const HomePage = () => {
   const auth = useStorage(authStorage);
 
   useEffect(() => {
-    chrome.runtime.sendMessage({ action: 'getAuthToken' }, response => {
+    chrome.runtime.sendMessage({ action: BackgroundActions.GET_AUTH_TOKEN }, response => {
+      console.log('woooooooooo', response);
+
       authStorage.setToken(response.token || '');
     });
   }, []);

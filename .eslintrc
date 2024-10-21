@@ -28,7 +28,7 @@
       "version": "detect",
     },
     "tailwindcss": {
-      "config": "./pages/popup/tailwind.config.ts", // Add this line
+      "prefix": "filliny-", // Replace with your actual prefix
     },
   },
   "rules": {

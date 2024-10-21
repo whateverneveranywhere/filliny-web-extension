@@ -1,2 +1,2 @@
 export { default as HomePage } from './home-page';
-export { default as SigninPage } from './auth-page';
+export { default as SigninPage } from './single-page';

@@ -1,4 +1,3 @@
 dist
 node_modules
 tailwind.config.ts
-packages/ui/lib/components/ui/**/*

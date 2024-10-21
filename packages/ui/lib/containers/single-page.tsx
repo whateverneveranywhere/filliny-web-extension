@@ -1,7 +1,7 @@
 import { getConfig } from '@extension/shared';
-import { PageLayout } from '../components/layout';
 import { Logo } from '../components/Logo';
 import { Button } from '../components/ui';
+import { PageLayout } from '../layout';
 
 function SigninPage() {
   const config = getConfig();

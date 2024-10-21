@@ -1,6 +1,7 @@
+import { Button } from '../components';
+import { Logo } from '../components/Logo';
 import { ProfileSelector } from './profile-selector';
-import { Button } from '../ui';
-import { Logo } from '../Logo';
+
 import { Link } from 'react-router-dom';
 
 function Header() {

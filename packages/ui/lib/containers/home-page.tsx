@@ -10,12 +10,12 @@ import {
 } from '@extension/shared';
 import { profileStrorage } from '@extension/storage';
 import { useEffect, useMemo, useState } from 'react';
-import { PageLayout } from '../components/layout';
 import { Alert, AlertDescription, AlertTitle, Badge } from '../components';
 import { Loader2 } from 'lucide-react';
 import { cn } from '../utils';
 import { QuickAddWebsiteToProfile } from './quick-add-website';
 import { ActiveProfileWebsitePreview } from './active-profile-website-preview';
+import { PageLayout } from '../layout';
 
 function HomePage() {
   const defaultProfile = useStorage(profileStrorage);

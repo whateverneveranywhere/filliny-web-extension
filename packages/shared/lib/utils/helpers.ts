@@ -96,6 +96,8 @@ export const handleAction = (
 
   switch (request.action) {
     case BackgroundActions.GET_AUTH_TOKEN:
+      console.log('woooooooo', chrome, envConfig);
+
       handleGetAuthToken(envConfig, sendResponse);
       return true; // Keep the message channel open for sendResponse
 

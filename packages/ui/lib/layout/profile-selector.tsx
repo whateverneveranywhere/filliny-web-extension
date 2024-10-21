@@ -10,13 +10,14 @@ import {
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from '@/lib/hooks/use-toast';
-import { RHFShadcnComboBox } from '../RHF';
-import FormProvider from '../RHF/FormProvider';
-import { Button } from '../ui';
+
 import { Plus } from 'lucide-react';
-import { ProfileForm } from '@/lib/containers/profile-form';
-import { Drawer } from '../Drawer';
 import { profileStrorage } from '@extension/storage';
+import { ProfileForm } from '@/lib/containers/profile-form';
+import FormProvider from '../components/RHF/FormProvider';
+import { RHFShadcnComboBox } from '../components/RHF';
+import { Button } from '../components';
+import { Drawer } from '../components/Drawer';
 
 export const schema = z.object({
   defaultActiveProfileId: z.string(),
