@@ -3,7 +3,7 @@ import App from '@src/App';
 import tailwindcssOutput from '../dist/tailwind-output.css?inline';
 
 const root = document.createElement('div');
-root.id = 'chrome-extension-boilerplate-react-vite-content-view-root';
+root.id = 'chrome-extension-filliny';
 
 document.body.append(root);
 
