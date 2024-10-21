@@ -13,8 +13,8 @@ function Header() {
       </div>
       <div className="filliny-col-span-2 filliny-flex filliny-justify-end">
         <Link to={'https://filliny.io'} target="_blank">
-          <Button size="icon">
-            <Logo />
+          <Button className="filliny-size-[800px]">
+            <Logo height={2400} width={2400} />
           </Button>
         </Link>{' '}
       </div>
