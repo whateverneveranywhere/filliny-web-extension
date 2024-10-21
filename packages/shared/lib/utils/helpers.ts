@@ -80,9 +80,7 @@ const handleGetAuthToken = (
   const getFromConfig = { url: envConfig.baseURL, name: envConfig.cookieName };
 
   chrome.cookies.get(getFromConfig, cookie => {
-    console.log('woooo', cookie);
-
-    return sendResponse({
+    sendResponse({
       success: { token: cookie ? cookie.value : null },
     });
   });
