@@ -1,8 +1,7 @@
 import { FormsOverlay } from './FormsOverlay';
 import { addGlowingBorder, detectFields } from './detectionHelpers';
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-expect-error
-import tailwindcssOutput from '@src/tailwind-output.css?inline';
+// import tailwindcssOutput from '@src/tailwind-output.css?inline';
 import { createRoot } from 'react-dom/client';
 
 interface HighlightFormsOptions {
@@ -14,7 +13,7 @@ let isHighlighting = false;
 // Function to inject Tailwind CSS into the shadow root
 const injectTailwindCSS = (shadowRoot: ShadowRoot) => {
   const styleElement = document.createElement('style');
-  styleElement.innerHTML = tailwindcssOutput;
+  // styleElement.innerHTML = tailwindcssOutput;
   shadowRoot.appendChild(styleElement);
 };
 

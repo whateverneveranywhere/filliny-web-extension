@@ -1,61 +1,91 @@
-import Draggable from 'react-draggable';
+import { useRef, useState } from 'react';
+import type { CSSProperties } from 'react';
+import type { DragEndEvent } from '@dnd-kit/core';
+import { DndContext, useDraggable } from '@dnd-kit/core';
+import { restrictToVerticalAxis } from '@dnd-kit/modifiers';
+import { CSS } from '@dnd-kit/utilities';
 
 import { DragButton } from './drag-button';
 import { LogoButton } from './logo-button';
 import { FillinyVisionButton } from './filliny-vision-button';
 import { BugReportButton } from './bug-report-button';
 import { ButtonWrapper, type ButtonComponentProps } from './button-wrapper';
-import type { CSSProperties } from 'react';
-import { useRef, useState } from 'react';
-// import { RecordFormButton } from './record-form-button';
 
 interface ButtonConfig {
   Component: React.FC<ButtonComponentProps>;
   position: CSSProperties;
 }
 
+interface Position {
+  x: number;
+  y: number;
+}
+
 const buttonComponents: ButtonConfig[] = [
-  { Component: FillinyVisionButton, position: { top: '-25px', left: '-10px' } }, // Top left
-  // { Component: RecordFormButton, position: { top: '-10px', left: '-25px' } }, // New button in between
-  { Component: DragButton, position: { top: '15px', left: '-25px' } }, // Left center adjusted
-  { Component: BugReportButton, position: { top: '30px', left: '-10px' } }, // Bottom left adjusted
+  { Component: FillinyVisionButton, position: { top: '-25px', left: '-10px' } },
+  { Component: DragButton, position: { top: '15px', left: '-25px' } },
+  { Component: BugReportButton, position: { top: '30px', left: '-10px' } },
 ];
 
-const FillinyButton: React.FC = () => {
-  const nodeRef = useRef<HTMLDivElement>(null);
+const DraggableButton = ({ position }: { position: Position; onPositionChange: (newPosition: Position) => void }) => {
   const [isHovered, setIsHovered] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
+  const nodeRef = useRef<HTMLDivElement>(null);
 
-  const updateBounds = () => ({
-    top: 170,
-    bottom: window.innerHeight - 120,
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: 'filliny-button',
   });
 
+  const style: CSSProperties = {
+    position: 'fixed',
+    top: position.y,
+    right: 30,
+    transform: CSS.Transform.toString(transform),
+    touchAction: 'none',
+  };
+
   return (
-    <Draggable
-      axis="y"
-      bounds={updateBounds()}
-      nodeRef={nodeRef}
-      handle=".drag-handle"
-      defaultPosition={{ x: 0, y: window.innerHeight * 0.25 }} // 25% from the top
-      onStart={() => setIsDragging(true)}
-      onStop={() => setIsDragging(false)}>
-      <div
-        ref={nodeRef}
-        className="filliny-group filliny-fixed filliny-z-[10000000] filliny-flex filliny-size-16 filliny-transform-gpu filliny-cursor-pointer filliny-items-center filliny-p-5"
-        style={{ top: 0, right: 30, transform: 'translateY(0)' }}
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}>
-        <div className="filliny-relative filliny-size-16">
-          <LogoButton isHovered={isHovered} isDragging={isDragging} />
-          {buttonComponents.map((button, index) => (
-            <ButtonWrapper key={index} isHovered={isHovered} isDragging={isDragging} position={button.position}>
-              <button.Component isHovered={isHovered} isDragging={isDragging} />
-            </ButtonWrapper>
-          ))}
-        </div>
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      className="filliny-group filliny-z-[10000000] filliny-flex filliny-size-16 filliny-transform-gpu filliny-cursor-pointer filliny-items-center filliny-p-5"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}>
+      <div ref={nodeRef} className="filliny-relative filliny-size-16">
+        <LogoButton isHovered={isHovered} isDragging={isDragging} />
+        {buttonComponents.map((button, index) => (
+          <ButtonWrapper key={index} isHovered={isHovered} isDragging={isDragging} position={button.position}>
+            <button.Component isHovered={isHovered} isDragging={isDragging} />
+          </ButtonWrapper>
+        ))}
       </div>
-    </Draggable>
+    </div>
+  );
+};
+
+const FillinyButton: React.FC = () => {
+  const [position, setPosition] = useState<Position>({
+    x: 0,
+    y: window.innerHeight * 0.25,
+  });
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { delta } = event;
+    if (delta) {
+      const newY = Math.min(Math.max(position.y + delta.y, 170), window.innerHeight - 120);
+
+      setPosition(prev => ({
+        ...prev,
+        y: newY,
+      }));
+    }
+  };
+
+  return (
+    <DndContext modifiers={[restrictToVerticalAxis]} onDragEnd={handleDragEnd}>
+      <DraggableButton position={position} onPositionChange={setPosition} />
+    </DndContext>
   );
 };
 
