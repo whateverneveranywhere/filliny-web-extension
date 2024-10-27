@@ -38,8 +38,6 @@ function ProfileSelector() {
 
   const defaultActiveProfileId = useMemo(() => profilesList?.find(item => item.isActive)?.id, [profilesList]);
 
-  console.log('heennn', defaultActiveProfileId);
-
   const methods = useForm<{ defaultActiveProfileId: string }>({
     values: {
       defaultActiveProfileId: typeof defaultActiveProfileId === 'number' ? String(defaultActiveProfileId) : '',
@@ -50,8 +48,6 @@ function ProfileSelector() {
 
   const { watch, handleSubmit, setValue } = methods;
   const activeProfileId = watch('defaultActiveProfileId');
-
-  console.log('woooo', watch());
 
   const { data: activeProfileData } = useFillingProfileById(activeProfileId);
 
