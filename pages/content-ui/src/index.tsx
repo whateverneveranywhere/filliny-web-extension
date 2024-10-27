@@ -40,7 +40,7 @@ const initializeMainUI = (styles: string) => {
   return rootIntoShadow;
 };
 
-// Initialize overlay container for dynamically injected content
+// Initialize overlay container
 const initializeOverlayContainer = () => {
   const overlayContainer = document.createElement('div');
   overlayContainer.id = 'filliny-overlay-container';
@@ -55,8 +55,3 @@ initializeOverlayContainer();
 
 // Render main app
 createRoot(mainRoot).render(<App />);
-
-// Export a helper for creating overlay roots
-export const createOverlayRoot = () => {
-  return document.getElementById('filliny-overlay-container');
-};

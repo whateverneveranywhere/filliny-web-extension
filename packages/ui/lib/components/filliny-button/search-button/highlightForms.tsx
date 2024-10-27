@@ -1,7 +1,7 @@
-import { FormsOverlay } from './FormsOverlay';
+// packages/ui/lib/components/filliny-button/search-button/highlightForms.tsx
+import { getOverlayContainer } from '@extension/shared';
 import { addGlowingBorder, detectFields } from './detectionHelpers';
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// import tailwindcssOutput from '@src/tailwind-output.css?inline';
+import { FormsOverlay } from './FormsOverlay';
 import { createRoot } from 'react-dom/client';
 
 interface HighlightFormsOptions {
@@ -10,17 +10,10 @@ interface HighlightFormsOptions {
 
 let isHighlighting = false;
 
-// Function to inject Tailwind CSS into the shadow root
-const injectTailwindCSS = (shadowRoot: ShadowRoot) => {
-  const styleElement = document.createElement('style');
-  // styleElement.innerHTML = tailwindcssOutput;
-  shadowRoot.appendChild(styleElement);
-};
-
 export const highlightForms = ({ visionOnly = false }: HighlightFormsOptions): void => {
   if (isHighlighting) {
-    console.warn('Highlighting is already in progress. Not adding another.');
-    return; // Prevent adding a new overlay if highlighting is already in progress
+    console.warn('Highlighting is already in progress.');
+    return;
   }
 
   const forms = document.querySelectorAll('form');
@@ -33,32 +26,37 @@ export const highlightForms = ({ visionOnly = false }: HighlightFormsOptions): v
 
   forms.forEach((form, index) => {
     if (form.querySelector('[data-highlight-overlay="true"]')) {
-      console.warn('A loading overlay is already active on this form. Skipping.');
-      return; // Prevent adding a new overlay if the form already has one
+      console.warn('A loading overlay is already active on this form.');
+      return;
     }
 
     form.dataset.formId = `form-${index}`;
 
     if (visionOnly) {
       highlightFormFields(form);
+      isHighlighting = false;
     } else {
-      const overlayContainer = document.createElement('div');
-      const shadowRoot = overlayContainer.attachShadow({ mode: 'open' });
+      const overlayContainer = getOverlayContainer();
+      const overlayRoot = createRoot(overlayContainer);
 
-      // Inject Tailwind CSS into the shadow root
-      injectTailwindCSS(shadowRoot);
+      // Get form position and dimensions
+      const formRect = form.getBoundingClientRect();
+      const scrollX = window.scrollX;
+      const scrollY = window.scrollY;
 
-      form.appendChild(overlayContainer);
-
-      const root = createRoot(shadowRoot);
-      root.render(
+      overlayRoot.render(
         <FormsOverlay
           formId={form.dataset.formId!}
+          position={{
+            top: formRect.top + scrollY,
+            left: formRect.left + scrollX,
+            width: formRect.width,
+            height: formRect.height,
+          }}
           onDismiss={() => {
-            root.unmount();
+            overlayRoot.unmount();
             form.style.pointerEvents = 'auto';
-            overlayContainer.remove(); // Ensure the overlay is removed
-            isHighlighting = false; // Reset the highlighting flag
+            isHighlighting = false;
           }}
         />,
       );
