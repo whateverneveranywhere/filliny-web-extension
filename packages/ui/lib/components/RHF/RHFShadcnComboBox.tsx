@@ -87,7 +87,10 @@ function RHFShadcnComboBox({
                           onSelect={() => handleSelect(option.value)}>
                           <div className="filliny-flex filliny-w-full filliny-items-center filliny-justify-center filliny-truncate">
                             <Check
-                              className={cn('mr-2 h-4 w-4', option.value === field.value ? 'opacity-100' : 'opacity-0')}
+                              className={cn(
+                                'filliny-mr-2 filliny-h-4 filliny-w-4',
+                                option.value === field.value ? 'filliny-opacity-100' : 'filliny-opacity-0',
+                              )}
                             />
                             <p className="filliny-w-full filliny-truncate">{option.label}</p>{' '}
                           </div>

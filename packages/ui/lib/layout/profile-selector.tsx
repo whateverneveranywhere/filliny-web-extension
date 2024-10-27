@@ -38,9 +38,11 @@ function ProfileSelector() {
 
   const defaultActiveProfileId = useMemo(() => profilesList?.find(item => item.isActive)?.id, [profilesList]);
 
+  console.log('heennn', defaultActiveProfileId);
+
   const methods = useForm<{ defaultActiveProfileId: string }>({
     values: {
-      defaultActiveProfileId: defaultActiveProfileId ? String(defaultActiveProfileId) : '',
+      defaultActiveProfileId: typeof defaultActiveProfileId === 'number' ? String(defaultActiveProfileId) : '',
     },
     resolver: zodResolver(schema),
     mode: 'onChange',
@@ -48,6 +50,8 @@ function ProfileSelector() {
 
   const { watch, handleSubmit, setValue } = methods;
   const activeProfileId = watch('defaultActiveProfileId');
+
+  console.log('woooo', watch());
 
   const { data: activeProfileData } = useFillingProfileById(activeProfileId);
 
@@ -77,7 +81,7 @@ function ProfileSelector() {
   }, [activeProfileData, profilesList]);
 
   return (
-    <>
+    <div className="filliny-w-full">
       <div className="-filliny-mt-1 filliny-flex filliny-items-center filliny-justify-center">
         <FormProvider methods={methods} onSubmit={onSubmit}>
           <RHFShadcnComboBox
@@ -131,7 +135,7 @@ function ProfileSelector() {
           </div>
         </Drawer>
       </FormProvider>
-    </>
+    </div>
   );
 }
 

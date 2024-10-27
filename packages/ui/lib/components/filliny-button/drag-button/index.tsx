@@ -7,7 +7,7 @@ const DragButton: React.FC<ButtonComponentProps> = () => (
   <Button
     variant={'default'}
     size={'icon'}
-    className="filliny-size-9 filliny-rounded-full filliny-bg-black filliny-text-white hover:filliny-bg-black">
+    className="filliny-size-9 filliny-overflow-hidden !filliny-rounded-full filliny-text-white">
     <Move className="filliny-size-4 filliny-text-white" />
   </Button>
 );
