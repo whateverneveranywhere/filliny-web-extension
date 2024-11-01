@@ -138,7 +138,7 @@ function HomePage() {
         )}
         {isLoading && (
           <div className="filliny-m-auto filliny-mt-44 filliny-flex filliny-size-full filliny-items-center filliny-justify-center">
-            <Loader2 className={cn('h-20 w-20 animate-spin')} />
+            <Loader2 className={cn('size-30 filliny-animate-spin')} />
           </div>
         )}
         {!isLoading && !hasConfiggedAccessToken && (
