@@ -11,7 +11,7 @@ export function mount() {
   document.body.append(root);
 
   const rootIntoShadow = document.createElement('div');
-  rootIntoShadow.id = 'shadow-root';
+  rootIntoShadow.id = 'filliny-shadow-root';
 
   const shadowRoot = root.attachShadow({ mode: 'open' });
 

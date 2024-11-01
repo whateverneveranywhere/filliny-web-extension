@@ -9,8 +9,6 @@ const HomePage = () => {
   // In your React component
   useEffect(() => {
     chrome.runtime.sendMessage({ action: BackgroundActions.GET_AUTH_TOKEN }, response => {
-      console.log('Response received in frontend:', response);
-
       if (response && response.success && response.success.token) {
         authStorage.setToken(response.success.token);
       } else {

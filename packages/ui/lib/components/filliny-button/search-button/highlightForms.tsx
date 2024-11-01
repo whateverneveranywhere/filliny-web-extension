@@ -1,18 +1,14 @@
-// packages/ui/lib/components/filliny-button/search-button/highlightForms.tsx
-import { getOverlayContainer } from '@extension/shared';
-import { addGlowingBorder, detectFields } from './detectionHelpers';
-import { FormsOverlay } from './FormsOverlay';
 import { createRoot } from 'react-dom/client';
-
-interface HighlightFormsOptions {
-  visionOnly?: boolean;
-}
-
-let isHighlighting = false;
+import { FormsOverlay } from './FormsOverlay';
+import { addGlowingBorder, detectFields } from './detectionHelpers';
+import { createElementWithStyles, findOrCreateShadowContainer, getFormPosition } from './overlayUtils';
+import type { HighlightFormsOptions } from './types';
 
 export const highlightForms = ({ visionOnly = false }: HighlightFormsOptions): void => {
-  if (isHighlighting) {
-    console.warn('Highlighting is already in progress.');
+  const shadowRoot = document.querySelector('#chrome-extension-filliny')?.shadowRoot;
+
+  if (!shadowRoot) {
+    console.error('No shadow root found');
     return;
   }
 
@@ -22,7 +18,7 @@ export const highlightForms = ({ visionOnly = false }: HighlightFormsOptions): v
     return;
   }
 
-  isHighlighting = true;
+  const overlaysContainer = findOrCreateShadowContainer(shadowRoot);
 
   forms.forEach((form, index) => {
     if (form.querySelector('[data-highlight-overlay="true"]')) {
@@ -30,40 +26,37 @@ export const highlightForms = ({ visionOnly = false }: HighlightFormsOptions): v
       return;
     }
 
-    form.dataset.formId = `form-${index}`;
+    const formId = `form-${index}`;
+    form.dataset.formId = formId;
 
-    if (visionOnly) {
-      highlightFormFields(form);
-      isHighlighting = false;
-    } else {
-      const overlayContainer = getOverlayContainer();
-      const overlayRoot = createRoot(overlayContainer);
+    visionOnly ? highlightFormFields(form) : createFormOverlay(form, formId, overlaysContainer);
+  });
+};
 
-      // Get form position and dimensions
-      const formRect = form.getBoundingClientRect();
-      const scrollX = window.scrollX;
-      const scrollY = window.scrollY;
+const createFormOverlay = (form: HTMLFormElement, formId: string, overlaysContainer: HTMLDivElement): void => {
+  const formOverlayContainer = createElementWithStyles('div', `overlay-${formId}`, {});
+  overlaysContainer.appendChild(formOverlayContainer);
 
-      overlayRoot.render(
-        <FormsOverlay
-          formId={form.dataset.formId!}
-          position={{
-            top: formRect.top + scrollY,
-            left: formRect.left + scrollX,
-            width: formRect.width,
-            height: formRect.height,
-          }}
-          onDismiss={() => {
-            overlayRoot.unmount();
-            form.style.pointerEvents = 'auto';
-            isHighlighting = false;
-          }}
-        />,
-      );
+  const overlayRoot = createRoot(formOverlayContainer);
+  const formElement = form as HTMLElement;
 
-      form.style.pointerEvents = 'none';
-      form.style.position = 'relative';
-    }
+  const initialPosition = getFormPosition(form);
+
+  overlayRoot.render(
+    <FormsOverlay
+      formId={formId}
+      initialPosition={initialPosition}
+      onDismiss={() => {
+        overlayRoot.unmount();
+        formOverlayContainer.remove();
+        formElement.style.pointerEvents = 'auto';
+      }}
+    />,
+  );
+
+  Object.assign(formElement.style, {
+    pointerEvents: 'none',
+    position: 'relative',
   });
 };
 
