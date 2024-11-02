@@ -15,6 +15,5 @@ export interface DTOFillPayload {
   contextText: string;
   formData: Field[];
   websiteUrl: string;
-  modelSlug: string;
   preferences?: DTOFillingPrefrences;
 }

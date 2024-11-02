@@ -45,7 +45,6 @@ export const handleFormClick = async (event: React.MouseEvent<HTMLButtonElement>
       const response = await aiFillService({
         contextText: matchingWebsite?.fillingContext || defaultProfile?.defaultFillingContext || '',
         formData: fields,
-        modelSlug: 'filliny-ai',
         websiteUrl: visitingUrl,
         preferences: defaultProfile?.preferences,
       });

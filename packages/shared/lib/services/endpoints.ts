@@ -3,28 +3,6 @@ export const apiEndpoints = {
   auth: {
     base: '/auth',
 
-    models: {
-      get base() {
-        return `${apiEndpoints.auth.base}/ai-models`;
-      },
-
-      get availableModesl() {
-        return `${this.base}/available`;
-      },
-
-      setDefault: (defaultId: string) => {
-        return `${apiEndpoints.auth.models.base}/${defaultId}/default`;
-      },
-
-      setConfig: (modelId: string) => {
-        return `${apiEndpoints.auth.models.base}/${modelId}`;
-      },
-
-      getById: (modelId: string) => {
-        return `${apiEndpoints.auth.models.base}/${modelId}`;
-      },
-    },
-
     profiles: {
       get base() {
         return `${apiEndpoints.auth.base}/filling-profiles`;

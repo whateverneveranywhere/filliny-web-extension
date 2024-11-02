@@ -106,7 +106,7 @@ export const handleAction = (
   return false;
 };
 
-export const getCurrentVistingUrl = () => {
+export const getCurrentVistingUrl = (): Promise<string> => {
   return new Promise((resolve, reject) => {
     chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
       if (chrome.runtime.lastError) {
