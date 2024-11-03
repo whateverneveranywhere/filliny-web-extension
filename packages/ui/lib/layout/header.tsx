@@ -3,7 +3,6 @@ import { Logo } from '../components/Logo';
 import { ProfileSelector } from './profile-selector';
 import { Link } from 'react-router-dom';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../components/ui/tooltip';
-import { Coins } from 'lucide-react';
 
 function formatToK(number: number): string {
   if (number >= 1000) {
@@ -22,8 +21,8 @@ function TokenDisplay({ tokens = 0 }) {
     <TooltipProvider>
       <Tooltip>
         <TooltipTrigger className="filliny-flex filliny-flex-col filliny-items-center filliny-gap-1">
-          <Coins className="filliny-h-4 filliny-w-4" />
-          <span className="filliny-text-xs">{abbreviatedTokens}</span>
+          <span className="filliny-text-sm filliny-font-bold">{abbreviatedTokens}</span>
+          <span className="filliny-text-xs filliny-font-semibold">Tokens</span>
         </TooltipTrigger>
         <TooltipContent>
           <p>{formattedTokens} tokens remaining</p>
