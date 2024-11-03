@@ -78,7 +78,7 @@ function ProfileSelector() {
 
   return (
     <div className="filliny-w-full">
-      <div className="-filliny-mt-1 filliny-flex filliny-items-center filliny-justify-center">
+      <div className="filliny-flex filliny-items-center filliny-justify-center filliny-gap-1">
         <FormProvider methods={methods} onSubmit={onSubmit}>
           <RHFShadcnComboBox
             disabled={isDeleting || isUpdatingDefault}
@@ -104,8 +104,8 @@ function ProfileSelector() {
             title={''}
           />
         </FormProvider>
-        <Button size="icon" onClick={isAddNewProfileModalOpen.onTrue}>
-          <Plus />
+        <Button onClick={isAddNewProfileModalOpen.onTrue} className="filliny-h-8 filliny-w-8 !filliny-p-2">
+          <Plus className="filliny-h-3 filliny-w-3" />
         </Button>
       </div>
 

@@ -33,6 +33,16 @@ export const apiEndpoints = {
       },
     },
 
+    dashboard: {
+      get base() {
+        return `${apiEndpoints.auth.base}/dashboard`;
+      },
+
+      get overview() {
+        return `${this.base}/overview`;
+      },
+    },
+
     ai: {
       get base() {
         return `${apiEndpoints.auth.base}/ai`;

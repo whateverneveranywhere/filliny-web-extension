@@ -15,6 +15,7 @@ function StepperForm3() {
           loading={isLoadingPOVs}
           options={povList || []}
           name="preferences.povId"
+          placeholder="POV"
           title="POV"
         />
         <RHFShadcnComboBox
@@ -22,6 +23,7 @@ function StepperForm3() {
           loading={isLoadingTones}
           options={tonesList || []}
           name="preferences.toneId"
+          placeholder="Tone"
           title="Tone"
         />
       </div>

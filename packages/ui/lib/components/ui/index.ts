@@ -18,3 +18,4 @@ export * from './aurora-background';
 export * from './badge';
 export * from './card';
 export * from './command';
+export * from './progress';

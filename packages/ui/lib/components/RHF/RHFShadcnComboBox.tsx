@@ -58,6 +58,7 @@ function RHFShadcnComboBox({
                   disabled={loading || disabled}
                   variant="outline"
                   role="combobox"
+                  size={'sm'}
                   className={cn(
                     'filliny-w-[200px] filliny-justify-between',
                     !field.value && 'filliny-text-muted-foreground',

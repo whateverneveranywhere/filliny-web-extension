@@ -13,7 +13,7 @@ const ToastViewport = React.forwardRef<
   <ToastPrimitives.Viewport
     ref={ref}
     className={cn(
-      'filliny-fixed filliny-top-0 filliny-z-[100] filliny-flex filliny-max-h-screen filliny-w-full filliny-flex-col-reverse filliny-p-4 sm:filliny-bottom-0 sm:filliny-right-0 sm:filliny-top-auto sm:filliny-flex-col md:filliny-max-w-[420px]',
+      'filliny-fixed filliny-bottom-0 filliny-z-[100] filliny-flex filliny-max-h-screen filliny-w-full filliny-flex-col-reverse filliny-p-4 sm:filliny-bottom-0 sm:filliny-right-0 sm:filliny-top-auto sm:filliny-flex-col md:filliny-max-w-[420px]',
       className,
     )}
     {...props}

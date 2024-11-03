@@ -5,6 +5,7 @@ import {
   getMatchingWebsite,
   isValidUrl,
   useAuthHealthCheckQuery,
+  useDashboardOverview,
   useEditFillingProfileMutation,
   useFillingProfileById,
   useStorage,
@@ -15,6 +16,7 @@ import { cn } from '../utils';
 import { QuickAddWebsiteToProfile } from './quick-add-website';
 import { ActiveProfileWebsitePreview } from './active-profile-website-preview';
 import { PageLayout } from '../layout';
+import { toast } from '../hooks/use-toast';
 
 const HomePage = () => {
   // Custom hook to handle URL state and validation
@@ -42,6 +44,7 @@ const HomePage = () => {
   const defaultProfile = useStorage(profileStrorage);
   const activeProfileId = useMemo(() => defaultProfile?.id?.toString() || '', [defaultProfile]);
   const { data: authHealthCheckData, isLoading: loadingAuthHealthCheck } = useAuthHealthCheckQuery();
+  const { data: dashboardOverview } = useDashboardOverview();
 
   // Profile data fetching
   const {
@@ -88,6 +91,8 @@ const HomePage = () => {
       };
       await editFillingProfile(updatedProfileData);
     } catch (error) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      toast({ variant: 'destructive', title: (error as any).message });
       console.error('Error adding website:', error);
     }
   };
@@ -99,21 +104,16 @@ const HomePage = () => {
 
   // Render helpers
   const renderCreditsBadge = () => {
-    if (loadingAuthHealthCheck || authHealthCheckData?.limitations.plan) return null;
+    const hasNoCredits = dashboardOverview?.remainingTokens === 0;
 
-    const { formFillingsCredit } = authHealthCheckData?.user || {};
-    const hasNoCredits = formFillingsCredit === 0;
+    if (loadingAuthHealthCheck || authHealthCheckData?.limitations.plan || !hasNoCredits) return null;
 
     return (
       <div className="filliny-z-50 filliny-w-full">
         <Badge
           variant="outline"
           className="filliny-flex filliny-w-full filliny-flex-col filliny-items-center filliny-justify-center filliny-gap-1 filliny-bg-yellow-400 filliny-py-2 filliny-text-black">
-          <span className="filliny-inline">
-            {hasNoCredits
-              ? 'You have ran out of free form filling credits'
-              : `You have ${formFillingsCredit} free form filling credits left.`}
-          </span>
+          <span className="filliny-inline">{hasNoCredits && 'You have ran out of free form filling credits'}</span>
           {hasNoCredits && (
             <span className="filliny-inline">
               To upgrade your plan, visit
