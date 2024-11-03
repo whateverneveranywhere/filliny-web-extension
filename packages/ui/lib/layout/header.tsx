@@ -20,7 +20,7 @@ function TokenDisplay({ tokens = 0 }) {
   return (
     <TooltipProvider>
       <Tooltip>
-        <TooltipTrigger className="filliny-flex filliny-flex-col filliny-items-center filliny-gap-1">
+        <TooltipTrigger className="filliny-flex filliny-flex-col filliny-items-center filliny-gap-0.5">
           <span className="filliny-text-sm filliny-font-bold">{abbreviatedTokens}</span>
           <span className="filliny-text-xs filliny-font-semibold">Tokens</span>
         </TooltipTrigger>
