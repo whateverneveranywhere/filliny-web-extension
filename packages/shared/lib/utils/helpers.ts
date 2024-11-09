@@ -65,7 +65,7 @@ const config: Record<WebappEnvs, ConfigEntry> = {
   },
   dev: {
     cookieName: '__Secure-authjs.session-token',
-    baseURL: 'https://dev.filliny.io',
+    baseURL: 'https://dev.filliny-app.pages.dev',
   },
   prod: {
     cookieName: '__Secure-authjs.session-token',
