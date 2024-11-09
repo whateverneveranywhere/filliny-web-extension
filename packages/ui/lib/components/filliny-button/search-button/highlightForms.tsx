@@ -12,7 +12,7 @@ export const highlightForms = ({ visionOnly = false }: HighlightFormsOptions): v
     return;
   }
 
-  const forms = document.querySelectorAll('form');
+  const forms = document.querySelectorAll<HTMLFormElement>('form');
   if (forms.length === 0) {
     alert('No form found');
     return;
@@ -21,19 +21,36 @@ export const highlightForms = ({ visionOnly = false }: HighlightFormsOptions): v
   const overlaysContainer = findOrCreateShadowContainer(shadowRoot);
 
   forms.forEach((form, index) => {
-    if (form.querySelector('[data-highlight-overlay="true"]')) {
-      console.warn('A loading overlay is already active on this form.');
-      return;
-    }
-
     const formId = `form-${index}`;
     form.dataset.formId = formId;
 
-    visionOnly ? highlightFormFields(form) : createFormOverlay(form, formId, overlaysContainer);
+    if (visionOnly) {
+      // Check if the form has already been highlighted
+      if (form.dataset.fillinyHighlighted === 'true') {
+        console.warn(`Highlights already exist for form ${formId}.`);
+        return;
+      }
+      highlightFormFields(form);
+      // Mark the form as highlighted
+      form.dataset.fillinyHighlighted = 'true';
+    } else {
+      // Check if an overlay for this form already exists in the overlaysContainer
+      if (overlaysContainer.querySelector(`#overlay-${formId}`)) {
+        console.warn(`An overlay is already active on form ${formId}.`);
+        return;
+      }
+      createFormOverlay(form, formId, overlaysContainer);
+    }
   });
 };
 
 const createFormOverlay = (form: HTMLFormElement, formId: string, overlaysContainer: HTMLDivElement): void => {
+  // Check if an overlay for this form already exists
+  if (overlaysContainer.querySelector(`#overlay-${formId}`)) {
+    console.warn(`An overlay is already active on form ${formId}.`);
+    return;
+  }
+
   const formOverlayContainer = createElementWithStyles('div', `overlay-${formId}`, {});
   overlaysContainer.appendChild(formOverlayContainer);
 
@@ -50,6 +67,8 @@ const createFormOverlay = (form: HTMLFormElement, formId: string, overlaysContai
         overlayRoot.unmount();
         formOverlayContainer.remove();
         formElement.style.pointerEvents = 'auto';
+        // Remove the overlay indicator
+        delete form.dataset.fillinyOverlayActive;
       }}
     />,
   );
@@ -58,14 +77,22 @@ const createFormOverlay = (form: HTMLFormElement, formId: string, overlaysContai
     pointerEvents: 'none',
     position: 'relative',
   });
+
+  // Mark the form as having an active overlay
+  form.dataset.fillinyOverlayActive = 'true';
 };
 
 const highlightFormFields = (form: HTMLFormElement): void => {
   const fields = detectFields(form);
   fields.forEach(field => {
-    const element = document.querySelector<HTMLElement>(`[data-filliny-id="${field.id}"]`);
+    const element = form.querySelector<HTMLElement>(`[data-filliny-id="${field.id}"]`);
     if (element) {
-      addGlowingBorder(element, 'black');
+      // Check if the element has already been highlighted
+      if (!element.dataset.fillinyHighlighted) {
+        addGlowingBorder(element, 'black');
+        // Mark the element as highlighted
+        element.dataset.fillinyHighlighted = 'true';
+      }
     }
   });
 };

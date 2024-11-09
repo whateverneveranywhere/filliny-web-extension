@@ -6,7 +6,8 @@ To use the code in the package, you need to add the following to the package.jso
 ```json
 {
   "dependencies": {
-    "@extension/shared": "workspace:*"
+    "@extension/shared": "workspace:*",
+    "@extension/ui": "workspace:*"
   }
 }
 ```

@@ -1,5 +1,6 @@
 import { createRoot } from 'react-dom/client';
 import App from '@src/App';
+import '@extension/ui/dist/global.css';
 import tailwindcssOutput from '../dist/tailwind-output.css?inline';
 
 const root = document.createElement('div');

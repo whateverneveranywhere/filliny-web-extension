@@ -53,3 +53,24 @@ export default function App() {
     )
   );
 }
+
+// import { useEffect } from 'react';
+// import { exampleThemeStorage } from '@extension/storage';
+// import { Button } from '@extension/ui';
+
+// export default function App() {
+//   useEffect(() => {
+//     console.log('content ui loaded');
+//   }, []);
+
+//   return (
+//     <div className="filliny-flex filliny-items-center filliny-justify-between filliny-gap-2 filliny-rounded filliny-bg-blue-100 filliny-px-2 filliny-py-1">
+//       <div className="filliny-flex filliny-gap-1 filliny-text-blue-500">
+//         Edit <strong className="filliny-text-blue-700">pages/content-ui/src/app.tsx</strong> and save to reload.
+//       </div>
+//       <Button variant={'destructive'} onClick={exampleThemeStorage.toggle}>
+//         Toggle Theme
+//       </Button>
+//     </div>
+//   );
+// }

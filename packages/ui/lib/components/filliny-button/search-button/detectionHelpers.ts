@@ -1,32 +1,36 @@
 import type { Field } from '@extension/shared';
 
 const isElementVisible = (element: HTMLElement): boolean => {
+  // Check if element is visible in the DOM
   return (
-    element.offsetParent !== null &&
-    getComputedStyle(element).visibility !== 'hidden' &&
-    getComputedStyle(element).display !== 'none'
+    !!(element.offsetWidth || element.offsetHeight || element.getClientRects().length) &&
+    getComputedStyle(element).visibility !== 'hidden'
   );
 };
 
-const getFieldLabel = (element: Element): string => {
+const getFieldLabel = (element: HTMLElement): string => {
   let label = '';
+
   if (element.id) {
     const labelElement = document.querySelector(`label[for="${element.id}"]`);
     if (labelElement) {
       label = labelElement.textContent?.trim() || '';
     }
   }
+
   if (!label) {
-    const parent = element.closest('label');
-    if (parent) {
-      label = parent.textContent?.trim() || '';
+    const parentLabel = element.closest('label');
+    if (parentLabel) {
+      label = parentLabel.textContent?.trim() || '';
     }
   }
+
   return label;
 };
 
-const getFieldDescription = (element: Element): string => {
+const getFieldDescription = (element: HTMLElement): string => {
   let description = element.getAttribute('aria-describedby') || element.getAttribute('data-description') || '';
+
   if (description) {
     const descElement = document.getElementById(description);
     if (descElement) {
@@ -41,41 +45,42 @@ const getFieldDescription = (element: Element): string => {
       }
     }
   }
+
   return description;
 };
 
 const getOptions = (element: HTMLElement): string[] => {
   const options: string[] = [];
-  if (element.tagName.toLowerCase() === 'select') {
+  const tagName = element.tagName.toLowerCase();
+
+  if (tagName === 'select') {
     const selectElement = element as HTMLSelectElement;
     for (let i = 0; i < selectElement.options.length; i++) {
-      options.push(selectElement.options[i].text);
+      options.push(selectElement.options[i].text.trim());
     }
-  } else if (element.tagName.toLowerCase() === 'input' && (element as HTMLInputElement).type === 'radio') {
-    const name = (element as HTMLInputElement).name;
-    const radioElements = document.querySelectorAll<HTMLInputElement>(`input[type="radio"][name="${name}"]`);
-    radioElements.forEach(radio => {
-      const radioLabel = getFieldLabel(radio);
-      options.push(radioLabel || radio.value);
-    });
-  } else if (element.tagName.toLowerCase() === 'input' && (element as HTMLInputElement).type === 'checkbox') {
-    const name = (element as HTMLInputElement).name;
-    const checkboxElements = document.querySelectorAll<HTMLInputElement>(`input[type="checkbox"][name="${name}"]`);
-    checkboxElements.forEach(checkbox => {
-      const checkboxLabel = getFieldLabel(checkbox);
-      options.push(checkboxLabel || checkbox.value);
-    });
+  } else if (tagName === 'input' && ['radio', 'checkbox'].includes((element as HTMLInputElement).type)) {
+    const inputElement = element as HTMLInputElement;
+    const type = inputElement.type;
+    const name = inputElement.name;
+    if (name) {
+      const elements = document.querySelectorAll<HTMLInputElement>(`input[type="${type}"][name="${name}"]`);
+      elements.forEach(el => {
+        const label = getFieldLabel(el);
+        options.push(label || el.value);
+      });
+    }
   }
+
   return options;
 };
 
-const createFieldObject = (element: HTMLElement, index: number, type: string, value: string = ''): Field => {
+const createFieldObject = (element: HTMLElement, index: number, type: Field['type'], value: string = ''): Field => {
   const id = `f-${index}`;
   element.setAttribute('data-filliny-id', id);
 
   const field: Field = {
     id,
-    type: type as Field['type'],
+    type,
     placeholder: (element as HTMLInputElement).placeholder || '',
     title: element.getAttribute('title') || '',
     label: getFieldLabel(element),
@@ -83,7 +88,7 @@ const createFieldObject = (element: HTMLElement, index: number, type: string, va
     value,
   };
 
-  if (type === 'select' || type === 'checkbox' || type === 'radio') {
+  if (['select', 'checkbox', 'radio'].includes(type)) {
     field.options = getOptions(element);
   }
 
@@ -92,95 +97,82 @@ const createFieldObject = (element: HTMLElement, index: number, type: string, va
 
 export const detectFields = (form: HTMLFormElement): Field[] => {
   const fields: Field[] = [];
+  let index = 0;
 
+  // Inputs
   const inputs = form.querySelectorAll<HTMLInputElement>('input:not([type="hidden"]):not(.filliny-ignore)');
-  inputs.forEach((input, index) => {
+  inputs.forEach(input => {
     if (isElementVisible(input) && input.type !== 'button') {
       const type = input.type === 'file' ? 'file' : 'input';
-      const field = createFieldObject(input, index, type, type === 'file' ? '' : input.value);
+      const value = type === 'file' ? '' : input.value || '';
+      const field = createFieldObject(input, index++, type, value);
       fields.push(field);
     }
   });
 
+  // Selects
   const selects = form.querySelectorAll<HTMLSelectElement>('select:not(.filliny-ignore)');
-  selects.forEach((select, index) => {
+  selects.forEach(select => {
     if (isElementVisible(select)) {
-      const field = createFieldObject(select, inputs.length + index, 'select', select.value);
+      const value = select.value || '';
+      const field = createFieldObject(select, index++, 'select', value);
       fields.push(field);
     }
   });
 
+  // Hidden Selects
   const hiddenSelects = form.querySelectorAll<HTMLSelectElement>(
     'select[style*="display: none"], select[style*="visibility: hidden"], select[style*="opacity: 0"]',
   );
-  hiddenSelects.forEach((select, index) => {
-    const options = select.querySelectorAll('option');
+  hiddenSelects.forEach(select => {
+    const options = select.options;
     if (options.length > 0) {
-      const field = createFieldObject(select, inputs.length + selects.length + index, 'select', select.value);
+      const value = select.value || '';
+      const field = createFieldObject(select, index++, 'select', value);
       fields.push(field);
     }
   });
 
+  // Textareas
   const textareas = form.querySelectorAll<HTMLTextAreaElement>('textarea:not(.filliny-ignore)');
-  textareas.forEach((textarea, index) => {
+  textareas.forEach(textarea => {
     if (isElementVisible(textarea)) {
-      const field = createFieldObject(
-        textarea,
-        inputs.length + selects.length + hiddenSelects.length + index,
-        'textarea',
-        textarea.value,
-      );
+      const value = textarea.value || '';
+      const field = createFieldObject(textarea, index++, 'textarea', value);
       fields.push(field);
     }
   });
 
+  // Checkboxes
   const checkboxes = form.querySelectorAll<HTMLInputElement>('input[type="checkbox"]:not(.filliny-ignore)');
-  checkboxes.forEach((checkbox, index) => {
+  checkboxes.forEach(checkbox => {
     if (isElementVisible(checkbox)) {
-      const field = createFieldObject(
-        checkbox,
-        inputs.length + selects.length + hiddenSelects.length + textareas.length + index,
-        'checkbox',
-        checkbox.checked.toString(),
-      );
+      const value = checkbox.checked.toString();
+      const field = createFieldObject(checkbox, index++, 'checkbox', value);
       fields.push(field);
     }
   });
 
+  // Radios
   const radios = form.querySelectorAll<HTMLInputElement>('input[type="radio"]:not(.filliny-ignore)');
-  radios.forEach((radio, index) => {
+  radios.forEach(radio => {
     if (isElementVisible(radio)) {
-      const field = createFieldObject(
-        radio,
-        inputs.length + selects.length + hiddenSelects.length + textareas.length + checkboxes.length + index,
-        'radio',
-        radio.checked.toString(),
-      );
+      const value = radio.checked.toString();
+      const field = createFieldObject(radio, index++, 'radio', value);
       fields.push(field);
     }
   });
 
-  // Include buttons related to file inputs
+  // File Inputs and associated buttons
   const fileInputs = form.querySelectorAll<HTMLInputElement>('input[type="file"]:not(.filliny-ignore)');
-  fileInputs.forEach((fileInput, fileIndex) => {
+  fileInputs.forEach(fileInput => {
     const parent = fileInput.parentElement;
     if (parent) {
       const buttons = parent.querySelectorAll<HTMLButtonElement>('button:not(.filliny-ignore)');
-      buttons.forEach((button, index) => {
+      buttons.forEach(button => {
         if (isElementVisible(button)) {
-          const field = createFieldObject(
-            button,
-            inputs.length +
-              selects.length +
-              hiddenSelects.length +
-              textareas.length +
-              checkboxes.length +
-              radios.length +
-              fileIndex +
-              index,
-            'button',
-            button.innerText,
-          );
+          const value = button.innerText.trim();
+          const field = createFieldObject(button, index++, 'button', value);
           fields.push(field);
         }
       });
@@ -191,10 +183,8 @@ export const detectFields = (form: HTMLFormElement): Field[] => {
 };
 
 export const addGlowingBorder = (element: HTMLElement, color: string = 'green'): void => {
-  Object.assign(element.style, {
-    boxShadow: `0 0 10px 2px ${color}`,
-    transition: 'box-shadow 0.3s ease-in-out',
-  });
+  element.style.boxShadow = `0 0 10px 2px ${color}`;
+  element.style.transition = 'box-shadow 0.3s ease-in-out';
 
   setTimeout(() => {
     element.style.boxShadow = '';

@@ -43,6 +43,7 @@ const DraggableButton = ({ position }: { position: Position }) => {
     right: 30,
     transform: CSS.Transform.toString(transform),
     touchAction: 'none',
+    zIndex: 1000000000000,
   };
 
   return (
