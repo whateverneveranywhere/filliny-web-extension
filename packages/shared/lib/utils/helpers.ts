@@ -86,7 +86,7 @@ const handleGetAuthToken = (
   });
 };
 
-export const getConfig = (webappEnv: WebappEnvs = WebappEnvs.LOCAL): ConfigEntry => {
+export const getConfig = (webappEnv: WebappEnvs = WebappEnvs.DEV): ConfigEntry => {
   return config[webappEnv];
 };
 

@@ -28,7 +28,11 @@ const manifest = deepmerge(
     name: '__MSG_extensionName__',
     version: packageJson.version,
     description: '__MSG_extensionDescription__',
-    host_permissions: ['https://dev.filliny.io/*', 'https://filliny.io/*', isDev && 'http://localhost:3000/*'],
+    host_permissions: [
+      'https://dev.filliny.io/*',
+      'https://filliny.io/*',
+      ...(isDev ? ['http://localhost:3000/*'] : []), // Only includes localhost if isDev is true
+    ],
     permissions: ['storage', 'scripting', 'tabs', 'cookies', 'activeTab', 'notifications'],
     options_page: 'options/index.html',
     background: {
