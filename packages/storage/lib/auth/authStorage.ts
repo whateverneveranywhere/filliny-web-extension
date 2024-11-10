@@ -6,6 +6,7 @@ type AuthTokenType = string;
 
 type AuthStorage = BaseStorage<AuthTokenType> & {
   setToken: (token: AuthTokenType) => Promise<void>;
+  deleteToken: () => Promise<void>;
 };
 
 const storage = createStorage<AuthTokenType>('auth-token', '', {
@@ -16,4 +17,5 @@ const storage = createStorage<AuthTokenType>('auth-token', '', {
 export const authStorage: AuthStorage = {
   ...storage,
   setToken: async (token: AuthTokenType) => await storage.set(token),
+  deleteToken: async () => await storage.set(''),
 };

@@ -23,18 +23,6 @@ export const useChangeActiveFillingProfileMutation = () => {
 export const useCreateFillingProfileMutation = () =>
   useMutation({
     mutationFn: ({ data }: { data: DTOProfileFillingForm }) => createFillingProfileService(data),
-    onSettled: (
-      data,
-      error,
-      // variables, context
-    ) => {
-      if (error) {
-        // toast({
-        //   variant: 'destructive',
-        //   title: error.message,
-        // });
-      }
-    },
   });
 
 export const useEditFillingProfileMutation = () => {
@@ -45,35 +33,11 @@ export const useEditFillingProfileMutation = () => {
     onSuccess: (data, { id }) => {
       queryClient.invalidateQueries({ queryKey: ['fillingProfileById', id] });
     },
-    onSettled: (
-      data,
-      error,
-      // variables, context
-    ) => {
-      if (error) {
-        // toast({
-        //   variant: 'destructive',
-        //   title: error.message,
-        // });
-      }
-    },
   });
 };
 
 export const useDeleteProfileByIdMutation = () => {
   return useMutation({
     mutationFn: ({ id }: { id: string }) => deleteFillingProfileByIdService(id),
-    onSettled: (
-      data,
-      error,
-      // variables, context
-    ) => {
-      if (error) {
-        // toast({
-        //   variant: 'destructive',
-        //   title: error.message,
-        // });
-      }
-    },
   });
 };

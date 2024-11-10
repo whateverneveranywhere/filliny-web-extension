@@ -18,7 +18,7 @@ export const getProfilesListService = (): Promise<DTOFillingProfileItem[]> => ht
 export const getSuggestedWebsitesService = (): Promise<DTOSuggestedWebsite[]> => httpService.get(suggestedWebsites);
 export const getTonesListService = (): Promise<DTOTone[]> => httpService.get(tonesList);
 export const getPOVsListService = (): Promise<DTOpov[]> => httpService.get(povsList);
-export const createFillingProfileService = (data: DTOProfileFillingForm): Promise<object> =>
+export const createFillingProfileService = (data: DTOProfileFillingForm): Promise<DTOProfileFillingForm> =>
   httpService.post(base, data);
 export const editFillingProfileService = (profileId: string, data: DTOProfileFillingForm): Promise<object> =>
   httpService.put(`${base}/${profileId}`, data);

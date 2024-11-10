@@ -1,25 +1,26 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Loader2 } from 'lucide-react';
 import {
+  getConfig,
   getCurrentVistingUrl,
   getMatchingWebsite,
   isValidUrl,
   useAuthHealthCheckQuery,
   useDashboardOverview,
+  useCreateFillingProfileMutation,
   useEditFillingProfileMutation,
   useFillingProfileById,
   useStorage,
 } from '@extension/shared';
-import { profileStrorage } from '@extension/storage';
-import { Alert, AlertDescription, AlertTitle, Badge } from '../components';
-import { cn } from '../utils';
+import type { DTOProfileFillingForm } from '@extension/storage';
+import { authStorage, profileStrorage } from '@extension/storage';
+import { Alert, AlertDescription, AlertTitle, Loading, ToastAction } from '../components';
 import { QuickAddWebsiteToProfile } from './quick-add-website';
 import { ActiveProfileWebsitePreview } from './active-profile-website-preview';
 import { PageLayout } from '../layout';
 import { toast } from '../hooks/use-toast';
 
 const HomePage = () => {
-  // Custom hook to handle URL state and validation
+  const config = getConfig();
   const useVisitingUrl = () => {
     const [url, setUrl] = useState('');
     const isValid = useMemo(() => isValidUrl(url), [url]);
@@ -40,13 +41,11 @@ const HomePage = () => {
     return { url, isValid };
   };
 
-  // Profile and auth state management
   const defaultProfile = useStorage(profileStrorage);
   const activeProfileId = useMemo(() => defaultProfile?.id?.toString() || '', [defaultProfile]);
-  const { data: authHealthCheckData, isLoading: loadingAuthHealthCheck } = useAuthHealthCheckQuery();
+  const { isLoading: loadingAuthHealthCheck, isError: healthCheckErrored } = useAuthHealthCheckQuery();
   const { data: dashboardOverview } = useDashboardOverview();
 
-  // Profile data fetching
   const {
     data: defaultActiveProfile,
     isLoading: isLoadingActiveProfile,
@@ -54,12 +53,10 @@ const HomePage = () => {
   } = useFillingProfileById(activeProfileId);
 
   const { mutateAsync: editFillingProfile, isPending: isUpdating } = useEditFillingProfileMutation();
+  const { mutateAsync: createFillingProfile, isPending: isCreatingProfile } = useCreateFillingProfileMutation();
   const { isLoading: isLoadingEditingItem, isFetching: isFetchingEditingItem } = useFillingProfileById(activeProfileId);
 
-  // URL handling
   const { url: currentVisitingWebsiteUrl, isValid: isVisitingUrlValid } = useVisitingUrl();
-
-  // Derived state
   const isLoading = isLoadingEditingItem || isLoadingActiveProfile || isFetchingActiveProfile || isFetchingEditingItem;
 
   const matchingWebsite = useMemo(
@@ -70,86 +67,116 @@ const HomePage = () => {
     [defaultProfile, currentVisitingWebsiteUrl],
   );
 
-  // Event handlers
   const handleQuickAdd = async () => {
-    if (!defaultProfile) return;
-
     try {
-      const updatedProfileData = {
-        id: activeProfileId,
-        data: {
-          ...defaultProfile,
+      if (!defaultProfile) {
+        // No default profile exists, create a new one with example data
+        const newProfileData: DTOProfileFillingForm = {
+          profileName: 'Example Profile',
+          defaultFillingContext: 'Fill the form with example test data',
+          preferences: {
+            isFormal: true,
+            isGapFillingAllowed: true,
+            povId: 1, // Ensure these are integers to align with backend expectations
+            toneId: 1,
+          },
           fillingWebsites: [
-            ...defaultProfile.fillingWebsites,
             {
               fillingContext: '',
               isRootLoad: true,
               websiteUrl: currentVisitingWebsiteUrl,
             },
           ],
-        },
-      };
-      await editFillingProfile(updatedProfileData);
+        };
+        const createdProfile = await createFillingProfile({ data: newProfileData });
+        console.log('wooooooo', createdProfile);
+
+        profileStrorage.setDefaultProfile(createdProfile); // Use returned profile to update state
+        toast({ variant: 'default', title: 'Profile created and website added successfully' });
+      } else {
+        // Add the website to the existing profile
+        const updatedProfileData = {
+          id: activeProfileId,
+          data: {
+            ...defaultProfile,
+            fillingWebsites: [
+              ...defaultProfile.fillingWebsites,
+              {
+                fillingContext: '',
+                isRootLoad: true,
+                websiteUrl: currentVisitingWebsiteUrl,
+              },
+            ],
+          },
+        };
+        await editFillingProfile(updatedProfileData);
+        toast({ variant: 'default', title: 'Website added to profile successfully' });
+      }
     } catch (error) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      toast({ variant: 'destructive', title: (error as any).message });
+      // Enhanced error handling
+      const errorText = error instanceof Error ? error.message : 'An unexpected error occurred';
+      if (errorText.includes('maximum')) {
+        toast({
+          variant: 'destructive',
+          title: errorText,
+          action: (
+            <ToastAction
+              onClick={() => (window.location.href = `${config.baseURL}/pricing?tab=tokens`)}
+              altText="Update plan">
+              Upgrade plan
+            </ToastAction>
+          ),
+        });
+      }
       console.error('Error adding website:', error);
     }
   };
 
-  // Side effects
   useEffect(() => {
     profileStrorage.setDefaultProfile(defaultActiveProfile);
   }, [defaultActiveProfile]);
 
-  // Render helpers
-  const renderCreditsBadge = () => {
-    const hasNoCredits = dashboardOverview?.remainingTokens === 0;
+  useEffect(() => {
+    if (healthCheckErrored) {
+      authStorage.deleteToken();
+    }
+  }, [healthCheckErrored]);
 
-    if (loadingAuthHealthCheck || authHealthCheckData?.limitations.plan || !hasNoCredits) return null;
+  if (loadingAuthHealthCheck) {
+    return <Loading />;
+  }
+
+  const hasNoAIToken = dashboardOverview?.remainingTokens === 0;
+
+  const renderCreditsBadge = () => {
+    if (hasNoAIToken && !defaultProfile) return null;
 
     return (
-      <div className="filliny-z-50 filliny-w-full">
-        <Badge
-          variant="outline"
-          className="filliny-flex filliny-w-full filliny-flex-col filliny-items-center filliny-justify-center filliny-gap-1 filliny-bg-yellow-400 filliny-py-2 filliny-text-black">
-          <span className="filliny-inline">{hasNoCredits && 'You have ran out of free form filling credits'}</span>
-          {hasNoCredits && (
-            <span className="filliny-inline">
-              To upgrade your plan, visit
-              <a
-                href="https://filliny.io/plans"
-                target="_blank"
-                rel="noreferrer"
-                className="filliny-ml-1 filliny-underline">
-                Filliny plans
-              </a>
-              .
-            </span>
-          )}
-        </Badge>
-      </div>
+      hasNoAIToken && (
+        <div className="filliny-w-full">
+          <Alert variant="destructive">
+            <AlertTitle>No AI Tokens</AlertTitle>
+            <AlertDescription>
+              <span className="filliny-inline">
+                To obtain tokens, please visit our
+                <a
+                  href={config.baseURL + '/pricing?tab=tokens'}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="filliny-ml-1 filliny-underline">
+                  pricing page
+                </a>
+              </span>
+            </AlertDescription>
+          </Alert>
+        </div>
+      )
     );
   };
 
   const renderContent = () => {
     if (isLoading) {
-      return (
-        <div className="filliny-m-auto filliny-mt-44 filliny-flex filliny-size-full filliny-items-center filliny-justify-center">
-          <Loader2 className={cn('size-30 filliny-animate-spin')} />
-        </div>
-      );
-    }
-
-    if (!defaultProfile) {
-      return (
-        <Alert>
-          <AlertTitle className="filliny-text-lg">Heads up!</AlertTitle>
-          <AlertDescription>
-            No active filling profiles found, start by clicking the plus button above to create your first profile
-          </AlertDescription>
-        </Alert>
-      );
+      return <Loading />;
     }
 
     if (!isVisitingUrlValid) {
@@ -158,7 +185,7 @@ const HomePage = () => {
           <AlertTitle className="filliny-text-lg">Error</AlertTitle>
           <AlertDescription>
             URL is not valid <br />
-            detected URL: {currentVisitingWebsiteUrl}
+            Detected URL: {currentVisitingWebsiteUrl}
           </AlertDescription>
         </Alert>
       );
@@ -166,19 +193,21 @@ const HomePage = () => {
 
     if (matchingWebsite) {
       return (
-        <ActiveProfileWebsitePreview
-          matchingWebsite={{
-            ...matchingWebsite,
-            fillingContext: matchingWebsite.fillingContext || defaultProfile.defaultFillingContext,
-          }}
-          preferences={defaultProfile.preferences}
-        />
+        defaultProfile && (
+          <ActiveProfileWebsitePreview
+            matchingWebsite={{
+              ...matchingWebsite,
+              fillingContext: matchingWebsite.fillingContext || defaultProfile.defaultFillingContext,
+            }}
+            preferences={defaultProfile.preferences}
+          />
+        )
       );
     }
 
     return (
       <QuickAddWebsiteToProfile
-        isLoading={isUpdating}
+        isLoading={isUpdating || isCreatingProfile}
         currentUrl={currentVisitingWebsiteUrl}
         onQuickAdd={handleQuickAdd}
       />

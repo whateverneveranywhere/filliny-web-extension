@@ -3,13 +3,31 @@ import App from '@src/App';
 import '@extension/ui/dist/global.css';
 import tailwindcssOutput from '../dist/tailwind-output.css?inline';
 
+// Create the root element
 const root = document.createElement('div');
 root.id = 'chrome-extension-filliny';
 
+// Style root to take up no space in the DOM layout
+Object.assign(root.style, {
+  position: 'fixed',
+  width: '0',
+  height: '0',
+  overflow: 'hidden',
+});
+
 document.body.append(root);
 
+// Create the shadow root container
 const rootIntoShadow = document.createElement('div');
 rootIntoShadow.id = 'filliny-shadow-root';
+
+// Style rootIntoShadow to ensure it doesn't take up space
+Object.assign(rootIntoShadow.style, {
+  position: 'fixed',
+  width: '0',
+  height: '0',
+  overflow: 'hidden',
+});
 
 const shadowRoot = root.attachShadow({ mode: 'open' });
 
