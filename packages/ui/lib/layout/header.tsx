@@ -1,13 +1,13 @@
-import { useDashboardOverview } from '@extension/shared';
+import { getConfig, useDashboardOverview } from '@extension/shared';
 import { Logo } from '../components/Logo';
 import { ProfileSelector } from './profile-selector';
 import { Link } from 'react-router-dom';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../components/ui/tooltip';
+import { Badge, Button } from '../components';
 
 function formatToK(number: number): string {
   if (number >= 1000) {
     const thousands = number / 1000;
-    // If it's a whole number, don't show decimal places
     return thousands % 1 === 0 ? `${thousands.toFixed(0)}k` : `${thousands.toFixed(1)}k`;
   }
   return number.toString();
@@ -16,6 +16,7 @@ function formatToK(number: number): string {
 function TokenDisplay({ tokens = 0 }) {
   const formattedTokens = tokens.toLocaleString();
   const abbreviatedTokens = formatToK(tokens);
+  const config = getConfig();
 
   return (
     <TooltipProvider>
@@ -24,8 +25,19 @@ function TokenDisplay({ tokens = 0 }) {
           <span className="filliny-text-sm filliny-font-bold">{abbreviatedTokens}</span>
           <span className="filliny-text-xs filliny-font-semibold">Tokens</span>
         </TooltipTrigger>
-        <TooltipContent>
-          <p>{formattedTokens} tokens remaining</p>
+        <TooltipContent className="filliny-flex filliny-w-full filliny-flex-col filliny-items-center filliny-gap-1">
+          <Badge className="filliny-flex filliny-w-full filliny-items-center filliny-py-2" variant="default">
+            <p className="filliny-w-full filliny-text-center">{formattedTokens}</p>
+          </Badge>
+          <a
+            className="filliny-w-full"
+            href={`${config.baseURL}/pricing?tab=tokens`}
+            target="_blank"
+            rel="noopener noreferrer">
+            <Button size={'sm'} variant={'link'}>
+              Buy more tokens
+            </Button>
+          </a>
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>
