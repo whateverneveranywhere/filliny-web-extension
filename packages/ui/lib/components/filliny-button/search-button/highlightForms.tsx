@@ -25,16 +25,13 @@ export const highlightForms = ({ visionOnly = false }: HighlightFormsOptions): v
     form.dataset.formId = formId;
 
     if (visionOnly) {
-      // Check if the form has already been highlighted
       if (form.dataset.fillinyHighlighted === 'true') {
         console.warn(`Highlights already exist for form ${formId}.`);
         return;
       }
       highlightFormFields(form);
-      // Mark the form as highlighted
       form.dataset.fillinyHighlighted = 'true';
     } else {
-      // Check if an overlay for this form already exists in the overlaysContainer
       if (overlaysContainer.querySelector(`#overlay-${formId}`)) {
         console.warn(`An overlay is already active on form ${formId}.`);
         return;
@@ -45,7 +42,6 @@ export const highlightForms = ({ visionOnly = false }: HighlightFormsOptions): v
 };
 
 const createFormOverlay = (form: HTMLFormElement, formId: string, overlaysContainer: HTMLDivElement): void => {
-  // Check if an overlay for this form already exists
   if (overlaysContainer.querySelector(`#overlay-${formId}`)) {
     console.warn(`An overlay is already active on form ${formId}.`);
     return;
@@ -67,7 +63,6 @@ const createFormOverlay = (form: HTMLFormElement, formId: string, overlaysContai
         overlayRoot.unmount();
         formOverlayContainer.remove();
         formElement.style.pointerEvents = 'auto';
-        // Remove the overlay indicator
         delete form.dataset.fillinyOverlayActive;
       }}
     />,
@@ -75,10 +70,8 @@ const createFormOverlay = (form: HTMLFormElement, formId: string, overlaysContai
 
   Object.assign(formElement.style, {
     pointerEvents: 'none',
-    position: 'relative',
   });
 
-  // Mark the form as having an active overlay
   form.dataset.fillinyOverlayActive = 'true';
 };
 
@@ -86,13 +79,9 @@ const highlightFormFields = (form: HTMLFormElement): void => {
   const fields = detectFields(form);
   fields.forEach(field => {
     const element = form.querySelector<HTMLElement>(`[data-filliny-id="${field.id}"]`);
-    if (element) {
-      // Check if the element has already been highlighted
-      if (!element.dataset.fillinyHighlighted) {
-        addGlowingBorder(element, 'black');
-        // Mark the element as highlighted
-        element.dataset.fillinyHighlighted = 'true';
-      }
+    if (element && !element.dataset.fillinyHighlighted) {
+      addGlowingBorder(element, 'black');
+      element.dataset.fillinyHighlighted = 'true';
     }
   });
 };

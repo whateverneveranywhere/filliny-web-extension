@@ -1,4 +1,3 @@
-// FormsOverlay.tsx
 import React, { useState, useEffect } from 'react';
 import { handleFormClick } from './handleFormClick';
 import { X } from 'lucide-react';
@@ -18,9 +17,26 @@ const FormsOverlay: React.FC<OverlayProps> = ({ formId, initialPosition, onDismi
 
   useEffect(() => {
     const form = document.querySelector(`[data-form-id="${formId}"]`);
+
     if (form) {
-      const updatedPosition = getFormPosition(form as HTMLFormElement);
-      setOverlayPosition(updatedPosition);
+      const updateOverlayPosition = () => {
+        const updatedPosition = getFormPosition(form as HTMLFormElement);
+        setOverlayPosition(updatedPosition);
+      };
+
+      updateOverlayPosition(); // Initial position
+
+      // Observers to update overlay position when the form changes
+      const resizeObserver = new ResizeObserver(updateOverlayPosition);
+      const mutationObserver = new MutationObserver(updateOverlayPosition);
+
+      resizeObserver.observe(form);
+      mutationObserver.observe(form, { attributes: true, childList: true, subtree: true });
+
+      return () => {
+        resizeObserver.disconnect();
+        mutationObserver.disconnect();
+      };
     }
   }, [formId]);
 
@@ -58,9 +74,7 @@ const FormsOverlay: React.FC<OverlayProps> = ({ formId, initialPosition, onDismi
           size="icon"
           type="button"
           variant="destructive"
-          className={
-            'filliny-absolute filliny-right-2.5 filliny-top-2.5 filliny-flex !filliny-size-8 !filliny-rounded-full'
-          }
+          className="filliny-absolute filliny-right-2.5 filliny-top-2.5 filliny-flex !filliny-size-8 !filliny-rounded-full"
           onClick={onDismiss}>
           <X />
         </Button>
