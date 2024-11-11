@@ -104,7 +104,10 @@ function ProfileSelector() {
             title={''}
           />
         </FormProvider>
-        <Button onClick={isAddNewProfileModalOpen.onTrue} className="filliny-h-8 filliny-w-8 !filliny-p-2">
+        <Button
+          variant={'default'}
+          onClick={isAddNewProfileModalOpen.onTrue}
+          className="filliny-h-8 filliny-w-8 !filliny-p-2">
           <Plus className="filliny-h-3 filliny-w-3" />
         </Button>
       </div>
