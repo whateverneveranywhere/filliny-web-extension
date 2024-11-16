@@ -20,3 +20,5 @@ export * from './card';
 export * from './command';
 export * from './progress';
 export * from './loading';
+export * from './theme-provider';
+export * from './mode-toggle';

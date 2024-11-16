@@ -2,7 +2,7 @@ import { createRoot } from 'react-dom/client';
 import '@src/index.css';
 import '@extension/ui/lib/global.css';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Toaster } from '@extension/ui';
+import { ThemeProvider, Toaster } from '@extension/ui';
 import App from './App';
 const queryClient = new QueryClient();
 
@@ -15,8 +15,10 @@ function init() {
 
   root.render(
     <QueryClientProvider client={queryClient}>
-      <App />
-      <Toaster />
+      <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
+        <App />
+        <Toaster />
+      </ThemeProvider>
     </QueryClientProvider>,
   );
 }

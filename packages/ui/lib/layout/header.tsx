@@ -1,9 +1,7 @@
 import { getConfig, useDashboardOverview } from '@extension/shared';
-import { Logo } from '../components/Logo';
 import { ProfileSelector } from './profile-selector';
-import { Link } from 'react-router-dom';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../components/ui/tooltip';
-import { Badge, Button } from '../components';
+import { Badge, Button, ModeToggle } from '../components';
 
 function formatToK(number: number): string {
   if (number >= 1000) {
@@ -55,10 +53,12 @@ function Header() {
       <div className="filliny-col-span-8 filliny-mx-auto filliny-flex filliny-items-center filliny-justify-center">
         <ProfileSelector />
       </div>
+
       <div className="filliny-col-span-2 filliny-flex filliny-justify-end">
-        <Link to={'https://filliny.io'} target="_blank">
+        {/* <Link to={'https://filliny.io'} target="_blank">
           <Logo />
-        </Link>
+        </Link> */}
+        <ModeToggle />
       </div>
     </header>
   );
