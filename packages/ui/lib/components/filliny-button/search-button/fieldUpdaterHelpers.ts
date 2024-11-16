@@ -1,5 +1,5 @@
 import type { Field } from '@extension/shared';
-import { addGlowingBorder } from './overlayUtils';
+import { addGlowingBorder } from './detectionHelpers';
 // type ReadableStreamReadResult<T> = { done: false; value: T } | { done: true; value?: T };
 
 let previousFields: Field[] = [];

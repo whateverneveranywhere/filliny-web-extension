@@ -1,5 +1,3 @@
-import type { OverlayPosition } from './types';
-
 export const resetOverlays = (): void => {
   document.querySelectorAll<HTMLDivElement>('div[style*="position: absolute"]').forEach(overlay => {
     const parentForm = overlay.closest<HTMLFormElement>('form');
@@ -56,17 +54,6 @@ export const disableOtherButtons = (formId: string): void => {
   });
 };
 
-export const addGlowingBorder = (element: HTMLElement, color: string = 'green'): void => {
-  Object.assign(element.style, {
-    boxShadow: `0 0 10px 2px ${color}`,
-    transition: 'box-shadow 0.3s ease-in-out',
-  });
-
-  setTimeout(() => {
-    element.style.boxShadow = '';
-  }, 2000);
-};
-
 // domUtils.ts
 export const createElementWithStyles = (tag: string, id: string, styles: Partial<CSSStyleDeclaration>): HTMLElement => {
   const element = document.createElement(tag);
@@ -79,13 +66,22 @@ export const createElementWithStyles = (tag: string, id: string, styles: Partial
   return element;
 };
 
-export const getFormPosition = (form: HTMLFormElement): OverlayPosition => {
-  const formRect = form.getBoundingClientRect();
+export const getFormPosition = (form: HTMLElement) => {
+  const rect = form.getBoundingClientRect();
+  const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
+  const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+
+  // Get the computed style to account for margins and padding
+  const computedStyle = window.getComputedStyle(form);
+  const marginTop = parseInt(computedStyle.marginTop, 10);
+  const marginBottom = parseInt(computedStyle.marginBottom, 10);
+
   return {
-    top: formRect.top,
-    left: formRect.left,
-    width: formRect.width,
-    height: formRect.height,
+    top: rect.top + scrollTop - marginTop,
+    left: rect.left + scrollLeft,
+    width: rect.width,
+    // Include margins in height calculation
+    height: rect.height + marginTop + marginBottom,
   };
 };
 

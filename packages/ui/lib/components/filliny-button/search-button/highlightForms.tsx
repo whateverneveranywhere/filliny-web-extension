@@ -1,7 +1,7 @@
 import { createRoot } from 'react-dom/client';
 import { FormsOverlay } from './FormsOverlay';
 import { addGlowingBorder, detectFields } from './detectionHelpers';
-import { createElementWithStyles, findOrCreateShadowContainer, getFormPosition } from './overlayUtils';
+import { findOrCreateShadowContainer, getFormPosition } from './overlayUtils';
 import type { HighlightFormsOptions } from './types';
 
 export const highlightForms = ({ visionOnly = false }: HighlightFormsOptions): void => {
@@ -25,12 +25,16 @@ export const highlightForms = ({ visionOnly = false }: HighlightFormsOptions): v
     form.dataset.formId = formId;
 
     if (visionOnly) {
-      if (form.dataset.fillinyHighlighted === 'true') {
-        console.warn(`Highlights already exist for form ${formId}.`);
-        return;
-      }
+      // Remove any existing highlights first
+      removeFormHighlights(form);
+
+      // Apply new highlights
       highlightFormFields(form);
-      form.dataset.fillinyHighlighted = 'true';
+
+      // Remove highlights after 2 seconds
+      setTimeout(() => {
+        removeFormHighlights(form);
+      }, 2000);
     } else {
       if (overlaysContainer.querySelector(`#overlay-${formId}`)) {
         console.warn(`An overlay is already active on form ${formId}.`);
@@ -47,31 +51,26 @@ const createFormOverlay = (form: HTMLFormElement, formId: string, overlaysContai
     return;
   }
 
-  const formOverlayContainer = createElementWithStyles('div', `overlay-${formId}`, {});
+  const formOverlayContainer = document.createElement('div');
+  formOverlayContainer.id = `overlay-${formId}`;
+  formOverlayContainer.className = 'filliny-pointer-events-auto filliny-relative filliny-w-full filliny-h-full';
   overlaysContainer.appendChild(formOverlayContainer);
 
   const overlayRoot = createRoot(formOverlayContainer);
   const formElement = form as HTMLElement;
-
   const initialPosition = getFormPosition(form);
 
-  overlayRoot.render(
-    <FormsOverlay
-      formId={formId}
-      initialPosition={initialPosition}
-      onDismiss={() => {
-        overlayRoot.unmount();
-        formOverlayContainer.remove();
-        formElement.style.pointerEvents = 'auto';
-        delete form.dataset.fillinyOverlayActive;
-      }}
-    />,
-  );
+  const cleanup = () => {
+    overlayRoot.unmount();
+    formOverlayContainer.remove();
+    formElement.classList.remove('filliny-pointer-events-none');
+    delete form.dataset.fillinyOverlayActive;
+    delete form.dataset.formId;
+  };
 
-  Object.assign(formElement.style, {
-    pointerEvents: 'none',
-  });
+  overlayRoot.render(<FormsOverlay formId={formId} initialPosition={initialPosition} onDismiss={cleanup} />);
 
+  formElement.classList.add('filliny-pointer-events-none');
   form.dataset.fillinyOverlayActive = 'true';
 };
 
@@ -79,9 +78,21 @@ const highlightFormFields = (form: HTMLFormElement): void => {
   const fields = detectFields(form);
   fields.forEach(field => {
     const element = form.querySelector<HTMLElement>(`[data-filliny-id="${field.id}"]`);
-    if (element && !element.dataset.fillinyHighlighted) {
+    if (element) {
       addGlowingBorder(element, 'black');
       element.dataset.fillinyHighlighted = 'true';
     }
   });
+};
+
+const removeFormHighlights = (form: HTMLFormElement): void => {
+  const fields = detectFields(form);
+  fields.forEach(field => {
+    const element = form.querySelector<HTMLElement>(`[data-filliny-id="${field.id}"]`);
+    if (element && element.dataset.fillinyHighlighted) {
+      element.style.removeProperty('box-shadow');
+      delete element.dataset.fillinyHighlighted;
+    }
+  });
+  delete form.dataset.fillinyHighlighted;
 };

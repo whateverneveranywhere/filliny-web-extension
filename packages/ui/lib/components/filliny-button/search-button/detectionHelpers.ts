@@ -183,8 +183,10 @@ export const detectFields = (form: HTMLFormElement): Field[] => {
 };
 
 export const addGlowingBorder = (element: HTMLElement, color: string = 'green'): void => {
-  element.style.boxShadow = `0 0 10px 2px ${color}`;
-  element.style.transition = 'box-shadow 0.3s ease-in-out';
+  Object.assign(element.style, {
+    boxShadow: `0 0 10px 2px ${color}`,
+    transition: 'box-shadow 0.3s ease-in-out',
+  });
 
   setTimeout(() => {
     element.style.boxShadow = '';

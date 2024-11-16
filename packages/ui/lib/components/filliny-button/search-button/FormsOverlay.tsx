@@ -24,9 +24,17 @@ const FormsOverlay: React.FC<OverlayProps> = ({ formId, initialPosition, onDismi
         setOverlayPosition(updatedPosition);
       };
 
+      // Update position on scroll
+      const handleScroll = () => {
+        requestAnimationFrame(updateOverlayPosition);
+      };
+
       updateOverlayPosition(); // Initial position
 
-      // Observers to update overlay position when the form changes
+      // Add scroll event listener
+      window.addEventListener('scroll', handleScroll, true);
+
+      // Existing observers
       const resizeObserver = new ResizeObserver(updateOverlayPosition);
       const mutationObserver = new MutationObserver(updateOverlayPosition);
 
@@ -34,6 +42,7 @@ const FormsOverlay: React.FC<OverlayProps> = ({ formId, initialPosition, onDismi
       mutationObserver.observe(form, { attributes: true, childList: true, subtree: true });
 
       return () => {
+        window.removeEventListener('scroll', handleScroll, true);
         resizeObserver.disconnect();
         mutationObserver.disconnect();
       };
@@ -57,7 +66,13 @@ const FormsOverlay: React.FC<OverlayProps> = ({ formId, initialPosition, onDismi
 
   return (
     <div
-      className="filliny-pointer-events-auto filliny-absolute filliny-z-[10000000] filliny-flex filliny-items-center filliny-justify-center filliny-rounded-lg filliny-bg-black/20 filliny-backdrop-blur-sm"
+      className={`
+        filliny-pointer-events-auto filliny-absolute
+        filliny-inset-0 filliny-z-[10000000] filliny-flex 
+        filliny-h-full filliny-w-full filliny-items-center
+        filliny-justify-center filliny-rounded-lg filliny-bg-black/20
+        filliny-backdrop-blur-sm
+      `}
       style={{
         top: `${overlayPosition.top}px`,
         left: `${overlayPosition.left}px`,
@@ -74,7 +89,7 @@ const FormsOverlay: React.FC<OverlayProps> = ({ formId, initialPosition, onDismi
           size="icon"
           type="button"
           variant="destructive"
-          className="filliny-absolute filliny-right-2.5 filliny-top-2.5 filliny-flex !filliny-size-8 !filliny-rounded-full"
+          className="filliny-absolute filliny-right-2.5 filliny-top-2.5 filliny-h-8 filliny-w-8 filliny-rounded-full"
           onClick={onDismiss}>
           <X />
         </Button>
