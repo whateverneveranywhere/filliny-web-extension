@@ -86,8 +86,12 @@ const handleGetAuthToken = (
   });
 };
 
-export const getConfig = (webappEnv: WebappEnvs = WebappEnvs.LOCAL): ConfigEntry => {
-  return config[webappEnv];
+export const getConfig = (webappEnv?: WebappEnvs): ConfigEntry => {
+  // Get env from import.meta.env or fallback to LOCAL
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const importMeta = (globalThis as any).import?.meta;
+  const env = (importMeta?.env?.VITE_WEBAPP_ENV as WebappEnvs) || WebappEnvs.LOCAL;
+  return config[webappEnv || env];
 };
 
 export const handleAction = (
