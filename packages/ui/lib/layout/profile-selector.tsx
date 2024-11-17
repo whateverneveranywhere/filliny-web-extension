@@ -6,11 +6,11 @@ import {
   useDeleteProfileByIdMutation,
   useFillingProfileById,
   useProfilesListQuery,
+  useStorage,
 } from '@extension/shared';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from '@/lib/hooks/use-toast';
-
 import { Plus } from 'lucide-react';
 import { profileStrorage } from '@extension/storage';
 import { ProfileForm } from '@/lib/containers/profile-form';
@@ -19,121 +19,143 @@ import { RHFShadcnComboBox } from '../components/RHF';
 import { Button } from '../components';
 import { Drawer } from '../components/Drawer';
 
-export const schema = z.object({
+const schema = z.object({
   defaultActiveProfileId: z.string(),
 });
 
 function ProfileSelector() {
-  const isAddNewProfileModalOpen = useBoolean();
-  const {
-    data: profilesList,
-    isLoading: isLoadingProfilesList,
-    isFetching: isFetchingProfilesList,
-    refetch: refetchProfilesList,
-  } = useProfilesListQuery();
+  const profileModal = useBoolean();
+  const [editingId, setEditingId] = useState<string>();
+  const defaultStorageProfile = useStorage(profileStrorage);
 
-  const { mutateAsync: deleteProfileById, isPending: isDeleting } = useDeleteProfileByIdMutation();
-  const { mutateAsync: updateActiveProfile, isPending: isUpdatingDefault } = useChangeActiveFillingProfileMutation();
-  const [editingTempId, setEditingTempId] = useState<string | undefined>(undefined);
+  // Queries and Mutations
+  const { data: profiles, isLoading, isFetching, refetch: refetchProfiles } = useProfilesListQuery();
+  const { mutateAsync: deleteProfile, isPending: isDeleting } = useDeleteProfileByIdMutation();
+  const { mutateAsync: updateActiveProfile, isPending: isUpdating } = useChangeActiveFillingProfileMutation();
 
-  const defaultActiveProfileId = useMemo(() => profilesList?.find(item => item.isActive)?.id, [profilesList]);
+  // Active Profile Management
+  const defaultActiveProfileId = useMemo(
+    () => defaultStorageProfile?.id || profiles?.find(item => item.isActive)?.id,
+    [profiles, defaultStorageProfile],
+  );
 
-  const methods = useForm<{ defaultActiveProfileId: string }>({
-    values: {
-      defaultActiveProfileId: typeof defaultActiveProfileId === 'number' ? String(defaultActiveProfileId) : '',
+  const methods = useForm({
+    defaultValues: {
+      defaultActiveProfileId: String(defaultActiveProfileId || ''),
     },
     resolver: zodResolver(schema),
     mode: 'onChange',
   });
 
-  const { watch, handleSubmit, setValue } = methods;
+  const { watch, setValue } = methods;
   const activeProfileId = watch('defaultActiveProfileId');
+  const { data: activeProfile, refetch: refetchActiveProfile } = useFillingProfileById(activeProfileId);
 
-  const { data: activeProfileData } = useFillingProfileById(activeProfileId);
+  // Initialize default profile if none exists
+  useEffect(() => {
+    const initializeDefaultProfile = async () => {
+      if (!defaultStorageProfile && profiles?.length) {
+        const activeFromApi = profiles.find(item => item.isActive);
+        if (activeFromApi) {
+          setValue('defaultActiveProfileId', String(activeFromApi.id));
+          const { data: profile } = await refetchActiveProfile();
+          if (profile) {
+            await profileStrorage.setDefaultProfile(profile);
+          }
+        }
+      }
+    };
 
+    initializeDefaultProfile();
+  }, [profiles, defaultStorageProfile]);
+
+  // Sync active profile with storage
+  useEffect(() => {
+    if (activeProfile) {
+      profileStrorage.setDefaultProfile(activeProfile);
+    }
+  }, [activeProfile]);
+
+  // Event Handlers
   const handleProfileChange = async (nextActiveId: string) => {
     if (nextActiveId === activeProfileId) return;
 
     try {
       await updateActiveProfile({ activeProfileId: nextActiveId });
       setValue('defaultActiveProfileId', nextActiveId);
-      toast({ variant: 'default', title: 'Default active profile changed!' });
+      toast({ title: 'Profile updated successfully' });
     } catch (error) {
       console.error(error);
-      toast({ variant: 'destructive', title: 'Error changing default profile!' });
+      toast({ variant: 'destructive', title: 'Failed to update profile' });
     }
   };
 
-  const onSubmit = handleSubmit(async formData => {
-    console.log(formData);
-  });
-
-  useEffect(() => {
-    if (activeProfileData && profilesList?.length) {
-      profileStrorage.setDefaultProfile(activeProfileData);
-    } else {
-      profileStrorage.setDefaultProfile(undefined);
+  const handleDeleteProfile = async (id: string) => {
+    try {
+      await deleteProfile({ id });
+      await refetchProfiles();
+      toast({ title: 'Profile deleted successfully' });
+    } catch (error) {
+      console.error(error);
+      toast({ variant: 'destructive', title: 'Failed to delete profile' });
     }
-  }, [activeProfileData, profilesList]);
+  };
+
+  const handleEditProfile = (id: string) => {
+    setEditingId(id);
+    profileModal.onTrue();
+  };
+
+  // UI States
+  const isDisabled = isDeleting || isUpdating;
+  const isLoaderVisible = isLoading || isFetching || isDeleting || isUpdating;
+  const profileOptions =
+    profiles?.map(item => ({
+      label: item.name,
+      value: String(item.id),
+    })) || [];
 
   return (
-    <div className="filliny-w-full">
-      <div className="filliny-flex filliny-items-center filliny-justify-center filliny-gap-1">
-        <FormProvider methods={methods} onSubmit={onSubmit}>
-          <RHFShadcnComboBox
-            disabled={isDeleting || isUpdatingDefault}
-            loading={isLoadingProfilesList || isFetchingProfilesList || isDeleting || isUpdatingDefault}
-            onDelete={async id => {
-              await deleteProfileById({ id });
-              await refetchProfilesList();
-            }}
-            onEdit={id => {
-              setEditingTempId(id);
-              isAddNewProfileModalOpen.onTrue();
-            }}
-            options={
-              profilesList?.map(item => ({
-                label: item.name,
-                value: String(item.id),
-              })) || []
-            }
-            onChange={handleProfileChange}
-            value={activeProfileId}
-            name="defaultActiveProfileId"
-            placeholder="Search by profile name"
-            title={''}
-          />
-        </FormProvider>
-        <Button
-          variant={'default'}
-          onClick={isAddNewProfileModalOpen.onTrue}
-          className="filliny-h-8 filliny-w-8 !filliny-p-2">
-          <Plus className="filliny-h-3 filliny-w-3" />
-        </Button>
-      </div>
-
-      <FormProvider methods={methods} onSubmit={onSubmit}>
-        <Drawer
-          hideFooter
-          onOpenChange={isOpen => {
-            isAddNewProfileModalOpen.setValue(isOpen);
-            if (!isOpen) setEditingTempId(undefined);
-          }}
-          open={isAddNewProfileModalOpen.value}
-          title={editingTempId ? 'Edit profile form' : 'New profile form'}
-          onConfirm={onSubmit}>
-          <div className="filliny-h-[70vh]">
-            <ProfileForm
-              id={editingTempId}
-              onFormSubmit={() => {
-                setEditingTempId(undefined);
-                isAddNewProfileModalOpen.onFalse();
-                refetchProfilesList();
-              }}
-            />
-          </div>
-        </Drawer>
+    <div className="filliny-flex filliny-w-full filliny-max-w-xl filliny-items-center filliny-gap-2">
+      <FormProvider methods={methods}>
+        <RHFShadcnComboBox
+          disabled={isDisabled}
+          loading={isLoaderVisible}
+          options={profileOptions}
+          onDelete={handleDeleteProfile}
+          onEdit={handleEditProfile}
+          onChange={handleProfileChange}
+          value={activeProfileId}
+          name="defaultActiveProfileId"
+          placeholder="Select or search profile"
+          className="filliny-w-full"
+          title={''}
+        />
       </FormProvider>
+
+      <Button variant="default" size="sm" onClick={profileModal.onTrue} className="filliny-h-9 filliny-w-9 filliny-p-0">
+        <Plus className="filliny-h-4 filliny-w-4" />
+      </Button>
+
+      <Drawer
+        hideFooter
+        open={profileModal.value}
+        title={editingId ? 'Edit Profile' : 'New Profile'}
+        onOpenChange={isOpen => {
+          profileModal.setValue(isOpen);
+          if (!isOpen) setEditingId(undefined);
+        }}>
+        <div className="filliny-h-[70vh] filliny-overflow-y-auto">
+          <ProfileForm
+            id={editingId}
+            onFormSubmit={() => {
+              setEditingId(undefined);
+              profileModal.onFalse();
+              refetchProfiles();
+            }}
+          />
+        </div>
+      </Drawer>
     </div>
   );
 }

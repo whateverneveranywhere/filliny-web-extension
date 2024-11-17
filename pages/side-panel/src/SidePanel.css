@@ -1,3 +1,12 @@
+:root {
+  --extension-width: 500px;
+}
+
+body {
+  width: var(--extension-width);
+  min-width: var(--extension-width);
+}
+
 .App {
   position: absolute;
   top: 0;
@@ -7,6 +16,8 @@
   text-align: center;
   height: 100%;
   padding: 1rem;
+  width: var(--extension-width);
+  min-width: var(--extension-width);
 }
 
 .App-logo {

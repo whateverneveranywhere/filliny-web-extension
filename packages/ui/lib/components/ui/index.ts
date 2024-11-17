@@ -22,3 +22,5 @@ export * from './progress';
 export * from './loading';
 export * from './theme-provider';
 export * from './mode-toggle';
+export * from './toggle-group';
+export * from './toggle';

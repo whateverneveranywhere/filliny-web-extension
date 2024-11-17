@@ -1,6 +1,5 @@
 import 'webextension-polyfill';
 import { exampleThemeStorage } from '@extension/storage';
-import { handleAction } from '@extension/shared';
 
 exampleThemeStorage.get().then(theme => {
   console.log('theme', theme);
@@ -8,6 +7,13 @@ exampleThemeStorage.get().then(theme => {
 
 console.log('background loaded');
 
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  return handleAction(request, sender, sendResponse);
+// Allow users to toggle the panel by clicking the extension icon
+chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(error => console.error(error));
+
+// Add click handler for extension icon
+chrome.action.onClicked.addListener(async tab => {
+  if (tab.windowId) {
+    // This will toggle the panel
+    await chrome.sidePanel.open({ windowId: tab.windowId });
+  }
 });

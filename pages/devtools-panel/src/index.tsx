@@ -10,6 +10,7 @@ function init() {
   const root = createRoot(appContainer);
 
   root.render(<Panel />);
+  // root.render(<></>);
 }
 
 init();

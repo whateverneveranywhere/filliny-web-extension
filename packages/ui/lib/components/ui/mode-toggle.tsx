@@ -9,7 +9,7 @@ export function ModeToggle() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon">
+        <Button variant="ghost" className="filliny-size-8 filliny-p-2" size="icon">
           {theme === 'dark' ? (
             <Moon className="filliny-h-[1.2rem] filliny-w-[1.2rem] filliny-transition-all" />
           ) : theme === 'system' ? (

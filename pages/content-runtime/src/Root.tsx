@@ -34,4 +34,5 @@ export function mount() {
 
   shadowRoot.appendChild(rootIntoShadow);
   createRoot(rootIntoShadow).render(<App />);
+  // createRoot(rootIntoShadow).render(<></>);
 }

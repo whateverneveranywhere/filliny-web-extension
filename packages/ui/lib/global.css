@@ -66,8 +66,8 @@
     @apply filliny-border-border;
   }
   body {
-    width: 400px;
-    height: 600px;
+    width: 100%;
+    /* height: 600px; */
     @apply filliny-bg-background filliny-text-foreground;
     font-feature-settings:
       'rlig' 1,

@@ -29,7 +29,6 @@ function RHFShadcnComboBox({
   placeholder,
   disabled,
   onChange: externalOnChange,
-  isFullWidth = false,
 }: Props) {
   const { control, setValue } = useFormContext();
   const [popoverOpen, setPopoverOpen] = useState(false);
@@ -48,7 +47,7 @@ function RHFShadcnComboBox({
       control={control}
       name={name}
       render={({ field }) => (
-        <FormItem className="filliny-flex filliny-flex-col">
+        <FormItem className="filliny-flex filliny-flex-col filliny-w-full">
           <FormLabel>{title}</FormLabel>
           <Popover modal open={popoverOpen} onOpenChange={setPopoverOpen}>
             <PopoverTrigger asChild>
@@ -60,9 +59,8 @@ function RHFShadcnComboBox({
                   role="combobox"
                   size={'sm'}
                   className={cn(
-                    'filliny-w-[200px] filliny-justify-between',
+                    'filliny-w-full filliny-justify-between',
                     !field.value && 'filliny-text-muted-foreground',
-                    isFullWidth && 'filliny-w-full',
                   )}>
                   <p className="filliny-w-full filliny-truncate filliny-text-left">
                     {field.value ? options.find(option => option.value === field.value)?.label : `Select ${title}`}
@@ -71,8 +69,8 @@ function RHFShadcnComboBox({
                 </Button>
               </FormControl>
             </PopoverTrigger>
-            <PopoverContent className={cn('filliny-w-[250px] filliny-p-0', isFullWidth && 'filliny-w-full')}>
-              <Command>
+            <PopoverContent align="start" className="filliny-w-[var(--radix-popover-trigger-width)] filliny-p-0">
+              <Command className="filliny-w-full">
                 <CommandInput placeholder={`${placeholder}...`} />
                 <CommandEmpty>No {title} found.</CommandEmpty>
                 <CommandGroup>

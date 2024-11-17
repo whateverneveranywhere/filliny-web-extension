@@ -11,6 +11,7 @@ function init() {
   const root = createRoot(appContainer);
 
   root.render(<NewTab />);
+  // root.render(<></>);
 }
 
 init();

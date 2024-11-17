@@ -1,11 +1,11 @@
 {
   "extensionDescription": {
     "description": "Extension description",
-    "message": "React, Typescript, Vite를 사용한 크롬 익스텐션 보일러플레이트입니다."
+    "message": "Filliny - AI 기반 폼 자동 완성 도우미. 스마트한 컨텍스트 인식 제안으로 시간을 절약하세요."
   },
   "extensionName": {
     "description": "Extension name",
-    "message": "크롬 익스텐션 보일러플레이트"
+    "message": "Filliny - AI 폼 자동완성"
   },
   "toggleTheme": {
     "message": "테마 변경"
