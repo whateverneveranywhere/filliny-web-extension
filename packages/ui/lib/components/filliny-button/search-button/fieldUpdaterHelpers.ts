@@ -1,10 +1,136 @@
 import type { Field } from '@extension/shared';
 import { addGlowingBorder } from './detectionHelpers';
-// type ReadableStreamReadResult<T> = { done: false; value: T } | { done: true; value?: T };
 
-let previousFields: Field[] = [];
+// Add at the top of the file with other declarations
 const initializedFields: Set<string> = new Set();
 
+// Specialized field update helpers
+const updateInputField = (element: HTMLInputElement, field: Field): void => {
+  if (!initializedFields.has(field.id)) {
+    addGlowingBorder(element);
+    initializedFields.add(field.id);
+  }
+  element.value = field.value || '';
+  dispatchEvent(element, 'input');
+  dispatchEvent(element, 'change');
+};
+
+const updateFileField = async (element: HTMLInputElement, field: Field, testMode: boolean): Promise<void> => {
+  if (!initializedFields.has(field.id)) {
+    addGlowingBorder(element);
+    initializedFields.add(field.id);
+  }
+
+  const url = testMode ? 'https://pdfobject.com/pdf/sample.pdf' : field.value;
+  if (url) {
+    try {
+      const blob = await fetchFile(url);
+      const fileName = getFileNameFromUrl(url);
+      const file = new File([blob], fileName, { type: blob.type });
+      const dataTransfer = new DataTransfer();
+      dataTransfer.items.add(file);
+      element.files = dataTransfer.files;
+      dispatchEvent(element, 'input');
+      dispatchEvent(element, 'change');
+    } catch (error) {
+      console.error('Failed to fetch file:', error);
+    }
+  }
+};
+
+const updateCheckableField = (element: HTMLInputElement, field: Field): void => {
+  if (!initializedFields.has(field.id)) {
+    addGlowingBorder(element);
+    initializedFields.add(field.id);
+  }
+
+  if (field.type === 'radio') {
+    const name = element.name;
+    const group = document.querySelectorAll<HTMLInputElement>(`input[type="radio"][name="${name}"]`);
+    if (group.length > 0) {
+      const valueToSelect = field.value || group[0].value;
+      group.forEach(radio => {
+        if (radio.value === valueToSelect) {
+          radio.checked = true;
+          dispatchEvent(radio, 'input');
+          dispatchEvent(radio, 'change');
+        }
+      });
+    }
+  } else if (field.type === 'checkbox') {
+    element.checked = field.value === 'true';
+    dispatchEvent(element, 'input');
+    dispatchEvent(element, 'change');
+  }
+};
+
+const updateTextAreaField = (element: HTMLTextAreaElement, field: Field): void => {
+  if (!initializedFields.has(field.id)) {
+    addGlowingBorder(element);
+    initializedFields.add(field.id);
+  }
+  element.value = field.value || '';
+  dispatchEvent(element, 'input');
+  dispatchEvent(element, 'change');
+};
+
+const updateSelectField = (element: HTMLSelectElement, field: Field): void => {
+  if (!initializedFields.has(field.id)) {
+    addGlowingBorder(element);
+    initializedFields.add(field.id);
+  }
+
+  // Skip first option if it looks like a placeholder
+  const startIndex = element.options[0]?.text.toLowerCase().includes('select') ? 1 : 0;
+
+  if (field.value && element.querySelector(`option[value="${field.value}"]`)) {
+    // If we have a specific value and it exists in options, use it
+    element.value = field.value;
+  } else if (startIndex < element.options.length) {
+    // Otherwise select a valid option
+    const validIndex = startIndex + Math.floor(Math.random() * (element.options.length - startIndex));
+    element.value = element.options[validIndex].value;
+  }
+
+  dispatchEvent(element, 'input');
+  dispatchEvent(element, 'change');
+};
+
+const updateButtonField = (element: HTMLButtonElement, field: Field): void => {
+  element.innerText = field.value || element.innerText;
+};
+
+// Main update function that delegates to specialized helpers
+export const updateFormFields = async (fields: Field[], testMode: boolean = false): Promise<void> => {
+  for (const field of fields) {
+    const element = document.querySelector<HTMLElement>(`[data-filliny-id="${field.id}"]`);
+    if (!element) continue;
+
+    console.log(`Updating field type: ${field.type} with ID: ${field.id}`);
+
+    if (element instanceof HTMLInputElement) {
+      switch (element.type) {
+        case 'file':
+          await updateFileField(element, field, testMode);
+          break;
+        case 'radio':
+        case 'checkbox':
+          updateCheckableField(element, field);
+          break;
+        default:
+          updateInputField(element, field);
+      }
+    } else if (element instanceof HTMLTextAreaElement) {
+      updateTextAreaField(element, field);
+    } else if (element instanceof HTMLSelectElement) {
+      updateSelectField(element, field);
+    } else if (element instanceof HTMLButtonElement) {
+      updateButtonField(element, field);
+    }
+  }
+};
+
+// Helper functions (keep existing ones)
 const getFileNameFromUrl = (url: string): string => {
   const urlParts = url.split('/');
   return urlParts[urlParts.length - 1];
@@ -18,104 +144,6 @@ const fetchFile = async (url: string): Promise<Blob> => {
   return await response.blob();
 };
 
-// filling helpers
-export const updateFormFields = (fields: Field[], testMode: boolean = false): void => {
-  fields.forEach(async field => {
-    const element = document.querySelector<HTMLElement>(`[data-filliny-id="${field.id}"]`);
-    const previousField = previousFields.find(prevField => prevField.id === field.id);
-
-    if (element) {
-      if (element instanceof HTMLInputElement) {
-        if (element.type === 'file') {
-          if (!initializedFields.has(field.id)) {
-            addGlowingBorder(element);
-            initializedFields.add(field.id);
-          }
-
-          const url = testMode ? 'https://pdfobject.com/pdf/sample.pdf' : field.value;
-          if (url) {
-            try {
-              const blob = await fetchFile(url);
-              const fileName = getFileNameFromUrl(url);
-              const file = new File([blob], fileName, { type: blob.type });
-              const dataTransfer = new DataTransfer();
-              dataTransfer.items.add(file);
-              element.files = dataTransfer.files;
-
-              dispatchEvent(element, 'input');
-              dispatchEvent(element, 'change');
-
-              // Trigger download for the user
-              // const downloadUrl = URL.createObjectURL(blob);
-              // const a = document.createElement('a');
-              // a.href = downloadUrl;
-              // a.download = fileName;
-              // document.body.appendChild(a);
-              // a.click();
-              // document.body.removeChild(a);
-              // URL.revokeObjectURL(downloadUrl);
-            } catch (error) {
-              console.error('Failed to fetch file:', error);
-            }
-          }
-        } else if (element.type === 'radio' || element.type === 'checkbox') {
-          if (!initializedFields.has(field.id) || (previousField && previousField.value !== field.value)) {
-            addGlowingBorder(element);
-            initializedFields.add(field.id);
-          }
-
-          const name = element.name;
-          const group = document.querySelectorAll<HTMLInputElement>(`input[name="${name}"]`);
-          if (group.length > 0) {
-            const firstOption = group[0];
-            firstOption.checked = true;
-            dispatchEvent(firstOption, 'input');
-            dispatchEvent(firstOption, 'change');
-          }
-        } else {
-          if (!initializedFields.has(field.id) || (previousField && previousField.value !== field.value)) {
-            addGlowingBorder(element);
-            initializedFields.add(field.id);
-          }
-          element.value = field.value || '';
-          dispatchEvent(element, 'input');
-          dispatchEvent(element, 'change');
-        }
-      } else if (element instanceof HTMLTextAreaElement) {
-        if (!initializedFields.has(field.id) || (previousField && previousField.value !== field.value)) {
-          addGlowingBorder(element);
-          initializedFields.add(field.id);
-        }
-        element.value = field.value || '';
-        dispatchEvent(element, 'input');
-        dispatchEvent(element, 'change');
-      } else if (element instanceof HTMLSelectElement) {
-        if (!initializedFields.has(field.id) || (previousField && previousField.value !== field.value)) {
-          addGlowingBorder(element);
-          initializedFields.add(field.id);
-        }
-        if (testMode) {
-          const firstOption = element.options[1]; // Skip the first option if it's a placeholder
-          if (firstOption) {
-            element.value = firstOption.value;
-            dispatchEvent(element, 'input');
-            dispatchEvent(element, 'change');
-          }
-        } else {
-          const index = parseInt(field.value || '0'); // Use '0' as a fallback if field.value is undefined
-          if (!isNaN(index) && index >= 0 && index < element.options.length) {
-            element.selectedIndex = index;
-            dispatchEvent(element, 'input');
-            dispatchEvent(element, 'change');
-          }
-        }
-      } else if (element instanceof HTMLButtonElement) {
-        element.innerText = field.value || element.innerText;
-      }
-    }
-  });
-};
-
 export const dispatchEvent = (
   element: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement,
   eventType: string,
@@ -124,16 +152,21 @@ export const dispatchEvent = (
   element.dispatchEvent(event);
 };
 
-// stream related helpers
-
-export const processChunks = (text: string): void => {
+// Stream processing (keep existing implementation)
+export const processChunks = (text: string, originalFields: Field[]): void => {
   text.split('\n').forEach(chunk => {
     if (chunk.trim()) {
       try {
         const jsonResponse = JSON.parse(chunk);
         if (jsonResponse?.data?.length) {
+          jsonResponse.data.forEach((field: Field) => {
+            const originalField = originalFields.find(f => f.id === field.id);
+            if (originalField) {
+              console.log(`Processing stream data for field type: ${originalField.type} with ID: ${field.id}`);
+            }
+          });
+
           updateFormFields(jsonResponse.data);
-          previousFields = jsonResponse.data;
         }
       } catch (e) {
         console.error('Failed to parse chunk:', e);
@@ -142,7 +175,7 @@ export const processChunks = (text: string): void => {
   });
 };
 
-export const processStreamResponse = async (response: ReadableStream): Promise<void> => {
+export const processStreamResponse = async (response: ReadableStream, originalFields: Field[]): Promise<void> => {
   const reader = response.getReader();
   const decoder = new TextDecoder('utf-8');
   let accumulatedResult = '';
@@ -154,7 +187,7 @@ export const processStreamResponse = async (response: ReadableStream): Promise<v
     }
 
     accumulatedResult += decoder.decode(value, { stream: true });
-    processChunks(accumulatedResult);
+    processChunks(accumulatedResult, originalFields);
     accumulatedResult = '';
 
     await reader.read().then(processText);

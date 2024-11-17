@@ -5,9 +5,11 @@ import { processStreamResponse, updateFormFields } from './fieldUpdaterHelpers';
 import { disableOtherButtons, resetOverlays, showLoadingIndicator } from './overlayUtils';
 import type { DTOProfileFillingForm } from '@extension/storage';
 import { profileStrorage } from '@extension/storage';
+import type { Field } from '@extension/shared';
 import { aiFillService, getMatchingWebsite } from '@extension/shared';
 
-const testMode = false; // Set this flag to true for development use to mock the API response
+// Move testMode to a configuration constant at the top of the file
+const TEST_MODE = true; // Set this to true to use test data instead of making API calls
 
 export const handleFormClick = async (event: React.MouseEvent<HTMLButtonElement>, formId: string): Promise<void> => {
   event.preventDefault();
@@ -24,36 +26,35 @@ export const handleFormClick = async (event: React.MouseEvent<HTMLButtonElement>
   showLoadingIndicator(formId);
 
   try {
-    const [defaultProfile] = await Promise.all([profileStrorage.get()]);
     const fields = detectFields(form);
     console.log('detected fields', fields);
 
-    if (testMode) {
-      // Mock response for test mode
+    if (TEST_MODE) {
+      console.log('Running in test mode - using mock data');
       const mockResponse = fields.map(field => ({
         ...field,
-        value: `filliny can fill this field`, // Example mock value
+        value: getMockValueForFieldType(field.type, field),
       }));
-      updateFormFields(mockResponse, testMode);
+      await updateFormFields(mockResponse, TEST_MODE);
+      return;
+    }
+
+    // Only execute API call logic if not in test mode
+    const [defaultProfile] = await Promise.all([profileStrorage.get()]);
+    const visitingUrl = window.location.href;
+    const matchingWebsite = getMatchingWebsite((defaultProfile as DTOProfileFillingForm).fillingWebsites, visitingUrl);
+
+    const response = await aiFillService({
+      contextText: matchingWebsite?.fillingContext || defaultProfile?.defaultFillingContext || '',
+      formData: fields,
+      websiteUrl: visitingUrl,
+      preferences: defaultProfile?.preferences,
+    });
+
+    if (response instanceof ReadableStream) {
+      await processStreamResponse(response, fields);
     } else {
-      const visitingUrl = window.location.href;
-      const matchingWebsite = getMatchingWebsite(
-        (defaultProfile as DTOProfileFillingForm).fillingWebsites,
-        visitingUrl,
-      );
-
-      const response = await aiFillService({
-        contextText: matchingWebsite?.fillingContext || defaultProfile?.defaultFillingContext || '',
-        formData: fields,
-        websiteUrl: visitingUrl,
-        preferences: defaultProfile?.preferences,
-      });
-
-      if (response instanceof ReadableStream) {
-        await processStreamResponse(response);
-      } else {
-        updateFormFields(response.data, testMode);
-      }
+      await updateFormFields(response.data, false);
     }
   } catch (error) {
     const apiError = (error as { message: string })?.message;
@@ -63,5 +64,43 @@ export const handleFormClick = async (event: React.MouseEvent<HTMLButtonElement>
     console.error('Error processing AI fill service:', error);
   } finally {
     resetOverlays();
+  }
+};
+
+const getMockValueForFieldType = (type: Field['type'], field: Field): string => {
+  const element = document.querySelector<HTMLElement>(`[data-filliny-id="${field.id}"]`);
+
+  switch (type) {
+    case 'file':
+      return 'https://pdfobject.com/pdf/sample.pdf';
+    case 'checkbox':
+      return 'true';
+    case 'radio': {
+      if (element instanceof HTMLInputElement) {
+        const name = element.name;
+        const group = document.querySelectorAll<HTMLInputElement>(`input[type="radio"][name="${name}"]`);
+        if (group.length) {
+          const randomIndex = Math.floor(Math.random() * group.length);
+          return group[randomIndex].value;
+        }
+      }
+      return 'true';
+    }
+    case 'select': {
+      if (element instanceof HTMLSelectElement) {
+        const startIndex = element.options[0]?.text.toLowerCase().includes('select') ? 1 : 0;
+        if (startIndex < element.options.length) {
+          const randomIndex = startIndex + Math.floor(Math.random() * (element.options.length - startIndex));
+          return element.options[randomIndex].value;
+        }
+      }
+      return '';
+    }
+    case 'textarea':
+      return 'This is a sample textarea content for testing purposes';
+    case 'button':
+      return 'Sample Button Text';
+    default:
+      return 'Sample test value for input field';
   }
 };
