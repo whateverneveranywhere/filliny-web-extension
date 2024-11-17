@@ -1,6 +1,6 @@
 /* eslint-disable jsx-a11y/no-static-element-interactions */
 /* eslint-disable jsx-a11y/click-events-have-key-events */
-import { ChevronDown, ChevronUp, Loader2, Globe, ExternalLink } from 'lucide-react';
+import { ChevronDown, ChevronUp, Loader2, Globe, ExternalLink, Trash } from 'lucide-react';
 import React, { useState } from 'react';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
@@ -18,6 +18,7 @@ interface Props {
   defaultExpanded?: boolean;
   hideExpandTrigger?: boolean;
   className?: string;
+  onRemove?: () => void;
 }
 
 const getFormattedURL = (url: string, rootLoad: boolean) => {
@@ -38,6 +39,7 @@ function WebsitePreviewCard({
   defaultExpanded = true,
   hideExpandTrigger = false,
   className,
+  onRemove,
 }: Props) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
   const [faviconError, setFaviconError] = useState(false);
@@ -114,6 +116,16 @@ function WebsitePreviewCard({
                     ) : (
                       <ChevronDown className="filliny-h-4 filliny-w-4" />
                     )}
+                  </Button>
+                )}
+                {onRemove && (
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="destructive"
+                    onClick={onRemove}
+                    className="filliny-h-8 filliny-w-8 hover:filliny-text-destructive">
+                    <Trash className="filliny-h-4 filliny-w-4" />
                   </Button>
                 )}
                 {actions}

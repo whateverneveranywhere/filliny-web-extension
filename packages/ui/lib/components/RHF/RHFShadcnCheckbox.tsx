@@ -1,10 +1,9 @@
 import React from 'react';
 import { useFormContext } from 'react-hook-form';
 
+import { Checkbox } from '../ui/checkbox';
 import { FormControl, FormDescription, FormField, FormItem, FormLabel } from '../ui/form';
 import type { GeneralFormProps } from '@extension/shared';
-
-import { Checkbox } from '../ui/checkbox';
 
 function RHFShadcnCheckbox({
   name,
@@ -21,7 +20,7 @@ function RHFShadcnCheckbox({
       control={control}
       name={name}
       render={({ field }) => (
-        <FormItem className="filliny-flex filliny-w-full filliny-flex-row filliny-items-start filliny-space-x-3 filliny-space-y-0">
+        <FormItem className="filliny-flex filliny-w-full filliny-flex-row filliny-items-start filliny-space-x-3 filliny-space-y-0 filliny-rounded-md filliny-p-4">
           <FormControl>
             <Checkbox
               required={required}
@@ -35,7 +34,7 @@ function RHFShadcnCheckbox({
               checked={field.value !== undefined ? field.value : externalValue}
             />
           </FormControl>
-          <div className="filliny-space-y-1 filliny-leading-none">
+          <div className="space-y-1 leading-none">
             <FormLabel>{title}</FormLabel>
             {description && <FormDescription>{description}</FormDescription>}
           </div>

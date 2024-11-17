@@ -38,9 +38,9 @@ const profileSchema = z.object({
     .default([]),
 });
 
-type ProfileFormData = z.infer<typeof profileSchema>;
+export type ProfileFormTypes = z.infer<typeof profileSchema>;
 
-const defaultFormValues: ProfileFormData = {
+const defaultFormValues: ProfileFormTypes = {
   profileName: '',
   defaultFillingContext: '',
   preferences: {
@@ -65,7 +65,7 @@ function ProfileForm({ id, onFormSubmit }: Props) {
   const { mutateAsync: createProfile, isPending: isCreating } = useCreateFillingProfileMutation();
   const { mutateAsync: editProfile, isPending: isUpdating } = useEditFillingProfileMutation();
 
-  const methods = useForm<ProfileFormData>({
+  const methods = useForm<ProfileFormTypes>({
     defaultValues: defaultFormValues,
     resolver: zodResolver(profileSchema),
     mode: 'onChange',
@@ -89,7 +89,7 @@ function ProfileForm({ id, onFormSubmit }: Props) {
   }, [editingItem, isEdit, reset]);
 
   const transformFormData = useCallback(
-    (formData: ProfileFormData): DTOProfileFillingForm => ({
+    (formData: ProfileFormTypes): DTOProfileFillingForm => ({
       ...formData,
       // filter out the user side isNew variable before sending to api
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -147,7 +147,7 @@ function ProfileForm({ id, onFormSubmit }: Props) {
 
   const handleNext = useCallback(async () => {
     const { fields } = steps[currentStep];
-    const isValid = await trigger(fields as (keyof ProfileFormData)[]);
+    const isValid = await trigger(fields as (keyof ProfileFormTypes)[]);
     if (isValid && currentStep < steps.length - 1) {
       setCurrentStep(prev => prev + 1);
     }
