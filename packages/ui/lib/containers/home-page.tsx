@@ -1,17 +1,16 @@
 /* eslint-disable react/no-unescaped-entities */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import { ExternalLink, AlertCircle } from 'lucide-react';
 import {
   getConfig,
-  getCurrentVistingUrl,
   getMatchingWebsite,
-  isValidUrl,
   useDashboardOverview,
   useCreateFillingProfileMutation,
   useEditFillingProfileMutation,
   useStorage,
   useProfilesListQuery,
   useFillingProfileById,
+  useActiveTabUrl,
 } from '@extension/shared';
 import type { DTOProfileFillingForm } from '@extension/storage';
 import { profileStrorage } from '@extension/storage';
@@ -22,28 +21,6 @@ import { ActiveProfileWebsitePreview } from './active-profile-website-preview';
 import { PageLayout } from '../layout';
 import { useToast } from '../hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
-
-const useCurrentUrl = () => {
-  const [url, setUrl] = useState('');
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchUrl = async () => {
-      try {
-        const visitingUrl = await getCurrentVistingUrl();
-        setUrl(isValidUrl(visitingUrl) ? visitingUrl : '');
-      } catch (error) {
-        console.error('Error fetching URL:', error);
-        setUrl('');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchUrl();
-  }, []);
-
-  return { url, isLoading, isValid: isValidUrl(url) };
-};
 
 const useProfileManagement = (url: string) => {
   const { toast } = useToast();
@@ -157,7 +134,7 @@ const useProfileManagement = (url: string) => {
 
 const HomePage = () => {
   const { data: dashboardOverview, isLoading: isLoadingOverview } = useDashboardOverview();
-  const { url, isLoading: isLoadingUrl, isValid: isUrlValid } = useCurrentUrl();
+  const { url, isLoading: isLoadingUrl, isValid: isUrlValid } = useActiveTabUrl();
   const { handleQuickAdd, defaultProfile, activeProfileId, isLoading: isProfileLoading } = useProfileManagement(url);
 
   const matchingWebsite = useMemo(
@@ -202,7 +179,7 @@ const HomePage = () => {
               preferences={defaultProfile?.preferences}
             />
           ) : (
-            <QuickAddWebsiteToProfile isLoading={isProfileLoading} currentUrl={url} onQuickAdd={handleQuickAdd} />
+            <QuickAddWebsiteToProfile isLoading={isProfileLoading} onQuickAdd={handleQuickAdd} />
           )
         ) : (
           <Alert variant="destructive">

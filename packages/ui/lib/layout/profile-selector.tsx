@@ -72,15 +72,31 @@ function ProfileSelector() {
   const handleDeleteProfile = useCallback(
     async (id: string) => {
       try {
+        const isActiveProfile = id === activeProfileId;
+
         await deleteProfile({ id });
         await refetchProfiles();
+
+        if (isActiveProfile && profiles) {
+          const deletedIndex = profiles.findIndex(profile => String(profile.id) === id);
+          const remainingProfiles = profiles.filter(profile => String(profile.id) !== id);
+
+          if (remainingProfiles.length > 0) {
+            const newActiveProfile = remainingProfiles[deletedIndex] || remainingProfiles[deletedIndex - 1];
+            if (newActiveProfile) {
+              await updateActiveProfile({ activeProfileId: String(newActiveProfile.id) });
+              setValue('defaultActiveProfileId', String(newActiveProfile.id));
+            }
+          }
+        }
+
         toast({ title: 'Profile deleted successfully' });
       } catch (error) {
         console.error(error);
         toast({ variant: 'destructive', title: 'Failed to delete profile' });
       }
     },
-    [deleteProfile, refetchProfiles],
+    [deleteProfile, refetchProfiles, activeProfileId, profiles, updateActiveProfile, setValue],
   );
 
   const handleEditProfile = useCallback(
