@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { z } from 'zod';
 import {
   useBoolean,
@@ -49,71 +49,83 @@ function ProfileSelector() {
 
   const { watch, setValue } = methods;
   const activeProfileId = watch('defaultActiveProfileId');
-  const { data: activeProfile, refetch: refetchActiveProfile } = useFillingProfileById(activeProfileId);
+  const { data: activeProfile } = useFillingProfileById(activeProfileId);
 
-  // Initialize default profile if none exists
-  useEffect(() => {
-    const initializeDefaultProfile = async () => {
-      if (!defaultStorageProfile && profiles?.length) {
-        const activeFromApi = profiles.find(item => item.isActive);
-        if (activeFromApi) {
-          setValue('defaultActiveProfileId', String(activeFromApi.id));
-          const { data: profile } = await refetchActiveProfile();
-          if (profile) {
-            await profileStrorage.setDefaultProfile(profile);
-          }
-        }
+  // Memoized handlers
+  const handleProfileChange = useCallback(
+    async (nextActiveId: string) => {
+      if (nextActiveId === activeProfileId) return;
+
+      try {
+        await updateActiveProfile({ activeProfileId: nextActiveId });
+        setValue('defaultActiveProfileId', nextActiveId);
+        await profileStrorage.setDefaultProfile(activeProfile);
+        toast({ title: 'Profile updated successfully' });
+      } catch (error) {
+        console.error(error);
+        toast({ variant: 'destructive', title: 'Failed to update profile' });
       }
-    };
+    },
+    [activeProfileId, activeProfile, updateActiveProfile, setValue],
+  );
 
-    initializeDefaultProfile();
-  }, [profiles, defaultStorageProfile]);
+  const handleDeleteProfile = useCallback(
+    async (id: string) => {
+      try {
+        await deleteProfile({ id });
+        await refetchProfiles();
+        toast({ title: 'Profile deleted successfully' });
+      } catch (error) {
+        console.error(error);
+        toast({ variant: 'destructive', title: 'Failed to delete profile' });
+      }
+    },
+    [deleteProfile, refetchProfiles],
+  );
 
-  // Sync active profile with storage
+  const handleEditProfile = useCallback(
+    (id: string) => {
+      setEditingId(id);
+      profileModal.onTrue();
+    },
+    [profileModal],
+  );
+
+  const handleDrawerChange = useCallback(
+    (isOpen: boolean) => {
+      profileModal.setValue(isOpen);
+      if (!isOpen) setEditingId(undefined);
+    },
+    [profileModal],
+  );
+
+  const handleFormSubmit = useCallback(() => {
+    setEditingId(undefined);
+    profileModal.onFalse();
+    refetchProfiles();
+  }, [profileModal, refetchProfiles]);
+
+  // Initialize default profile if needed
   useEffect(() => {
-    if (activeProfile) {
-      profileStrorage.setDefaultProfile(activeProfile);
+    if (!defaultStorageProfile && profiles?.length) {
+      const activeFromApi = profiles.find(item => item.isActive);
+      if (activeFromApi) {
+        setValue('defaultActiveProfileId', String(activeFromApi.id));
+      }
     }
-  }, [activeProfile]);
-
-  // Event Handlers
-  const handleProfileChange = async (nextActiveId: string) => {
-    if (nextActiveId === activeProfileId) return;
-
-    try {
-      await updateActiveProfile({ activeProfileId: nextActiveId });
-      setValue('defaultActiveProfileId', nextActiveId);
-      toast({ title: 'Profile updated successfully' });
-    } catch (error) {
-      console.error(error);
-      toast({ variant: 'destructive', title: 'Failed to update profile' });
-    }
-  };
-
-  const handleDeleteProfile = async (id: string) => {
-    try {
-      await deleteProfile({ id });
-      await refetchProfiles();
-      toast({ title: 'Profile deleted successfully' });
-    } catch (error) {
-      console.error(error);
-      toast({ variant: 'destructive', title: 'Failed to delete profile' });
-    }
-  };
-
-  const handleEditProfile = (id: string) => {
-    setEditingId(id);
-    profileModal.onTrue();
-  };
+  }, [profiles, defaultStorageProfile, setValue]);
 
   // UI States
   const isDisabled = isDeleting || isUpdating;
   const isLoaderVisible = isLoading || isFetching || isDeleting || isUpdating;
-  const profileOptions =
-    profiles?.map(item => ({
-      label: item.name,
-      value: String(item.id),
-    })) || [];
+  const profileOptions = useMemo(
+    () =>
+      profiles?.map(item => ({
+        label: item.name,
+        value: String(item.id),
+      })) || [],
+    [profiles],
+  );
 
   return (
     <div className="filliny-flex filliny-w-full filliny-max-w-xl filliny-items-center filliny-gap-2">
@@ -141,19 +153,9 @@ function ProfileSelector() {
         hideFooter
         open={profileModal.value}
         title={editingId ? 'Edit Profile' : 'New Profile'}
-        onOpenChange={isOpen => {
-          profileModal.setValue(isOpen);
-          if (!isOpen) setEditingId(undefined);
-        }}>
+        onOpenChange={handleDrawerChange}>
         <div className="filliny-h-[70vh] filliny-overflow-y-auto">
-          <ProfileForm
-            id={editingId}
-            onFormSubmit={() => {
-              setEditingId(undefined);
-              profileModal.onFalse();
-              refetchProfiles();
-            }}
-          />
+          <ProfileForm id={editingId} onFormSubmit={handleFormSubmit} />
         </div>
       </Drawer>
     </div>
