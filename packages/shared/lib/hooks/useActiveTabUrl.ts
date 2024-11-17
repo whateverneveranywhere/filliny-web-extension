@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { getCurrentVistingUrl, isValidUrl } from '../utils';
+import { getCurrentVistingUrl, getMatchingWebsite, isValidUrl } from '../utils';
 import type { DTOProfileFillingForm } from '@extension/storage';
 
 interface UseActiveTabUrlReturn {
@@ -47,6 +47,13 @@ const getTabListeners = (): TabUpdateListeners => {
   };
 };
 
+const getCurrentUrl = async (useCurrentUrl: boolean): Promise<string> => {
+  if (useCurrentUrl && window.location?.href) {
+    return window.location.href;
+  }
+  return getCurrentVistingUrl();
+};
+
 export const useActiveTabUrl = ({ websites }: UseActiveTabUrlProps = {}): UseActiveTabUrlReturn => {
   const [url, setUrl] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -54,38 +61,19 @@ export const useActiveTabUrl = ({ websites }: UseActiveTabUrlProps = {}): UseAct
   const updateUrl = useCallback(async () => {
     try {
       setIsLoading(true);
-      const visitingUrl = await getCurrentVistingUrl();
-      setUrl(isValidUrl(visitingUrl) ? visitingUrl : '');
+      const visitingUrl = await getCurrentUrl(!!websites);
+      setUrl(visitingUrl || '');
     } catch (error) {
       console.error('Error fetching URL:', error);
       setUrl('');
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [websites]);
 
   const matchingWebsite = useMemo(() => {
-    if (!websites || !isValidUrl(url)) {
-      return null;
-    }
-
-    const currentUrlObj = new URL(url);
-
-    return (
-      websites.find(({ websiteUrl, isRootLoad }) => {
-        if (!isValidUrl(websiteUrl)) {
-          return false;
-        }
-
-        const websiteUrlObj = new URL(websiteUrl);
-
-        if (isRootLoad) {
-          return websiteUrlObj.hostname === currentUrlObj.hostname;
-        } else {
-          return websiteUrlObj.origin === currentUrlObj.origin && websiteUrlObj.pathname === currentUrlObj.pathname;
-        }
-      }) || null
-    );
+    if (!websites || !url) return null;
+    return getMatchingWebsite(websites, url);
   }, [url, websites]);
 
   useEffect(() => {
@@ -93,17 +81,19 @@ export const useActiveTabUrl = ({ websites }: UseActiveTabUrlProps = {}): UseAct
   }, [updateUrl]);
 
   useEffect(() => {
-    const tabListeners = getTabListeners();
-    const handleTabUpdate = () => updateUrl();
+    if (!websites) {
+      const tabListeners = getTabListeners();
+      const handleTabUpdate = () => updateUrl();
 
-    tabListeners.onActivated(handleTabUpdate);
-    tabListeners.onUpdated(handleTabUpdate);
+      tabListeners.onActivated(handleTabUpdate);
+      tabListeners.onUpdated(handleTabUpdate);
 
-    return () => {
-      tabListeners.removeActivated(handleTabUpdate);
-      tabListeners.removeUpdated(handleTabUpdate);
-    };
-  }, [updateUrl]);
+      return () => {
+        tabListeners.removeActivated(handleTabUpdate);
+        tabListeners.removeUpdated(handleTabUpdate);
+      };
+    }
+  }, [updateUrl, websites]);
 
   return {
     url,

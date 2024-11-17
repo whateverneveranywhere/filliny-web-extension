@@ -40,17 +40,17 @@ const profileSchema = z.object({
 
 type ProfileFormData = z.infer<typeof profileSchema>;
 
-const defaultFormValues: ProfileFormData = profileSchema.parse({
-  profileName: 'First profile',
-  defaultFillingContext: 'Fill the form with lorem ipsum example context',
+const defaultFormValues: ProfileFormData = {
+  profileName: '',
+  defaultFillingContext: '',
   preferences: {
     isFormal: true,
     isGapFillingAllowed: false,
-    toneId: '0',
-    povId: '0',
+    toneId: '',
+    povId: '',
   },
   fillingWebsites: [],
-});
+};
 
 interface Props {
   id?: string;

@@ -1,17 +1,21 @@
-import { useStorage, useActiveTabUrl } from '@extension/shared';
+import { useActiveTabUrl, useStorage } from '@extension/shared';
 import { profileStrorage } from '@extension/storage';
 import { FillinyButton } from '@extension/ui';
 
 export default function App() {
   const defaultProfile = useStorage(profileStrorage);
-  const { isLoading, isValid, matchingWebsite } = useActiveTabUrl({
+  const {
+    isLoading,
+    isValid: isVisitingUrlValid,
+    matchingWebsite,
+  } = useActiveTabUrl({
     websites: defaultProfile?.fillingWebsites,
   });
 
   return (
     !isLoading &&
     defaultProfile &&
-    isValid &&
+    isVisitingUrlValid &&
     matchingWebsite && (
       <>
         <FillinyButton />

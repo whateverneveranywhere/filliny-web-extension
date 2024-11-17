@@ -17,12 +17,33 @@ export const cleanUrl = (url: string) => {
 };
 
 export const isValidUrl = (url: string) => {
+  if (!url) return false;
+
+  // Handle relative URLs by prepending the current origin
+  if (url.startsWith('/')) {
+    url = window.location.origin + url;
+  }
+
   try {
     new URL(url);
     return true;
   } catch (_) {
-    return false;
+    try {
+      // Try adding https:// if no protocol is specified
+      new URL(`https://${url}`);
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
+};
+
+export const formatToK = (number: number): string => {
+  if (number >= 1000) {
+    const thousands = number / 1000;
+    return thousands % 1 === 0 ? `${thousands.toFixed(0)}k` : `${thousands.toFixed(1)}k`;
+  }
+  return number.toString();
 };
 
 export const getMatchingWebsite = (websites: DTOProfileFillingForm['fillingWebsites'], currentUrl: string) => {

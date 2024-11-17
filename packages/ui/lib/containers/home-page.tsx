@@ -66,7 +66,7 @@ const useProfileManagement = (url: string) => {
 
   const handleCreateProfile = async () => {
     const newProfileData: DTOProfileFillingForm = {
-      profileName: 'First Profile',
+      profileName: 'Quick Add Profile',
       defaultFillingContext: 'Fill the form with example mock data',
       preferences: {
         isFormal: true,
