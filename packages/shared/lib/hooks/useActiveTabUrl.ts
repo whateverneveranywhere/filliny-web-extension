@@ -93,6 +93,7 @@ export const useActiveTabUrl = ({ websites }: UseActiveTabUrlProps = {}): UseAct
         tabListeners.removeUpdated(handleTabUpdate);
       };
     }
+    return () => {};
   }, [updateUrl, websites]);
 
   return {
