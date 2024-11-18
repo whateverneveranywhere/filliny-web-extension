@@ -131,6 +131,13 @@ function ProfileSelector() {
     }
   }, [profiles, defaultStorageProfile, setValue]);
 
+  // Add this useEffect to watch for changes in defaultStorageProfile
+  useEffect(() => {
+    if (defaultStorageProfile?.id) {
+      setValue('defaultActiveProfileId', String(defaultStorageProfile.id));
+    }
+  }, [defaultStorageProfile, setValue]);
+
   // UI States
   const isDisabled = isDeleting || isUpdating;
   const isLoaderVisible = isLoading || isFetching || isDeleting || isUpdating;

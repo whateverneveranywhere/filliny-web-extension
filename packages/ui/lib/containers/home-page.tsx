@@ -47,14 +47,18 @@ const useProfileManagement = (url: string) => {
 
   // Set the default profile in storage whenever it changes
   useEffect(() => {
-    if (defaultProfile && profiles?.length) {
+    // Clear default profile if there are no profiles left
+    if (!profiles?.length) {
+      profileStrorage.setDefaultProfile(undefined);
+    } else if (defaultProfile) {
       profileStrorage.setDefaultProfile(defaultProfile);
     }
   }, [defaultProfile, profiles]);
 
   const handleQuickAdd = async () => {
     try {
-      if (!defaultProfile) {
+      // Check both conditions: no default profile OR no profiles at all
+      if (!defaultProfile || !profiles?.length) {
         await handleCreateProfile();
       } else {
         await handleUpdateProfile();
@@ -66,7 +70,7 @@ const useProfileManagement = (url: string) => {
 
   const handleCreateProfile = async () => {
     const newProfileData: DTOProfileFillingForm = {
-      profileName: 'Quick Add Profile',
+      profileName: 'First profile',
       defaultFillingContext: 'Fill the form with example mock data',
       preferences: {
         isFormal: true,
