@@ -2,7 +2,8 @@ import type { DTOFillingPrefrences } from '@extension/storage';
 
 export interface Field {
   id: string;
-  type: 'input' | 'select' | 'checkbox' | 'radio' | 'textarea' | 'button' | 'file';
+  name?: string;
+  type: 'input' | 'select' | 'checkbox' | 'radio' | 'textarea' | 'button' | 'file' | 'fieldset';
   placeholder?: string;
   title?: string;
   label?: string;

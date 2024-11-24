@@ -1,11 +1,38 @@
 import type { Field } from '@extension/shared';
 
 const isElementVisible = (element: HTMLElement): boolean => {
-  // Check if element is visible in the DOM
-  return (
-    !!(element.offsetWidth || element.offsetHeight || element.getClientRects().length) &&
-    getComputedStyle(element).visibility !== 'hidden'
-  );
+  // Check if element or any parent is hidden via CSS
+  const isHidden = (el: HTMLElement | null): boolean => {
+    while (el) {
+      const style = getComputedStyle(el);
+      // Don't check position: absolute for form controls that might be styled this way
+      const isFormControl = ['select', 'input'].includes(el.tagName.toLowerCase());
+      if (
+        style.display === 'none' ||
+        style.visibility === 'hidden' ||
+        (!isFormControl && style.opacity === '0') ||
+        el.hasAttribute('hidden')
+      ) {
+        return true;
+      }
+      el = el.parentElement;
+    }
+    return false;
+  };
+
+  // Special handling for form controls
+  const isFormControl = ['select', 'input', 'textarea'].includes(element.tagName.toLowerCase());
+  if (isFormControl) {
+    // Only check if the element is completely hidden
+    return !isHidden(element);
+  }
+
+  // For non-form controls, perform full visibility checks
+  const hasZeroDimensions = !element.offsetWidth && !element.offsetHeight && !element.getClientRects().length;
+  const rect = element.getBoundingClientRect();
+  const isOutsideViewport = rect.left + rect.width <= 0 || rect.top + rect.height <= 0;
+
+  return !hasZeroDimensions && !isHidden(element) && !isOutsideViewport;
 };
 
 const getFieldLabel = (element: HTMLElement): string => {
@@ -98,11 +125,31 @@ const createFieldObject = (element: HTMLElement, index: number, type: Field['typ
 export const detectFields = (form: HTMLFormElement): Field[] => {
   const fields: Field[] = [];
   let index = 0;
+  const processedGroups = new Set<string>(); // Track processed radio groups
 
-  // Inputs
-  const inputs = form.querySelectorAll<HTMLInputElement>('input:not([type="hidden"]):not(.filliny-ignore)');
+  // Add these helper functions at the start
+  const shouldSkipElement = (element: HTMLElement): boolean => {
+    // Skip disabled elements
+    if (element.hasAttribute('disabled')) return true;
+
+    // Skip readonly elements
+    if (element.hasAttribute('readonly')) return true;
+
+    // Skip elements with specific data attributes
+    if (element.getAttribute('data-filliny-skip') === 'true') return true;
+
+    // Skip elements that are part of autocomplete/datalist
+    if (element.hasAttribute('list')) return true;
+
+    return false;
+  };
+
+  // Inputs (excluding radio)
+  const inputs = form.querySelectorAll<HTMLInputElement>(
+    'input:not([type="hidden"]):not([type="radio"]):not(.filliny-ignore)',
+  );
   inputs.forEach(input => {
-    if (isElementVisible(input) && input.type !== 'button') {
+    if (isElementVisible(input) && !shouldSkipElement(input) && input.type !== 'button') {
       const type = input.type === 'file' ? 'file' : 'input';
       const value = type === 'file' ? '' : input.value || '';
       const field = createFieldObject(input, index++, type, value);
@@ -110,27 +157,66 @@ export const detectFields = (form: HTMLFormElement): Field[] => {
     }
   });
 
-  // Selects
+  // Selects - only add the select element itself, with options
   const selects = form.querySelectorAll<HTMLSelectElement>('select:not(.filliny-ignore)');
   selects.forEach(select => {
-    if (isElementVisible(select)) {
+    if (isElementVisible(select) && !shouldSkipElement(select)) {
       const value = select.value || '';
-      const field = createFieldObject(select, index++, 'select', value);
+      const options: string[] = Array.from(select.options).map(opt => opt.text.trim());
+
+      const field = {
+        id: `f-${index++}`,
+        type: 'select' as const,
+        placeholder: select.getAttribute('placeholder') || '',
+        title: select.getAttribute('title') || '',
+        label: getFieldLabel(select),
+        description: getFieldDescription(select),
+        value,
+        options,
+      };
+
+      select.setAttribute('data-filliny-id', field.id);
       fields.push(field);
     }
   });
 
-  // Hidden Selects
-  const hiddenSelects = form.querySelectorAll<HTMLSelectElement>(
-    'select[style*="display: none"], select[style*="visibility: hidden"], select[style*="opacity: 0"]',
-  );
-  hiddenSelects.forEach(select => {
-    const options = select.options;
-    if (options.length > 0) {
-      const value = select.value || '';
-      const field = createFieldObject(select, index++, 'select', value);
+  // Radio groups - group by name attribute
+  const radios = form.querySelectorAll<HTMLInputElement>('input[type="radio"]:not(.filliny-ignore)');
+  radios.forEach(radio => {
+    const name = radio.name;
+    if (!name || processedGroups.has(name)) return;
+
+    const groupElements = form.querySelectorAll<HTMLInputElement>(`input[type="radio"][name="${name}"]`);
+    const visibleElements = Array.from(groupElements).filter(el => isElementVisible(el) && !shouldSkipElement(el));
+
+    if (visibleElements.length > 0) {
+      // Use the first radio button as the main element
+      const mainRadio = visibleElements[0];
+      const options: string[] = visibleElements.map(el => {
+        const label = getFieldLabel(el);
+        return label || el.value;
+      });
+
+      const selectedRadio = visibleElements.find(el => el.checked);
+      const value = selectedRadio ? getFieldLabel(selectedRadio) || selectedRadio.value : '';
+
+      const field = {
+        id: `f-${index++}`,
+        type: 'radio' as const,
+        placeholder: mainRadio.getAttribute('placeholder') || '',
+        title: mainRadio.getAttribute('title') || '',
+        label: getFieldLabel(mainRadio),
+        description: getFieldDescription(mainRadio),
+        value,
+        options,
+      };
+
+      // Add the field ID to all radio buttons in the group
+      visibleElements.forEach(el => el.setAttribute('data-filliny-id', field.id));
       fields.push(field);
     }
+
+    processedGroups.add(name);
   });
 
   // Textareas
@@ -153,16 +239,6 @@ export const detectFields = (form: HTMLFormElement): Field[] => {
     }
   });
 
-  // Radios
-  const radios = form.querySelectorAll<HTMLInputElement>('input[type="radio"]:not(.filliny-ignore)');
-  radios.forEach(radio => {
-    if (isElementVisible(radio)) {
-      const value = radio.checked.toString();
-      const field = createFieldObject(radio, index++, 'radio', value);
-      fields.push(field);
-    }
-  });
-
   // File Inputs and associated buttons
   const fileInputs = form.querySelectorAll<HTMLInputElement>('input[type="file"]:not(.filliny-ignore)');
   fileInputs.forEach(fileInput => {
@@ -180,15 +256,4 @@ export const detectFields = (form: HTMLFormElement): Field[] => {
   });
 
   return fields;
-};
-
-export const addGlowingBorder = (element: HTMLElement, color: string = 'green'): void => {
-  Object.assign(element.style, {
-    boxShadow: `0 0 10px 2px ${color}`,
-    transition: 'box-shadow 0.3s ease-in-out',
-  });
-
-  setTimeout(() => {
-    element.style.boxShadow = '';
-  }, 2000);
 };

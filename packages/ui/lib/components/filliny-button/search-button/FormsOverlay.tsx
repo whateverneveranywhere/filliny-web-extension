@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { handleFormClick } from './handleFormClick';
-import { X } from 'lucide-react';
-import { disableOtherButtons, getFormPosition, showLoadingIndicator } from './overlayUtils';
+import { X, Wand2 } from 'lucide-react';
+import { disableOtherButtons, showLoadingIndicator } from './overlayUtils';
 import { Button } from '../../ui';
 import type { OverlayPosition } from './types';
 
@@ -14,44 +14,88 @@ interface OverlayProps {
 const FormsOverlay: React.FC<OverlayProps> = ({ formId, initialPosition, onDismiss }) => {
   const [loading, setLoading] = useState(false);
   const [overlayPosition, setOverlayPosition] = useState<OverlayPosition>(initialPosition);
+  const overlayRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     const form = document.querySelector(`[data-form-id="${formId}"]`);
+    if (!form) return;
 
-    if (form) {
-      const updateOverlayPosition = () => {
-        const updatedPosition = getFormPosition(form as HTMLFormElement);
-        setOverlayPosition(updatedPosition);
-      };
+    let rafId: number;
+    let isUpdating = false;
 
-      // Update position on scroll
-      const handleScroll = () => {
-        requestAnimationFrame(updateOverlayPosition);
-      };
+    const updateOverlayPosition = () => {
+      if (!form || isUpdating) return;
+      isUpdating = true;
 
-      updateOverlayPosition(); // Initial position
+      const formRect = form.getBoundingClientRect();
+      const viewportHeight = window.innerHeight;
 
-      // Add scroll event listener
-      window.addEventListener('scroll', handleScroll, true);
+      // Calculate the visible portion of the form
+      const formTop = formRect.top;
+      const formBottom = formRect.bottom;
 
-      // Existing observers
-      const resizeObserver = new ResizeObserver(updateOverlayPosition);
-      const mutationObserver = new MutationObserver(updateOverlayPosition);
+      // Check if form is at least partially visible
+      const isFormVisible = formBottom > 0 && formTop < viewportHeight;
 
-      resizeObserver.observe(form);
-      mutationObserver.observe(form, { attributes: true, childList: true, subtree: true });
+      if (isFormVisible) {
+        const visibleTop = Math.max(0, formTop);
+        const visibleBottom = Math.min(viewportHeight, formBottom);
+        const visibleHeight = Math.max(0, visibleBottom - visibleTop);
 
-      return () => {
-        window.removeEventListener('scroll', handleScroll, true);
-        resizeObserver.disconnect();
-        mutationObserver.disconnect();
-      };
-    }
+        setOverlayPosition({
+          // Use viewport-relative positioning
+          top: visibleTop,
+          left: formRect.left,
+          width: formRect.width,
+          height: visibleHeight,
+        });
+      }
+
+      isUpdating = false;
+    };
+
+    const handleScroll = () => {
+      if (rafId) {
+        cancelAnimationFrame(rafId);
+      }
+      rafId = requestAnimationFrame(updateOverlayPosition);
+    };
+
+    // Update on scroll
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    document.addEventListener('scroll', handleScroll, { passive: true, capture: true });
+
+    // Update on resize
+    const resizeObserver = new ResizeObserver(handleScroll);
+    resizeObserver.observe(form);
+    resizeObserver.observe(document.documentElement);
+
+    // Update on DOM changes
+    const mutationObserver = new MutationObserver(handleScroll);
+    mutationObserver.observe(form, {
+      attributes: true,
+      childList: true,
+      subtree: true,
+      characterData: true,
+    });
+
+    // Initial position
+    updateOverlayPosition();
+
+    return () => {
+      if (rafId) {
+        cancelAnimationFrame(rafId);
+      }
+      window.removeEventListener('scroll', handleScroll);
+      document.removeEventListener('scroll', handleScroll, { capture: true });
+      resizeObserver.disconnect();
+      mutationObserver.disconnect();
+    };
   }, [formId]);
 
   const handleFillClick = async (event: React.MouseEvent<HTMLButtonElement>) => {
     if (loading) return;
-
     setLoading(true);
     disableOtherButtons(formId);
     showLoadingIndicator(formId);
@@ -66,12 +110,17 @@ const FormsOverlay: React.FC<OverlayProps> = ({ formId, initialPosition, onDismi
 
   return (
     <div
+      ref={overlayRef}
       className={`
-        filliny-pointer-events-auto filliny-absolute
-        filliny-inset-0 filliny-z-[10000000] filliny-flex 
-        filliny-h-full filliny-w-full filliny-items-center
-        filliny-justify-center filliny-rounded-lg filliny-bg-black/20
-        filliny-backdrop-blur-sm
+        filliny-pointer-events-auto filliny-fixed
+        filliny-z-[10000000] filliny-flex
+        filliny-items-center filliny-justify-center
+        filliny-transition-all filliny-duration-300
+        ${
+          loading
+            ? 'filliny-animate-border-glow filliny-bg-transparent'
+            : 'filliny-rounded-lg filliny-bg-black/30 filliny-backdrop-blur-md hover:filliny-bg-black/40'
+        }
       `}
       style={{
         top: `${overlayPosition.top}px`,
@@ -80,19 +129,34 @@ const FormsOverlay: React.FC<OverlayProps> = ({ formId, initialPosition, onDismi
         height: `${overlayPosition.height}px`,
       }}
       data-highlight-overlay="true">
-      <Button loading={loading} disabled={loading} type="button" variant="default" onClick={handleFillClick}>
-        {loading ? 'Filling...' : 'Fill it out'}
-      </Button>
-
       {!loading && (
-        <Button
-          size="icon"
-          type="button"
-          variant="destructive"
-          className="filliny-absolute filliny-right-2.5 filliny-top-2.5 filliny-h-8 filliny-w-8 filliny-rounded-full"
-          onClick={onDismiss}>
-          <X />
-        </Button>
+        <>
+          <div className="filliny-fixed filliny-left-1/2 filliny-top-1/2 filliny-z-[10000001] filliny-flex filliny-w-full filliny-max-w-fit filliny--translate-x-1/2 filliny--translate-y-1/2 filliny-flex-col filliny-items-center filliny-gap-3">
+            <div className="filliny-rounded-full filliny-bg-white/10 filliny-p-1">
+              <Button
+                ref={buttonRef}
+                loading={loading}
+                disabled={loading}
+                type="button"
+                size="lg"
+                variant="default"
+                onClick={handleFillClick}>
+                <Wand2 className="filliny-h-5 filliny-w-5" />
+                Auto-Fill Form
+              </Button>
+            </div>
+            <p className="filliny-text-sm filliny-text-white/80">Click to automatically fill out this form with AI</p>
+          </div>
+
+          <Button
+            size="icon"
+            type="button"
+            variant="ghost"
+            className="filliny-fixed filliny-right-4 filliny-top-4 filliny-h-8 filliny-w-8 filliny-rounded-full filliny-bg-white/10 filliny-text-white hover:filliny-bg-white/20"
+            onClick={onDismiss}>
+            <X className="filliny-h-4 filliny-w-4" />
+          </Button>
+        </>
       )}
     </div>
   );

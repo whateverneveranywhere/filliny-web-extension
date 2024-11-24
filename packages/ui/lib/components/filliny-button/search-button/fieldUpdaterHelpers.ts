@@ -1,5 +1,5 @@
 import type { Field } from '@extension/shared';
-import { addGlowingBorder } from './detectionHelpers';
+import { addGlowingBorder } from './overlayUtils';
 
 // Add at the top of the file with other declarations
 const initializedFields: Set<string> = new Set();
@@ -159,14 +159,14 @@ export const processChunks = (text: string, originalFields: Field[]): void => {
       try {
         const jsonResponse = JSON.parse(chunk);
         if (jsonResponse?.data?.length) {
-          jsonResponse.data.forEach((field: Field) => {
+          // Merge incoming fields with original field data
+          const mergedFields = jsonResponse.data.map((field: Field) => {
             const originalField = originalFields.find(f => f.id === field.id);
-            if (originalField) {
-              console.log(`Processing stream data for field type: ${originalField.type} with ID: ${field.id}`);
-            }
+            return originalField ? { ...originalField, ...field } : field;
           });
 
-          updateFormFields(jsonResponse.data);
+          console.log(`Processing stream data for fields:`, mergedFields);
+          updateFormFields(mergedFields);
         }
       } catch (e) {
         console.error('Failed to parse chunk:', e);

@@ -9,6 +9,17 @@ export const resetOverlays = (): void => {
   });
 };
 
+export const addGlowingBorder = (element: HTMLElement, color: string = 'green'): void => {
+  Object.assign(element.style, {
+    boxShadow: `0 0 10px 2px ${color}`,
+    transition: 'box-shadow 0.3s ease-in-out',
+  });
+
+  setTimeout(() => {
+    element.style.boxShadow = '';
+  }, 2000);
+};
+
 export const showLoadingIndicator = (formId: string): void => {
   const form = document.querySelector<HTMLFormElement>(`form[data-form-id="${formId}"]`);
   if (!form) return;

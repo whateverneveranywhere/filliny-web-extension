@@ -1,7 +1,7 @@
 import { createRoot } from 'react-dom/client';
 import { FormsOverlay } from './FormsOverlay';
-import { addGlowingBorder, detectFields } from './detectionHelpers';
-import { findOrCreateShadowContainer, getFormPosition } from './overlayUtils';
+import { detectFields } from './detectionHelpers';
+import { addGlowingBorder, findOrCreateShadowContainer, getFormPosition } from './overlayUtils';
 import type { HighlightFormsOptions } from './types';
 
 export const highlightForms = ({ visionOnly = false }: HighlightFormsOptions): void => {
