@@ -68,33 +68,36 @@ export const handleFormClick = async (event: React.MouseEvent<HTMLButtonElement>
 };
 
 const getMockValueForFieldType = (type: Field['type'], field: Field): string => {
-  const element = document.querySelector<HTMLElement>(`[data-filliny-id="${field.id}"]`);
-
   switch (type) {
     case 'file':
       return 'https://pdfobject.com/pdf/sample.pdf';
     case 'checkbox':
       return 'true';
     case 'radio': {
-      if (element instanceof HTMLInputElement) {
-        const name = element.name;
-        const group = document.querySelectorAll<HTMLInputElement>(`input[type="radio"][name="${name}"]`);
-        if (group.length) {
-          const randomIndex = Math.floor(Math.random() * group.length);
-          return group[randomIndex].value;
+      if (field.options && field.options.length > 0) {
+        if (field.options.some(opt => ['true', 'false'].includes(opt.value))) {
+          return 'true';
         }
+        return field.options[0].value;
       }
       return 'true';
     }
     case 'select': {
-      if (element instanceof HTMLSelectElement) {
-        const startIndex = element.options[0]?.text.toLowerCase().includes('select') ? 1 : 0;
-        if (startIndex < element.options.length) {
-          const randomIndex = startIndex + Math.floor(Math.random() * (element.options.length - startIndex));
-          return element.options[randomIndex].value;
+      if (field.value && field.options) {
+        const matchingOption = field.options.find(opt => opt.value === field.value || opt.text === field.value);
+        if (matchingOption) {
+          return matchingOption.value;
         }
       }
-      return '';
+
+      if (field.options?.length) {
+        const startIndex = field.options[0].text.toLowerCase().includes('select') ? 1 : 0;
+        if (startIndex < field.options.length) {
+          const randomIndex = startIndex + Math.floor(Math.random() * (field.options.length - startIndex));
+          return field.options[randomIndex].value;
+        }
+      }
+      return field.value || '';
     }
     case 'textarea':
       return 'This is a sample textarea content for testing purposes';

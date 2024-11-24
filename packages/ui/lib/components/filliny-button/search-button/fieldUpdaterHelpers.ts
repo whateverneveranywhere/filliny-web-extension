@@ -44,24 +44,9 @@ const updateCheckableField = (element: HTMLInputElement, field: Field): void => 
     initializedFields.add(field.id);
   }
 
-  if (field.type === 'radio') {
-    const name = element.name;
-    const group = document.querySelectorAll<HTMLInputElement>(`input[type="radio"][name="${name}"]`);
-    if (group.length > 0) {
-      const valueToSelect = field.value || group[0].value;
-      group.forEach(radio => {
-        if (radio.value === valueToSelect) {
-          radio.checked = true;
-          dispatchEvent(radio, 'input');
-          dispatchEvent(radio, 'change');
-        }
-      });
-    }
-  } else if (field.type === 'checkbox') {
-    element.checked = field.value === 'true';
-    dispatchEvent(element, 'input');
-    dispatchEvent(element, 'change');
-  }
+  element.checked = field.value === 'true';
+  dispatchEvent(element, 'input');
+  dispatchEvent(element, 'change');
 };
 
 const updateTextAreaField = (element: HTMLTextAreaElement, field: Field): void => {
@@ -75,29 +60,177 @@ const updateTextAreaField = (element: HTMLTextAreaElement, field: Field): void =
 };
 
 const updateSelectField = (element: HTMLSelectElement, field: Field): void => {
-  if (!initializedFields.has(field.id)) {
-    addGlowingBorder(element);
-    initializedFields.add(field.id);
+  console.log('Updating select field:', {
+    elementId: element.id,
+    fieldId: field.id,
+    options: Array.from(element.options).map(opt => ({ value: opt.value, text: opt.text })),
+    testMode: !!field.testValue,
+    currentValue: element.value,
+    newValue: field.testValue || field.value,
+  });
+
+  if (field.testValue) {
+    const matchingOption = Array.from(element.options).find(
+      opt => opt.value === field.testValue || opt.text === field.testValue,
+    );
+
+    if (matchingOption) {
+      // Set the value
+      element.value = matchingOption.value;
+
+      // Trigger native events
+      dispatchEvent(element, 'input');
+      dispatchEvent(element, 'change');
+
+      // Trigger React synthetic events
+      const nativeInputEvent = new Event('input', { bubbles: true });
+      const nativeChangeEvent = new Event('change', { bubbles: true });
+
+      Object.defineProperty(nativeInputEvent, 'target', { value: element });
+      Object.defineProperty(nativeChangeEvent, 'target', { value: element });
+
+      element.dispatchEvent(nativeInputEvent);
+      element.dispatchEvent(nativeChangeEvent);
+
+      // Force a click for good measure
+      element.click();
+
+      // Add visual feedback
+      addGlowingBorder(element);
+    } else {
+      console.warn('No matching option found:', {
+        testValue: field.testValue,
+        availableOptions: Array.from(element.options).map(opt => ({
+          value: opt.value,
+          text: opt.text,
+        })),
+      });
+    }
   }
-
-  // Skip first option if it looks like a placeholder
-  const startIndex = element.options[0]?.text.toLowerCase().includes('select') ? 1 : 0;
-
-  if (field.value && element.querySelector(`option[value="${field.value}"]`)) {
-    // If we have a specific value and it exists in options, use it
-    element.value = field.value;
-  } else if (startIndex < element.options.length) {
-    // Otherwise select a valid option
-    const validIndex = startIndex + Math.floor(Math.random() * (element.options.length - startIndex));
-    element.value = element.options[validIndex].value;
-  }
-
-  dispatchEvent(element, 'input');
-  dispatchEvent(element, 'change');
 };
 
 const updateButtonField = (element: HTMLButtonElement, field: Field): void => {
   element.innerText = field.value || element.innerText;
+};
+
+const updateRadioGroup = (element: HTMLInputElement, field: Field): void => {
+  console.log('Updating radio group:', {
+    elementId: element.id,
+    fieldId: field.id,
+    name: element.name,
+    testMode: !!field.testValue,
+    currentValue: element.value,
+    newValue: field.testValue || field.value,
+  });
+
+  const form = element.closest('form');
+  if (!form) {
+    console.error('Radio group has no parent form:', element);
+    return;
+  }
+
+  const groupElements = form.querySelectorAll<HTMLInputElement>(`input[type="radio"][name="${element.name}"]`);
+  console.log('Found radio group elements:', {
+    groupSize: groupElements.length,
+    elements: Array.from(groupElements).map(el => ({
+      value: el.value,
+      checked: el.checked,
+      label: el.labels?.[0]?.textContent,
+    })),
+  });
+
+  const valueToUse = field.testValue || field.value || field.options?.[0]?.value;
+
+  if (valueToUse) {
+    let foundMatch = false;
+    groupElements.forEach(radio => {
+      const shouldCheck = radio.value === valueToUse;
+      if (shouldCheck) {
+        foundMatch = true;
+        // Force React to notice the change
+        radio.checked = shouldCheck;
+
+        // Trigger native events
+        dispatchEvent(radio, 'input');
+        dispatchEvent(radio, 'change');
+
+        // Trigger React synthetic events
+        const nativeInputEvent = new Event('input', { bubbles: true });
+        const nativeChangeEvent = new Event('change', { bubbles: true });
+
+        // Add properties that React's synthetic events expect
+        Object.defineProperty(nativeInputEvent, 'target', { value: radio });
+        Object.defineProperty(nativeChangeEvent, 'target', { value: radio });
+
+        // Dispatch both native and React events
+        radio.dispatchEvent(nativeInputEvent);
+        radio.dispatchEvent(nativeChangeEvent);
+
+        // Force a click event which React definitely listens to
+        radio.click();
+
+        // Add visual feedback
+        addGlowingBorder(radio);
+      }
+    });
+
+    if (!foundMatch) {
+      console.error('No matching radio button found for value:', {
+        valueToUse,
+        availableValues: Array.from(groupElements).map(el => el.value),
+      });
+    }
+  } else {
+    console.warn('No value available to set radio group:', {
+      fieldId: field.id,
+      name: element.name,
+    });
+  }
+};
+
+// Add this helper function at the top with other helpers
+const assignTestValue = (field: Field): void => {
+  // Only log for radio/select fields
+  if (field.type === 'radio' || field.type === 'select') {
+    console.log('Attempting to assign test value for field:', {
+      type: field.type,
+      id: field.id,
+      hasOptions: !!field.options,
+      optionsLength: field.options?.length,
+      currentValue: field.value,
+      currentTestValue: field.testValue,
+    });
+
+    if (field.options && field.options.length > 0) {
+      // Skip first option if it's a placeholder (contains 'select' text)
+      const startIndex = field.type === 'select' && field.options[0].text.toLowerCase().includes('select') ? 1 : 0;
+      console.log('Determining start index:', {
+        startIndex,
+        firstOptionText: field.options[0]?.text,
+        isSelectWithPlaceholder: field.type === 'select' && field.options[0]?.text.toLowerCase().includes('select'),
+      });
+
+      if (startIndex < field.options.length) {
+        field.testValue = field.options[startIndex].value;
+        console.log('Successfully assigned test value:', {
+          fieldId: field.id,
+          assignedValue: field.testValue,
+          selectedOption: field.options[startIndex],
+        });
+      } else {
+        console.warn('Failed to assign test value - invalid start index:', {
+          fieldId: field.id,
+          startIndex,
+          optionsLength: field.options.length,
+        });
+      }
+    } else {
+      console.warn('Cannot assign test value - no options available:', {
+        fieldId: field.id,
+        type: field.type,
+      });
+    }
+  }
 };
 
 // Main update function that delegates to specialized helpers
@@ -106,7 +239,19 @@ export const updateFormFields = async (fields: Field[], testMode: boolean = fals
     const element = document.querySelector<HTMLElement>(`[data-filliny-id="${field.id}"]`);
     if (!element) continue;
 
-    console.log(`Updating field type: ${field.type} with ID: ${field.id}`);
+    // Only log for radio/select fields
+    if ((field.type === 'radio' || field.type === 'select') && testMode && !field.testValue) {
+      console.log('Assigning test value for field:', {
+        id: field.id,
+        type: field.type,
+      });
+      assignTestValue(field);
+    }
+
+    // Use testValue if in test mode
+    if (testMode && field.testValue) {
+      field.value = field.testValue;
+    }
 
     if (element instanceof HTMLInputElement) {
       switch (element.type) {
@@ -114,6 +259,8 @@ export const updateFormFields = async (fields: Field[], testMode: boolean = fals
           await updateFileField(element, field, testMode);
           break;
         case 'radio':
+          updateRadioGroup(element, field);
+          break;
         case 'checkbox':
           updateCheckableField(element, field);
           break;

@@ -1,15 +1,29 @@
 import type { DTOFillingPrefrences } from '@extension/storage';
 
+export type FieldType = 'input' | 'select' | 'checkbox' | 'radio' | 'textarea' | 'button' | 'file' | 'fieldset';
 export interface Field {
   id: string;
   name?: string;
-  type: 'input' | 'select' | 'checkbox' | 'radio' | 'textarea' | 'button' | 'file' | 'fieldset';
+  type: FieldType;
   placeholder?: string;
   title?: string;
   label?: string;
   description?: string;
   value?: string;
-  options?: string[];
+  testValue?: string;
+  options?: Array<{
+    value: string;
+    text: string;
+    selected: boolean;
+  }>;
+  required?: boolean;
+  validation?: {
+    pattern?: string;
+    minLength?: number;
+    maxLength?: number;
+    min?: number;
+    max?: number;
+  };
 }
 
 export interface DTOFillPayload {
