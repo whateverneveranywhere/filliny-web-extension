@@ -59,9 +59,16 @@ const getMockValueForFieldType = (type: FieldType, field: Field): string => {
     case 'file':
       return 'https://example.com/sample.pdf';
     case 'checkbox': {
-      const element = document.querySelector<HTMLInputElement>(`[data-filliny-id="${field.id}"]`);
+      const element = document.querySelector<HTMLElement>(`[data-filliny-id="${field.id}"]`);
       if (element) {
-        return element.checked ? 'false' : 'true';
+        // Determine current state
+        const isCurrentlyChecked =
+          element instanceof HTMLInputElement
+            ? element.checked
+            : element.hasAttribute('checked') || element.getAttribute('aria-checked') === 'true';
+
+        // Return the opposite state
+        return (!isCurrentlyChecked).toString();
       }
       return 'true'; // Default to checking the box if element not found
     }

@@ -38,37 +38,32 @@ const updateFileField = async (element: HTMLInputElement, field: Field, testMode
   }
 };
 
-const updateCheckableField = (element: HTMLInputElement, field: Field): void => {
+const updateCheckableField = (element: HTMLElement, field: Field): void => {
   if (!initializedFields.has(field.id)) {
     addGlowingBorder(element);
     initializedFields.add(field.id);
   }
 
-  // Convert field.value to boolean, defaulting to false if invalid
   const newCheckedState = field.value === 'true';
-  console.log('Updating checkbox:', {
-    elementId: element.id,
-    fieldId: field.id,
-    currentState: element.checked,
-    newState: newCheckedState,
-    fieldValue: field.value,
+
+  if (element instanceof HTMLInputElement && element.type === 'checkbox') {
+    element.checked = newCheckedState;
+  } else if (element.getAttribute('role') === 'checkbox') {
+    // Update both the attribute and ARIA state
+    if (newCheckedState) {
+      element.setAttribute('checked', '');
+      element.setAttribute('aria-checked', 'true');
+    } else {
+      element.removeAttribute('checked');
+      element.setAttribute('aria-checked', 'false');
+    }
+  }
+
+  // Trigger events
+  dispatchEnhancedEvents(element, newCheckedState, {
+    triggerFocus: true,
+    triggerValidation: field.required,
   });
-
-  // Set the checked state
-  element.checked = newCheckedState;
-
-  // Trigger native events
-  const events = ['input', 'change'];
-  events.forEach(eventType => {
-    const event = new Event(eventType, { bubbles: true });
-    Object.defineProperty(event, 'target', { value: element });
-    element.dispatchEvent(event);
-  });
-
-  // Force a click event which many frameworks listen to
-  setTimeout(() => {
-    element.click();
-  }, 0);
 };
 
 const updateTextAreaField = (element: HTMLTextAreaElement, field: Field): void => {

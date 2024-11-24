@@ -169,13 +169,69 @@ const detectTextareaField = (textarea: HTMLTextAreaElement, index: number): Fiel
   return field;
 };
 
-const detectCheckboxField = (checkbox: HTMLInputElement, index: number): Field | null => {
-  if (!isElementVisible(checkbox) || shouldSkipElement(checkbox)) return null;
+const detectCheckboxField = (element: HTMLElement, index: number): Field | null => {
+  if (!isElementVisible(element) || shouldSkipElement(element)) return null;
 
-  const field = createBaseField(checkbox, index, 'checkbox');
-  field.value = checkbox.checked.toString();
-  field.testValue = checkbox.getAttribute('data-test-value') || '';
+  const field = createBaseField(element, index, 'checkbox');
+
+  // Determine initial state
+  let isInitiallyChecked: boolean;
+  if (element instanceof HTMLInputElement && element.type === 'checkbox') {
+    isInitiallyChecked = element.checked;
+  } else if (element.getAttribute('role') === 'checkbox') {
+    isInitiallyChecked = element.hasAttribute('checked') || element.getAttribute('aria-checked') === 'true';
+  } else {
+    isInitiallyChecked = false;
+  }
+
+  // Set the value to the opposite of the initial state
+  field.value = (!isInitiallyChecked).toString();
+
+  field.testValue = element.getAttribute('data-test-value') || '';
   return field;
+};
+
+const getElementRole = (element: HTMLElement): string | null => {
+  // Check explicit role first
+  const role = element.getAttribute('role');
+  if (role) return role;
+
+  // Check implicit roles based on element type
+  switch (element.tagName.toLowerCase()) {
+    case 'input':
+      return (element as HTMLInputElement).type;
+    case 'select':
+      return 'combobox';
+    case 'textarea':
+      return 'textbox';
+    default:
+      return null;
+  }
+};
+
+const getElementValue = (element: HTMLElement): string => {
+  // Check standard value attribute
+  const value = element.getAttribute('value') || '';
+
+  // Check aria-checked for checkbox-like elements
+  const checked = element.getAttribute('aria-checked');
+  if (checked) {
+    return checked;
+  }
+
+  // Check data-state for custom components
+  const state = element.getAttribute('data-state');
+  if (state) {
+    return state;
+  }
+
+  // For input-like elements
+  if (element instanceof HTMLInputElement) {
+    return element.value;
+  }
+
+  // For custom components, check inner text
+  return value || element.textContent?.trim() || '';
 };
 
 export const detectFields = (form: HTMLFormElement): Field[] => {
@@ -183,45 +239,55 @@ export const detectFields = (form: HTMLFormElement): Field[] => {
   let index = 0;
   const processedGroups = new Set<string>();
 
-  // Detect regular inputs
-  form.querySelectorAll<HTMLInputElement>('input:not([type="radio"])').forEach(input => {
-    const field = detectInputField(input, index);
-    if (field) {
-      fields.push(field);
-      index++;
-    }
-  });
+  // Query all potential form controls, including ARIA-based ones
+  const formControls = form.querySelectorAll<HTMLElement>(`
+    input[type="checkbox"],
+    [role="checkbox"],
+    [role="switch"],
+    input,
+    select,
+    textarea,
+    [role="radio"],
+    [role="textbox"],
+    [role="combobox"],
+    [role="spinbutton"],
+    [data-filliny-field]
+  `);
 
-  // Detect selects
-  form.querySelectorAll<HTMLSelectElement>('select').forEach(select => {
-    const field = detectSelectField(select, index);
-    if (field) {
-      fields.push(field);
-      index++;
-    }
-  });
+  formControls.forEach(element => {
+    if (!isElementVisible(element) || shouldSkipElement(element)) return;
 
-  // Detect radio groups
-  form.querySelectorAll<HTMLInputElement>('input[type="radio"]').forEach(radio => {
-    const field = detectRadioGroup(form, radio, index, processedGroups);
-    if (field) {
-      fields.push(field);
-      index++;
-    }
-  });
+    const role = getElementRole(element);
+    let field: Field | null = null;
 
-  // Detect textareas
-  form.querySelectorAll<HTMLTextAreaElement>('textarea').forEach(textarea => {
-    const field = detectTextareaField(textarea, index);
-    if (field) {
-      fields.push(field);
-      index++;
+    switch (role) {
+      case 'checkbox':
+      case 'switch':
+        field = detectCheckboxField(element, index);
+        break;
+      case 'radio':
+        if (element instanceof HTMLInputElement) {
+          field = detectRadioGroup(form, element, index, processedGroups);
+        }
+        break;
+      case 'textbox':
+      case 'spinbutton':
+        field = detectTextLikeField(element, index);
+        break;
+      case 'combobox':
+        field = detectSelectLikeField(element, index);
+        break;
+      default:
+        // Handle native elements
+        if (element instanceof HTMLInputElement) {
+          field = detectInputField(element, index);
+        } else if (element instanceof HTMLSelectElement) {
+          field = detectSelectField(element, index);
+        } else if (element instanceof HTMLTextAreaElement) {
+          field = detectTextareaField(element, index);
+        }
     }
-  });
 
-  // Detect checkboxes
-  form.querySelectorAll<HTMLInputElement>('input[type="checkbox"]').forEach(checkbox => {
-    const field = detectCheckboxField(checkbox, index);
     if (field) {
       fields.push(field);
       index++;
@@ -229,4 +295,27 @@ export const detectFields = (form: HTMLFormElement): Field[] => {
   });
 
   return fields;
+};
+
+const detectTextLikeField = (element: HTMLElement, index: number): Field | null => {
+  const field = createBaseField(element, index, 'text');
+  field.value = getElementValue(element);
+  field.testValue = element.getAttribute('data-test-value') || '';
+  return field;
+};
+
+const detectSelectLikeField = (element: HTMLElement, index: number): Field | null => {
+  const field = createBaseField(element, index, 'select');
+
+  // Look for options in various formats
+  const options = element.querySelectorAll('[role="option"], option, [data-option]');
+  field.options = Array.from(options).map(opt => ({
+    value: opt.getAttribute('value') || opt.textContent?.trim() || '',
+    text: opt.textContent?.trim() || '',
+    selected: opt.getAttribute('aria-selected') === 'true' || opt.hasAttribute('selected'),
+  }));
+
+  field.value = getElementValue(element);
+  field.testValue = element.getAttribute('data-test-value') || '';
+  return field;
 };
