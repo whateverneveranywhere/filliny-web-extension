@@ -58,8 +58,13 @@ const getMockValueForFieldType = (type: FieldType, field: Field): string => {
     // Complex input types
     case 'file':
       return 'https://example.com/sample.pdf';
-    case 'checkbox':
-      return 'true';
+    case 'checkbox': {
+      const element = document.querySelector<HTMLInputElement>(`[data-filliny-id="${field.id}"]`);
+      if (element) {
+        return element.checked ? 'false' : 'true';
+      }
+      return 'true'; // Default to checking the box if element not found
+    }
     case 'radio': {
       if (field.options?.length) {
         // Prefer boolean values if available

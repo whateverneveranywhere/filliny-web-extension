@@ -44,9 +44,31 @@ const updateCheckableField = (element: HTMLInputElement, field: Field): void => 
     initializedFields.add(field.id);
   }
 
-  element.checked = field.value === 'true';
-  dispatchEvent(element, 'input');
-  dispatchEvent(element, 'change');
+  // Convert field.value to boolean, defaulting to false if invalid
+  const newCheckedState = field.value === 'true';
+  console.log('Updating checkbox:', {
+    elementId: element.id,
+    fieldId: field.id,
+    currentState: element.checked,
+    newState: newCheckedState,
+    fieldValue: field.value,
+  });
+
+  // Set the checked state
+  element.checked = newCheckedState;
+
+  // Trigger native events
+  const events = ['input', 'change'];
+  events.forEach(eventType => {
+    const event = new Event(eventType, { bubbles: true });
+    Object.defineProperty(event, 'target', { value: element });
+    element.dispatchEvent(event);
+  });
+
+  // Force a click event which many frameworks listen to
+  setTimeout(() => {
+    element.click();
+  }, 0);
 };
 
 const updateTextAreaField = (element: HTMLTextAreaElement, field: Field): void => {
@@ -233,28 +255,153 @@ const assignTestValue = (field: Field): void => {
   }
 };
 
+// Add these new specialized update helpers
+const updateSearchField = (element: HTMLInputElement, field: Field): void => {
+  if (!initializedFields.has(field.id)) {
+    addGlowingBorder(element);
+    initializedFields.add(field.id);
+  }
+  element.value = field.value || '';
+  // Search inputs often have associated clear buttons and search events
+  dispatchEvent(element, 'input');
+  dispatchEvent(element, 'change');
+  dispatchEvent(element, 'search');
+};
+
+const updateHiddenField = (element: HTMLInputElement, field: Field): void => {
+  // No visual feedback for hidden fields
+  element.value = field.value || '';
+  dispatchEvent(element, 'input');
+  dispatchEvent(element, 'change');
+};
+
+const updateImageField = (element: HTMLInputElement, field: Field): void => {
+  if (!initializedFields.has(field.id)) {
+    addGlowingBorder(element);
+    initializedFields.add(field.id);
+  }
+  if (field.value) {
+    element.src = field.value;
+  }
+  dispatchEvent(element, 'input');
+  dispatchEvent(element, 'change');
+};
+
+// Enhanced event dispatcher with more comprehensive event handling
+const dispatchEnhancedEvents = (
+  element: HTMLElement,
+  value: string | boolean,
+  options: { triggerFocus?: boolean; triggerValidation?: boolean } = {},
+): void => {
+  // Basic events
+  const events = ['input', 'change'];
+
+  // Add focus events if requested
+  if (options.triggerFocus) {
+    events.push('focus', 'focusin');
+  }
+
+  // Create and dispatch all events
+  events.forEach(eventType => {
+    const event = new Event(eventType, { bubbles: true, cancelable: true });
+    // Add common properties expected by frameworks
+    Object.defineProperty(event, 'target', { value: element });
+    Object.defineProperty(event, 'currentTarget', { value: element });
+
+    // Add value property for input events
+    if (eventType === 'input' || eventType === 'change') {
+      Object.defineProperty(event, 'value', { value });
+    }
+
+    element.dispatchEvent(event);
+  });
+
+  // Trigger validation if requested
+  if (options.triggerValidation) {
+    const validityEvent = new Event('invalid', { bubbles: true });
+    element.dispatchEvent(validityEvent);
+  }
+};
+
+// Enhanced update function with accessibility support and test mode handling
+const updateFormField = (element: HTMLElement, field: Field, testMode: boolean): void => {
+  // Handle ARIA attributes
+  if (field.label) {
+    element.setAttribute('aria-label', field.label);
+  }
+  if (field.description) {
+    element.setAttribute('aria-description', field.description);
+  }
+
+  // Handle disabled state
+  if (field.disabled !== undefined) {
+    element.toggleAttribute('disabled', field.disabled);
+  }
+
+  // Store original values for potential reset
+  if (!element.hasAttribute('data-original-value')) {
+    element.setAttribute('data-original-value', (element as HTMLInputElement).value || '');
+  }
+
+  // Add test mode indicators and styling
+  if (testMode) {
+    element.setAttribute('data-test-mode', 'true');
+    // Add visual indicator for test mode
+    element.style.border = '2px dashed green';
+    // Add tooltip to indicate test mode
+    element.title = `Test Mode - Original value: ${element.getAttribute('data-original-value')}`;
+
+    // Log test mode information
+    console.log('Test mode active for field:', {
+      id: field.id,
+      type: field.type,
+      originalValue: element.getAttribute('data-original-value'),
+      testValue: field.testValue,
+    });
+  } else {
+    // Remove test mode indicators if switching back to normal mode
+    element.removeAttribute('data-test-mode');
+    element.style.removeProperty('border');
+    // Restore original title if it exists
+    const originalTitle = element.getAttribute('data-original-title');
+    if (originalTitle) {
+      element.title = originalTitle;
+    } else {
+      element.removeAttribute('title');
+    }
+  }
+};
+
 // Main update function that delegates to specialized helpers
 export const updateFormFields = async (fields: Field[], testMode: boolean = false): Promise<void> => {
   for (const field of fields) {
     const element = document.querySelector<HTMLElement>(`[data-filliny-id="${field.id}"]`);
     if (!element) continue;
 
-    // Only log for radio/select fields
-    if ((field.type === 'radio' || field.type === 'select') && testMode && !field.testValue) {
-      console.log('Assigning test value for field:', {
-        id: field.id,
-        type: field.type,
-      });
+    // Only assign test values in test mode and for fields that support it
+    if (testMode && !field.testValue && (field.type === 'radio' || field.type === 'select')) {
       assignTestValue(field);
     }
 
-    // Use testValue if in test mode
+    // Use testValue if in test mode and available
     if (testMode && field.testValue) {
       field.value = field.testValue;
     }
 
+    // Apply common updates and accessibility enhancements
+    updateFormField(element, field, testMode);
+
     if (element instanceof HTMLInputElement) {
       switch (element.type) {
+        case 'search':
+          updateSearchField(element, field);
+          break;
+        case 'hidden':
+          updateHiddenField(element, field);
+          break;
+        case 'image':
+          updateImageField(element, field);
+          break;
         case 'file':
           await updateFileField(element, field, testMode);
           break;
@@ -274,6 +421,12 @@ export const updateFormFields = async (fields: Field[], testMode: boolean = fals
     } else if (element instanceof HTMLButtonElement) {
       updateButtonField(element, field);
     }
+
+    // Trigger enhanced events with validation
+    dispatchEnhancedEvents(element, field.value || '', {
+      triggerFocus: true,
+      triggerValidation: field.required,
+    });
   }
 };
 
