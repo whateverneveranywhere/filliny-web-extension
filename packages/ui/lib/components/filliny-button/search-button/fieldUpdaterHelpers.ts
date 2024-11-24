@@ -327,10 +327,9 @@ const updateFormField = (element: HTMLElement, field: Field, testMode: boolean):
   if (field.description) {
     element.setAttribute('aria-description', field.description);
   }
-
   // Handle disabled state
-  if (field.disabled !== undefined) {
-    element.toggleAttribute('disabled', field.disabled);
+  if ('disabled' in field) {
+    element.toggleAttribute('disabled', field.disabled as boolean);
   }
 
   // Store original values for potential reset

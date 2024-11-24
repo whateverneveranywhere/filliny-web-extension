@@ -65,7 +65,7 @@ function QuickAddWebsiteToProfile({ onQuickAdd, isLoading }: Props) {
               }
             />
             {isLoadingUrl && (
-              <p className="filliny-text-sm filliny-text-muted-foreground filliny-text-center">
+              <p className="filliny-text-center filliny-text-sm filliny-text-muted-foreground">
                 Loading website information...
               </p>
             )}

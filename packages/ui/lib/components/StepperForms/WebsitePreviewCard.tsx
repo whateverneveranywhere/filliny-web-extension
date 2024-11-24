@@ -55,8 +55,8 @@ function WebsitePreviewCard({
 
   return (
     <Card className={cn('w-full transition-all duration-200 hover:shadow-md', className)}>
-      <CardHeader className="filliny-space-y-0 !filliny-p-0.5">
-        <CardTitle className="filliny-flex filliny-w-full filliny-items-center filliny-gap-4 !filliny-p-0">
+      <CardHeader className="filliny-w-full filliny-space-y-0 !filliny-p-2">
+        <CardTitle className="filliny-flex filliny-w-full filliny-items-center filliny-gap-4 !filliny-p-1">
           {/* Favicon Section */}
           <div className="filliny-shrink-0">
             {isLoading ? (
