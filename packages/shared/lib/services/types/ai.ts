@@ -1,6 +1,23 @@
 import type { DTOFillingPrefrences } from '@extension/storage';
 
-export type FieldType = 'input' | 'select' | 'checkbox' | 'radio' | 'textarea' | 'button' | 'file' | 'fieldset';
+export type InputFieldType =
+  | 'text'
+  | 'password'
+  | 'email'
+  | 'number'
+  | 'tel'
+  | 'url'
+  | 'search'
+  | 'color'
+  | 'date'
+  | 'datetime-local'
+  | 'month'
+  | 'week'
+  | 'time'
+  | 'range';
+
+export type FieldType = InputFieldType | 'select' | 'checkbox' | 'radio' | 'textarea' | 'button' | 'file' | 'fieldset';
+
 export interface Field {
   id: string;
   name?: string;
@@ -23,6 +40,7 @@ export interface Field {
     maxLength?: number;
     min?: number;
     max?: number;
+    step?: number;
   };
 }
 

@@ -84,12 +84,31 @@ const detectInputField = (input: HTMLInputElement, index: number): Field | null 
     case 'reset':
     case 'hidden':
       return null;
+    case 'color':
+    case 'date':
+    case 'datetime-local':
+    case 'month':
+    case 'week':
+    case 'time':
+    case 'range':
+    case 'tel':
+    case 'email':
+    case 'url':
+    case 'number':
+      field = createBaseField(input, index, type);
+      field.value = input.value || '';
+      if (type === 'number' || type === 'range') {
+        field.validation = {
+          ...field.validation,
+          step: Number(input.step) || 1,
+        };
+      }
+      return field;
     case 'file':
       return createBaseField(input, index, 'file');
     default:
-      field = createBaseField(input, index, 'input');
+      field = createBaseField(input, index, 'text');
       field.value = input.value || '';
-      field.testValue = input.getAttribute('data-test-value') || '';
       return field;
   }
 };
