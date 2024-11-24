@@ -97,7 +97,7 @@ function StepperForm1() {
     <div className="filliny-flex filliny-flex-col filliny-gap-4">
       <ScrollArea className="filliny-w-full">
         <div className="filliny-flex filliny-items-center filliny-gap-2 filliny-pb-3">
-          <span className="filliny-font-medium filliny-whitespace-nowrap">Recommended websites:</span>
+          <span className="filliny-whitespace-nowrap filliny-font-medium">Recommended websites:</span>
           <RecommendedWebsites onWebsiteSelect={handleWebsiteSelect} />
         </div>
         <ScrollBar orientation="horizontal" />

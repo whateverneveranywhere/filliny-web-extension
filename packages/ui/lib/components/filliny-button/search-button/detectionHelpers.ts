@@ -128,16 +128,15 @@ const detectSelectField = (select: HTMLSelectElement, index: number): Field | nu
   return field;
 };
 
-const detectRadioGroup = (
-  form: HTMLFormElement,
-  radio: HTMLInputElement,
-  index: number,
-  processedGroups: Set<string>,
-): Field | null => {
-  const name = radio.name;
+const detectRadioGroup = (element: HTMLInputElement, index: number, processedGroups: Set<string>): Field | null => {
+  const name = element.name;
   if (!name || processedGroups.has(name)) return null;
 
-  const groupElements = form.querySelectorAll<HTMLInputElement>(`input[type="radio"][name="${name}"]`);
+  // Find the parent form or form-like container
+  const container = element.closest('form, [data-filliny-confidence]');
+  if (!container) return null;
+
+  const groupElements = container.querySelectorAll<HTMLInputElement>(`input[type="radio"][name="${name}"]`);
   const visibleElements = Array.from(groupElements).filter(el => isElementVisible(el) && !shouldSkipElement(el));
 
   if (visibleElements.length === 0) return null;
@@ -234,13 +233,30 @@ const getElementValue = (element: HTMLElement): string => {
   return value || element.textContent?.trim() || '';
 };
 
-export const detectFields = (form: HTMLFormElement): Field[] => {
+// Add new helper function at the top
+const isFormLikeContainer = (element: HTMLElement): boolean => {
+  // Common form-like container classes and attributes
+  const formLikeClasses = ['form', 'form-group', 'form-container', 'form-wrapper', 'form-section'];
+  const formLikeRoles = ['form', 'group', 'region'];
+
+  return (
+    // Check for form-like classes
+    formLikeClasses.some(className => element.classList.contains(className)) ||
+    // Check for form-like roles
+    (element.getAttribute('role') && formLikeRoles.includes(element.getAttribute('role')!)) ||
+    // Check for multiple form controls
+    element.querySelectorAll('input, select, textarea').length > 1
+  );
+};
+
+// Modify the detectFields export to handle both forms and form-like containers
+export const detectFields = (container: HTMLElement, isImplicitForm: boolean = false): Field[] => {
   const fields: Field[] = [];
   let index = 0;
   const processedGroups = new Set<string>();
 
   // Query all potential form controls, including ARIA-based ones
-  const formControls = form.querySelectorAll<HTMLElement>(`
+  const formControls = container.querySelectorAll<HTMLElement>(`
     input[type="checkbox"],
     [role="checkbox"],
     [role="switch"],
@@ -253,6 +269,13 @@ export const detectFields = (form: HTMLFormElement): Field[] => {
     [role="spinbutton"],
     [data-filliny-field]
   `);
+
+  // Add confidence level attribute to the container
+  if (isImplicitForm) {
+    container.setAttribute('data-filliny-confidence', 'medium');
+  } else {
+    container.setAttribute('data-filliny-confidence', 'high');
+  }
 
   formControls.forEach(element => {
     if (!isElementVisible(element) || shouldSkipElement(element)) return;
@@ -267,7 +290,7 @@ export const detectFields = (form: HTMLFormElement): Field[] => {
         break;
       case 'radio':
         if (element instanceof HTMLInputElement) {
-          field = detectRadioGroup(form, element, index, processedGroups);
+          field = detectRadioGroup(element, index, processedGroups);
         }
         break;
       case 'textbox':
@@ -318,4 +341,29 @@ const detectSelectLikeField = (element: HTMLElement, index: number): Field | nul
   field.value = getElementValue(element);
   field.testValue = element.getAttribute('data-test-value') || '';
   return field;
+};
+
+// Add new export for detecting form-like containers
+export const detectFormLikeContainers = (): HTMLElement[] => {
+  const containers: HTMLElement[] = [];
+
+  // First, get all actual forms
+  const forms = Array.from(document.querySelectorAll<HTMLFormElement>('form'));
+  containers.push(...forms);
+
+  // Then look for potential form-like containers that aren't actual forms
+  const potentialContainers = document.querySelectorAll<HTMLElement>('div, section, article, main, aside');
+
+  potentialContainers.forEach(container => {
+    // Skip if this container is inside an actual form or already detected container
+    if (container.closest('form') || containers.some(existing => existing.contains(container))) {
+      return;
+    }
+
+    if (isFormLikeContainer(container)) {
+      containers.push(container);
+    }
+  });
+
+  return containers;
 };

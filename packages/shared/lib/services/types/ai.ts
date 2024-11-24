@@ -42,12 +42,6 @@ export interface Field {
     max?: number;
     step?: number;
   };
-  disabled?: boolean;
-  readonly?: boolean;
-  ariaLabel?: string;
-  ariaDescription?: string;
-  customEvents?: string[];
-  defaultValue?: string;
 }
 
 export interface DTOFillPayload {
