@@ -9,9 +9,10 @@ interface OverlayProps {
   formId: string;
   initialPosition: OverlayPosition;
   onDismiss: () => void;
+  testMode?: boolean;
 }
 
-const FormsOverlay: React.FC<OverlayProps> = ({ formId, initialPosition, onDismiss }) => {
+const FormsOverlay: React.FC<OverlayProps> = ({ formId, initialPosition, onDismiss, testMode = false }) => {
   const [loading, setLoading] = useState(false);
   const [overlayPosition, setOverlayPosition] = useState<OverlayPosition>(initialPosition);
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -101,7 +102,7 @@ const FormsOverlay: React.FC<OverlayProps> = ({ formId, initialPosition, onDismi
     showLoadingIndicator(formId);
 
     try {
-      await handleFormClick(event, formId);
+      await handleFormClick(event, formId, testMode);
     } finally {
       setLoading(false);
       onDismiss();

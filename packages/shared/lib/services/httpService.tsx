@@ -14,6 +14,12 @@ interface CustomFetchConfig extends RequestInit {
   isStream?: boolean;
 }
 
+interface ApiErrorResponse {
+  message: string;
+  code?: string;
+  details?: unknown;
+}
+
 const config = getConfig();
 
 class HttpService {
@@ -24,42 +30,45 @@ class HttpService {
   }
 
   private async request<T>(url: string, config?: CustomFetchConfig): Promise<T> {
-    const authToken = await authStorage.get();
+    try {
+      const authToken = config?.authToken || (await authStorage.get()) || '';
+      const headers = new Headers(config?.headers || {});
+      const finalBaseUrl = config?.baseUrl || this.baseUrl;
 
-    const token = config?.authToken || authToken || '';
-    const headers = new Headers(config?.headers || {});
-    const finalBaseUrl = config?.baseUrl || this.baseUrl;
-
-    if (token) {
-      headers.append('Authorization', `Bearer ${token}`);
-    }
-
-    headers.append('Content-Type', 'application/json');
-
-    const response = await fetch(`${finalBaseUrl}${url}`, {
-      ...config,
-      headers,
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      const requestStatus = response.status;
-
-      if (requestStatus === 403 || requestStatus === 401) {
-        console.log('unauthorized');
+      if (authToken) {
+        headers.append('Authorization', `Bearer ${authToken}`);
       }
 
-      throw new Error(errorData.message || 'Unknown error');
-    }
+      headers.append('Content-Type', 'application/json');
 
-    if (config?.isStream) {
-      // Return a ReadableStream if the response is streamable
-      return response.body as unknown as T;
-    }
+      const response = await fetch(`${finalBaseUrl}${url}`, {
+        ...config,
+        headers,
+      });
 
-    // Return the JSON response if not streamable
-    const jsonResponse: T = await response.json();
-    return jsonResponse;
+      if (!response.ok) {
+        const errorData: ApiErrorResponse = await response.json();
+        const requestStatus = response.status;
+
+        if (requestStatus === 403 || requestStatus === 401) {
+          console.log('unauthorized');
+        }
+
+        throw new Error(errorData.message || 'An unexpected error occurred');
+      }
+
+      if (config?.isStream) {
+        return response.body as unknown as T;
+      }
+
+      const jsonResponse: T = await response.json();
+      return jsonResponse;
+    } catch (error) {
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error('An unexpected error occurred');
+    }
   }
 
   async get<T>(url: string, config?: CustomFetchConfig): Promise<T> {

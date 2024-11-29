@@ -1,17 +1,24 @@
+/* eslint-disable react/no-unescaped-entities */
 import React, { useCallback } from 'react';
 import { useFieldArray, useFormContext } from 'react-hook-form';
-import { Plus } from 'lucide-react';
+import { Plus, ExternalLink } from 'lucide-react';
 import { WebsitePreviewCard } from './WebsitePreviewCard';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { ScrollArea, ScrollBar } from '../ui/scroll-area';
 import { RHFShadcnCheckbox, RHFShadcnTextField, RHFShadcnTextarea } from '../RHF';
-import { getFaviconUrl, useSuggestedWebsites } from '@extension/shared';
+import { getFaviconUrl, useSuggestedWebsites, useAuthHealthCheckQuery, getConfig } from '@extension/shared';
 import type { ProfileFormTypes } from '@/lib/containers/profile-form';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
+import { cn } from '@/lib/utils';
 
 // Separate component for recommended websites section
 const RecommendedWebsites = ({ onWebsiteSelect }: { onWebsiteSelect: (value: string) => void }) => {
   const { data: recommendedWebsites, isLoading } = useSuggestedWebsites();
+  const { data: healthCheck } = useAuthHealthCheckQuery();
+  const { fields } = useFieldArray({ name: 'fillingWebsites' });
+
+  const hasReachedLimit = fields.length >= (healthCheck?.limitations?.maxWebsitesPerProfile || 0);
 
   if (isLoading) {
     return <span className="filliny-text-muted-foreground">Loading recommendations...</span>;
@@ -24,20 +31,35 @@ const RecommendedWebsites = ({ onWebsiteSelect }: { onWebsiteSelect: (value: str
   return (
     <div className="filliny-flex filliny-w-max filliny-space-x-1">
       {recommendedWebsites.map(item => (
-        <Badge
-          key={String(item.id)}
-          variant="outline"
-          className="filliny-flex filliny-cursor-pointer filliny-items-center filliny-gap-1 hover:filliny-bg-accent"
-          onClick={() => onWebsiteSelect(item.value)}>
-          <img
-            src={getFaviconUrl(item.value)}
-            alt={`${item.label} favicon`}
-            width={15}
-            height={15}
-            className="filliny-rounded"
-          />
-          {item.label}
-        </Badge>
+        <TooltipProvider key={String(item.id)}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Badge
+                variant="outline"
+                className={cn(
+                  'filliny-flex filliny-items-center filliny-gap-1',
+                  hasReachedLimit
+                    ? 'filliny-cursor-not-allowed filliny-opacity-50'
+                    : 'filliny-cursor-pointer hover:filliny-bg-accent',
+                )}
+                onClick={() => !hasReachedLimit && onWebsiteSelect(item.value)}>
+                <img
+                  src={getFaviconUrl(item.value)}
+                  alt={`${item.label} favicon`}
+                  width={15}
+                  height={15}
+                  className="filliny-rounded"
+                />
+                {item.label}
+              </Badge>
+            </TooltipTrigger>
+            {hasReachedLimit && (
+              <TooltipContent>
+                <p>Upgrade your plan to add more websites</p>
+              </TooltipContent>
+            )}
+          </Tooltip>
+        </TooltipProvider>
       ))}
     </div>
   );
@@ -69,18 +91,27 @@ function StepperForm1() {
     control,
     name: 'fillingWebsites',
   });
+  const { data: healthCheck } = useAuthHealthCheckQuery();
+
+  const hasReachedLimit = fields.length >= (healthCheck?.limitations?.maxWebsitesPerProfile || 0);
+  const currentPlan = healthCheck?.limitations?.plan?.planName || 'Free';
+  const maxWebsites = healthCheck?.limitations?.maxWebsitesPerProfile || 0;
 
   const handleAdd = useCallback(() => {
+    if (hasReachedLimit) return;
+
     append({
       fillingContext: '',
       isRootLoad: true,
       websiteUrl: '',
       isNew: true,
     });
-  }, [append]);
+  }, [append, hasReachedLimit]);
 
   const handleWebsiteSelect = useCallback(
     (websiteUrl: string) => {
+      if (hasReachedLimit) return;
+
       append({
         fillingContext: '',
         isRootLoad: true,
@@ -88,7 +119,7 @@ function StepperForm1() {
         isNew: false,
       });
     },
-    [append],
+    [append, hasReachedLimit],
   );
 
   const latestWebsiteValues = watch('fillingWebsites');
@@ -119,10 +150,37 @@ function StepperForm1() {
         )}
       </div>
 
-      <Button className="filliny-mt-2" onClick={handleAdd} variant="outline">
-        <Plus className="filliny-mr-2 filliny-h-4 filliny-w-4" />
-        Add Website
-      </Button>
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className="filliny-w-full">
+              <Button
+                className="filliny-mt-2 filliny-w-full"
+                onClick={handleAdd}
+                variant="outline"
+                disabled={hasReachedLimit}>
+                <Plus className="filliny-mr-2 filliny-h-4 filliny-w-4" />
+                Add Website {fields.length > 0 && `(${fields.length}/${maxWebsites})`}
+              </Button>
+            </div>
+          </TooltipTrigger>
+          {hasReachedLimit && (
+            <TooltipContent side="top" className="filliny-max-w-xs">
+              <div className="filliny-flex filliny-w-full filliny-flex-col filliny-gap-2">
+                <p>
+                  You've reached the maximum limit of {maxWebsites} websites for your {currentPlan} plan.
+                </p>
+                <Button
+                  variant="link"
+                  className="filliny-h-auto filliny-w-fit filliny-p-0"
+                  onClick={() => window.open(`${getConfig().baseURL}/pricing`, '_blank')}>
+                  Upgrade your plan <ExternalLink className="filliny-ml-1 filliny-h-4 filliny-w-4" />
+                </Button>
+              </div>
+            </TooltipContent>
+          )}
+        </Tooltip>
+      </TooltipProvider>
     </div>
   );
 }

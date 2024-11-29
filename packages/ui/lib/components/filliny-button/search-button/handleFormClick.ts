@@ -7,9 +7,6 @@ import { profileStrorage } from '@extension/storage';
 import type { Field, FieldType } from '@extension/shared';
 import { aiFillService, getMatchingWebsite } from '@extension/shared';
 
-// Move testMode to a configuration constant at the top of the file
-const TEST_MODE = true; // Set this to true to use test data instead of making API calls
-
 const getMockValueForFieldType = (type: FieldType, field: Field): string => {
   const now = new Date();
 
@@ -110,7 +107,11 @@ const getMockValueForFieldType = (type: FieldType, field: Field): string => {
   }
 };
 
-export const handleFormClick = async (event: React.MouseEvent<HTMLButtonElement>, formId: string): Promise<void> => {
+export const handleFormClick = async (
+  event: React.MouseEvent<HTMLButtonElement>,
+  formId: string,
+  testMode: boolean = false,
+): Promise<void> => {
   event.preventDefault();
 
   const form = document.querySelector<HTMLFormElement>(`form[data-form-id="${formId}"]`);
@@ -128,13 +129,13 @@ export const handleFormClick = async (event: React.MouseEvent<HTMLButtonElement>
     const fields = detectFields(form);
     console.log('detected fields', fields);
 
-    if (TEST_MODE) {
+    if (testMode) {
       console.log('Running in test mode - using mock data');
       const mockResponse = fields.map(field => ({
         ...field,
         value: getMockValueForFieldType(field.type, field),
       }));
-      await updateFormFields(mockResponse, TEST_MODE);
+      await updateFormFields(mockResponse, testMode);
       return;
     }
 

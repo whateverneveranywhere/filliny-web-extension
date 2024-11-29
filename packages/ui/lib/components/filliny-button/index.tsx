@@ -8,8 +8,9 @@ import { CSS } from '@dnd-kit/utilities';
 import { DragButton } from './drag-button';
 import { LogoButton } from './logo-button';
 import { FillinyVisionButton } from './filliny-vision-button';
-import { BugReportButton } from './bug-report-button';
+import { SupportRequestButton } from './support-request-button';
 import { ButtonWrapper, type ButtonComponentProps } from './button-wrapper';
+import { FillinyTestModeFillerButton } from './test-mode-button';
 
 interface ButtonConfig {
   Component: React.FC<ButtonComponentProps>;
@@ -22,9 +23,9 @@ interface Position {
 }
 
 const buttonComponents: ButtonConfig[] = [
-  // { Component: FillinyVisionButton, position: { top: '-25px', left: '-10px' } },
+  { Component: FillinyTestModeFillerButton, position: { top: '-25px', left: '-10px' } },
   { Component: DragButton, position: { top: '15px', left: '-25px' } },
-  { Component: BugReportButton, position: { top: '30px', left: '-10px' } },
+  { Component: SupportRequestButton, position: { top: '30px', left: '-10px' } },
   { Component: FillinyVisionButton, position: { top: '-10px', left: '-25px' } }, // New button in between
 ];
 

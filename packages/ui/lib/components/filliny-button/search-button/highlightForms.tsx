@@ -4,7 +4,7 @@ import { detectFields } from './detectionHelpers';
 import { addGlowingBorder, findOrCreateShadowContainer, getFormPosition } from './overlayUtils';
 import type { HighlightFormsOptions } from './types';
 
-export const highlightForms = ({ visionOnly = false }: HighlightFormsOptions): void => {
+export const highlightForms = ({ visionOnly = false, testMode = false }: HighlightFormsOptions): void => {
   const shadowRoot = document.querySelector('#chrome-extension-filliny')?.shadowRoot;
 
   if (!shadowRoot) {
@@ -40,12 +40,17 @@ export const highlightForms = ({ visionOnly = false }: HighlightFormsOptions): v
         console.warn(`An overlay is already active on form ${formId}.`);
         return;
       }
-      createFormOverlay(form, formId, overlaysContainer);
+      createFormOverlay(form, formId, overlaysContainer, testMode);
     }
   });
 };
 
-const createFormOverlay = (form: HTMLFormElement, formId: string, overlaysContainer: HTMLDivElement): void => {
+const createFormOverlay = (
+  form: HTMLFormElement,
+  formId: string,
+  overlaysContainer: HTMLDivElement,
+  testMode: boolean,
+): void => {
   if (overlaysContainer.querySelector(`#overlay-${formId}`)) {
     console.warn(`An overlay is already active on form ${formId}.`);
     return;
@@ -68,7 +73,9 @@ const createFormOverlay = (form: HTMLFormElement, formId: string, overlaysContai
     delete form.dataset.formId;
   };
 
-  overlayRoot.render(<FormsOverlay formId={formId} initialPosition={initialPosition} onDismiss={cleanup} />);
+  overlayRoot.render(
+    <FormsOverlay formId={formId} initialPosition={initialPosition} onDismiss={cleanup} testMode={testMode} />,
+  );
 
   formElement.classList.add('filliny-pointer-events-none');
   form.dataset.fillinyOverlayActive = 'true';

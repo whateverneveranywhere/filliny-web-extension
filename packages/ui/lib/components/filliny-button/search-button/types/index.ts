@@ -7,4 +7,5 @@ export interface OverlayPosition {
 
 export interface HighlightFormsOptions {
   visionOnly?: boolean;
+  testMode?: boolean;
 }

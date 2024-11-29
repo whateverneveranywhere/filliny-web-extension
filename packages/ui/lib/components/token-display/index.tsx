@@ -77,7 +77,7 @@ function TokenDisplay({ tokens = 0, onRefresh, isRefetching = false, isLoading =
           </div>
           <a
             className="filliny-w-full"
-            href={`${config.baseURL}/pricing?tab=tokens`}
+            href={`${config.baseURL}/pricing?tab=token`}
             target="_blank"
             rel="noopener noreferrer">
             <Button size={'sm'} variant={'default'} className="filliny-w-full">

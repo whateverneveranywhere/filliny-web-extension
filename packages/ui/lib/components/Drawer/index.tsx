@@ -43,7 +43,7 @@ function Drawer(props: Props) {
   return (
     <ShadcnDrawer open={open} onOpenChange={onOpenChange}>
       <DrawerContent>
-        <div className="filliny-mx-auto filliny-w-full filliny-max-w-sm">
+        <div className="filliny-mx-auto filliny-w-full">
           <DrawerHeader>
             <DrawerTitle className="filliny-text-center">{title}</DrawerTitle>
             {description && <DrawerDescription>{description}</DrawerDescription>}{' '}

@@ -120,7 +120,8 @@ function ProfileForm({ id, onFormSubmit }: Props) {
       reset();
     } catch (error) {
       console.error('Error submitting profile:', error);
-      toast({ variant: 'destructive', title: 'Failed to save profile' });
+      const errorMessage = error instanceof Error ? error.message : 'Failed to save profile';
+      toast({ variant: 'destructive', title: 'Error', description: errorMessage });
     }
   });
 

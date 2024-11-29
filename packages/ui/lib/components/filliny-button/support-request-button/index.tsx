@@ -1,10 +1,10 @@
 import React from 'react';
-import { Bug } from 'lucide-react';
+import { HelpCircle } from 'lucide-react';
 import { Button } from '../../ui/button';
 import type { ButtonComponentProps } from '../button-wrapper';
 import { getConfig } from '@extension/shared';
 
-const BugReportButton: React.FC<ButtonComponentProps> = () => {
+const SupportRequestButton: React.FC<ButtonComponentProps> = () => {
   const gatherBugDetails = async () => {
     try {
       const visitingUrl = window.location.href;
@@ -27,9 +27,9 @@ const BugReportButton: React.FC<ButtonComponentProps> = () => {
       size={'icon'}
       className="filliny-size-9 filliny-overflow-hidden !filliny-rounded-full filliny-text-white"
       onClick={gatherBugDetails}>
-      <Bug className="filliny-size-4" />
+      <HelpCircle className="filliny-size-4" />
     </Button>
   );
 };
 
-export { BugReportButton };
+export { SupportRequestButton };

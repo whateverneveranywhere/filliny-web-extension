@@ -104,26 +104,30 @@ const useProfileManagement = (url: string) => {
   };
 
   const handleError = (error: unknown) => {
-    const errorText = error instanceof Error ? error.message : 'An unexpected error occurred';
+    const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
 
-    if (errorText.includes('maximum')) {
+    if (errorMessage.toLowerCase().includes('maximum') || errorMessage.toLowerCase().includes('limit')) {
       toast({
         variant: 'destructive',
-        title: 'Token Limit Reached',
+        title: 'Limit Reached',
         description: (
-          <div className="filliny-flex filliny-items-center filliny-gap-2">
-            <span>You've reached your token limit.</span>
+          <div className="filliny-flex filliny-flex-col filliny-items-center filliny-gap-2">
+            <span>{errorMessage}</span>
             <Button
               variant="link"
-              className="filliny-h-auto filliny-p-0"
-              onClick={() => window.open(`${config.baseURL}/pricing?tab=tokens`, '_blank')}>
+              className="filliny-h-auto filliny-w-full filliny-p-0"
+              onClick={() => window.open(`${config.baseURL}/pricing?tab=subscription`, '_blank')}>
               Upgrade Plan <ExternalLink className="filliny-ml-1 filliny-h-4 filliny-w-4" />
             </Button>
           </div>
         ),
       });
     } else {
-      toast({ variant: 'destructive', title: 'Error', description: errorText });
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: errorMessage,
+      });
     }
     console.error('Error adding website:', error);
   };
@@ -159,18 +163,18 @@ const HomePage = () => {
       <div className="filliny-flex filliny-min-h-[200px] filliny-w-full filliny-flex-col filliny-gap-4">
         {/* Token Status */}
         {dashboardOverview?.remainingTokens === 0 && (
-          <Alert variant="destructive">
+          <Alert variant="default">
             <AlertCircle className="filliny-h-4 filliny-w-4" />
-            <AlertTitle>Low Token Balance</AlertTitle>
+            <AlertTitle>No Tokens Left</AlertTitle>
             <AlertDescription className="filliny-flex filliny-items-center filliny-gap-2">
-              Purchase more tokens to continue using AI features.
-              <Button
-                variant="link"
-                className="filliny-h-auto filliny-p-0"
-                onClick={() => window.open(`${getConfig().baseURL}/pricing?tab=tokens`, '_blank')}>
-                Buy Tokens <ExternalLink className="filliny-ml-1 filliny-h-4 filliny-w-4" />
-              </Button>
+              Purchase more tokens to continue using AI features
             </AlertDescription>
+            <Button
+              variant="link"
+              className="filliny-h-auto filliny-w-full filliny-p-0"
+              onClick={() => window.open(`${getConfig().baseURL}/pricing?tab=token`, '_blank')}>
+              Buy Tokens <ExternalLink className="filliny-ml-1 filliny-h-4 filliny-w-4" />
+            </Button>
           </Alert>
         )}
         {isUrlValid ? (
