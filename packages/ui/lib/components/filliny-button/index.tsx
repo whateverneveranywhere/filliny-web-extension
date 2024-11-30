@@ -4,6 +4,7 @@ import type { DragEndEvent } from '@dnd-kit/core';
 import { DndContext, useDraggable } from '@dnd-kit/core';
 import { restrictToVerticalAxis } from '@dnd-kit/modifiers';
 import { CSS } from '@dnd-kit/utilities';
+import { useStorage } from '@extension/shared';
 
 import { DragButton } from './drag-button';
 import { LogoButton } from './logo-button';
@@ -11,6 +12,7 @@ import { FillinyVisionButton } from './filliny-vision-button';
 import { SupportRequestButton } from './support-request-button';
 import { ButtonWrapper, type ButtonComponentProps } from './button-wrapper';
 import { FillinyTestModeFillerButton } from './test-mode-button';
+import { positionStorage } from '@extension/storage';
 
 interface ButtonConfig {
   Component: React.FC<ButtonComponentProps>;
@@ -25,7 +27,7 @@ interface Position {
 const buttonComponents: ButtonConfig[] = [
   { Component: FillinyTestModeFillerButton, position: { top: '-28px', left: '-8px' } },
   { Component: DragButton, position: { top: '15px', left: '-25px' } },
-  { Component: SupportRequestButton, position: { top: '30px', left: '-10px' } },
+  { Component: SupportRequestButton, position: { top: '32px', left: '-8px' } },
   { Component: FillinyVisionButton, position: { top: '-10px', left: '-25px' } }, // New button in between
 ];
 
@@ -78,20 +80,21 @@ const DraggableButton = ({ position }: { position: Position }) => {
 };
 
 const FillinyButton: React.FC = () => {
-  const [position, setPosition] = useState<Position>({
-    x: 0,
-    y: window.innerHeight * 0.25,
-  });
+  const savedPosition = useStorage(positionStorage);
+  const [position, setPosition] = useState<Position>(savedPosition);
 
-  const handleDragEnd = (event: DragEndEvent) => {
+  const handleDragEnd = async (event: DragEndEvent) => {
     const { delta } = event;
     if (delta) {
-      const newY = Math.min(Math.max(position.y + delta.y, 170), window.innerHeight - 120);
+      const newY = Math.min(Math.max(position.y + delta.y, 60), window.innerHeight - 120);
 
-      setPosition(prev => ({
-        ...prev,
+      const newPosition = {
+        ...position,
         y: newY,
-      }));
+      };
+
+      setPosition(newPosition);
+      await positionStorage.setPosition(newPosition);
     }
   };
 
