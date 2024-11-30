@@ -14,16 +14,22 @@ type PositionStorage = BaseStorage<Position> & {
 
 const defaultPosition: Position = {
   x: 0,
-  y: window.innerHeight * 0.25,
+  y: 0,
 };
 
-const storage = createStorage<Position>('filliny-button-position', defaultPosition, {
-  storageEnum: StorageEnum.Local,
-  liveUpdate: true,
-});
+const isClient = typeof window !== 'undefined';
+const storage = isClient
+  ? createStorage<Position>('filliny-button-position', defaultPosition, {
+      storageEnum: StorageEnum.Local,
+      liveUpdate: true,
+    })
+  : null;
 
 export const positionStorage: PositionStorage = {
-  ...storage,
-  setPosition: async (position: Position) => await storage.set(position),
-  resetPosition: async () => await storage.set(defaultPosition),
+  get: async () => storage?.get() ?? defaultPosition,
+  set: async value => storage?.set(value),
+  getSnapshot: () => storage?.getSnapshot() ?? defaultPosition,
+  subscribe: listener => storage?.subscribe(listener) ?? (() => {}),
+  setPosition: async position => storage?.set(position),
+  resetPosition: async () => storage?.set(defaultPosition),
 };

@@ -1,6 +1,7 @@
 import type { ReactNode, CSSProperties } from 'react';
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 
 export interface ButtonComponentProps {
   isHovered: boolean;
@@ -11,28 +12,39 @@ export interface ButtonWrapperProps {
   isHovered: boolean;
   isDragging: boolean;
   position: CSSProperties;
+  tooltipContent?: string;
   children?: ReactNode;
 }
 
-const ButtonWrapper: React.FC<ButtonWrapperProps> = ({ children, isHovered, isDragging, position }) => (
+const ButtonWrapper: React.FC<ButtonWrapperProps> = ({ children, isHovered, isDragging, position, tooltipContent }) => (
   <AnimatePresence>
     <motion.div
       style={{ position: 'absolute', ...position }}
-      className="filliny-p-2"
-      initial={{ opacity: 0, x: 0, y: 0 }}
+      className="filliny-z-[1000000000001] filliny-p-2"
+      initial={{ x: 0, y: 0 }}
       animate={{
-        opacity: isHovered || isDragging ? 1 : 0,
         x: isHovered || isDragging ? position.left : 0,
         y: isHovered || isDragging ? position.top : 0,
-        transition: { duration: 0.3 }, // Fast appearance
+        transition: { duration: 0.3 },
       }}
       exit={{
-        opacity: 0,
         x: 0,
         y: 0,
-        transition: { duration: 0.3, delay: 0.1 }, // Slow disappearance with delay
+        transition: { duration: 0.3, delay: 0.1 },
       }}>
-      {children}
+      <div
+        className={`filliny-transition-opacity ${isHovered || isDragging ? 'filliny-opacity-100' : 'filliny-opacity-0'}`}>
+        <TooltipProvider delayDuration={0}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="filliny-pointer-events-auto">{children}</div>
+            </TooltipTrigger>
+            <TooltipContent side="right" className="filliny-z-[1000000000002] filliny-select-none">
+              <p>{tooltipContent}</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      </div>
     </motion.div>
   </AnimatePresence>
 );

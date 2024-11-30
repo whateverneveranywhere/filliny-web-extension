@@ -5,18 +5,18 @@ import { DndContext, useDraggable } from '@dnd-kit/core';
 import { restrictToVerticalAxis } from '@dnd-kit/modifiers';
 import { CSS } from '@dnd-kit/utilities';
 import { useStorage } from '@extension/shared';
-
-import { DragButton } from './drag-button';
 import { LogoButton } from './logo-button';
 import { FillinyVisionButton } from './filliny-vision-button';
 import { SupportRequestButton } from './support-request-button';
 import { ButtonWrapper, type ButtonComponentProps } from './button-wrapper';
 import { FillinyTestModeFillerButton } from './test-mode-button';
 import { positionStorage } from '@extension/storage';
+import { DragButton } from './drag-button';
 
 interface ButtonConfig {
   Component: React.FC<ButtonComponentProps>;
   position: CSSProperties;
+  tooltipContent: string;
 }
 
 interface Position {
@@ -25,10 +25,22 @@ interface Position {
 }
 
 const buttonComponents: ButtonConfig[] = [
-  { Component: FillinyTestModeFillerButton, position: { top: '-28px', left: '-8px' } },
-  { Component: DragButton, position: { top: '15px', left: '-25px' } },
-  { Component: SupportRequestButton, position: { top: '32px', left: '-8px' } },
-  { Component: FillinyVisionButton, position: { top: '-10px', left: '-25px' } }, // New button in between
+  {
+    Component: FillinyTestModeFillerButton,
+    position: { top: '-28px', left: '-8px' },
+    tooltipContent: 'Test form filling functionality',
+  },
+  { Component: DragButton, position: { top: '15px', left: '-25px' }, tooltipContent: 'Drag to reposition the button' },
+  {
+    Component: SupportRequestButton,
+    position: { top: '32px', left: '-8px' },
+    tooltipContent: 'Get help or report an issue',
+  },
+  {
+    Component: FillinyVisionButton,
+    position: { top: '-10px', left: '-25px' },
+    tooltipContent: 'Highlight fillable form fields',
+  },
 ];
 
 const DraggableButton = ({ position }: { position: Position }) => {
@@ -43,7 +55,7 @@ const DraggableButton = ({ position }: { position: Position }) => {
   const style: CSSProperties = {
     position: 'fixed',
     top: position.y,
-    right: 30,
+    right: 10,
     transform: CSS.Transform.toString(transform),
     touchAction: 'none',
     zIndex: 1000000000000,
@@ -53,15 +65,24 @@ const DraggableButton = ({ position }: { position: Position }) => {
     <div
       ref={setNodeRef}
       style={style}
-      className="filliny-group filliny-z-[10000000] filliny-flex filliny-size-16 filliny-transform-gpu filliny-cursor-pointer filliny-items-center filliny-p-5"
+      className="filliny-group filliny-flex filliny-size-16 filliny-transform-gpu filliny-cursor-pointer filliny-items-center"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}>
       <div ref={nodeRef} className="filliny-relative">
-        <LogoButton isHovered={isHovered} isDragging={isDragging} />
+        <div className="filliny-absolute filliny-z-[1000000000000]">
+          <div className="filliny-pointer-events-auto">
+            <LogoButton isHovered={isHovered} isDragging={isDragging} />
+          </div>
+        </div>
         {buttonComponents.map((button, index) => {
           if (button.Component === DragButton) {
             return (
-              <ButtonWrapper key={index} isHovered={isHovered} isDragging={isDragging} position={button.position}>
+              <ButtonWrapper
+                key={index}
+                isHovered={isHovered}
+                isDragging={isDragging}
+                position={button.position}
+                tooltipContent={button.tooltipContent}>
                 <div ref={dragHandleRef} {...attributes} {...listeners}>
                   <button.Component isHovered={isHovered} isDragging={isDragging} />
                 </div>
@@ -69,7 +90,12 @@ const DraggableButton = ({ position }: { position: Position }) => {
             );
           }
           return (
-            <ButtonWrapper key={index} isHovered={isHovered} isDragging={isDragging} position={button.position}>
+            <ButtonWrapper
+              key={index}
+              isHovered={isHovered}
+              isDragging={isDragging}
+              position={button.position}
+              tooltipContent={button.tooltipContent}>
               <button.Component isHovered={isHovered} isDragging={isDragging} />
             </ButtonWrapper>
           );
@@ -86,7 +112,7 @@ const FillinyButton: React.FC = () => {
   const handleDragEnd = async (event: DragEndEvent) => {
     const { delta } = event;
     if (delta) {
-      const newY = Math.min(Math.max(position.y + delta.y, 60), window.innerHeight - 120);
+      const newY = Math.min(Math.max(position.y + delta.y, 20), window.innerHeight - 150);
 
       const newPosition = {
         ...position,
