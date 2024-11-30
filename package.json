@@ -27,7 +27,11 @@
     "lint:fix": "turbo lint:fix --continue -- --fix --cache --cache-location node_modules/.cache/.eslintcache",
     "prettier": "turbo prettier --continue -- --cache --cache-location node_modules/.cache/.prettiercache",
     "prepare": "husky",
-    "update-version": "bash update_version.sh"
+    "update-version": "bash update_version.sh",
+    "build:preview": "cross-env VITE_WEBAPP_ENV=dev vite build",
+    "build:prod": "cross-env VITE_WEBAPP_ENV=prod vite build",
+    "zip:preview": "npm run build:preview && zip -r dist.zip dist",
+    "zip:prod": "npm run build:prod && zip -r dist.zip dist"
   },
   "dependencies": {
     "eslint-plugin-tailwindcss": "^3.17.4",
