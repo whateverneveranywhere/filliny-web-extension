@@ -32,10 +32,10 @@ export function FillinyTestModeFillerButton() {
   return (
     <Button
       variant={'default'}
-      className="!filliny-size-8 filliny-overflow-hidden !filliny-rounded-full !filliny-p-1"
       onClick={() => highlightForms({ visionOnly: false, testMode: true })}
-      disabled={!isDOMReady}>
-      <TestTube className="filliny-h-4 filliny-w-4" />
+      disabled={!isDOMReady}
+      className="!filliny-size-9 filliny-overflow-hidden !filliny-rounded-full filliny-text-white">
+      <TestTube className="filliny-size-4 filliny-text-white" />
     </Button>
   );
 }

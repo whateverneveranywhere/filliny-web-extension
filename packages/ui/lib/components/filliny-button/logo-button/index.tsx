@@ -33,7 +33,8 @@ const LogoButton: React.FC<ButtonComponentProps> = () => {
   return (
     <Button
       variant={'default'}
-      className="!filliny-size-16 filliny-overflow-hidden !filliny-rounded-full !filliny-p-2"
+      size={'icon'}
+      className="!filliny-size-16 !filliny-rounded-full !filliny-p-0"
       onClick={() => highlightForms({ visionOnly: false })}
       disabled={!isDOMReady}>
       <Logo width={300} height={300} />

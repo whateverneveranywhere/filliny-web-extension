@@ -15,7 +15,7 @@ const SupportRequestButton: React.FC<ButtonComponentProps> = () => {
       const config = getConfig();
 
       const queryString = new URLSearchParams(bugDetails as Record<string, string>).toString();
-      window.location.href = `${config.baseURL}/dashboard/bug-report?${queryString}`;
+      window.location.href = `${config.baseURL}/dashboard/support-request?${queryString}`;
     } catch (error) {
       console.error(error);
     }

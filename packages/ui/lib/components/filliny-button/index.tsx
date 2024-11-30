@@ -23,7 +23,7 @@ interface Position {
 }
 
 const buttonComponents: ButtonConfig[] = [
-  { Component: FillinyTestModeFillerButton, position: { top: '-25px', left: '-10px' } },
+  { Component: FillinyTestModeFillerButton, position: { top: '-28px', left: '-8px' } },
   { Component: DragButton, position: { top: '15px', left: '-25px' } },
   { Component: SupportRequestButton, position: { top: '30px', left: '-10px' } },
   { Component: FillinyVisionButton, position: { top: '-10px', left: '-25px' } }, // New button in between
@@ -54,7 +54,7 @@ const DraggableButton = ({ position }: { position: Position }) => {
       className="filliny-group filliny-z-[10000000] filliny-flex filliny-size-16 filliny-transform-gpu filliny-cursor-pointer filliny-items-center filliny-p-5"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}>
-      <div ref={nodeRef} className="filliny-relative filliny-size-16">
+      <div ref={nodeRef} className="filliny-relative">
         <LogoButton isHovered={isHovered} isDragging={isDragging} />
         {buttonComponents.map((button, index) => {
           if (button.Component === DragButton) {
