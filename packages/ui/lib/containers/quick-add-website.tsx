@@ -18,7 +18,7 @@ function QuickAddWebsiteToProfile({ onQuickAdd, isLoading, currentPlan, maxWebsi
   const tooltipText = isDisabled
     ? `You've reached the maximum number of websites (${maxWebsites}) allowed for your ${currentPlan} plan`
     : 'Add this website to your profile';
-  const { url, isLoading: isLoadingUrl, isValid } = useActiveTabUrl();
+  const { activeTabUrl, isLoading: isLoadingUrl, isValid } = useActiveTabUrl();
 
   const button = (
     <Button
@@ -45,7 +45,7 @@ function QuickAddWebsiteToProfile({ onQuickAdd, isLoading, currentPlan, maxWebsi
         <CardContent>
           <div className="filliny-space-y-4">
             <WebsitePreviewCard
-              websiteURL={url}
+              websiteURL={activeTabUrl}
               isRootLoad
               hideExpandTrigger
               isLoading={isLoading || isLoadingUrl}

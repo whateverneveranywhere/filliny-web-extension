@@ -23,7 +23,6 @@ function RHFShadcnCheckbox({
         <FormItem className="filliny-flex filliny-w-full filliny-flex-row filliny-items-start filliny-space-x-3 filliny-space-y-0 filliny-rounded-md filliny-py-4">
           <FormControl>
             <Checkbox
-              className="!-filliny-mt-10"
               required={required}
               data-testid={field.name}
               onCheckedChange={e => {

@@ -103,8 +103,17 @@ const useProfileManagement = (url: string) => {
 const HomePage = () => {
   const { data: dashboardOverview, isLoading: isLoadingOverview } = useDashboardOverview();
   const { activeProfile } = useActiveProfile();
-  const { url, isLoading: isLoadingUrl, isValid: isUrlValid, matchingWebsite } = useActiveTabUrl();
-  const { handleQuickAdd, isLoading: isProfileLoading, currentPlan, maxWebsites } = useProfileManagement(url);
+  const {
+    activeTabUrl,
+    isLoading: isLoadingUrl,
+    isValid: isUrlValid,
+    matchingWebsite,
+  } = useActiveTabUrl({
+    websites: activeProfile?.fillingWebsites,
+    mode: 'activeTab',
+  });
+
+  const { handleQuickAdd, isLoading: isProfileLoading, currentPlan, maxWebsites } = useProfileManagement(activeTabUrl);
 
   if (isLoadingUrl || isLoadingOverview || isProfileLoading) {
     return (
@@ -145,7 +154,7 @@ const HomePage = () => {
               <AlertTitle className="filliny-text-lg">Error</AlertTitle>
               <AlertDescription>
                 URL is not valid <br />
-                Detected URL: {url}
+                Detected URL: {activeTabUrl}
               </AlertDescription>
             </Alert>
           )}
