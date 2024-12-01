@@ -11,6 +11,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from '@/lib/hooks/use-toast';
 import { Plus } from 'lucide-react';
+import type { DTOProfileFillingForm } from '@extension/storage';
 import { profileStrorage } from '@extension/storage';
 import { ProfileForm } from '@/lib/containers/profile-form';
 import FormProvider from '../components/RHF/FormProvider';
@@ -50,14 +51,20 @@ function ProfileSelector() {
       try {
         await updateActiveProfile({ activeProfileId: nextActiveId });
         setValue('defaultActiveProfileId', nextActiveId);
-        await profileStrorage.setDefaultProfile(activeProfile);
+
+        // Find the new active profile from the profiles list
+        const newActiveProfile = profiles?.find(profile => String(profile.id) === nextActiveId);
+        if (newActiveProfile) {
+          await profileStrorage.setDefaultProfile(newActiveProfile as unknown as DTOProfileFillingForm);
+        }
+
         toast({ title: 'Profile updated successfully' });
       } catch (error) {
         console.error(error);
         toast({ variant: 'destructive', title: 'Failed to update profile' });
       }
     },
-    [activeProfileId, activeProfile, updateActiveProfile, setValue],
+    [activeProfileId, profiles, updateActiveProfile, setValue],
   );
 
   const handleDeleteProfile = useCallback(
@@ -69,10 +76,12 @@ function ProfileSelector() {
         await refetchProfiles();
 
         if (isActiveProfile && profiles) {
-          const deletedIndex = profiles.findIndex(profile => String(profile.id) === id);
+          // Only reset if we don't have any remaining profiles
           const remainingProfiles = profiles.filter(profile => String(profile.id) !== id);
-
-          if (remainingProfiles.length > 0) {
+          if (remainingProfiles.length === 0) {
+            await profileStrorage.resetDefaultProfile();
+          } else {
+            const deletedIndex = profiles.findIndex(profile => String(profile.id) === id);
             const newActiveProfile = remainingProfiles[deletedIndex] || remainingProfiles[deletedIndex - 1];
             if (newActiveProfile) {
               await updateActiveProfile({ activeProfileId: String(newActiveProfile.id) });
@@ -152,7 +161,7 @@ function ProfileSelector() {
           onDelete={handleDeleteProfile}
           onEdit={handleEditProfile}
           onChange={handleProfileChange}
-          value={activeProfileId}
+          value={methods.watch('defaultActiveProfileId')}
           name="defaultActiveProfileId"
           className="filliny-w-full"
           title={''}
