@@ -1,8 +1,9 @@
 import { useActiveTabUrl, useStorage } from '@extension/shared';
-import { profileStrorage } from '@extension/storage';
+import { authStorage, profileStrorage } from '@extension/storage';
 import { FillinyButton } from '@extension/ui';
 
 export default function App() {
+  const auth = useStorage(authStorage);
   const defaultProfile = useStorage(profileStrorage);
   const {
     isLoading,
@@ -13,6 +14,7 @@ export default function App() {
   });
 
   return (
+    auth &&
     !isLoading &&
     defaultProfile &&
     isVisitingUrlValid &&

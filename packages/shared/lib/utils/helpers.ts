@@ -1,4 +1,4 @@
-import type { DTOProfileFillingForm } from '@extension/storage';
+import { type DTOProfileFillingForm } from '@extension/storage';
 import type { ErrorResponse, GetAuthTokenResponse, Request } from './shared-types';
 import { BackgroundActions, WebappEnvs } from './shared-types';
 
@@ -115,6 +115,28 @@ export const getConfig = (webappEnv?: WebappEnvs): ConfigEntry => {
   return config[webappEnv || env];
 };
 
+const handleAuthTokenChanged = (
+  envConfig: ReturnType<typeof getConfig>,
+  sendResponse: (response: GetAuthTokenResponse) => void,
+) => {
+  // Get auth token from cookie
+  chrome.cookies.get(
+    {
+      url: envConfig.baseURL,
+      name: envConfig.cookieName,
+    },
+    cookie => {
+      const token = cookie ? cookie.value : null;
+
+      // Send response back
+      sendResponse({
+        success: { token },
+      });
+    },
+  );
+  return true; // Keep message channel open for async response
+};
+
 export const handleAction = (
   request: Request,
   sender: chrome.runtime.MessageSender,
@@ -122,13 +144,19 @@ export const handleAction = (
 ): boolean => {
   const envConfig = getConfig();
 
-  if (request.action === BackgroundActions.GET_AUTH_TOKEN) {
-    handleGetAuthToken(envConfig, sendResponse);
-    return true; // Keep the message channel open for sendResponse
-  }
+  switch (request.action) {
+    case BackgroundActions.GET_AUTH_TOKEN:
+      handleGetAuthToken(envConfig, sendResponse);
+      return true;
 
-  sendResponse({ error: { error: 'Invalid action' } });
-  return false;
+    case BackgroundActions.AUTH_TOKEN_CHANGED:
+      handleAuthTokenChanged(envConfig, sendResponse);
+      return true;
+
+    default:
+      sendResponse({ error: { error: 'Invalid action' } });
+      return false;
+  }
 };
 
 export const getCurrentVistingUrl = (): Promise<string> => {
@@ -145,5 +173,26 @@ export const getCurrentVistingUrl = (): Promise<string> => {
         reject('No active tab found');
       }
     });
+  });
+};
+
+// Add a new function to listen for cookie changes
+export const setupAuthTokenListener = (webappEnv?: WebappEnvs) => {
+  const envConfig = getConfig(webappEnv);
+
+  // Listen for changes to the specific cookie
+  chrome.cookies.onChanged.addListener(changeInfo => {
+    const { cookie } = changeInfo;
+
+    if (cookie.domain === new URL(envConfig.baseURL).hostname && cookie.name === envConfig.cookieName) {
+      // Handle the cookie change
+      handleGetAuthToken(envConfig, response => {
+        // Broadcast the change to all extension contexts
+        chrome.runtime.sendMessage({
+          action: BackgroundActions.AUTH_TOKEN_CHANGED,
+          payload: response,
+        });
+      });
+    }
   });
 };

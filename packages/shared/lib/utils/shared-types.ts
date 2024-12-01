@@ -65,6 +65,7 @@ export interface StepperProps {
 // Define reusable action types
 export enum BackgroundActions {
   GET_AUTH_TOKEN = 'GET_AUTH_TOKEN',
+  AUTH_TOKEN_CHANGED = 'AUTH_TOKEN_CHANGED',
   INVALID_ACTION = 'INVALID_ACTION',
   // Add future actions here
 }
@@ -78,9 +79,10 @@ interface ActionRequest<ActionType, Payload = undefined> {
 // Specific request interfaces for each action
 export type GetAuthTokenRequest = ActionRequest<BackgroundActions.GET_AUTH_TOKEN>;
 export type InvalidRequest = ActionRequest<BackgroundActions.INVALID_ACTION>;
+export type AuthTokenChangedRequest = ActionRequest<BackgroundActions.AUTH_TOKEN_CHANGED, GetAuthTokenResponse>;
 
 // Union of all valid requests
-export type Request = GetAuthTokenRequest | InvalidRequest;
+export type Request = GetAuthTokenRequest | AuthTokenChangedRequest | InvalidRequest;
 
 // Generic interface for action responses
 interface ActionResponse<SuccessData = undefined, ErrorData = undefined> {

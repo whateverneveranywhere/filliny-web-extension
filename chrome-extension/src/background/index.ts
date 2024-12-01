@@ -1,19 +1,27 @@
+import { getConfig, handleAction } from '@extension/shared';
 import 'webextension-polyfill';
-import { exampleThemeStorage } from '@extension/storage';
 
-exampleThemeStorage.get().then(theme => {
-  console.log('theme', theme);
+// Listen for messages from other parts of the extension
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  return handleAction(request, sender, sendResponse);
 });
 
-console.log('background loaded');
+// Handle extension installation
+chrome.runtime.onInstalled.addListener(details => {
+  if (details.reason === 'install') {
+    const config = getConfig();
+    chrome.tabs.create({
+      url: `${config.baseURL}/auth/sign-in`,
+    });
+  }
+});
 
-// Allow users to toggle the panel by clicking the extension icon
+// Set up side panel behavior
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(error => console.error(error));
 
-// Add click handler for extension icon
+// Handle extension icon clicks
 chrome.action.onClicked.addListener(async tab => {
   if (tab.windowId) {
-    // This will toggle the panel
     await chrome.sidePanel.open({ windowId: tab.windowId });
   }
 });

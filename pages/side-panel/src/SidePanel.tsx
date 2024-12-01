@@ -6,19 +6,31 @@ import { useEffect } from 'react';
 const HomePage = () => {
   const auth = useStorage(authStorage);
 
-  // In your React component
   useEffect(() => {
+    // Initial auth check
     chrome.runtime.sendMessage({ action: BackgroundActions.GET_AUTH_TOKEN }, response => {
       if (response && response.success && response.success.token) {
         authStorage.setToken(response.success.token);
       } else {
-        console.error('Failed to get auth token:', response);
+        authStorage.deleteToken();
+      }
+    });
+
+    // Listen for auth token changes
+    chrome.runtime.onMessage.addListener(message => {
+      if (message.action === BackgroundActions.AUTH_TOKEN_CHANGED) {
+        const token = message.payload?.success?.token;
+        if (token) {
+          authStorage.setToken(token);
+        } else {
+          authStorage.deleteToken();
+        }
       }
     });
   }, []);
 
   return (
-    <div className="size-full">
+    <>
       {auth ? (
         <>
           <RouterProvider />
@@ -26,7 +38,7 @@ const HomePage = () => {
       ) : (
         <SigninPage />
       )}
-    </div>
+    </>
   );
 };
 
