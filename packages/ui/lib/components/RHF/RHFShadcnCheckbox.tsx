@@ -20,9 +20,10 @@ function RHFShadcnCheckbox({
       control={control}
       name={name}
       render={({ field }) => (
-        <FormItem className="filliny-flex filliny-w-full filliny-flex-row filliny-items-start filliny-space-x-3 filliny-space-y-0 filliny-rounded-md filliny-p-4">
+        <FormItem className="filliny-flex filliny-w-full filliny-flex-row filliny-items-start filliny-space-x-3 filliny-space-y-0 filliny-rounded-md filliny-py-4">
           <FormControl>
             <Checkbox
+              className="!-filliny-mt-10"
               required={required}
               data-testid={field.name}
               onCheckedChange={e => {
@@ -34,7 +35,7 @@ function RHFShadcnCheckbox({
               checked={field.value !== undefined ? field.value : externalValue}
             />
           </FormControl>
-          <div className="space-y-1 leading-none">
+          <div className="filliny-leading-none">
             <FormLabel>{title}</FormLabel>
             {description && <FormDescription>{description}</FormDescription>}
           </div>

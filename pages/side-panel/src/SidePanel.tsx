@@ -1,4 +1,4 @@
-import { BackgroundActions, useStorage, withErrorBoundary, withSuspense } from '@extension/shared';
+import { BackgroundActions, clearUserStorage, useStorage, withErrorBoundary, withSuspense } from '@extension/shared';
 import { authStorage } from '@extension/storage';
 import { RouterProvider, SigninPage } from '@extension/ui';
 import { useEffect } from 'react';
@@ -12,7 +12,7 @@ const HomePage = () => {
       if (response && response.success && response.success.token) {
         authStorage.setToken(response.success.token);
       } else {
-        authStorage.deleteToken();
+        clearUserStorage();
       }
     });
 
@@ -23,7 +23,7 @@ const HomePage = () => {
         if (token) {
           authStorage.setToken(token);
         } else {
-          authStorage.deleteToken();
+          clearUserStorage();
         }
       }
     });

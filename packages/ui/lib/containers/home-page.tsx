@@ -111,7 +111,7 @@ const useProfileManagement = (url: string) => {
         variant: 'destructive',
         title: 'Limit Reached',
         description: (
-          <div className="filliny-flex filliny-flex-col filliny-items-center filliny-gap-2">
+          <div className="filliny-flex filliny-flex-col filliny-gap-3">
             <span>{errorMessage}</span>
             <Button
               variant="link"
@@ -153,7 +153,7 @@ const HomePage = () => {
   if (isLoadingUrl || isLoadingOverview || isProfileLoading) {
     return (
       <PageLayout>
-        <Loading className="filliny-min-h-[200px]" />
+        <Loading size="xl" className="filliny-min-h-[200px]" />
       </PageLayout>
     );
   }
@@ -163,18 +163,29 @@ const HomePage = () => {
       <div className="filliny-flex filliny-min-h-[200px] filliny-w-full filliny-flex-col filliny-gap-4">
         {/* Token Status */}
         {dashboardOverview?.remainingTokens === 0 && (
-          <Alert variant="default">
-            <AlertCircle className="filliny-h-4 filliny-w-4" />
-            <AlertTitle>No Tokens Left</AlertTitle>
-            <AlertDescription className="filliny-flex filliny-items-center filliny-gap-2">
-              Purchase more tokens to continue using AI features
-            </AlertDescription>
-            <Button
-              variant="link"
-              className="filliny-h-auto filliny-w-full filliny-p-0"
-              onClick={() => window.open(`${getConfig().baseURL}/pricing?tab=token`, '_blank')}>
-              Buy Tokens <ExternalLink className="filliny-ml-1 filliny-h-4 filliny-w-4" />
-            </Button>
+          <Alert variant="destructive" className="filliny-border-2 filliny-border-destructive/50">
+            <div className="filliny-flex filliny-flex-col filliny-gap-3">
+              <div className="filliny-flex filliny-items-center filliny-gap-2">
+                <AlertCircle className="filliny-h-5 filliny-w-5" />
+                <AlertTitle className="filliny-text-lg filliny-font-semibold">No Tokens Available</AlertTitle>
+              </div>
+
+              <AlertDescription className="filliny-flex filliny-flex-col filliny-gap-3">
+                <p className="filliny-text-sm">
+                  To start using AI features and form filling capabilities, you'll need to purchase AI tokens.
+                </p>
+
+                <Button
+                  variant="destructive"
+                  className="filliny-w-full"
+                  onClick={() => window.open(`${getConfig().baseURL}/pricing?tab=token`, '_blank')}>
+                  <span className="filliny-flex filliny-items-center filliny-gap-2">
+                    Purchase Tokens
+                    <ExternalLink className="filliny-h-4 filliny-w-4" />
+                  </span>
+                </Button>
+              </AlertDescription>
+            </div>
           </Alert>
         )}
         {isUrlValid ? (
@@ -185,6 +196,7 @@ const HomePage = () => {
                 fillingContext: matchingWebsite.fillingContext || defaultProfile?.defaultFillingContext,
               }}
               preferences={defaultProfile?.preferences}
+              profile={defaultProfile}
             />
           ) : (
             <QuickAddWebsiteToProfile isLoading={isProfileLoading} onQuickAdd={handleQuickAdd} />

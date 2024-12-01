@@ -1,4 +1,4 @@
-import { type DTOProfileFillingForm } from '@extension/storage';
+import { authStorage, positionStorage, profileStrorage, type DTOProfileFillingForm } from '@extension/storage';
 import type { ErrorResponse, GetAuthTokenResponse, Request } from './shared-types';
 import { BackgroundActions, WebappEnvs } from './shared-types';
 
@@ -195,4 +195,10 @@ export const setupAuthTokenListener = (webappEnv?: WebappEnvs) => {
       });
     }
   });
+};
+
+export const clearUserStorage = () => {
+  authStorage.deleteToken();
+  positionStorage.resetPosition();
+  profileStrorage.resetDefaultProfile();
 };

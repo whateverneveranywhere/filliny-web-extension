@@ -32,8 +32,8 @@ function Header() {
 
         {/* Right section - 1/5 width */}
         <div className="filliny-flex filliny-w-1/5 filliny-items-center filliny-justify-end filliny-gap-3">
-          <a href={`${config.baseURL}`} target="_blank" rel="noopener noreferrer">
-            <Logo width={30} height={30} />
+          <a href={`${config.baseURL}/dashboard`} target="_blank" rel="noopener noreferrer">
+            <Logo width={40} height={40} />
           </a>
         </div>
       </div>

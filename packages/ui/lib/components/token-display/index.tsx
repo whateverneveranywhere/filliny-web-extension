@@ -54,7 +54,7 @@ function TokenDisplay({ tokens = 0, onRefresh, isRefetching = false, isLoading =
       <Tooltip>
         <TooltipTrigger className="filliny-flex filliny-items-center filliny-gap-2 filliny-rounded-md filliny-p-2 filliny-transition-colors hover:filliny-bg-muted/50">
           <div className="filliny-flex filliny-flex-col">
-            <span className="filliny-font-bold">{isLoading ? <Loading /> : abbreviatedTokens}</span>
+            <span className="filliny-font-bold">{isLoading ? <Loading size="sm" /> : abbreviatedTokens}</span>
             <span className="filliny-text-xs filliny-text-muted-foreground">Tokens</span>
           </div>
         </TooltipTrigger>
