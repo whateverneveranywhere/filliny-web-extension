@@ -1,5 +1,8 @@
-import { getConfig, handleAction } from '@extension/shared';
+import { getConfig, handleAction, setupAuthTokenListener } from '@extension/shared';
 import 'webextension-polyfill';
+
+// Add this near the top of the file, after imports
+setupAuthTokenListener();
 
 // Listen for messages from other parts of the extension
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {

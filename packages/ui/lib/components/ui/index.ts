@@ -25,3 +25,4 @@ export * from './mode-toggle';
 export * from './toggle-group';
 export * from './toggle';
 export * from './skeleton';
+export * from './tooltip';

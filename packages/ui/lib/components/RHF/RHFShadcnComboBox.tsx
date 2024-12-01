@@ -47,7 +47,7 @@ function RHFShadcnComboBox({
       control={control}
       name={name}
       render={({ field }) => (
-        <FormItem className="filliny-flex filliny-flex-col filliny-w-full">
+        <FormItem className="filliny-flex filliny-w-full filliny-flex-col">
           <FormLabel>{title}</FormLabel>
           <Popover modal open={popoverOpen} onOpenChange={setPopoverOpen}>
             <PopoverTrigger asChild>

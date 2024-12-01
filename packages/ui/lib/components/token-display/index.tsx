@@ -1,9 +1,8 @@
 import { formatToK, getConfig } from '@extension/shared';
 import { Button } from '../ui/button';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger, Loading } from '../ui';
 import { RefreshCw } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { Loading } from '../ui';
 
 interface TokenDisplayProps {
   tokens?: number;

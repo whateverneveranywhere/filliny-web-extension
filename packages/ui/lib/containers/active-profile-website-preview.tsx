@@ -6,7 +6,7 @@ import { Check, X, Info, Pencil, Trash } from 'lucide-react';
 import { usePOVListQuery, useTonesListQuery, useEditFillingProfileMutation } from '@extension/shared';
 import { Badge } from '../components/ui/badge';
 import { WebsitePreviewCard } from '../components/StepperForms/WebsitePreviewCard';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../components/ui';
 import { Separator } from '../components/ui/separator';
 import type { DTOFillingPrefrences, DTOFillingWebsite, DTOProfileFillingForm } from '@extension/storage';
 import { cn } from '../utils';

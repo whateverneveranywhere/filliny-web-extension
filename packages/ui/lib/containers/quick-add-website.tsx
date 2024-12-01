@@ -1,44 +1,40 @@
 /* eslint-disable react/no-unescaped-entities */
-import { Plus, AlertCircle } from 'lucide-react';
-import React from 'react';
-import {
-  Button,
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-  Alert,
-  AlertDescription,
-} from '../components';
+import { Plus } from 'lucide-react';
+import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, UpgradeBanner } from '../components';
 import { WebsitePreviewCard } from '../components/StepperForms/WebsitePreviewCard';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../components/ui/tooltip';
 import { useActiveTabUrl } from '@extension/shared';
 
 interface Props {
   onQuickAdd: () => void;
   isLoading: boolean;
+  currentPlan: string;
+  maxWebsites: number;
+  websitesCount: number;
 }
 
-function QuickAddWebsiteToProfile({ onQuickAdd, isLoading }: Props) {
+function QuickAddWebsiteToProfile({ onQuickAdd, isLoading, currentPlan, maxWebsites, websitesCount }: Props) {
+  const isDisabled = websitesCount >= maxWebsites;
+  const tooltipText = isDisabled
+    ? `You've reached the maximum number of websites (${maxWebsites}) allowed for your ${currentPlan} plan`
+    : 'Add this website to your profile';
   const { url, isLoading: isLoadingUrl, isValid } = useActiveTabUrl();
 
-  const isDisabled = isLoading || isLoadingUrl || !url || !isValid;
-
-  if (!isValid && url) {
-    return (
-      <Alert variant="destructive">
-        <AlertCircle className="filliny-h-4 filliny-w-4" />
-        <AlertDescription>
-          Invalid URL detected: {url}
-          <br />
-          Please make sure you're on a valid website.
-        </AlertDescription>
-      </Alert>
-    );
-  }
+  const button = (
+    <Button
+      size="icon"
+      variant={isDisabled ? 'ghost' : 'default'}
+      onClick={onQuickAdd}
+      disabled={isDisabled || isLoading || !isValid}
+      className="filliny-transition-all hover:filliny-scale-105">
+      <Plus />
+    </Button>
+  );
 
   return (
     <div className="filliny-flex filliny-w-full filliny-flex-col filliny-items-center filliny-justify-center filliny-gap-4">
+      {isDisabled && <UpgradeBanner />}
+
       <Card className="filliny-w-full">
         <CardHeader>
           <CardTitle>Want Filliny here?</CardTitle>{' '}
@@ -54,14 +50,12 @@ function QuickAddWebsiteToProfile({ onQuickAdd, isLoading }: Props) {
               hideExpandTrigger
               isLoading={isLoading || isLoadingUrl}
               actions={
-                <Button
-                  size="icon"
-                  variant={isDisabled ? 'ghost' : 'default'}
-                  onClick={onQuickAdd}
-                  disabled={isDisabled}
-                  className="filliny-transition-all hover:filliny-scale-105">
-                  <Plus />
-                </Button>
+                <TooltipProvider>
+                  <Tooltip delayDuration={200}>
+                    <TooltipTrigger>{button}</TooltipTrigger>
+                    <TooltipContent className="filliny-max-w-xs">{tooltipText}</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               }
             />
             {isLoadingUrl && (

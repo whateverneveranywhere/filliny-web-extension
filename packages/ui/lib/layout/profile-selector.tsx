@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { z } from 'zod';
 import {
+  useActiveProfile,
   useBoolean,
   useChangeActiveFillingProfileMutation,
   useDeleteProfileByIdMutation,
-  useFillingProfileById,
   useProfilesListQuery,
-  useStorage,
 } from '@extension/shared';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -26,30 +25,22 @@ const schema = z.object({
 function ProfileSelector() {
   const profileModal = useBoolean();
   const [editingId, setEditingId] = useState<string>();
-  const defaultStorageProfile = useStorage(profileStrorage);
 
+  const { activeProfileId, activeProfile } = useActiveProfile();
   // Queries and Mutations
   const { data: profiles, isLoading, isFetching, refetch: refetchProfiles } = useProfilesListQuery();
   const { mutateAsync: deleteProfile, isPending: isDeleting } = useDeleteProfileByIdMutation();
   const { mutateAsync: updateActiveProfile, isPending: isUpdating } = useChangeActiveFillingProfileMutation();
 
-  // Active Profile Management
-  const defaultActiveProfileId = useMemo(
-    () => defaultStorageProfile?.id || profiles?.find(item => item.isActive)?.id,
-    [profiles, defaultStorageProfile],
-  );
-
   const methods = useForm({
     defaultValues: {
-      defaultActiveProfileId: String(defaultActiveProfileId || ''),
+      defaultActiveProfileId: String(activeProfileId || ''),
     },
     resolver: zodResolver(schema),
     mode: 'onChange',
   });
 
-  const { watch, setValue } = methods;
-  const activeProfileId = watch('defaultActiveProfileId');
-  const { data: activeProfile } = useFillingProfileById(activeProfileId);
+  const { setValue } = methods;
 
   // Memoized handlers
   const handleProfileChange = useCallback(
@@ -123,20 +114,20 @@ function ProfileSelector() {
 
   // Initialize default profile if needed
   useEffect(() => {
-    if (!defaultStorageProfile && profiles?.length) {
+    if (!activeProfile && profiles?.length) {
       const activeFromApi = profiles.find(item => item.isActive);
       if (activeFromApi) {
         setValue('defaultActiveProfileId', String(activeFromApi.id));
       }
     }
-  }, [profiles, defaultStorageProfile, setValue]);
+  }, [profiles, activeProfile, setValue]);
 
   // Add this useEffect to watch for changes in defaultStorageProfile
   useEffect(() => {
-    if (defaultStorageProfile?.id) {
-      setValue('defaultActiveProfileId', String(defaultStorageProfile.id));
+    if (activeProfile?.id) {
+      setValue('defaultActiveProfileId', String(activeProfile.id));
     }
-  }, [defaultStorageProfile, setValue]);
+  }, [activeProfile, setValue]);
 
   // UI States
   const isDisabled = isDeleting || isUpdating;
@@ -154,6 +145,7 @@ function ProfileSelector() {
     <div className="filliny-flex filliny-w-full filliny-max-w-xl filliny-items-center filliny-gap-2">
       <FormProvider methods={methods}>
         <RHFShadcnComboBox
+          placeholder="Select or search profile"
           disabled={isDisabled}
           loading={isLoaderVisible}
           options={profileOptions}
@@ -162,7 +154,6 @@ function ProfileSelector() {
           onChange={handleProfileChange}
           value={activeProfileId}
           name="defaultActiveProfileId"
-          placeholder="Select or search profile"
           className="filliny-w-full"
           title={''}
         />
