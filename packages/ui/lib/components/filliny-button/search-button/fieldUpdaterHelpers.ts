@@ -24,12 +24,62 @@ const updateFileField = async (element: HTMLInputElement, field: Field, testMode
   const url = testMode ? 'https://pdfobject.com/pdf/sample.pdf' : field.value;
   if (url) {
     try {
+      // Get accepted file types from input
+      const acceptedTypes = element.accept ? element.accept.split(',').map(t => t.trim()) : ['.pdf'];
+
+      // Default to PDF if no specific types are specified
+      const defaultMimeType = 'application/pdf';
+
       const blob = await fetchFile(url);
       const fileName = getFileNameFromUrl(url);
-      const file = new File([blob], fileName, { type: blob.type });
-      const dataTransfer = new DataTransfer();
-      dataTransfer.items.add(file);
-      element.files = dataTransfer.files;
+
+      // Determine the appropriate MIME type based on accepted types
+      let mimeType = defaultMimeType;
+      if (acceptedTypes.length > 0) {
+        // If specific types are accepted, use the first one
+        // Convert file extension to MIME type if needed
+        const firstType = acceptedTypes[0];
+        if (firstType.startsWith('.')) {
+          // Convert extension to MIME type (e.g., .pdf -> application/pdf)
+          switch (firstType.toLowerCase()) {
+            case '.pdf':
+              mimeType = 'application/pdf';
+              break;
+            case '.doc':
+            case '.docx':
+              mimeType = 'application/msword';
+              break;
+            // Add more cases as needed
+            default:
+              mimeType = defaultMimeType;
+          }
+        } else {
+          // Use the MIME type directly if specified
+          mimeType = firstType;
+        }
+      }
+
+      // Create file with appropriate MIME type
+      const file = new File([blob], fileName, { type: mimeType });
+
+      // Validate if the file type matches accepted types
+      if (
+        !acceptedTypes.some(type =>
+          type.startsWith('.') ? fileName.toLowerCase().endsWith(type) : file.type.includes(type.split('/')[1]),
+        )
+      ) {
+        console.warn(`File type ${file.type} not in accepted types:`, acceptedTypes);
+        // Convert to PDF if necessary
+        const pdfFile = new File([blob], `${fileName}.pdf`, { type: 'application/pdf' });
+        const dataTransfer = new DataTransfer();
+        dataTransfer.items.add(pdfFile);
+        element.files = dataTransfer.files;
+      } else {
+        const dataTransfer = new DataTransfer();
+        dataTransfer.items.add(file);
+        element.files = dataTransfer.files;
+      }
+
       dispatchEvent(element, 'input');
       dispatchEvent(element, 'change');
     } catch (error) {

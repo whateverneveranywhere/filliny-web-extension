@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { handleFormClick } from './handleFormClick';
-import { X, Wand2 } from 'lucide-react';
+import { X, Wand2, Loader2 } from 'lucide-react';
 import { disableOtherButtons, showLoadingIndicator } from './overlayUtils';
 import { Button } from '../../ui';
 import type { OverlayPosition } from './types';
@@ -119,7 +119,7 @@ const FormsOverlay: React.FC<OverlayProps> = ({ formId, initialPosition, onDismi
         filliny-transition-all filliny-duration-300
         ${
           loading
-            ? 'filliny-animate-border-glow filliny-bg-transparent'
+            ? 'filliny-bg-black/40 filliny-backdrop-blur-sm'
             : 'filliny-rounded-lg filliny-bg-black/30 filliny-backdrop-blur-md hover:filliny-bg-black/40'
         }
       `}
@@ -130,7 +130,17 @@ const FormsOverlay: React.FC<OverlayProps> = ({ formId, initialPosition, onDismi
         height: `${overlayPosition.height}px`,
       }}
       data-highlight-overlay="true">
-      {!loading && (
+      {loading ? (
+        <div className="filliny-flex filliny-flex-col filliny-items-center filliny-gap-4 filliny-text-white">
+          <div className="filliny-h-8 filliny-w-8 filliny-animate-spin">
+            <Loader2 className="filliny-h-full filliny-w-full" />
+          </div>
+          <div className="filliny-text-center">
+            <p className="filliny-text-lg filliny-font-semibold">Filling Your Form</p>
+            <p className="filliny-text-sm filliny-text-white/80">AI is intelligently completing your form fields...</p>
+          </div>
+        </div>
+      ) : (
         <>
           <div className="filliny-fixed filliny-left-1/2 filliny-top-1/2 filliny-z-[10000001] filliny-flex filliny-w-full filliny-max-w-fit filliny--translate-x-1/2 filliny--translate-y-1/2 filliny-flex-col filliny-items-center filliny-gap-3">
             <div className="filliny-rounded-full filliny-bg-white/10 filliny-p-1">

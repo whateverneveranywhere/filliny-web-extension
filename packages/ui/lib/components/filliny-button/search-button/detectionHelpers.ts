@@ -39,6 +39,7 @@ const isElementVisible = (element: HTMLElement): boolean => {
 const getFieldLabel = (element: HTMLElement): string => {
   let label = '';
 
+  // 1. Check explicit label with 'for' attribute
   if (element.id) {
     const labelElement = document.querySelector(`label[for="${element.id}"]`);
     if (labelElement) {
@@ -46,10 +47,113 @@ const getFieldLabel = (element: HTMLElement): string => {
     }
   }
 
+  // 2. Check for wrapping label
   if (!label) {
     const parentLabel = element.closest('label');
     if (parentLabel) {
       label = parentLabel.textContent?.trim() || '';
+    }
+  }
+
+  // 3. Check aria-label
+  if (!label) {
+    label = element.getAttribute('aria-label')?.trim() || '';
+  }
+
+  // 4. Check aria-labelledby
+  if (!label && element.getAttribute('aria-labelledby')) {
+    const labelledBy = element.getAttribute('aria-labelledby')?.split(' ');
+    if (labelledBy) {
+      label = labelledBy
+        .map(id => document.getElementById(id)?.textContent?.trim())
+        .filter(Boolean)
+        .join(' ');
+    }
+  }
+
+  // 5. Check placeholder
+  if (!label && 'placeholder' in element) {
+    label = (element as HTMLInputElement).placeholder || '';
+  }
+
+  // 6. Check name attribute
+  if (!label) {
+    const name = element.getAttribute('name');
+    if (name) {
+      // Convert name to readable format (e.g., user_first_name -> User First Name)
+      label = name
+        .replace(/[_-]/g, ' ')
+        .replace(/([A-Z])/g, ' $1')
+        .toLowerCase()
+        .split(' ')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+    }
+  }
+
+  // 7. Check preceding elements for potential labels
+  if (!label) {
+    // Look for elements that might be labels immediately before this field
+    const previousElement = element.previousElementSibling;
+    if (previousElement && ['span', 'div', 'p'].includes(previousElement.tagName.toLowerCase())) {
+      label = previousElement.textContent?.trim() || '';
+    }
+  }
+
+  // 8. Check parent containers for potential field groups
+  if (!label) {
+    const fieldGroup = element.closest('[class*="field"], [class*="form-group"], [class*="input-group"]');
+    if (fieldGroup) {
+      // Look for heading elements or elements with specific classes
+      const groupLabel = fieldGroup.querySelector('legend, h1, h2, h3, h4, h5, h6, [class*="label"], [class*="title"]');
+      if (groupLabel) {
+        label = groupLabel.textContent?.trim() || '';
+      }
+    }
+  }
+
+  // 9. Analyze surrounding context
+  if (!label) {
+    // Look for any text node directly preceding the input
+    let node = element.previousSibling;
+    while (node && !label) {
+      if (node.nodeType === Node.TEXT_NODE) {
+        const text = node.textContent?.trim();
+        if (text && text.length < 50) {
+          // Avoid capturing large text blocks
+          label = text;
+        }
+      }
+      node = node.previousSibling;
+    }
+  }
+
+  // 10. Generate fallback label based on field type and context
+  if (!label) {
+    const type = (element as HTMLInputElement).type || element.getAttribute('type');
+    const role = element.getAttribute('role');
+    const pattern = element.getAttribute('pattern');
+
+    // Create contextual fallback label
+    if (type === 'email' || pattern?.includes('@')) {
+      label = 'Email';
+    } else if (type === 'tel' || pattern?.includes('\\d')) {
+      label = 'Phone';
+    } else if (type === 'password') {
+      label = 'Password';
+    } else if (role === 'search' || element.classList.contains('search')) {
+      label = 'Search';
+    } else if (element instanceof HTMLSelectElement) {
+      label = 'Selection';
+    } else if (element instanceof HTMLTextAreaElement) {
+      label = 'Comments';
+    } else {
+      // Last resort: generate based on position
+      const inputs = Array.from(
+        element.closest('form, [data-filliny-confidence]')?.querySelectorAll('input, select, textarea') || [],
+      );
+      const index = inputs.indexOf(element as HTMLElement);
+      label = `Field ${index + 1}`;
     }
   }
 
@@ -142,11 +246,14 @@ const detectRadioGroup = (element: HTMLInputElement, index: number, processedGro
   if (visibleElements.length === 0) return null;
 
   const field = createBaseField(visibleElements[0], index, 'radio');
-  field.options = visibleElements.map(el => ({
-    value: el.value,
-    text: getFieldLabel(el) || el.value,
-    selected: el.checked,
-  }));
+  field.options = visibleElements.map(el => {
+    const labelText = getFieldLabel(el);
+    return {
+      value: el.value,
+      text: labelText || el.value,
+      selected: el.checked,
+    };
+  });
 
   const selectedRadio = visibleElements.find(el => el.checked);
   field.value = selectedRadio ? getFieldLabel(selectedRadio) || selectedRadio.value : '';
