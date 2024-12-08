@@ -12,6 +12,12 @@ const {
 export const aiFillService = async (
   fillPayLoad: DTOFillPayload,
 ): Promise<{ data: Field[] } | ReadableStream<Uint8Array>> => {
+  // const response = await httpService.requestViaBackground<{ data: Field[] } | ReadableStream<Uint8Array>>(AIFill, {
+  //   method: 'POST',
+  //   body: JSON.stringify(fillPayLoad),
+  //   isStream: true,
+  // });
+
   const response = await httpService.post<{ data: Field[] }>(AIFill, fillPayLoad, { isStream: true });
 
   if (response instanceof ReadableStream) {

@@ -150,17 +150,17 @@ const ActiveProfileWebsitePreview: React.FC<Props> = ({ matchingWebsite, prefere
               variant="ghost"
               size="icon"
               onClick={() => setIsEditModalOpen(true)}
-              className="filliny-h-8 filliny-w-8 hover:filliny-bg-primary/10"
+              className="filliny-h-8 filliny-w-8"
               title="Edit website settings">
               <Pencil className="filliny-h-4 filliny-w-4" />
             </Button>
             <Button
-              variant="ghost"
+              variant="destructive"
               size="icon"
               onClick={() => setShowDeleteDialog(true)}
-              className="filliny-h-8 filliny-w-8 hover:filliny-bg-destructive/10 hover:filliny-text-destructive"
+              className="filliny-h-8 filliny-w-8 filliny-bg-transparent filliny-text-destructive"
               title="Remove website from profile">
-              <Trash className="filliny-h-4 filliny-w-4 filliny-text-destructive" />
+              <Trash className="filliny-h-4 filliny-w-4" />
             </Button>
           </div>
         }>
@@ -228,7 +228,7 @@ const ActiveProfileWebsitePreview: React.FC<Props> = ({ matchingWebsite, prefere
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDelete}
-              className="filliny-bg-destructive hover:filliny-bg-destructive/90">
+              className="filliny-bg-destructive hover:filliny-bg-destructive/10">
               Remove
             </AlertDialogAction>
           </AlertDialogFooter>

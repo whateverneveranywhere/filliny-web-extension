@@ -102,6 +102,32 @@ class HttpService {
   async delete<T>(url: string, config?: CustomFetchConfig): Promise<T> {
     return this.request<T>(url, { method: 'DELETE', ...config });
   }
+
+  async requestViaBackground<T>(url: string, config?: CustomFetchConfig): Promise<T> {
+    const message = {
+      type: 'API_REQUEST',
+      url: `${config?.baseUrl || this.baseUrl}${url}`,
+      options: {
+        ...config,
+        headers: {
+          ...config?.headers,
+          Authorization: `Bearer ${config?.authToken}`,
+          'Content-Type': 'application/json',
+          'X-Extension-ID': chrome.runtime.id,
+        },
+      },
+    };
+
+    return new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage(message, response => {
+        if (response.error) {
+          reject(new Error(response.error));
+        } else {
+          resolve(response.data);
+        }
+      });
+    });
+  }
 }
 
 const httpService = new HttpService();
