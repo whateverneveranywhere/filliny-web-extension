@@ -1,6 +1,6 @@
 {
   "name": "filliny",
-  "version": "0.3.4",
+  "version": "0.3.5",
   "description": "Filliny - AI-powered form filling assistant that makes completing online forms effortless and intelligent",
   "license": "MIT",
   "repository": {
@@ -9,9 +9,9 @@
   },
   "type": "module",
   "scripts": {
-    "clean:bundle": "rimraf dist && rimraf dist-zip && turbo clean:bundle",
+    "clean:bundle": "rimraf dist && turbo clean:bundle",
     "clean:node_modules": "pnpx rimraf node_modules && pnpx turbo clean:node_modules",
-    "clean:turbo": "turbo daemon stop && rimraf .turbo && turbo clean:turbo",
+    "clean:turbo": "rimraf .turbo && turbo clean:turbo",
     "clean": "pnpm clean:bundle && pnpm clean:turbo && pnpm clean:node_modules",
     "clean:install": "pnpm clean:node_modules && pnpm install --frozen-lockfile",
     "build": "pnpm clean:bundle && turbo ready && turbo build",
@@ -40,7 +40,7 @@
   },
   "devDependencies": {
     "@types/chrome": "^0.0.270",
-    "@types/node": "^20.16.5",
+    "@types/node": "^22.5.5",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@typescript-eslint/eslint-plugin": "^7.18.0",
@@ -63,17 +63,18 @@
     "rimraf": "^6.0.1",
     "tailwindcss": "^3.4.14",
     "tslib": "^2.6.3",
-    "turbo": "^2.0.12",
     "typescript": "5.5.4",
-    "vite": "5.4.9"
+    "turbo": "^2.3.3",
+    "vite": "6.0.5",
+    "run-script-os": "^1.1.6"
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx,json}": [
       "prettier --write"
     ]
   },
-  "packageManager": "pnpm@9.9.0",
+  "packageManager": "pnpm@9.15.1",
   "engines": {
-    "node": ">=18.19.1"
+    "node": ">=22.12.0"
   }
 }

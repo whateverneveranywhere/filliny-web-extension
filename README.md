@@ -65,11 +65,12 @@ the build speed and development experience by using Vite and Turborepo.
 
    **This will set the EOL (End of line) character to be the same as on Linux/macOS. Without this, our bash script won't work, and you will have conflicts with developers on Linux/macOS.**
 2. Clone this repository.
-3. Edit `/packages/i18n/locales/`{your locale(s)}/`messages.json`
-4. In the objects `extensionDescription` and `extensionName`, change the `message` fields (leave `description` alone)
-5. In `/.package.json`, change the `version` to the desired version of your extension.
-6. Install pnpm globally: `npm install -g pnpm` (check your node version >= 18.19.1))
-7. Run `pnpm install`
+3. Check your node version is >= than in `.nvmrc` file, recommend to use [nvm](https://github.com/nvm-sh/nvm?tab=readme-ov-file#intro)
+4. Edit `/packages/i18n/locales/`{your locale(s)}/`messages.json`
+5. In the objects `extensionDescription` and `extensionName`, change the `message` fields (leave `description` alone)
+6. In `/.package.json`, change the `version` to the desired version of your extension.
+7. Install pnpm globally: `npm install -g pnpm` (check your node version >= 22.12.0))
+8. Run `pnpm install`
 
 Then, depending on the target browser:
 
@@ -180,14 +181,10 @@ Some shared packages:
 - `tsconfig` - shared tsconfig for the entire project
 - `ui` - function to merge your Tailwind config with the global one; you can save components here
 - `vite-config` - shared Vite config for the entire project
-- `zipper` - run `pnpm zip` to pack the `dist` folder into `extension.zip` inside the newly created `dist-zip`
+- `zipper` - run `pnpm zip` to pack the `dist` folder into `extension-YYYYMMDD-HHmmss.zip` inside the newly created `dist-zip`
 - `e2e` - run `pnpm e2e` for end-to-end tests of your zipped extension on different browsers
 
 ## Troubleshooting
-
-### Adding env vars or `content.css` rules does nothing
-
-For these types of issues, kill and restart `pnpm dev`. Also try reloading the extension in the browser.
 
 ### Hot module reload seems to have frozen
 
