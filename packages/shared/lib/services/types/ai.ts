@@ -42,6 +42,23 @@ export interface Field {
     max?: number;
     step?: number;
   };
+  metadata?: {
+    framework: 'react' | 'angular' | 'vue' | 'vanilla' | 'select2';
+    frameworkProps?: {
+      onSubmit?: () => void;
+      onChange?: () => void;
+      onClick?: () => void;
+      [key: string]: (() => void) | undefined;
+    };
+    visibility: {
+      isVisible: boolean;
+      hiddenReason?: string;
+    };
+    select2Container?: string;
+    actualSelect?: string;
+  };
+  xpath?: string;
+  uniqueSelectors?: string[];
 }
 
 export interface DTOFillPayload {

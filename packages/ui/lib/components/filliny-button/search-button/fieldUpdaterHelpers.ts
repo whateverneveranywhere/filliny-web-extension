@@ -4,6 +4,10 @@ import { addGlowingBorder } from './overlayUtils';
 // Add at the top of the file with other declarations
 const initializedFields: Set<string> = new Set();
 
+interface Select2Instance {
+  trigger: (event: string, data: { val: string }) => void;
+}
+
 // Specialized field update helpers
 const updateInputField = (element: HTMLInputElement, field: Field): void => {
   if (!initializedFields.has(field.id)) {
@@ -126,54 +130,40 @@ const updateTextAreaField = (element: HTMLTextAreaElement, field: Field): void =
   dispatchEvent(element, 'change');
 };
 
-const updateSelectField = (element: HTMLSelectElement, field: Field): void => {
+const updateSelectField = (element: HTMLElement, field: Field): void => {
+  if (!(element instanceof HTMLSelectElement)) {
+    console.warn('Expected HTMLSelectElement but got:', element.tagName);
+    return;
+  }
+
   console.log('Updating select field:', {
     elementId: element.id,
     fieldId: field.id,
-    options: Array.from(element.options).map(opt => ({ value: opt.value, text: opt.text })),
-    testMode: !!field.testValue,
     currentValue: element.value,
     newValue: field.testValue || field.value,
+    options: Array.from(element.options).map(opt => ({
+      value: opt.value,
+      text: opt.text,
+    })),
   });
 
-  if (field.testValue) {
-    const matchingOption = Array.from(element.options).find(
-      opt => opt.value === field.testValue || opt.text === field.testValue,
-    );
+  // Set the value
+  element.value = field.testValue || field.value || '';
 
-    if (matchingOption) {
-      // Set the value
-      element.value = matchingOption.value;
+  // Trigger Select2 update if it's a Select2 field
+  if (field.metadata?.framework === 'select2') {
+    const select2Instance = (window as { jQuery?: (el: HTMLElement) => { data: (key: string) => Select2Instance } })
+      .jQuery?.(element)
+      ?.data?.('select2');
 
-      // Trigger native events
-      dispatchEvent(element, 'input');
-      dispatchEvent(element, 'change');
-
-      // Trigger React synthetic events
-      const nativeInputEvent = new Event('input', { bubbles: true });
-      const nativeChangeEvent = new Event('change', { bubbles: true });
-
-      Object.defineProperty(nativeInputEvent, 'target', { value: element });
-      Object.defineProperty(nativeChangeEvent, 'target', { value: element });
-
-      element.dispatchEvent(nativeInputEvent);
-      element.dispatchEvent(nativeChangeEvent);
-
-      // Force a click for good measure
-      element.click();
-
-      // Add visual feedback
-      addGlowingBorder(element);
-    } else {
-      console.warn('No matching option found:', {
-        testValue: field.testValue,
-        availableOptions: Array.from(element.options).map(opt => ({
-          value: opt.value,
-          text: opt.text,
-        })),
-      });
+    if (select2Instance) {
+      select2Instance.trigger('select', { val: element.value });
     }
   }
+
+  // Dispatch events
+  dispatchEvent(element, 'change');
+  dispatchEvent(element, 'input');
 };
 
 const updateButtonField = (element: HTMLButtonElement, field: Field): void => {
@@ -418,17 +408,57 @@ const updateFormField = (element: HTMLElement, field: Field, testMode: boolean):
 
 // Main update function that delegates to specialized helpers
 export const updateFormFields = async (fields: Field[], testMode: boolean = false): Promise<void> => {
+  console.log('updateFormFields called:', { fieldsCount: fields.length, testMode });
+
   for (const field of fields) {
-    const element = document.querySelector<HTMLElement>(`[data-filliny-id="${field.id}"]`);
-    if (!element) continue;
+    console.log('Processing field:', {
+      id: field.id,
+      type: field.type,
+      label: field.label,
+      value: field.value,
+      testValue: field.testValue,
+      metadata: field.metadata,
+    });
+
+    // For Select2 fields, look for both the container and the actual select
+    let element: HTMLElement | null = null;
+    if (field.metadata?.framework === 'select2' && field.metadata.actualSelect) {
+      // Get the actual select element instead of the container
+      element = document.getElementById(field.metadata.actualSelect);
+      console.log('Found Select2 actual select:', {
+        id: field.metadata.actualSelect,
+        element: element?.tagName,
+        value: (element as HTMLSelectElement)?.value,
+      });
+    } else {
+      element = document.querySelector<HTMLElement>(`[data-filliny-id="${field.id}"]`);
+    }
+
+    console.log('Found element:', {
+      found: !!element,
+      elementType: element?.tagName,
+      elementId: element?.id,
+      dataFillinyId: element?.getAttribute('data-filliny-id'),
+    });
+
+    if (!element) {
+      console.warn('Element not found for field:', field.id);
+      continue;
+    }
 
     // Only assign test values in test mode and for fields that support it
     if (testMode && !field.testValue && (field.type === 'radio' || field.type === 'select')) {
+      console.log('Assigning test value for field:', field.id);
       assignTestValue(field);
     }
 
     // Use testValue if in test mode and available
     if (testMode && field.testValue) {
+      console.log('Using test value:', {
+        fieldId: field.id,
+        originalValue: field.value,
+        testValue: field.testValue,
+      });
       field.value = field.testValue;
     }
 

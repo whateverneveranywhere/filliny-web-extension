@@ -1,18 +1,36 @@
-import type { Field } from '@extension/shared';
-import { createBaseField } from './fieldCreator';
+import type { Field, FieldType } from '@extension/shared';
 
-const isElementVisible = (element: HTMLElement): boolean => {
+interface ReactElementProps {
+  onSubmit?: () => void;
+  onChange?: () => void;
+  onClick?: () => void;
+  [key: string]: (() => void) | undefined;
+}
+
+interface VueElement extends HTMLElement {
+  __vue__?: unknown;
+}
+
+// Add new helper for computing element visibility with more robust checks
+const computeElementVisibility = (
+  element: HTMLElement,
+): {
+  isVisible: boolean;
+  hiddenReason?: string;
+} => {
   // Check if element or any parent is hidden via CSS
   const isHidden = (el: HTMLElement | null): boolean => {
     while (el) {
       const style = getComputedStyle(el);
-      // Don't check position: absolute for form controls that might be styled this way
-      const isFormControl = ['select', 'input'].includes(el.tagName.toLowerCase());
+      const isFormControl = ['select', 'input', 'textarea'].includes(el.tagName.toLowerCase());
+
+      // More comprehensive visibility checks
       if (
         style.display === 'none' ||
         style.visibility === 'hidden' ||
         (!isFormControl && style.opacity === '0') ||
-        el.hasAttribute('hidden')
+        el.hasAttribute('hidden') ||
+        (style.position === 'absolute' && (parseInt(style.left) < -9999 || parseInt(style.top) < -9999))
       ) {
         return true;
       }
@@ -21,29 +39,64 @@ const isElementVisible = (element: HTMLElement): boolean => {
     return false;
   };
 
-  // Special handling for form controls
+  // Check dimensions and viewport position
+  const rect = element.getBoundingClientRect();
+  const hasZeroDimensions = !element.offsetWidth && !element.offsetHeight;
+  const isOutsideViewport =
+    rect.right <= 0 || rect.bottom <= 0 || rect.left >= window.innerWidth || rect.top >= window.innerHeight;
+
+  // Special handling for form controls that might be styled differently
   const isFormControl = ['select', 'input', 'textarea'].includes(element.tagName.toLowerCase());
+
   if (isFormControl) {
-    // Only check if the element is completely hidden
-    return !isHidden(element);
+    if (isHidden(element)) {
+      return { isVisible: false, hiddenReason: 'hidden-by-css' };
+    }
+    return { isVisible: true };
   }
 
-  // For non-form controls, perform full visibility checks
-  const hasZeroDimensions = !element.offsetWidth && !element.offsetHeight && !element.getClientRects().length;
-  const rect = element.getBoundingClientRect();
-  const isOutsideViewport = rect.left + rect.width <= 0 || rect.top + rect.height <= 0;
+  if (hasZeroDimensions) {
+    return { isVisible: false, hiddenReason: 'zero-dimensions' };
+  }
 
-  return !hasZeroDimensions && !isHidden(element) && !isOutsideViewport;
+  if (isOutsideViewport) {
+    return { isVisible: false, hiddenReason: 'outside-viewport' };
+  }
+
+  if (isHidden(element)) {
+    return { isVisible: false, hiddenReason: 'hidden-by-css' };
+  }
+
+  return { isVisible: true };
+};
+
+// Update isElementVisible to use the new compute function
+const isElementVisible = (element: HTMLElement): boolean => {
+  const { isVisible } = computeElementVisibility(element);
+  return isVisible;
 };
 
 const getFieldLabel = (element: HTMLElement): string => {
   let label = '';
+  let description = '';
 
   // 1. Check explicit label with 'for' attribute
   if (element.id) {
     const labelElement = document.querySelector(`label[for="${element.id}"]`);
     if (labelElement) {
-      label = labelElement.textContent?.trim() || '';
+      // Get the text content without any nested element text
+      const labelNodes = Array.from(labelElement.childNodes)
+        .filter(node => node.nodeType === Node.TEXT_NODE)
+        .map(node => node.textContent?.trim())
+        .filter(Boolean);
+
+      label = labelNodes.join(' ');
+
+      // Look for description in nested elements
+      const descriptionEl = labelElement.querySelector('.description, .help-text, .hint, small');
+      if (descriptionEl) {
+        description = descriptionEl.textContent?.trim() || '';
+      }
     }
   }
 
@@ -51,113 +104,23 @@ const getFieldLabel = (element: HTMLElement): string => {
   if (!label) {
     const parentLabel = element.closest('label');
     if (parentLabel) {
-      label = parentLabel.textContent?.trim() || '';
+      const labelNodes = Array.from(parentLabel.childNodes)
+        .filter(node => node.nodeType === Node.TEXT_NODE)
+        .map(node => node.textContent?.trim())
+        .filter(Boolean);
+
+      label = labelNodes.join(' ');
     }
   }
 
-  // 3. Check aria-label
+  // 3. Check aria-label and aria-description
   if (!label) {
     label = element.getAttribute('aria-label')?.trim() || '';
+    description = element.getAttribute('aria-description')?.trim() || '';
   }
 
-  // 4. Check aria-labelledby
-  if (!label && element.getAttribute('aria-labelledby')) {
-    const labelledBy = element.getAttribute('aria-labelledby')?.split(' ');
-    if (labelledBy) {
-      label = labelledBy
-        .map(id => document.getElementById(id)?.textContent?.trim())
-        .filter(Boolean)
-        .join(' ');
-    }
-  }
-
-  // 5. Check placeholder
-  if (!label && 'placeholder' in element) {
-    label = (element as HTMLInputElement).placeholder || '';
-  }
-
-  // 6. Check name attribute
-  if (!label) {
-    const name = element.getAttribute('name');
-    if (name) {
-      // Convert name to readable format (e.g., user_first_name -> User First Name)
-      label = name
-        .replace(/[_-]/g, ' ')
-        .replace(/([A-Z])/g, ' $1')
-        .toLowerCase()
-        .split(' ')
-        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-        .join(' ');
-    }
-  }
-
-  // 7. Check preceding elements for potential labels
-  if (!label) {
-    // Look for elements that might be labels immediately before this field
-    const previousElement = element.previousElementSibling;
-    if (previousElement && ['span', 'div', 'p'].includes(previousElement.tagName.toLowerCase())) {
-      label = previousElement.textContent?.trim() || '';
-    }
-  }
-
-  // 8. Check parent containers for potential field groups
-  if (!label) {
-    const fieldGroup = element.closest('[class*="field"], [class*="form-group"], [class*="input-group"]');
-    if (fieldGroup) {
-      // Look for heading elements or elements with specific classes
-      const groupLabel = fieldGroup.querySelector('legend, h1, h2, h3, h4, h5, h6, [class*="label"], [class*="title"]');
-      if (groupLabel) {
-        label = groupLabel.textContent?.trim() || '';
-      }
-    }
-  }
-
-  // 9. Analyze surrounding context
-  if (!label) {
-    // Look for any text node directly preceding the input
-    let node = element.previousSibling;
-    while (node && !label) {
-      if (node.nodeType === Node.TEXT_NODE) {
-        const text = node.textContent?.trim();
-        if (text && text.length < 50) {
-          // Avoid capturing large text blocks
-          label = text;
-        }
-      }
-      node = node.previousSibling;
-    }
-  }
-
-  // 10. Generate fallback label based on field type and context
-  if (!label) {
-    const type = (element as HTMLInputElement).type || element.getAttribute('type');
-    const role = element.getAttribute('role');
-    const pattern = element.getAttribute('pattern');
-
-    // Create contextual fallback label
-    if (type === 'email' || pattern?.includes('@')) {
-      label = 'Email';
-    } else if (type === 'tel' || pattern?.includes('\\d')) {
-      label = 'Phone';
-    } else if (type === 'password') {
-      label = 'Password';
-    } else if (role === 'search' || element.classList.contains('search')) {
-      label = 'Search';
-    } else if (element instanceof HTMLSelectElement) {
-      label = 'Selection';
-    } else if (element instanceof HTMLTextAreaElement) {
-      label = 'Comments';
-    } else {
-      // Last resort: generate based on position
-      const inputs = Array.from(
-        element.closest('form, [data-filliny-confidence]')?.querySelectorAll('input, select, textarea') || [],
-      );
-      const index = inputs.indexOf(element as HTMLElement);
-      label = `Field ${index + 1}`;
-    }
-  }
-
-  return label;
+  // Combine label and description if both exist
+  return description ? `${label} (${description})` : label;
 };
 
 const shouldSkipElement = (element: HTMLElement): boolean => {
@@ -176,13 +139,100 @@ const shouldSkipElement = (element: HTMLElement): boolean => {
   return false;
 };
 
-const detectInputField = (input: HTMLInputElement, index: number): Field | null => {
+// Add new helper to detect framework-specific properties
+const detectFramework = (
+  element: HTMLElement,
+): {
+  framework: 'react' | 'angular' | 'vue' | 'vanilla';
+  props?: ReactElementProps;
+} => {
+  // Check for React
+  const reactKey = Object.keys(element).find(key => key.startsWith('__react') || key.startsWith('_reactProps'));
+  if (reactKey) {
+    return {
+      framework: 'react',
+      props: (element as unknown as { [key: string]: ReactElementProps })[reactKey],
+    };
+  }
+
+  // Check for Angular
+  if (element.hasAttribute('ng-model') || element.hasAttribute('[(ngModel)]')) {
+    return { framework: 'angular' };
+  }
+
+  // Check for Vue
+  if (element.hasAttribute('v-model') || (element as VueElement).__vue__) {
+    return { framework: 'vue' };
+  }
+
+  return { framework: 'vanilla' };
+};
+
+// Update field detection to use framework information
+const detectInputField = (input: HTMLInputElement, index: number, testMode: boolean = false): Field | null => {
   if (!isElementVisible(input) || shouldSkipElement(input)) return null;
 
-  const type = input.type;
-  let field: Field;
+  const framework = detectFramework(input);
+  let field = createBaseField(input, index, input.type, testMode);
 
-  switch (type) {
+  // Special handling for Select2 inputs
+  if (input.classList.contains('select2-focusser')) {
+    const select2Container = input.closest('.select2-container');
+    if (select2Container) {
+      const selectId = select2Container.getAttribute('id')?.replace('s2id_', '');
+      if (selectId) {
+        const actualSelect = document.getElementById(selectId) as HTMLSelectElement;
+        if (actualSelect) {
+          const field = createBaseField(actualSelect, index, 'select', testMode);
+
+          // Set data attribute on both elements
+          select2Container.setAttribute('data-filliny-id', field.id);
+          input.setAttribute('data-filliny-id', field.id);
+
+          field.options = Array.from(actualSelect.options).map(opt => ({
+            value: opt.value,
+            text: opt.text.trim(),
+            selected: opt.selected,
+          }));
+
+          // Always select first valid option in test mode
+          const validOptions = field.options.filter(
+            opt =>
+              opt.value &&
+              !opt.text.toLowerCase().includes('select') &&
+              !opt.text.includes('--') &&
+              !opt.text.toLowerCase().includes('please select'),
+          );
+
+          if (validOptions.length > 0) {
+            field.testValue = validOptions[0].value;
+            field.value = validOptions[0].value; // Set the value immediately in test mode
+          }
+
+          // Add Select2-specific metadata
+          field.metadata = {
+            ...field.metadata,
+            framework: 'select2',
+            select2Container: select2Container.id,
+            actualSelect: selectId,
+            visibility: computeElementVisibility(actualSelect),
+          };
+
+          return field;
+        }
+      }
+    }
+  }
+
+  // Add framework-specific metadata
+  field.metadata = {
+    framework: framework.framework,
+    frameworkProps: framework.props,
+    visibility: computeElementVisibility(input),
+  };
+
+  // Rest of the existing detection logic...
+  switch (input.type) {
     case 'button':
     case 'submit':
     case 'reset':
@@ -199,9 +249,9 @@ const detectInputField = (input: HTMLInputElement, index: number): Field | null 
     case 'email':
     case 'url':
     case 'number':
-      field = createBaseField(input, index, type);
+      field = createBaseField(input, index, input.type);
       field.value = input.value || '';
-      if (type === 'number' || type === 'range') {
+      if (input.type === 'number' || input.type === 'range') {
         field.validation = {
           ...field.validation,
           step: Number(input.step) || 1,
@@ -342,18 +392,54 @@ const getElementValue = (element: HTMLElement): string => {
 
 // Add new helper function at the top
 const isFormLikeContainer = (element: HTMLElement): boolean => {
-  // Common form-like container classes and attributes
-  const formLikeClasses = ['form', 'form-group', 'form-container', 'form-wrapper', 'form-section'];
-  const formLikeRoles = ['form', 'group', 'region'];
+  // Framework-specific form indicators
+  const framework = detectFramework(element);
+  if (framework.framework !== 'vanilla') {
+    const hasFormProps =
+      framework.props &&
+      (framework.props.onSubmit ||
+        framework.props.onChange ||
+        framework.props['ng-submit'] ||
+        framework.props['v-on:submit']);
+    if (hasFormProps) return true;
+  }
 
-  return (
-    // Check for form-like classes
-    formLikeClasses.some(className => element.classList.contains(className)) ||
-    // Check for form-like roles
-    (element.getAttribute('role') && formLikeRoles.includes(element.getAttribute('role')!)) ||
-    // Check for multiple form controls
-    element.querySelectorAll('input, select, textarea').length > 1
+  // Common form-like container classes and attributes
+  const formLikeClasses = [
+    'form',
+    'form-group',
+    'form-container',
+    'form-wrapper',
+    'form-section',
+    'form-content',
+    'form-body',
+  ];
+
+  const formLikeRoles = ['form', 'group', 'region', 'search', 'contentinfo'];
+
+  // Check for form-like classes
+  const hasFormClass = formLikeClasses.some(
+    className => element.classList.contains(className) || element.className.toLowerCase().includes(className),
   );
+
+  // Check for form-like roles
+  const hasFormRole = formLikeRoles.includes(element.getAttribute('role') || '');
+
+  // Check for multiple form controls
+  const formControls = element.querySelectorAll(
+    'input:not([type="hidden"]), select, textarea, [role="textbox"], [role="combobox"]',
+  );
+
+  // Check for form-like structure
+  const hasFormStructure =
+    formControls.length > 1 &&
+    !!(
+      element.querySelector('button[type="submit"]') ||
+      element.querySelector('[role="button"]') ||
+      element.querySelector('input[type="submit"]')
+    );
+
+  return hasFormClass || hasFormRole || hasFormStructure;
 };
 
 // Modify the detectFields export to handle both forms and form-like containers
@@ -384,6 +470,16 @@ export const detectFields = (container: HTMLElement, isImplicitForm: boolean = f
     container.setAttribute('data-filliny-confidence', 'high');
   }
 
+  console.log('Tagged elements:', {
+    container,
+    taggedElements: Array.from(container.querySelectorAll('[data-filliny-id]')).map(el => ({
+      id: el.getAttribute('data-filliny-id'),
+      tagName: el.tagName,
+      type: (el as HTMLInputElement).type,
+      classes: el.className,
+    })),
+  });
+
   formControls.forEach(element => {
     if (!isElementVisible(element) || shouldSkipElement(element)) return;
 
@@ -410,7 +506,7 @@ export const detectFields = (container: HTMLElement, isImplicitForm: boolean = f
       default:
         // Handle native elements
         if (element instanceof HTMLInputElement) {
-          field = detectInputField(element, index);
+          field = detectInputField(element, index, isImplicitForm);
         } else if (element instanceof HTMLSelectElement) {
           field = detectSelectField(element, index);
         } else if (element instanceof HTMLTextAreaElement) {
@@ -473,4 +569,96 @@ export const detectFormLikeContainers = (): HTMLElement[] => {
   });
 
   return containers;
+};
+
+// Add new helper for XPath-based element location
+export const findElementByXPath = (xpath: string, context: HTMLElement = document.body): HTMLElement | null => {
+  try {
+    const result = document.evaluate(xpath, context, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
+    return result.singleNodeValue as HTMLElement;
+  } catch (e) {
+    console.warn('XPath evaluation failed:', e);
+    return null;
+  }
+};
+
+// Add helper to generate XPath for an element
+const getElementXPath = (element: HTMLElement): string => {
+  if (!element.parentElement) return '';
+
+  const idx =
+    Array.from(element.parentElement.children)
+      .filter(child => child.tagName === element.tagName)
+      .indexOf(element) + 1;
+
+  return `${getElementXPath(element.parentElement)}/${element.tagName.toLowerCase()}[${idx}]`;
+};
+
+// Update field creation to include XPath information
+const createBaseField = (element: HTMLElement, index: number, type: string, testMode: boolean = false): Field => {
+  const fieldId = `field-${index}`;
+
+  // Set the data attribute on the element
+  element.setAttribute('data-filliny-id', fieldId);
+
+  const field: Field = {
+    id: fieldId,
+    type: type as FieldType,
+    xpath: getElementXPath(element),
+    uniqueSelectors: generateUniqueSelectors(element),
+    label: getFieldLabel(element),
+    value: '',
+  };
+
+  // Generate default test values based on field type
+  if (testMode) {
+    switch (type) {
+      case 'text':
+        field.testValue = 'Test text';
+        break;
+      case 'email':
+        field.testValue = 'test@example.com';
+        break;
+      case 'tel':
+        field.testValue = '+1234567890';
+        break;
+      case 'select':
+        // Will be handled by Select2 specific code
+        break;
+      case 'number':
+        field.testValue = '42';
+        break;
+      default:
+        field.testValue = `Test ${type}`;
+    }
+  }
+
+  return field;
+};
+
+// Helper to generate multiple unique selectors for an element
+const generateUniqueSelectors = (element: HTMLElement): string[] => {
+  const selectors: string[] = [];
+
+  // ID-based selector
+  if (element.id) {
+    selectors.push(`#${CSS.escape(element.id)}`);
+  }
+
+  // Class-based selector
+  if (element.className) {
+    const classSelector = Array.from(element.classList)
+      .map(c => `.${CSS.escape(c)}`)
+      .join('');
+    if (classSelector) selectors.push(classSelector);
+  }
+
+  // Attribute-based selectors
+  ['name', 'type', 'role', 'aria-label'].forEach(attr => {
+    if (element.hasAttribute(attr)) {
+      selectors.push(`[${attr}="${CSS.escape(element.getAttribute(attr)!)}"]`);
+    }
+  });
+
+  return selectors;
 };
