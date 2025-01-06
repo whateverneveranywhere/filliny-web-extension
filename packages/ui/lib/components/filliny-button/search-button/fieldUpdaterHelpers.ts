@@ -98,12 +98,35 @@ const updateCheckableField = (element: HTMLElement, field: Field): void => {
     initializedFields.add(field.id);
   }
 
-  const newCheckedState = field.value === 'true';
+  // Convert field.value to boolean, handling all possible value types
+  const newCheckedState =
+    field.value !== undefined &&
+    ((field.value as unknown) === true || field.value === 'true' || Number(field.value) === 1);
+  console.log('Updating checkbox:', {
+    id: field.id,
+    value: field.value,
+    newState: newCheckedState,
+    element: element.tagName,
+    currentState: element instanceof HTMLInputElement ? element.checked : element.getAttribute('aria-checked'),
+  });
 
-  if (element instanceof HTMLInputElement && element.type === 'checkbox') {
+  if (element instanceof HTMLInputElement) {
+    // Set checked state
     element.checked = newCheckedState;
-  } else if (element.getAttribute('role') === 'checkbox') {
-    // Update both the attribute and ARIA state
+
+    // Trigger native events in correct order
+    element.dispatchEvent(new Event('click', { bubbles: true }));
+    element.dispatchEvent(new Event('input', { bubbles: true }));
+    element.dispatchEvent(new Event('change', { bubbles: true }));
+
+    // Force React to notice the change
+    const nativeInputEvent = new Event('input', { bubbles: true });
+    const nativeChangeEvent = new Event('change', { bubbles: true });
+    Object.defineProperty(nativeInputEvent, 'target', { value: element });
+    Object.defineProperty(nativeChangeEvent, 'target', { value: element });
+    element.dispatchEvent(nativeInputEvent);
+    element.dispatchEvent(nativeChangeEvent);
+  } else {
     if (newCheckedState) {
       element.setAttribute('checked', '');
       element.setAttribute('aria-checked', 'true');
@@ -111,13 +134,19 @@ const updateCheckableField = (element: HTMLElement, field: Field): void => {
       element.removeAttribute('checked');
       element.setAttribute('aria-checked', 'false');
     }
+    // Trigger events for custom elements
+    element.dispatchEvent(new Event('change', { bubbles: true }));
   }
 
-  // Trigger events
-  dispatchEnhancedEvents(element, newCheckedState, {
-    triggerFocus: true,
-    triggerValidation: field.required,
-  });
+  // Handle any framework-specific updates
+  if (element.closest('[data-reactroot]')) {
+    // Force React controlled components to update
+    const reactChangeEvent = new Event('change', { bubbles: true });
+    Object.defineProperty(reactChangeEvent, 'target', {
+      value: { checked: newCheckedState, type: 'checkbox' },
+    });
+    element.dispatchEvent(reactChangeEvent);
+  }
 };
 
 const updateTextAreaField = (element: HTMLTextAreaElement, field: Field): void => {

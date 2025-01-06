@@ -4,7 +4,10 @@ import { detectFields } from './detectionHelpers';
 import { addGlowingBorder, findOrCreateShadowContainer, getFormPosition } from './overlayUtils';
 import type { HighlightFormsOptions } from './types';
 
-export const highlightForms = ({ visionOnly = false, testMode = false }: HighlightFormsOptions): void => {
+export const highlightForms = async ({
+  visionOnly = false,
+  testMode = false,
+}: HighlightFormsOptions): Promise<void> => {
   const shadowRoot = document.querySelector('#chrome-extension-filliny')?.shadowRoot;
 
   if (!shadowRoot) {
@@ -20,20 +23,17 @@ export const highlightForms = ({ visionOnly = false, testMode = false }: Highlig
 
   const overlaysContainer = findOrCreateShadowContainer(shadowRoot);
 
-  forms.forEach((form, index) => {
+  let index = 0;
+  for (const form of Array.from(forms)) {
     const formId = `form-${index}`;
     form.dataset.formId = formId;
+    index++;
 
     if (visionOnly) {
-      // Remove any existing highlights first
-      removeFormHighlights(form);
-
-      // Apply new highlights
-      highlightFormFields(form);
-
-      // Remove highlights after 2 seconds
-      setTimeout(() => {
-        removeFormHighlights(form);
+      await removeFormHighlights(form);
+      await highlightFormFields(form);
+      setTimeout(async () => {
+        await removeFormHighlights(form);
       }, 2000);
     } else {
       if (overlaysContainer.querySelector(`#overlay-${formId}`)) {
@@ -42,7 +42,7 @@ export const highlightForms = ({ visionOnly = false, testMode = false }: Highlig
       }
       createFormOverlay(form, formId, overlaysContainer, testMode);
     }
-  });
+  }
 };
 
 const createFormOverlay = (
@@ -81,8 +81,8 @@ const createFormOverlay = (
   form.dataset.fillinyOverlayActive = 'true';
 };
 
-const highlightFormFields = (form: HTMLFormElement): void => {
-  const fields = detectFields(form);
+const highlightFormFields = async (form: HTMLFormElement): Promise<void> => {
+  const fields = await detectFields(form);
   fields.forEach(field => {
     const element = form.querySelector<HTMLElement>(`[data-filliny-id="${field.id}"]`);
     if (element) {
@@ -92,8 +92,8 @@ const highlightFormFields = (form: HTMLFormElement): void => {
   });
 };
 
-const removeFormHighlights = (form: HTMLFormElement): void => {
-  const fields = detectFields(form);
+const removeFormHighlights = async (form: HTMLFormElement): Promise<void> => {
+  const fields = await detectFields(form);
   fields.forEach(field => {
     const element = form.querySelector<HTMLElement>(`[data-filliny-id="${field.id}"]`);
     if (element && element.dataset.fillinyHighlighted) {

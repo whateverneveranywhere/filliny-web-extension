@@ -76,51 +76,238 @@ const isElementVisible = (element: HTMLElement): boolean => {
   return isVisible;
 };
 
-const getFieldLabel = (element: HTMLElement): string => {
-  let label = '';
-  let description = '';
+const getAllFrameDocuments = (): Document[] => {
+  const docs: Document[] = [document];
+  const processedFrames = new Set<string>();
 
-  // 1. Check explicit label with 'for' attribute
-  if (element.id) {
-    const labelElement = document.querySelector(`label[for="${element.id}"]`);
-    if (labelElement) {
-      // Get the text content without any nested element text
-      const labelNodes = Array.from(labelElement.childNodes)
-        .filter(node => node.nodeType === Node.TEXT_NODE)
-        .map(node => node.textContent?.trim())
-        .filter(Boolean);
-
-      label = labelNodes.join(' ');
-
-      // Look for description in nested elements
-      const descriptionEl = labelElement.querySelector('.description, .help-text, .hint, small');
-      if (descriptionEl) {
-        description = descriptionEl.textContent?.trim() || '';
+  const tryGetIframeDoc = (iframe: HTMLIFrameElement): Document | null => {
+    try {
+      // Try different ways to access iframe content
+      if (iframe.contentDocument?.readyState === 'complete') {
+        return iframe.contentDocument;
       }
+      if (iframe.contentWindow?.document?.readyState === 'complete') {
+        return iframe.contentWindow.document;
+      }
+      // If not complete but accessible, queue for retry
+      if (iframe.contentDocument || iframe.contentWindow?.document) {
+        setTimeout(() => {
+          const doc = tryGetIframeDoc(iframe);
+          if (doc && !processedFrames.has(iframe.src)) {
+            processedFrames.add(iframe.src);
+            docs.push(doc);
+            detectFormLikeContainers(); // Re-run detection
+          }
+        }, 500);
+      }
+    } catch (e) {
+      console.debug('Frame access restricted:', {
+        src: iframe.src,
+        error: (e as Error).message,
+      });
+    }
+    return null;
+  };
+
+  // Process all iframes recursively
+  const processIframes = (doc: Document) => {
+    Array.from(doc.getElementsByTagName('iframe')).forEach(iframe => {
+      if (!processedFrames.has(iframe.src)) {
+        const iframeDoc = tryGetIframeDoc(iframe);
+        if (iframeDoc) {
+          processedFrames.add(iframe.src);
+          docs.push(iframeDoc);
+          // Recursively process nested iframes
+          processIframes(iframeDoc);
+        }
+      }
+    });
+  };
+
+  try {
+    processIframes(document);
+  } catch (e) {
+    console.warn('Error processing frames:', e);
+  }
+
+  return docs;
+};
+
+// Update the initialization to be more robust
+export const initializeIframeDetection = (): void => {
+  let detectingForms = false;
+
+  const safeDetectForms = () => {
+    if (detectingForms) return;
+    detectingForms = true;
+    setTimeout(() => {
+      detectFormLikeContainers();
+      detectingForms = false;
+    }, 0);
+  };
+
+  // Watch for any DOM changes that might indicate new forms
+  const observer = new MutationObserver(mutations => {
+    const hasRelevantChanges = mutations.some(mutation =>
+      Array.from(mutation.addedNodes).some(node => {
+        if (node instanceof HTMLElement) {
+          return node.tagName === 'IFRAME' || node.tagName === 'FORM' || node.querySelector('form, iframe');
+        }
+        return false;
+      }),
+    );
+
+    if (hasRelevantChanges) {
+      safeDetectForms();
+    }
+  });
+
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true,
+  });
+
+  // Initial detection
+  safeDetectForms();
+
+  // Handle dynamic iframe loads
+  window.addEventListener('load', safeDetectForms, { once: true });
+  window.addEventListener('DOMContentLoaded', safeDetectForms, { once: true });
+};
+
+// Update querySelector to work across frames
+const querySelectorAllFrames = (selector: string): Element[] => {
+  const results: Element[] = [];
+  const documents = getAllFrameDocuments();
+
+  for (const doc of documents) {
+    try {
+      results.push(...Array.from(doc.querySelectorAll(selector)));
+    } catch (e) {
+      console.warn('Error querying in frame:', e);
     }
   }
 
-  // 2. Check for wrapping label
-  if (!label) {
-    const parentLabel = element.closest('label');
-    if (parentLabel) {
-      const labelNodes = Array.from(parentLabel.childNodes)
-        .filter(node => node.nodeType === Node.TEXT_NODE)
-        .map(node => node.textContent?.trim())
-        .filter(Boolean);
+  return results;
+};
 
-      label = labelNodes.join(' ');
+const getFieldLabel = (element: HTMLElement): string => {
+  const strategies = [
+    // 1. Accessibility-first approach
+    () => {
+      // Check ARIA attributes
+      const ariaLabel = element.getAttribute('aria-label')?.trim();
+      if (ariaLabel) return ariaLabel;
+
+      // Check ARIA labelledby
+      const labelledBy = element.getAttribute('aria-labelledby');
+      if (labelledBy) {
+        const labelTexts = labelledBy
+          .split(/\s+/)
+          .map(id => document.getElementById(id)?.textContent?.trim())
+          .filter(Boolean);
+        if (labelTexts.length) return labelTexts.join(' ');
+      }
+
+      // Check ARIA describedby
+      const describedBy = element.getAttribute('aria-describedby');
+      if (describedBy) {
+        const descriptionTexts = describedBy
+          .split(/\s+/)
+          .map(id => document.getElementById(id)?.textContent?.trim())
+          .filter(Boolean);
+        if (descriptionTexts.length) return descriptionTexts.join(' ');
+      }
+
+      return '';
+    },
+
+    // 2. Standard HTML semantics
+    () => {
+      // Check for explicit label using 'for' attribute
+      if (element.id) {
+        const labelElement = element.ownerDocument.querySelector(`label[for="${element.id}"]`);
+        if (labelElement?.textContent?.trim()) return labelElement.textContent.trim();
+      }
+
+      // Check for wrapping label
+      const parentLabel = element.closest('label');
+      if (parentLabel) {
+        // Clone to avoid modifying the actual DOM
+        const clone = parentLabel.cloneNode(true) as HTMLElement;
+        // Remove the input element from clone to get just the label text
+        clone.querySelectorAll('input, select, textarea, button').forEach(el => el.remove());
+        if (clone.textContent?.trim()) return clone.textContent.trim();
+      }
+
+      return '';
+    },
+
+    // 3. DOM structure analysis
+    () => {
+      const doc = element.ownerDocument;
+
+      // Try to find preceding text nodes using XPath
+      try {
+        const xpathResult = doc.evaluate(
+          `./preceding-sibling::text()[normalize-space(.)!=''] | 
+           ./preceding-sibling::*/text()[normalize-space(.)!=''] |
+           ../text()[following-sibling::*[1][self::${element.tagName.toLowerCase()}]]`,
+          element,
+          null,
+          XPathResult.ORDERED_NODE_SNAPSHOT_TYPE,
+          null,
+        );
+
+        const textNodes = [];
+        for (let i = 0; i < xpathResult.snapshotLength; i++) {
+          const node = xpathResult.snapshotItem(i);
+          if (node?.textContent) textNodes.push(node.textContent.trim());
+        }
+
+        // Return the closest meaningful text
+        const relevantText = textNodes.reverse().find(
+          text =>
+            text.length > 1 &&
+            text.length < 200 &&
+            !/^[0-9.,$€£%]+$/.test(text) &&
+            !text.includes('{{') && // Skip template syntax
+            !text.includes('}}'),
+        );
+
+        if (relevantText) return relevantText;
+      } catch (e) {
+        console.debug('XPath evaluation failed:', e);
+      }
+
+      return '';
+    },
+
+    // 4. Form field attributes
+    () => {
+      return (
+        element.getAttribute('placeholder')?.trim() ||
+        element.getAttribute('title')?.trim() ||
+        element
+          .getAttribute('name')
+          ?.split(/[._[\]]/g)
+          .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+          .join(' ')
+          .trim() ||
+        ''
+      );
+    },
+  ];
+
+  // Try each strategy until we find a valid label
+  for (const strategy of strategies) {
+    const label = strategy();
+    if (label && !/^[0-9.,$€£%]+$/.test(label)) {
+      return label;
     }
   }
 
-  // 3. Check aria-label and aria-description
-  if (!label) {
-    label = element.getAttribute('aria-label')?.trim() || '';
-    description = element.getAttribute('aria-description')?.trim() || '';
-  }
-
-  // Combine label and description if both exist
-  return description ? `${label} (${description})` : label;
+  return 'Unlabeled field';
 };
 
 const shouldSkipElement = (element: HTMLElement): boolean => {
@@ -330,20 +517,32 @@ const detectCheckboxField = (element: HTMLElement, index: number): Field | null 
 
   const field = createBaseField(element, index, 'checkbox');
 
-  // Determine initial state
-  let isInitiallyChecked: boolean;
-  if (element instanceof HTMLInputElement && element.type === 'checkbox') {
-    isInitiallyChecked = element.checked;
-  } else if (element.getAttribute('role') === 'checkbox') {
-    isInitiallyChecked = element.hasAttribute('checked') || element.getAttribute('aria-checked') === 'true';
+  // Get the current state
+  let isChecked = false;
+  if (element instanceof HTMLInputElement) {
+    isChecked = element.checked;
   } else {
-    isInitiallyChecked = false;
+    isChecked = element.getAttribute('aria-checked') === 'true' || element.hasAttribute('checked');
   }
 
-  // Set the value to the opposite of the initial state
-  field.value = (!isInitiallyChecked).toString();
+  // Store boolean value as string
+  field.value = isChecked.toString();
 
-  field.testValue = element.getAttribute('data-test-value') || '';
+  field.metadata = {
+    framework: 'vanilla',
+    visibility: { isVisible: isElementVisible(element) },
+    ...field.metadata,
+    checkboxValue: element instanceof HTMLInputElement ? element.value : 'on',
+    isExclusive:
+      element.hasAttribute('data-exclusive') ||
+      element.closest('[role="radiogroup"]') !== null ||
+      element.closest('fieldset[data-exclusive]') !== null,
+    groupName:
+      element instanceof HTMLInputElement
+        ? element.name
+        : element.getAttribute('data-group') || element.closest('fieldset')?.id,
+  };
+
   return field;
 };
 
@@ -391,7 +590,7 @@ const getElementValue = (element: HTMLElement): string => {
 };
 
 // Add new helper function at the top
-const isFormLikeContainer = (element: HTMLElement): boolean => {
+const isFormLikeContainer = async (element: HTMLElement): Promise<boolean> => {
   // Framework-specific form indicators
   const framework = detectFramework(element);
   if (framework.framework !== 'vanilla') {
@@ -443,44 +642,19 @@ const isFormLikeContainer = (element: HTMLElement): boolean => {
 };
 
 // Modify the detectFields export to handle both forms and form-like containers
-export const detectFields = (container: HTMLElement, isImplicitForm: boolean = false): Field[] => {
+export const detectFields = async (container: HTMLElement, isImplicitForm: boolean = false): Promise<Field[]> => {
   const fields: Field[] = [];
   let index = 0;
   const processedGroups = new Set<string>();
 
-  // Query all potential form controls, including ARIA-based ones
-  const formControls = container.querySelectorAll<HTMLElement>(`
-    input[type="checkbox"],
-    [role="checkbox"],
-    [role="switch"],
-    input,
-    select,
-    textarea,
-    [role="radio"],
-    [role="textbox"],
-    [role="combobox"],
-    [role="spinbutton"],
-    [data-filliny-field]
-  `);
-
-  // Add confidence level attribute to the container
-  if (isImplicitForm) {
-    container.setAttribute('data-filliny-confidence', 'medium');
-  } else {
-    container.setAttribute('data-filliny-confidence', 'high');
-  }
-
-  console.log('Tagged elements:', {
-    container,
-    taggedElements: Array.from(container.querySelectorAll('[data-filliny-id]')).map(el => ({
-      id: el.getAttribute('data-filliny-id'),
-      tagName: el.tagName,
-      type: (el as HTMLInputElement).type,
-      classes: el.className,
-    })),
-  });
-
-  formControls.forEach(element => {
+  // Process all elements and collect promises
+  const promises = Array.from(
+    container.querySelectorAll<HTMLElement>(`
+      input[type="checkbox"], [role="checkbox"], [role="switch"],
+      input, select, textarea, [role="radio"], [role="textbox"],
+      [role="combobox"], [role="spinbutton"], [data-filliny-field]
+    `),
+  ).map(async element => {
     if (!isElementVisible(element) || shouldSkipElement(element)) return;
 
     const role = getElementRole(element);
@@ -501,7 +675,7 @@ export const detectFields = (container: HTMLElement, isImplicitForm: boolean = f
         field = detectTextLikeField(element, index);
         break;
       case 'combobox':
-        field = detectSelectLikeField(element, index);
+        field = await detectSelectLikeField(element, index);
         break;
       default:
         // Handle native elements
@@ -520,6 +694,8 @@ export const detectFields = (container: HTMLElement, isImplicitForm: boolean = f
     }
   });
 
+  // Wait for all async operations to complete
+  await Promise.all(promises);
   return fields;
 };
 
@@ -530,16 +706,88 @@ const detectTextLikeField = (element: HTMLElement, index: number): Field | null 
   return field;
 };
 
-const detectSelectLikeField = (element: HTMLElement, index: number): Field | null => {
+const detectDynamicSelectOptions = async (element: HTMLElement): Promise<Array<{ value: string; text: string }>> => {
+  const originalState = document.documentElement.innerHTML;
+  let options: Array<{ value: string; text: string }> = [];
+
+  try {
+    // Click to trigger any dynamic content
+    element.click();
+    await new Promise(resolve => setTimeout(resolve, 300));
+
+    // Look for any newly added content in the DOM
+    const root = element.ownerDocument;
+    const addedElements = Array.from(root.querySelectorAll('*')).filter(el => {
+      if (!el.isConnected || !isElementVisible(el as HTMLElement)) return false;
+
+      // Look for common option patterns
+      const isOptionLike =
+        el.matches('li, [role="option"]') || // Standard options
+        el.getAttribute('role')?.includes('option') || // ARIA roles
+        el.matches('[data-value], [value]') || // Value attributes
+        el.parentElement?.getAttribute('role')?.includes('listbox'); // Inside listbox
+
+      return isOptionLike && !element.contains(el);
+    });
+
+    // Group options by their containers to find the most likely option list
+    const optionGroups = addedElements.reduce((groups, el) => {
+      const container = el.parentElement;
+      if (!container) return groups;
+
+      if (!groups.has(container)) {
+        groups.set(container, []);
+      }
+      groups.get(container)?.push(el);
+      return groups;
+    }, new Map<Element, Element[]>());
+
+    // Use the group with the most options
+    const bestGroup = Array.from(optionGroups.entries()).sort(([, a], [, b]) => b.length - a.length)[0]?.[1] || [];
+
+    options = bestGroup
+      .map(opt => ({
+        value: opt.getAttribute('data-value') || opt.getAttribute('value') || opt.textContent?.trim() || '',
+        text: opt.textContent?.trim() || '',
+      }))
+      .filter(opt => opt.value || opt.text);
+
+    // Clean up
+    document.body.click();
+  } catch (e) {
+    console.debug('Error detecting dynamic options:', (e as Error).message);
+  }
+
+  // Restore original state if needed
+  if (document.documentElement.innerHTML !== originalState) {
+    document.documentElement.innerHTML = originalState;
+  }
+
+  return options;
+};
+
+// Update detectSelectLikeField to use the dynamic detection as fallback
+const detectSelectLikeField = async (element: HTMLElement, index: number): Promise<Field | null> => {
   const field = createBaseField(element, index, 'select');
 
-  // Look for options in various formats
-  const options = element.querySelectorAll('[role="option"], option, [data-option]');
-  field.options = Array.from(options).map(opt => ({
-    value: opt.getAttribute('value') || opt.textContent?.trim() || '',
-    text: opt.textContent?.trim() || '',
-    selected: opt.getAttribute('aria-selected') === 'true' || opt.hasAttribute('selected'),
-  }));
+  // Try standard option detection first
+  const staticOptions = element.querySelectorAll('[role="option"], option, [data-option]');
+  if (staticOptions.length) {
+    field.options = Array.from(staticOptions).map(opt => ({
+      value: opt.getAttribute('value') || opt.textContent?.trim() || '',
+      text: opt.textContent?.trim() || '',
+      selected: opt.getAttribute('aria-selected') === 'true' || opt.hasAttribute('selected'),
+    }));
+  } else {
+    // Fallback to dynamic detection
+    const dynamicOptions = await detectDynamicSelectOptions(element);
+    if (dynamicOptions.length) {
+      field.options = dynamicOptions.map(opt => ({
+        ...opt,
+        selected: false,
+      }));
+    }
+  }
 
   field.value = getElementValue(element);
   field.testValue = element.getAttribute('data-test-value') || '';
@@ -547,39 +795,50 @@ const detectSelectLikeField = (element: HTMLElement, index: number): Field | nul
 };
 
 // Add new export for detecting form-like containers
-export const detectFormLikeContainers = (): HTMLElement[] => {
+export const detectFormLikeContainers = async (): Promise<HTMLElement[]> => {
   const containers: HTMLElement[] = [];
+  const documents = getAllFrameDocuments();
 
-  // First, get all actual forms
-  const forms = Array.from(document.querySelectorAll<HTMLFormElement>('form'));
-  containers.push(...forms);
+  for (const doc of documents) {
+    try {
+      const forms = Array.from(doc.querySelectorAll<HTMLFormElement>('form'));
+      containers.push(...forms);
 
-  // Then look for potential form-like containers that aren't actual forms
-  const potentialContainers = document.querySelectorAll<HTMLElement>('div, section, article, main, aside');
+      // Convert NodeList to Array
+      const potentialContainers = Array.from(doc.querySelectorAll<HTMLElement>('div, section, article, main, aside'));
 
-  potentialContainers.forEach(container => {
-    // Skip if this container is inside an actual form or already detected container
-    if (container.closest('form') || containers.some(existing => existing.contains(container))) {
-      return;
+      for (const container of potentialContainers) {
+        if (container.closest('form') || containers.some(existing => existing.contains(container))) {
+          continue;
+        }
+        if (await isFormLikeContainer(container)) {
+          containers.push(container);
+        }
+      }
+    } catch (e) {
+      console.warn('Error detecting forms in frame:', e);
     }
-
-    if (isFormLikeContainer(container)) {
-      containers.push(container);
-    }
-  });
+  }
 
   return containers;
 };
 
 // Add new helper for XPath-based element location
-export const findElementByXPath = (xpath: string, context: HTMLElement = document.body): HTMLElement | null => {
-  try {
-    const result = document.evaluate(xpath, context, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
-    return result.singleNodeValue as HTMLElement;
-  } catch (e) {
-    console.warn('XPath evaluation failed:', e);
-    return null;
+export const findElementByXPath = (xpath: string): HTMLElement | null => {
+  // Try direct XPath first
+  for (const doc of getAllFrameDocuments()) {
+    try {
+      const result = doc.evaluate(xpath, doc, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
+      const element = result.singleNodeValue as HTMLElement;
+      if (element) return element;
+    } catch (e) {
+      console.warn('XPath evaluation failed:', e);
+    }
   }
+
+  // Fallback to querySelector if XPath fails
+  const elements = querySelectorAllFrames('[data-filliny-id]');
+  return (elements[0] as HTMLElement) || null;
 };
 
 // Add helper to generate XPath for an element

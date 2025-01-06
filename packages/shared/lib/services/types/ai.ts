@@ -56,6 +56,9 @@ export interface Field {
     };
     select2Container?: string;
     actualSelect?: string;
+    checkboxValue?: string;
+    isExclusive?: boolean;
+    groupName?: string;
   };
   xpath?: string;
   uniqueSelectors?: string[];

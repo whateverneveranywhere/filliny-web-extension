@@ -126,7 +126,7 @@ export const handleFormClick = async (
   showLoadingIndicator(formId);
 
   try {
-    const fields = detectFields(form);
+    const fields = await detectFields(form);
     console.log('detected fields', fields);
 
     if (testMode) {
