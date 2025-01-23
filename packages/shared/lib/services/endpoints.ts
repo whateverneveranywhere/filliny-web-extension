@@ -2,63 +2,24 @@ export const apiEndpoints = {
   version: '/api/v1',
   auth: {
     base: '/auth',
-
     profiles: {
-      get base() {
-        return `${apiEndpoints.auth.base}/filling-profiles`;
-      },
-
-      get profilesList() {
-        return `${this.base}`;
-      },
-
-      get suggestedWebsites() {
-        return `${this.base}/suggested-websites`;
-      },
-
-      get povsList() {
-        return `${this.base}/povs`;
-      },
-
-      get tonesList() {
-        return `${this.base}/tones`;
-      },
-
-      setActive: (defaultId: string) => {
-        return `${apiEndpoints.auth.profiles.base}/${defaultId}/activate`;
-      },
-
-      getById: (defaultId: string) => {
-        return `${apiEndpoints.auth.profiles.base}/${defaultId}`;
-      },
+      base: `${'/auth'}/filling-profiles`,
+      profilesList: `${'/auth'}/filling-profiles`,
+      suggestedWebsites: `${'/auth'}/filling-profiles/suggested-websites`,
+      povsList: `${'/auth'}/filling-profiles/povs`,
+      tonesList: `${'/auth'}/filling-profiles/tones`,
+      setActive: (defaultId: string) => `${'/auth'}/filling-profiles/${defaultId}/activate`,
+      getById: (defaultId: string) => `${'/auth'}/filling-profiles/${defaultId}`,
     },
-
     dashboard: {
-      get base() {
-        return `${apiEndpoints.auth.base}/dashboard`;
-      },
-
-      get overview() {
-        return `${this.base}/overview`;
-      },
+      base: `${'/auth'}/dashboard`,
+      overview: `${'/auth'}/dashboard/overview`,
     },
-
     ai: {
-      get base() {
-        return `${apiEndpoints.auth.base}/ai`;
-      },
-
-      get AIBase() {
-        return `${this.base}`;
-      },
-
-      get AIFill() {
-        return `${this.base}/fill`;
-      },
+      base: `${'/auth'}/ai`,
+      AIBase: `${'/auth'}/ai`,
+      AIFill: `${'/auth'}/ai/fill`,
     },
   },
-
-  get healthCheck() {
-    return `/auth-health-check`;
-  },
-};
+  healthCheck: '/auth-health-check',
+} as const;

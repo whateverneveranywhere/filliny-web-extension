@@ -6,6 +6,12 @@ setupAuthTokenListener();
 
 // Listen for messages from other parts of the extension
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  // Handle API requests separately from other actions
+  if (request.type === 'API_REQUEST') {
+    handleApiRequest(request, sender, sendResponse);
+    return true; // Keep the message channel open for async response
+  }
+
   return handleAction(request, sender, sendResponse);
 });
 
@@ -29,32 +35,98 @@ chrome.action.onClicked.addListener(async tab => {
   }
 });
 
-// Add this after your existing listeners
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.type === 'API_REQUEST') {
-    const { url, options } = message;
+// Define the message type
+interface APIRequestMessage {
+  type: 'API_REQUEST';
+  url: string;
+  options: {
+    method: string;
+    body?: string;
+    headers?: Record<string, string>;
+    isStream?: boolean;
+  };
+}
 
-    fetch(url, options)
-      .then(async response => {
-        if (!response.ok) {
-          const error = await response.json();
-          sendResponse({ error: error.message || 'Request failed' });
+// Separate function to handle API requests
+const handleApiRequest = (
+  message: APIRequestMessage,
+  sender: chrome.runtime.MessageSender,
+  sendResponse: (response: { error?: string; data?: unknown; success?: boolean }) => void,
+) => {
+  const { url, options } = message;
+  const tabId = sender.tab?.id;
+
+  if (!tabId) {
+    sendResponse({ error: 'No valid tab ID found' });
+    return;
+  }
+
+  console.log('Background: Making API request to:', url);
+
+  fetch(url, options)
+    .then(async response => {
+      console.log('Background: API response status:', response.status);
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: response.statusText }));
+        console.error('Background: API error:', errorData);
+        sendResponse({
+          error: typeof errorData === 'object' ? errorData.message || JSON.stringify(errorData) : 'Request failed',
+        });
+        return;
+      }
+
+      if (options.isStream) {
+        console.log('Background: Processing stream response');
+        const reader = response.body?.getReader();
+        if (!reader) {
+          console.error('Background: No readable stream available');
+          sendResponse({ error: 'No readable stream available' });
           return;
         }
 
-        if (options.isStream) {
-          // Handle streaming response
-          const reader = response.body?.getReader();
-          sendResponse({ data: reader });
-        } else {
-          const data = await response.json();
-          sendResponse({ data });
-        }
-      })
-      .catch(error => {
-        sendResponse({ error: error.message });
-      });
+        // Send chunks back to content script
+        try {
+          let isDone = false;
+          while (!isDone) {
+            const { done, value } = await reader.read();
+            isDone = done;
 
-    return true; // Keep the message channel open for async response
-  }
-});
+            if (!done && value) {
+              // Convert Uint8Array to string
+              const chunk = new TextDecoder().decode(value);
+              console.log('Background: Sending chunk:', chunk.substring(0, 100) + '...');
+              chrome.tabs.sendMessage(tabId, {
+                type: 'STREAM_CHUNK',
+                data: chunk,
+              });
+            }
+          }
+          console.log('Background: Stream complete');
+          // Signal end of stream
+          chrome.tabs.sendMessage(tabId, {
+            type: 'STREAM_DONE',
+          });
+        } catch (error) {
+          console.error('Background: Stream error:', error);
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+          chrome.tabs.sendMessage(tabId, {
+            type: 'STREAM_ERROR',
+            error: errorMessage,
+          });
+          sendResponse({ error: errorMessage });
+          return;
+        }
+        sendResponse({ success: true }); // Acknowledge the request
+      } else {
+        const data = await response.json();
+        console.log('Background: Regular response data:', data);
+        sendResponse({ data });
+      }
+    })
+    .catch(error => {
+      console.error('Background: Fetch error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      sendResponse({ error: errorMessage });
+    });
+};

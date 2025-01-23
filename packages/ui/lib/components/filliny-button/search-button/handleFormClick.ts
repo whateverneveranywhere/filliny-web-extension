@@ -1,6 +1,6 @@
 import { highlightForms } from './highlightForms';
 import { detectFields } from './detectionHelpers';
-import { processStreamResponse, updateFormFields } from './fieldUpdaterHelpers';
+import { processChunks, updateFormFields } from './fieldUpdaterHelpers';
 import { disableOtherButtons, resetOverlays, showLoadingIndicator } from './overlayUtils';
 import type { DTOProfileFillingForm } from '@extension/storage';
 import { profileStrorage } from '@extension/storage';
@@ -127,10 +127,10 @@ export const handleFormClick = async (
 
   try {
     const fields = await detectFields(form);
-    console.log('detected fields', fields);
+    console.log('Form Click: Detected fields:', fields);
 
     if (testMode) {
-      console.log('Running in test mode - using mock data');
+      console.log('Form Click: Running in test mode - using mock data');
       const mockResponse = fields.map(field => ({
         ...field,
         value: getMockValueForFieldType(field.type, field),
@@ -144,6 +144,35 @@ export const handleFormClick = async (
     const visitingUrl = window.location.href;
     const matchingWebsite = getMatchingWebsite((defaultProfile as DTOProfileFillingForm).fillingWebsites, visitingUrl);
 
+    console.log('Form Click: Setting up stream handler');
+    // Set up message listener for streaming response
+    const streamPromise = new Promise<void>((resolve, reject) => {
+      const messageHandler = (message: { type: string; data?: string; error?: string }) => {
+        console.log('Form Click: Received message:', message.type);
+        if (message.type === 'STREAM_CHUNK' && message.data) {
+          try {
+            console.log('Form Click: Processing chunk:', message.data.substring(0, 100) + '...');
+            processChunks(message.data, fields);
+          } catch (error) {
+            console.error('Form Click: Error processing chunk:', error);
+            // Don't reject here, continue processing other chunks
+          }
+        } else if (message.type === 'STREAM_DONE') {
+          console.log('Form Click: Stream complete');
+          chrome.runtime.onMessage.removeListener(messageHandler);
+          resolve();
+        } else if (message.type === 'STREAM_ERROR') {
+          console.error('Form Click: Stream error:', message.error);
+          chrome.runtime.onMessage.removeListener(messageHandler);
+          reject(new Error(message.error || 'Stream error'));
+        }
+      };
+
+      chrome.runtime.onMessage.addListener(messageHandler);
+    });
+
+    console.log('Form Click: Making API call');
+    // Make the API call
     const response = await aiFillService({
       contextText: matchingWebsite?.fillingContext || defaultProfile?.defaultFillingContext || '',
       formData: fields,
@@ -151,17 +180,28 @@ export const handleFormClick = async (
       preferences: defaultProfile?.preferences,
     });
 
+    console.log('Form Click: Got API response:', response);
+
     if (response instanceof ReadableStream) {
-      await processStreamResponse(response, fields);
-    } else {
+      console.log('Form Click: Processing stream response');
+      // Wait for all streaming chunks to be processed
+      await streamPromise;
+    } else if (response.data) {
+      console.log('Form Click: Processing regular response');
       await updateFormFields(response.data, false);
+    } else {
+      console.error('Form Click: Invalid response format:', response);
+      throw new Error('Invalid response format from API');
     }
   } catch (error) {
-    const apiError = (error as { message: string })?.message;
-    if (apiError) {
-      alert(apiError);
-    }
-    console.error('Error processing AI fill service:', error);
+    console.error('Form Click: Error processing AI fill service:', error);
+    const errorMessage =
+      error instanceof Error
+        ? error.message
+        : typeof error === 'object'
+          ? JSON.stringify(error)
+          : 'Unknown error occurred';
+    alert(`Failed to fill form: ${errorMessage}`);
   } finally {
     resetOverlays();
   }
