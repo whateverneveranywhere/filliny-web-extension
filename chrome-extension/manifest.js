@@ -4,7 +4,8 @@ import deepmerge from 'deepmerge';
 const packageJson = JSON.parse(fs.readFileSync('../package.json', 'utf8'));
 
 const isFirefox = process.env.__FIREFOX__ === 'true';
-const isDev = process.env.__DEV__ === 'true';
+// const isDev = process.env.__DEV__ === 'true';
+const env = process.env.VITE_WEBAPP_ENV || 'dev';
 
 /**
  * If you want to disable the sidePanel, you can delete withSidePanel function and remove the sidePanel HoC on the manifest declaration.
@@ -37,13 +38,14 @@ const manifest = withSidePanel({
    * if you want to support multiple languages, you can use the following reference
    * https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/Internationalization
    */
-  name: '__MSG_extensionName__',
+  name: env === 'prod' ? '__MSG_extensionName__' : `__MSG_extensionName__ | ${env.toUpperCase()}`,
   version: packageJson.version,
   description: '__MSG_extensionDescription__',
   host_permissions: [
-    'https://dev.filliny.io/*',
     'https://filliny.io/*',
-    ...(isDev ? ['http://localhost:3000/*'] : []), // Only includes localhost if isDev is true
+    ...(env === 'dev' ? ['http://localhost:3000/*'] : []),
+    ...(env === 'preview' ? ['https://dev.filliny-app.pages.dev/*'] : []),
+    ...(env === 'prod' ? ['https://app.filliny.io/*'] : []),
   ],
   permissions: ['storage', 'scripting', 'tabs', 'cookies', 'activeTab', 'notifications'],
   options_page: 'options/index.html',
@@ -51,9 +53,6 @@ const manifest = withSidePanel({
     service_worker: 'background.iife.js',
     type: 'module',
   },
-  action: {
-    default_icon: 'icon-34.png',
-  },
   // chrome_url_overrides: {
   //   newtab: 'new-tab/index.html',
   // },
@@ -81,7 +80,6 @@ const manifest = withSidePanel({
       matches: ['*://*/*'],
     },
   ],
-
   action: {
     default_popup: 'popup/index.html',
     default_icon: 'icon-34.png',
@@ -89,31 +87,6 @@ const manifest = withSidePanel({
   // chrome_url_overrides: {
   //   newtab: 'new-tab/index.html',
   // },
-
-  icons: {
-    128: 'icon-128.png',
-  },
-  content_scripts: [
-    {
-      matches: ['http://*/*', 'https://*/*', '<all_urls>'],
-      js: ['content/index.iife.js'],
-    },
-    {
-      matches: ['http://*/*', 'https://*/*', '<all_urls>'],
-      js: ['content-ui/index.iife.js'],
-    },
-    {
-      matches: ['http://*/*', 'https://*/*', '<all_urls>'],
-      css: ['content.css'], // public folder
-    },
-  ],
-  devtools_page: 'devtools/index.html',
-  web_accessible_resources: [
-    {
-      resources: ['*.js', '*.css', '*.svg', 'icon-128.png', 'icon-34.png'],
-      matches: ['*://*/*'],
-    },
-  ],
 });
 
 export default manifest;
