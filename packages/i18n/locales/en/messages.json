@@ -1,11 +1,11 @@
 {
   "extensionDescription": {
     "description": "Extension description",
-    "message": "Filliny - Your AI-powered form filling assistant. Save time by automatically filling forms with smart, context-aware suggestions."
+    "message": "Filliny - Your AI-powered form filling assistant. Save time by automatically filling forms with AI-driven, context-aware suggestions."
   },
   "extensionName": {
     "description": "Extension name",
-    "message": "Filliny - Smart AI Form Assistant"
+    "message": "Filliny - AI Form Filling Assistant"
   },
   "toggleTheme": {
     "message": "Toggle theme"
