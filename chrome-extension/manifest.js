@@ -38,7 +38,7 @@ const manifest = withSidePanel({
    * if you want to support multiple languages, you can use the following reference
    * https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/Internationalization
    */
-  name: '__MSG_extensionName__',
+  name: env === 'prod' ? '__MSG_extensionName__' : '__MSG_extensionName__' + `| ${env.toUpperCase()}`,
   version: packageJson.version,
   description: '__MSG_extensionDescription__',
   host_permissions: [
