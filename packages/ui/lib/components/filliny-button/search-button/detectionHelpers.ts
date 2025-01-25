@@ -355,6 +355,22 @@ const detectFramework = (
   return { framework: 'vanilla' };
 };
 
+// Add new helper for tracking used IDs
+const usedFieldIds = new Set<string>();
+
+const getUniqueFieldId = (baseIndex: number): string => {
+  let fieldId = `field-${baseIndex}`;
+  let counter = baseIndex;
+
+  while (usedFieldIds.has(fieldId)) {
+    counter++;
+    fieldId = `field-${counter}`;
+  }
+
+  usedFieldIds.add(fieldId);
+  return fieldId;
+};
+
 // Update field detection to use framework information
 const detectInputField = (input: HTMLInputElement, index: number, testMode: boolean = false): Field | null => {
   if (!isElementVisible(input) || shouldSkipElement(input)) return null;
@@ -855,7 +871,7 @@ const getElementXPath = (element: HTMLElement): string => {
 
 // Update field creation to include XPath information
 const createBaseField = (element: HTMLElement, index: number, type: string, testMode: boolean = false): Field => {
-  const fieldId = `field-${index}`;
+  const fieldId = getUniqueFieldId(index);
 
   // Set the data attribute on the element
   element.setAttribute('data-filliny-id', fieldId);
