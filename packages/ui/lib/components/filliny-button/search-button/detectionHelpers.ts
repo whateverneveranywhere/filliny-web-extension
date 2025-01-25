@@ -1,4 +1,7 @@
 import type { Field, FieldType } from '@extension/shared';
+import type { Worker } from 'tesseract.js';
+import { PSM } from 'tesseract.js';
+import type { Options as Html2CanvasOptions } from 'html2canvas';
 
 interface ReactElementProps {
   onSubmit?: () => void;
@@ -191,10 +194,142 @@ const querySelectorAllFrames = (selector: string): Element[] => {
   return results;
 };
 
-const getFieldLabel = (element: HTMLElement): string => {
+// Add new helper for capturing and processing field screenshots
+const getFieldLabelFromScreenshot = async (element: HTMLElement): Promise<string> => {
+  try {
+    // Find the outermost wrapper before the next field
+    const getOutermostWrapper = (el: HTMLElement): HTMLElement => {
+      let current = el;
+      let parent = el.parentElement;
+
+      // Keep going up until we find a sibling that's another form field
+      // or until we reach a common container with other fields
+      while (parent) {
+        const hasOtherFields = Array.from(parent.children).some(
+          child =>
+            child !== current &&
+            (child.querySelector('input, select, textarea, [role="textbox"]') ||
+              child.matches('input, select, textarea, [role="textbox"]')),
+        );
+
+        if (hasOtherFields) break;
+        current = parent;
+        parent = parent.parentElement;
+      }
+
+      return current;
+    };
+
+    const wrapper = getOutermostWrapper(element);
+    console.log('OCR - Found wrapper:', {
+      tagName: wrapper.tagName,
+      classes: wrapper.className,
+      dimensions: {
+        width: wrapper.offsetWidth,
+        height: wrapper.offsetHeight,
+      },
+      html: wrapper.outerHTML,
+    });
+
+    // Use html2canvas to capture the wrapper area
+    const canvas = await import('html2canvas').then(html2canvas =>
+      html2canvas.default(wrapper, {
+        logging: false,
+        useCORS: true,
+        backgroundColor: null,
+        scale: 2, // Increase resolution for better OCR
+      } as Html2CanvasOptions),
+    );
+
+    console.log('OCR - Canvas created:', {
+      width: canvas.width,
+      height: canvas.height,
+      dataUrl: canvas.toDataURL(),
+    });
+
+    // Initialize Tesseract worker with better config
+    const { createWorker } = await import('tesseract.js');
+    const worker = (await createWorker('eng')) as Worker;
+    await worker.setParameters({
+      tessedit_pageseg_mode: PSM.SINGLE_BLOCK, // Assume uniform text block
+      tessedit_char_whitelist:
+        'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,?!@#$%&*()-_+=[]{}|:;"\'<>/ ', // Allow common characters
+    });
+
+    // Recognize text from the canvas
+    const result = await worker.recognize(canvas);
+    console.log('OCR - Raw Tesseract result:', {
+      fullText: result.data.text,
+      confidence: result.data.confidence,
+      words: result.data.words?.map(w => ({
+        text: w.text,
+        confidence: w.confidence,
+      })),
+    });
+
+    // Clean up
+    await worker.terminate();
+
+    // Process the extracted text
+    const lines = result.data.text
+      .split('\n')
+      .map((line: string) => line.trim())
+      .filter((line: string) => {
+        const isValid =
+          line &&
+          line.length > 1 &&
+          !line.toLowerCase().includes('select') &&
+          !line.toLowerCase().includes('choose') &&
+          !/^[0-9.,$€£%]+$/.test(line) &&
+          !line.includes('{{') &&
+          !line.includes('}}');
+
+        console.log('OCR - Processing line:', {
+          line,
+          isValid,
+          length: line.length,
+        });
+
+        return isValid;
+      });
+
+    // Find the most likely label by prioritizing:
+    // 1. Question-like text (ends with ?)
+    // 2. Longer text that's not a placeholder
+    // 3. First meaningful line
+    const questionText = lines.find(line => line.trim().endsWith('?'));
+    const nonPlaceholderText = lines.find(
+      line =>
+        !line.toLowerCase().includes('type') &&
+        !line.toLowerCase().includes('enter') &&
+        !line.toLowerCase().includes('your'),
+    );
+    const label = questionText || nonPlaceholderText || lines[0] || '';
+
+    console.log('OCR - Final label selection:', {
+      allLines: lines,
+      questionText,
+      nonPlaceholderText,
+      selectedLabel: label,
+    });
+
+    return label;
+  } catch (e) {
+    console.debug('OCR - Screenshot label detection failed:', e);
+    return '';
+  }
+};
+
+const getFieldLabel = async (element: HTMLElement): Promise<string> => {
   const strategies = [
+    // 0. Screenshot-based approach (new first strategy)
+    async () => {
+      const label = await getFieldLabelFromScreenshot(element);
+      return label;
+    },
+
     // 1. Accessibility-first approach
-    () => {
+    async () => {
       // Check ARIA attributes
       const ariaLabel = element.getAttribute('aria-label')?.trim();
       if (ariaLabel) return ariaLabel;
@@ -301,7 +436,7 @@ const getFieldLabel = (element: HTMLElement): string => {
 
   // Try each strategy until we find a valid label
   for (const strategy of strategies) {
-    const label = strategy();
+    const label = await strategy();
     if (label && !/^[0-9.,$€£%]+$/.test(label)) {
       return label;
     }
@@ -372,11 +507,16 @@ const getUniqueFieldId = (baseIndex: number): string => {
 };
 
 // Update field detection to use framework information
-const detectInputField = (input: HTMLInputElement, index: number, testMode: boolean = false): Field | null => {
+const detectInputField = async (
+  input: HTMLInputElement,
+  index: number,
+  testMode: boolean = false,
+): Promise<Field | null> => {
   if (!isElementVisible(input) || shouldSkipElement(input)) return null;
 
   const framework = detectFramework(input);
-  let field = createBaseField(input, index, input.type, testMode);
+  const field = await createBaseField(input, index, input.type, testMode);
+  if (!field) return null;
 
   // Special handling for Select2 inputs
   if (input.classList.contains('select2-focusser')) {
@@ -386,20 +526,23 @@ const detectInputField = (input: HTMLInputElement, index: number, testMode: bool
       if (selectId) {
         const actualSelect = document.getElementById(selectId) as HTMLSelectElement;
         if (actualSelect) {
-          const field = createBaseField(actualSelect, index, 'select', testMode);
+          const selectField = await createBaseField(actualSelect, index, 'select', testMode);
+          if (!selectField) return null;
 
           // Set data attribute on both elements
-          select2Container.setAttribute('data-filliny-id', field.id);
-          input.setAttribute('data-filliny-id', field.id);
+          select2Container.setAttribute('data-filliny-id', selectField.id);
+          input.setAttribute('data-filliny-id', selectField.id);
 
-          field.options = Array.from(actualSelect.options).map(opt => ({
-            value: opt.value,
-            text: opt.text.trim(),
-            selected: opt.selected,
-          }));
+          selectField.options = await Promise.all(
+            Array.from(actualSelect.options).map(async opt => ({
+              value: opt.value,
+              text: opt.text.trim(),
+              selected: opt.selected,
+            })),
+          );
 
           // Always select first valid option in test mode
-          const validOptions = field.options.filter(
+          const validOptions = selectField.options.filter(
             opt =>
               opt.value &&
               !opt.text.toLowerCase().includes('select') &&
@@ -408,20 +551,19 @@ const detectInputField = (input: HTMLInputElement, index: number, testMode: bool
           );
 
           if (validOptions.length > 0) {
-            field.testValue = validOptions[0].value;
-            field.value = validOptions[0].value; // Set the value immediately in test mode
+            selectField.testValue = validOptions[0].value;
+            selectField.value = validOptions[0].value; // Set the value immediately in test mode
           }
 
           // Add Select2-specific metadata
-          field.metadata = {
-            ...field.metadata,
+          selectField.metadata = {
             framework: 'select2',
             select2Container: select2Container.id,
             actualSelect: selectId,
             visibility: computeElementVisibility(actualSelect),
           };
 
-          return field;
+          return selectField;
         }
       }
     }
@@ -452,7 +594,6 @@ const detectInputField = (input: HTMLInputElement, index: number, testMode: bool
     case 'email':
     case 'url':
     case 'number':
-      field = createBaseField(input, index, input.type);
       field.value = input.value || '';
       if (input.type === 'number' || input.type === 'range') {
         field.validation = {
@@ -462,30 +603,35 @@ const detectInputField = (input: HTMLInputElement, index: number, testMode: bool
       }
       return field;
     case 'file':
-      return createBaseField(input, index, 'file');
+      return field;
     default:
-      field = createBaseField(input, index, 'text');
       field.value = input.value || '';
       return field;
   }
 };
 
-const detectSelectField = (select: HTMLSelectElement, index: number): Field | null => {
+const detectSelectField = async (select: HTMLSelectElement, index: number): Promise<Field | null> => {
   if (!isElementVisible(select) || shouldSkipElement(select)) return null;
 
-  const field = createBaseField(select, index, 'select');
+  const field = await createBaseField(select, index, 'select');
   field.value = select.value || '';
-  field.options = Array.from(select.options).map(opt => ({
-    value: opt.value,
-    text: opt.text.trim(),
-    selected: opt.selected,
-  }));
+  field.options = await Promise.all(
+    Array.from(select.options).map(async opt => ({
+      value: opt.value,
+      text: opt.text.trim(),
+      selected: opt.selected,
+    })),
+  );
   field.testValue = select.getAttribute('data-test-value') || '';
 
   return field;
 };
 
-const detectRadioGroup = (element: HTMLInputElement, index: number, processedGroups: Set<string>): Field | null => {
+const detectRadioGroup = async (
+  element: HTMLInputElement,
+  index: number,
+  processedGroups: Set<string>,
+): Promise<Field | null> => {
   const name = element.name;
   if (!name || processedGroups.has(name)) return null;
 
@@ -498,18 +644,20 @@ const detectRadioGroup = (element: HTMLInputElement, index: number, processedGro
 
   if (visibleElements.length === 0) return null;
 
-  const field = createBaseField(visibleElements[0], index, 'radio');
-  field.options = visibleElements.map(el => {
-    const labelText = getFieldLabel(el);
-    return {
-      value: el.value,
-      text: labelText || el.value,
-      selected: el.checked,
-    };
-  });
+  const field = await createBaseField(visibleElements[0], index, 'radio');
+  field.options = await Promise.all(
+    visibleElements.map(async el => {
+      const labelText = await getFieldLabel(el);
+      return {
+        value: el.value,
+        text: labelText || el.value,
+        selected: el.checked,
+      };
+    }),
+  );
 
   const selectedRadio = visibleElements.find(el => el.checked);
-  field.value = selectedRadio ? getFieldLabel(selectedRadio) || selectedRadio.value : '';
+  field.value = selectedRadio ? (await getFieldLabel(selectedRadio)) || selectedRadio.value : '';
   field.testValue = visibleElements[0].getAttribute('data-test-value') || '';
 
   // Add field ID to all radio buttons in group
@@ -519,19 +667,19 @@ const detectRadioGroup = (element: HTMLInputElement, index: number, processedGro
   return field;
 };
 
-const detectTextareaField = (textarea: HTMLTextAreaElement, index: number): Field | null => {
+const detectTextareaField = async (textarea: HTMLTextAreaElement, index: number): Promise<Field | null> => {
   if (!isElementVisible(textarea) || shouldSkipElement(textarea)) return null;
 
-  const field = createBaseField(textarea, index, 'textarea');
+  const field = await createBaseField(textarea, index, 'textarea');
   field.value = textarea.value || '';
   field.testValue = textarea.getAttribute('data-test-value') || '';
   return field;
 };
 
-const detectCheckboxField = (element: HTMLElement, index: number): Field | null => {
+const detectCheckboxField = async (element: HTMLElement, index: number): Promise<Field | null> => {
   if (!isElementVisible(element) || shouldSkipElement(element)) return null;
 
-  const field = createBaseField(element, index, 'checkbox');
+  const field = await createBaseField(element, index, 'checkbox');
 
   // Get the current state
   let isChecked = false;
@@ -547,7 +695,6 @@ const detectCheckboxField = (element: HTMLElement, index: number): Field | null 
   field.metadata = {
     framework: 'vanilla',
     visibility: { isVisible: isElementVisible(element) },
-    ...field.metadata,
     checkboxValue: element instanceof HTMLInputElement ? element.value : 'on',
     isExclusive:
       element.hasAttribute('data-exclusive') ||
@@ -664,59 +811,63 @@ export const detectFields = async (container: HTMLElement, isImplicitForm: boole
   const processedGroups = new Set<string>();
 
   // Process all elements and collect promises
-  const promises = Array.from(
+  const elements = Array.from(
     container.querySelectorAll<HTMLElement>(`
       input[type="checkbox"], [role="checkbox"], [role="switch"],
       input, select, textarea, [role="radio"], [role="textbox"],
       [role="combobox"], [role="spinbutton"], [data-filliny-field]
     `),
-  ).map(async element => {
-    if (!isElementVisible(element) || shouldSkipElement(element)) return;
+  );
+
+  for (const element of elements) {
+    if (!isElementVisible(element) || shouldSkipElement(element)) continue;
 
     const role = getElementRole(element);
     let field: Field | null = null;
 
-    switch (role) {
-      case 'checkbox':
-      case 'switch':
-        field = detectCheckboxField(element, index);
-        break;
-      case 'radio':
-        if (element instanceof HTMLInputElement) {
-          field = detectRadioGroup(element, index, processedGroups);
-        }
-        break;
-      case 'textbox':
-      case 'spinbutton':
-        field = detectTextLikeField(element, index);
-        break;
-      case 'combobox':
-        field = await detectSelectLikeField(element, index);
-        break;
-      default:
-        // Handle native elements
-        if (element instanceof HTMLInputElement) {
-          field = detectInputField(element, index, isImplicitForm);
-        } else if (element instanceof HTMLSelectElement) {
-          field = detectSelectField(element, index);
-        } else if (element instanceof HTMLTextAreaElement) {
-          field = detectTextareaField(element, index);
-        }
-    }
+    try {
+      switch (role) {
+        case 'checkbox':
+        case 'switch':
+          field = await detectCheckboxField(element, index);
+          break;
+        case 'radio':
+          if (element instanceof HTMLInputElement) {
+            field = await detectRadioGroup(element, index, processedGroups);
+          }
+          break;
+        case 'textbox':
+        case 'spinbutton':
+          field = await detectTextLikeField(element, index);
+          break;
+        case 'combobox':
+          field = await detectSelectLikeField(element, index);
+          break;
+        default:
+          // Handle native elements
+          if (element instanceof HTMLInputElement) {
+            field = await detectInputField(element, index, isImplicitForm);
+          } else if (element instanceof HTMLSelectElement) {
+            field = await detectSelectField(element, index);
+          } else if (element instanceof HTMLTextAreaElement) {
+            field = await detectTextareaField(element, index);
+          }
+      }
 
-    if (field) {
-      fields.push(field);
-      index++;
+      if (field) {
+        fields.push(field);
+        index++;
+      }
+    } catch (e) {
+      console.warn('Error detecting field:', e);
     }
-  });
+  }
 
-  // Wait for all async operations to complete
-  await Promise.all(promises);
   return fields;
 };
 
-const detectTextLikeField = (element: HTMLElement, index: number): Field | null => {
-  const field = createBaseField(element, index, 'text');
+const detectTextLikeField = async (element: HTMLElement, index: number): Promise<Field | null> => {
+  const field = await createBaseField(element, index, 'text');
   field.value = getElementValue(element);
   field.testValue = element.getAttribute('data-test-value') || '';
   return field;
@@ -784,7 +935,7 @@ const detectDynamicSelectOptions = async (element: HTMLElement): Promise<Array<{
 
 // Update detectSelectLikeField to use the dynamic detection as fallback
 const detectSelectLikeField = async (element: HTMLElement, index: number): Promise<Field | null> => {
-  const field = createBaseField(element, index, 'select');
+  const field = await createBaseField(element, index, 'select');
 
   // Try standard option detection first
   const staticOptions = element.querySelectorAll('[role="option"], option, [data-option]');
@@ -870,18 +1021,25 @@ const getElementXPath = (element: HTMLElement): string => {
 };
 
 // Update field creation to include XPath information
-const createBaseField = (element: HTMLElement, index: number, type: string, testMode: boolean = false): Field => {
+const createBaseField = async (
+  element: HTMLElement,
+  index: number,
+  type: string,
+  testMode: boolean = false,
+): Promise<Field> => {
   const fieldId = getUniqueFieldId(index);
 
   // Set the data attribute on the element
   element.setAttribute('data-filliny-id', fieldId);
+
+  const label = await getFieldLabel(element);
 
   const field: Field = {
     id: fieldId,
     type: type as FieldType,
     xpath: getElementXPath(element),
     uniqueSelectors: generateUniqueSelectors(element),
-    label: getFieldLabel(element),
+    label,
     value: '',
   };
 
