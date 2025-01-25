@@ -143,19 +143,17 @@ const FormsOverlay: React.FC<OverlayProps> = ({ formId, initialPosition, onDismi
       ) : (
         <>
           <div className="filliny-fixed filliny-left-1/2 filliny-top-1/2 filliny-z-[10000001] filliny-flex filliny-w-full filliny-max-w-fit filliny--translate-x-1/2 filliny--translate-y-1/2 filliny-flex-col filliny-items-center filliny-gap-3">
-            <div className="filliny-rounded-full filliny-bg-white/10 filliny-p-1">
-              <Button
-                ref={buttonRef}
-                loading={loading}
-                disabled={loading}
-                type="button"
-                size="lg"
-                variant="default"
-                onClick={handleFillClick}>
-                <Wand2 className="filliny-h-5 filliny-w-5" />
-                Auto-Fill Form
-              </Button>
-            </div>
+            <Button
+              ref={buttonRef}
+              loading={loading}
+              disabled={loading}
+              type="button"
+              size="lg"
+              variant="default"
+              onClick={handleFillClick}>
+              <Wand2 className="filliny-h-5 filliny-w-5" />
+              Auto-Fill Form
+            </Button>
             <p className="filliny-text-sm filliny-text-white/80">Click to automatically fill out this form with AI</p>
           </div>
 
