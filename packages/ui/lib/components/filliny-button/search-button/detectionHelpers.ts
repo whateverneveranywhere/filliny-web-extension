@@ -1,7 +1,5 @@
 import type { Field, FieldType } from '@extension/shared';
-import type { Worker } from 'tesseract.js';
 import { PSM } from 'tesseract.js';
-import type { Options as Html2CanvasOptions } from 'html2canvas';
 
 interface ReactElementProps {
   onSubmit?: () => void;
@@ -194,140 +192,336 @@ const querySelectorAllFrames = (selector: string): Element[] => {
   return results;
 };
 
-// Add new helper for capturing and processing field screenshots
-const getFieldLabelFromScreenshot = async (element: HTMLElement): Promise<string> => {
+// Add new helper for capturing element using Chrome APIs
+const captureElement = async (element: HTMLElement): Promise<string> => {
+  const rect = element.getBoundingClientRect();
+
+  try {
+    // Get current window ID
+    const currentWindow = await chrome.windows.getCurrent();
+    if (!currentWindow.id) {
+      throw new Error('Could not get current window ID');
+    }
+
+    // Capture the visible tab with proper options
+    const dataUrl = await chrome.tabs.captureVisibleTab(currentWindow.id, { format: 'png' });
+
+    // Create a canvas to crop the screenshot
+    const img = new Image();
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+
+    if (!ctx) {
+      throw new Error('Could not get canvas context');
+    }
+
+    // Wait for image to load
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = () => reject(new Error('Failed to load image'));
+      img.src = dataUrl;
+    });
+
+    // Set canvas dimensions to match element
+    canvas.width = rect.width;
+    canvas.height = rect.height;
+
+    // Calculate device pixel ratio for retina displays
+    const dpr = window.devicePixelRatio || 1;
+
+    // Draw the cropped region
+    ctx.drawImage(
+      img,
+      rect.left * dpr,
+      rect.top * dpr,
+      rect.width * dpr,
+      rect.height * dpr,
+      0,
+      0,
+      rect.width,
+      rect.height,
+    );
+
+    return canvas.toDataURL('image/png');
+  } catch (error) {
+    console.error('Failed to capture element:', error);
+    throw error;
+  }
+};
+
+// Update getFieldLabelFromScreenshot to include field ID in logs
+const getFieldLabelFromScreenshot = async (element: HTMLElement, fieldId: string): Promise<string> => {
   try {
     // Find the outermost wrapper before the next field
     const getOutermostWrapper = (el: HTMLElement): HTMLElement => {
       let current = el;
       let parent = el.parentElement;
+      let lastValidWrapper = current;
 
-      // Keep going up until we find a sibling that's another form field
-      // or until we reach a common container with other fields
+      // Helper to check if an element contains a form field
+      const containsFormField = (node: Element): boolean => {
+        if (!node) return false;
+        // Check if the node itself is a form field
+        if (
+          node.matches(
+            'input:not([type="hidden"]), select, textarea, [role="textbox"], [role="combobox"], [contenteditable="true"]',
+          )
+        ) {
+          return true;
+        }
+        // Check children recursively but exclude the original element's branch
+        const isInOriginalBranch = (child: Element): boolean => {
+          let parent = child;
+          while (parent) {
+            if (parent === el) return true;
+            parent = parent.parentElement as Element;
+          }
+          return false;
+        };
+
+        // Look for form fields in children, excluding the original element's branch
+        return Array.from(
+          node.querySelectorAll(
+            'input:not([type="hidden"]), select, textarea, [role="textbox"], [role="combobox"], [contenteditable="true"]',
+          ),
+        ).some(field => !isInOriginalBranch(field));
+      };
+
+      // Helper to check if this is a meaningful wrapper
+      const isMeaningfulWrapper = (node: Element): boolean => {
+        // Check if it has text content (excluding the current field's content)
+        const hasText = Array.from(node.childNodes).some(child => {
+          if (child.nodeType === Node.TEXT_NODE) {
+            const text = child.textContent?.trim();
+            return text && text.length > 0;
+          }
+          if (child instanceof Element && !child.contains(el)) {
+            const text = child.textContent?.trim();
+            return text && text.length > 0;
+          }
+          return false;
+        });
+
+        // Check if it has specific ARIA attributes that suggest it's a labeled group
+        const hasAriaLabel =
+          node.hasAttribute('aria-label') ||
+          node.hasAttribute('aria-labelledby') ||
+          node.hasAttribute('aria-describedby');
+
+        // Check if it's a common wrapper element type
+        const isCommonWrapper = node.matches('div, section, fieldset, form, li, article');
+
+        return hasText || hasAriaLabel || isCommonWrapper;
+      };
+
       while (parent) {
-        const hasOtherFields = Array.from(parent.children).some(
-          child =>
-            child !== current &&
-            (child.querySelector('input, select, textarea, [role="textbox"]') ||
-              child.matches('input, select, textarea, [role="textbox"]')),
-        );
+        // Check all siblings at this level
+        let hasSiblingField = false;
+        for (const sibling of Array.from(parent.children)) {
+          if (sibling !== current && !sibling.contains(current) && containsFormField(sibling)) {
+            hasSiblingField = true;
+            break;
+          }
+        }
 
-        if (hasOtherFields) break;
+        if (hasSiblingField) {
+          // We've found a level with another field, use the last valid wrapper
+          break;
+        }
+
+        if (isMeaningfulWrapper(parent)) {
+          lastValidWrapper = parent;
+        }
+
         current = parent;
         parent = parent.parentElement;
       }
 
-      return current;
+      return lastValidWrapper;
     };
 
     const wrapper = getOutermostWrapper(element);
-    console.log('OCR - Found wrapper:', {
+    const wrapperInfo = {
+      fieldId,
       tagName: wrapper.tagName,
       classes: wrapper.className,
       dimensions: {
         width: wrapper.offsetWidth,
         height: wrapper.offsetHeight,
       },
-      html: wrapper.outerHTML,
-    });
+      textContent: wrapper.textContent?.trim(),
+    };
+    console.log('OCR - Found wrapper:', wrapperInfo);
 
-    // Use html2canvas to capture the wrapper area
-    const canvas = await import('html2canvas').then(html2canvas =>
-      html2canvas.default(wrapper, {
-        logging: false,
-        useCORS: true,
-        backgroundColor: null,
-        scale: 2, // Increase resolution for better OCR
-      } as Html2CanvasOptions),
-    );
+    // If wrapper has clean text content that looks like a label, use it directly
+    const directText = wrapperInfo.textContent;
+    if (
+      directText &&
+      directText.length > 1 &&
+      directText.length < 100 &&
+      !directText.includes('{{') &&
+      !directText.includes('}}') &&
+      !/^[0-9.,$€£%]+$/.test(directText) &&
+      !/^[*_-]+$/.test(directText)
+    ) {
+      console.log('OCR - Using direct wrapper text as label:', { fieldId, label: directText });
+      return directText;
+    }
 
-    console.log('OCR - Canvas created:', {
-      width: canvas.width,
-      height: canvas.height,
-      dataUrl: canvas.toDataURL(),
-    });
+    // Use Chrome's native capture instead of html2canvas
+    const dataUrl = await captureElement(wrapper);
+    console.log('OCR - Screenshot captured for field:', fieldId);
 
-    // Initialize Tesseract worker with better config
+    // Initialize Tesseract with optimized settings
     const { createWorker } = await import('tesseract.js');
-    const worker = (await createWorker('eng')) as Worker;
+    const worker = await createWorker('eng', 1, {
+      logger: m => {
+        if (m.status === 'recognizing text') {
+          console.log('OCR - Recognition progress for field:', fieldId, Math.floor(m.progress * 100) + '%');
+        }
+      },
+    });
+
+    // Configure Tesseract for speed
     await worker.setParameters({
-      tessedit_pageseg_mode: PSM.SINGLE_BLOCK, // Assume uniform text block
+      tessedit_pageseg_mode: PSM.SINGLE_BLOCK,
       tessedit_char_whitelist:
-        'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,?!@#$%&*()-_+=[]{}|:;"\'<>/ ', // Allow common characters
+        'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,?!@#$%&*()-_+=[]{}|:;"\'<>/ ',
+      tessjs_create_hocr: '0',
+      tessjs_create_tsv: '0',
+      tessjs_create_box: '0',
+      tessjs_create_unlv: '0',
+      tessjs_create_osd: '0',
     });
 
-    // Recognize text from the canvas
-    const result = await worker.recognize(canvas);
-    console.log('OCR - Raw Tesseract result:', {
-      fullText: result.data.text,
-      confidence: result.data.confidence,
-      words: result.data.words?.map(w => ({
-        text: w.text,
-        confidence: w.confidence,
-      })),
-    });
+    // Recognize text from the captured image
+    console.log('OCR - Starting text recognition for field:', fieldId);
+    const result = await worker.recognize(dataUrl);
+    console.log('OCR - Recognition completed for field:', fieldId);
 
-    // Clean up
+    // Clean up worker immediately
     await worker.terminate();
 
-    // Process the extracted text
-    const lines = result.data.text
-      .split('\n')
-      .map((line: string) => line.trim())
-      .filter((line: string) => {
-        const isValid =
-          line &&
-          line.length > 1 &&
-          !line.toLowerCase().includes('select') &&
-          !line.toLowerCase().includes('choose') &&
-          !/^[0-9.,$€£%]+$/.test(line) &&
-          !line.includes('{{') &&
-          !line.includes('}}');
-
-        console.log('OCR - Processing line:', {
-          line,
-          isValid,
-          length: line.length,
-        });
-
-        return isValid;
-      });
-
-    // Find the most likely label by prioritizing:
-    // 1. Question-like text (ends with ?)
-    // 2. Longer text that's not a placeholder
-    // 3. First meaningful line
-    const questionText = lines.find(line => line.trim().endsWith('?'));
-    const nonPlaceholderText = lines.find(
-      line =>
-        !line.toLowerCase().includes('type') &&
-        !line.toLowerCase().includes('enter') &&
-        !line.toLowerCase().includes('your'),
-    );
-    const label = questionText || nonPlaceholderText || lines[0] || '';
-
-    console.log('OCR - Final label selection:', {
-      allLines: lines,
-      questionText,
-      nonPlaceholderText,
-      selectedLabel: label,
+    // Process the extracted text with more detailed analysis
+    const rawText = result.data.text;
+    console.log('OCR - Raw detected text:', {
+      fieldId,
+      text: rawText,
+      confidence: result.data.confidence,
+      words: result.data.words?.map(w => ({ text: w.text, confidence: w.confidence })),
     });
 
-    return label;
-  } catch (e) {
-    console.debug('OCR - Screenshot label detection failed:', e);
+    // Split into lines and normalize
+    const lines = rawText
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => line.length > 0);
+
+    console.log('OCR - Detected lines:', { fieldId, lines });
+
+    // First pass: Filter out obviously invalid lines
+    const validLines = lines.filter(line => {
+      const isValid =
+        line.length > 1 &&
+        !/^[0-9.,$€£%]+$/.test(line) && // Not just numbers/currency
+        !line.includes('{{') &&
+        !line.includes('}}') &&
+        !/^[*_-]+$/.test(line); // Not just decorative characters
+
+      console.log('OCR - Line validation:', {
+        fieldId,
+        line,
+        isValid,
+        length: line.length,
+        isNumeric: /^[0-9.,$€£%]+$/.test(line),
+        hasTemplate: line.includes('{{') || line.includes('}}'),
+        isDecorative: /^[*_-]+$/.test(line),
+      });
+
+      return isValid;
+    });
+
+    console.log('OCR - Valid lines:', { fieldId, validLines });
+
+    // Score each line based on likelihood of being a label
+    const scoredLines = validLines.map(line => {
+      let score = 0;
+      const text = line.trim();
+
+      const scoring = {
+        isQuestion: text.endsWith('?'),
+        isCommonPattern: !!text.match(/^(what|who|when|where|why|how|please|enter|select|choose|pick)/i),
+        hasPlaceholderWords:
+          text.toLowerCase().includes('select') ||
+          text.toLowerCase().includes('choose') ||
+          text.toLowerCase().includes('type') ||
+          text.toLowerCase().includes('enter') ||
+          text.toLowerCase().includes('your'),
+        isGoodLength: text.length > 3 && text.length < 100,
+        isCapitalized: !!text.match(/^[A-Z]/),
+      };
+
+      if (scoring.isQuestion) score += 10;
+      if (scoring.isCommonPattern) score += 5;
+      if (scoring.hasPlaceholderWords) score -= 3;
+      if (scoring.isGoodLength) score += 2;
+      if (scoring.isCapitalized) score += 1;
+
+      console.log('OCR - Scoring line:', {
+        fieldId,
+        text,
+        score,
+        scoring,
+      });
+
+      return { text, score };
+    });
+
+    // Sort by score and get the best candidate
+    scoredLines.sort((a, b) => b.score - a.score);
+
+    const bestLabel = scoredLines.length > 0 ? scoredLines[0].text : '';
+    console.log('OCR - Final label selection:', {
+      fieldId,
+      selectedLabel: bestLabel,
+      score: scoredLines[0]?.score,
+      allCandidates: scoredLines.map(l => `"${l.text}" (score: ${l.score})`),
+    });
+
+    // Return the best label if found
+    if (bestLabel) {
+      return bestLabel;
+    }
+
+    // If we didn't find a good label through OCR, try getting text content directly
+    if (directText) {
+      console.log('OCR - Falling back to direct text content:', { fieldId, directText });
+      return directText;
+    }
+
     return '';
+  } catch (e) {
+    console.error('OCR - Screenshot label detection failed:', { fieldId, error: e });
+    // Try getting text content directly as fallback
+    const directText = element.textContent?.trim() || '';
+    console.log('OCR - Error fallback to direct text content:', { fieldId, directText });
+    return directText;
   }
 };
 
-const getFieldLabel = async (element: HTMLElement): Promise<string> => {
-  const strategies = [
-    // 0. Screenshot-based approach (new first strategy)
-    async () => {
-      const label = await getFieldLabelFromScreenshot(element);
-      return label;
-    },
+// Update getFieldLabel to ensure OCR labels are prioritized
+const getFieldLabel = async (element: HTMLElement, fieldId: string): Promise<string> => {
+  // First try OCR-based label detection
+  const ocrLabel = await getFieldLabelFromScreenshot(element, fieldId);
+  if (ocrLabel) {
+    console.log('Using OCR-detected label:', { fieldId, label: ocrLabel });
+    return ocrLabel;
+  }
 
+  console.log('OCR label not found, trying fallback strategies:', { fieldId });
+
+  // Fallback strategies if OCR fails
+  const strategies = [
     // 1. Accessibility-first approach
     async () => {
       // Check ARIA attributes
@@ -434,10 +628,11 @@ const getFieldLabel = async (element: HTMLElement): Promise<string> => {
     },
   ];
 
-  // Try each strategy until we find a valid label
+  // Try each fallback strategy until we find a valid label
   for (const strategy of strategies) {
     const label = await strategy();
     if (label && !/^[0-9.,$€£%]+$/.test(label)) {
+      console.log('Using fallback label:', { fieldId, label, strategy: strategy.name });
       return label;
     }
   }
@@ -647,7 +842,7 @@ const detectRadioGroup = async (
   const field = await createBaseField(visibleElements[0], index, 'radio');
   field.options = await Promise.all(
     visibleElements.map(async el => {
-      const labelText = await getFieldLabel(el);
+      const labelText = await getFieldLabel(el, field.id);
       return {
         value: el.value,
         text: labelText || el.value,
@@ -657,7 +852,7 @@ const detectRadioGroup = async (
   );
 
   const selectedRadio = visibleElements.find(el => el.checked);
-  field.value = selectedRadio ? (await getFieldLabel(selectedRadio)) || selectedRadio.value : '';
+  field.value = selectedRadio ? (await getFieldLabel(selectedRadio, field.id)) || selectedRadio.value : '';
   field.testValue = visibleElements[0].getAttribute('data-test-value') || '';
 
   // Add field ID to all radio buttons in group
@@ -1032,16 +1227,17 @@ const createBaseField = async (
   // Set the data attribute on the element
   element.setAttribute('data-filliny-id', fieldId);
 
-  const label = await getFieldLabel(element);
-
+  // First detect all field properties except label
   const field: Field = {
     id: fieldId,
     type: type as FieldType,
     xpath: getElementXPath(element),
     uniqueSelectors: generateUniqueSelectors(element),
-    label,
     value: '',
   };
+
+  // Now get the label using OCR as primary strategy
+  field.label = await getFieldLabel(element, fieldId);
 
   // Generate default test values based on field type
   if (testMode) {
