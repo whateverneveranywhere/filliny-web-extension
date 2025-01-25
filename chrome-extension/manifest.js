@@ -7,6 +7,8 @@ const isFirefox = process.env.__FIREFOX__ === 'true';
 // const isDev = process.env.__DEV__ === 'true';
 const env = process.env.VITE_WEBAPP_ENV || 'dev';
 
+console.log('Building manifest with env:', env); // Debug log
+
 /**
  * If you want to disable the sidePanel, you can delete withSidePanel function and remove the sidePanel HoC on the manifest declaration.
  *
@@ -38,7 +40,7 @@ const manifest = withSidePanel({
    * if you want to support multiple languages, you can use the following reference
    * https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/Internationalization
    */
-  name: env === 'prod' ? '__MSG_extensionName__' : '__MSG_extensionName__' + ` | ${env.toUpperCase()}`,
+  name: '__MSG_extensionName__' + ' | ' + env,
   version: packageJson.version,
   description: '__MSG_extensionDescription__',
   host_permissions: [

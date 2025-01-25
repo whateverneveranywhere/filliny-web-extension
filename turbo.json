@@ -1,7 +1,7 @@
 {
   "$schema": "https://turbo.build/schema.json",
   "ui": "tui",
-  "globalEnv": ["__FIREFOX__"],
+  "globalEnv": ["__FIREFOX__", "VITE_WEBAPP_ENV"],
   "daemon": false,
   "tasks": {
     "ready": {

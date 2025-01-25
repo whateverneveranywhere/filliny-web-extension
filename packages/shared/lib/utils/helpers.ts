@@ -80,11 +80,11 @@ interface ConfigEntry {
 
 // Typed config object
 const config: Record<WebappEnvs, ConfigEntry> = {
-  local: {
+  dev: {
     cookieName: 'authjs.session-token',
     baseURL: 'http://localhost:3000',
   },
-  dev: {
+  preview: {
     cookieName: '__Secure-authjs.session-token',
     baseURL: 'https://dev.filliny-app.pages.dev',
   },
@@ -111,7 +111,7 @@ export const getConfig = (webappEnv?: WebappEnvs): ConfigEntry => {
   // Get env from import.meta.env or fallback to LOCAL
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const importMeta = (globalThis as any).import?.meta;
-  const env = (importMeta?.env?.VITE_WEBAPP_ENV as WebappEnvs) || WebappEnvs.LOCAL;
+  const env = (importMeta?.env?.VITE_WEBAPP_ENV as WebappEnvs) || WebappEnvs.DEV;
   return config[webappEnv || env];
 };
 

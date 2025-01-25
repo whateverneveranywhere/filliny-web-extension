@@ -12,6 +12,7 @@ const manifestFile = resolve(rootDir, 'manifest.js');
 
 const getManifestWithCacheBurst = (): Promise<{ default: chrome.runtime.ManifestV3 }> => {
   const withCacheBurst = (path: string) => `${path}?${Date.now().toString()}`;
+
   /**
    * In Windows, import() doesn't work without file:// protocol.
    * So, we need to convert path to file:// protocol. (url.pathToFileURL)
