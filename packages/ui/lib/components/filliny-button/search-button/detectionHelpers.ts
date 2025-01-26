@@ -254,90 +254,104 @@ const getFieldLabelFromScreenshot = async (element: HTMLElement, fieldId: string
   try {
     // Find the outermost wrapper before the next field
     const getOutermostWrapper = (el: HTMLElement): HTMLElement => {
-      let current = el;
-      let parent = el.parentElement;
-      let lastValidWrapper = current;
-
-      // Helper to check if an element contains a form field
-      const containsFormField = (node: Element): boolean => {
-        if (!node) return false;
-        // Check if the node itself is a form field
-        if (
-          node.matches(
-            'input:not([type="hidden"]), select, textarea, [role="textbox"], [role="combobox"], [contenteditable="true"]',
-          )
-        ) {
-          return true;
-        }
-        // Check children recursively but exclude the original element's branch
-        const isInOriginalBranch = (child: Element): boolean => {
-          let parent = child;
-          while (parent) {
-            if (parent === el) return true;
-            parent = parent.parentElement as Element;
-          }
-          return false;
-        };
-
-        // Look for form fields in children, excluding the original element's branch
+      // Helper to find all form fields in the document
+      const getAllFormFields = (doc: Document): HTMLElement[] => {
         return Array.from(
-          node.querySelectorAll(
+          doc.querySelectorAll<HTMLElement>(
             'input:not([type="hidden"]), select, textarea, [role="textbox"], [role="combobox"], [contenteditable="true"]',
           ),
-        ).some(field => !isInOriginalBranch(field));
+        ).filter(field => isElementVisible(field) && !shouldSkipElement(field));
       };
 
-      // Helper to check if this is a meaningful wrapper
-      const isMeaningfulWrapper = (node: Element): boolean => {
-        // Check if it has text content (excluding the current field's content)
-        const hasText = Array.from(node.childNodes).some(child => {
-          if (child.nodeType === Node.TEXT_NODE) {
-            const text = child.textContent?.trim();
-            return text && text.length > 0;
+      // Helper to check if an element contains other form fields besides the target
+      const containsOtherFields = (container: HTMLElement, target: HTMLElement): boolean => {
+        const fields = getAllFormFields(container.ownerDocument);
+        return fields.some(field => field !== target && container.contains(field) && !target.contains(field));
+      };
+
+      // Helper to find the nearest form fields before and after the current element
+      const findNearestFields = (
+        fields: HTMLElement[],
+        target: HTMLElement,
+      ): { prev: HTMLElement | null; next: HTMLElement | null } => {
+        const sortedFields = fields.sort((a, b) => {
+          const aRect = a.getBoundingClientRect();
+          const bRect = b.getBoundingClientRect();
+          // First compare by vertical position with a threshold
+          if (Math.abs(aRect.top - bRect.top) > 20) {
+            return aRect.top - bRect.top;
           }
-          if (child instanceof Element && !child.contains(el)) {
-            const text = child.textContent?.trim();
-            return text && text.length > 0;
-          }
-          return false;
+          // If on same line, compare by horizontal position
+          return aRect.left - bRect.left;
         });
 
-        // Check if it has specific ARIA attributes that suggest it's a labeled group
-        const hasAriaLabel =
-          node.hasAttribute('aria-label') ||
-          node.hasAttribute('aria-labelledby') ||
-          node.hasAttribute('aria-describedby');
+        const currentIndex = sortedFields.indexOf(target);
+        if (currentIndex === -1) return { prev: null, next: null };
 
-        // Check if it's a common wrapper element type
-        const isCommonWrapper = node.matches('div, section, fieldset, form, li, article');
-
-        return hasText || hasAriaLabel || isCommonWrapper;
+        return {
+          prev: currentIndex > 0 ? sortedFields[currentIndex - 1] : null,
+          next: currentIndex < sortedFields.length - 1 ? sortedFields[currentIndex + 1] : null,
+        };
       };
 
-      while (parent) {
-        // Check all siblings at this level
-        let hasSiblingField = false;
-        for (const sibling of Array.from(parent.children)) {
-          if (sibling !== current && !sibling.contains(current) && containsFormField(sibling)) {
-            hasSiblingField = true;
-            break;
-          }
-        }
+      // Helper to check if a container is a good boundary
+      const isGoodBoundary = (container: HTMLElement): boolean => {
+        // Check for common boundary indicators
+        const hasFormRole =
+          container.getAttribute('role') === 'group' ||
+          container.getAttribute('role') === 'form' ||
+          container.tagName.toLowerCase() === 'form';
+        const hasFormClass =
+          container.className.toLowerCase().includes('form-group') ||
+          container.className.toLowerCase().includes('form-row') ||
+          container.className.toLowerCase().includes('field-group');
+        const hasFieldsetLike =
+          container.tagName.toLowerCase() === 'fieldset' || container.querySelector('legend, label') !== null;
 
-        if (hasSiblingField) {
-          // We've found a level with another field, use the last valid wrapper
+        return hasFormRole || hasFormClass || hasFieldsetLike;
+      };
+
+      const allFields = getAllFormFields(el.ownerDocument);
+      const neighbors = findNearestFields(allFields, el);
+      let bestContainer: HTMLElement = el;
+      let currentEl: HTMLElement | null = el;
+
+      while (currentEl && currentEl.parentElement) {
+        const parent: HTMLElement = currentEl.parentElement;
+
+        // Stop if we've reached a form or the document body
+        if (parent.tagName.toLowerCase() === 'form' || parent.tagName.toLowerCase() === 'body') {
           break;
         }
 
-        if (isMeaningfulWrapper(parent)) {
-          lastValidWrapper = parent;
+        // Check if this parent contains other form fields
+        const hasOtherFields = containsOtherFields(parent, el);
+
+        // If this parent contains other fields, we need to be more careful
+        if (hasOtherFields) {
+          // Check if this is still a valid container despite having other fields
+          const parentRect = parent.getBoundingClientRect();
+          const elRect = el.getBoundingClientRect();
+          const isCompact = parentRect.height - elRect.height < 100; // Arbitrary threshold
+
+          // If the container is compact or looks like a good boundary, use it
+          if (isCompact || isGoodBoundary(parent)) {
+            bestContainer = parent;
+          }
+          break;
         }
 
-        current = parent;
-        parent = parent.parentElement;
+        // Check if this parent contains any of the neighbor fields
+        const containsPrevField = neighbors.prev ? parent.contains(neighbors.prev) : false;
+        const containsNextField = neighbors.next ? parent.contains(neighbors.next) : false;
+        if (containsPrevField || containsNextField) break;
+
+        // This parent looks good, update our best container
+        bestContainer = parent;
+        currentEl = parent;
       }
 
-      return lastValidWrapper;
+      return bestContainer;
     };
 
     const wrapper = getOutermostWrapper(element);

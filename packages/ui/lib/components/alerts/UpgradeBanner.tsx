@@ -12,7 +12,7 @@ export default function UpgradeBanner() {
     return null;
   }
 
-  const title = `${currentPlan} Plan • ${maxWebsites} websites`;
+  const title = `${currentPlan} • ${maxWebsites} websites`;
   const description = 'Upgrade your plan to add more websites and unlock additional features';
   const handleUpgrade = () => window.open(`${getConfig().baseURL}/pricing`, '_blank');
 

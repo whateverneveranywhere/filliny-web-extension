@@ -25,7 +25,7 @@ const SupportRequestButton: React.FC<ButtonComponentProps> = () => {
     <Button
       variant={'default'}
       size={'icon'}
-      className="filliny-size-9 filliny-overflow-hidden !filliny-rounded-full filliny-text-white"
+      className="filliny-size-10 filliny-min-h-10 filliny-min-w-10 filliny-overflow-hidden !filliny-rounded-full filliny-text-white"
       onClick={gatherBugDetails}>
       <HelpCircle className="filliny-size-4" />
     </Button>

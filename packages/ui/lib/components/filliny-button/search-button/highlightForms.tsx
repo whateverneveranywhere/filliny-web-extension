@@ -151,7 +151,12 @@ const createFormOverlay = (
       // Wait for next frame to ensure overlay is rendered before scrolling
       requestAnimationFrame(() => {
         if (isFirstForm) {
-          form.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          const formRect = form.getBoundingClientRect();
+          const isFormInView = formRect.top >= 0 && formRect.top <= window.innerHeight;
+          if (!isFormInView) {
+            const scrollPosition = window.scrollY + formRect.top - 200;
+            window.scrollTo({ top: scrollPosition, behavior: 'smooth' });
+          }
         }
       });
     });
@@ -174,7 +179,12 @@ const highlightFormFields = async (form: HTMLFormElement, isFirstForm: boolean =
   // If there are highlighted elements and this is the first form, scroll to it
   if (highlightedElements.length > 0 && isFirstForm) {
     requestAnimationFrame(() => {
-      highlightedElements[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+      const formRect = form.getBoundingClientRect();
+      const isFormInView = formRect.top >= 0 && formRect.top <= window.innerHeight;
+      if (!isFormInView) {
+        const scrollPosition = window.scrollY + formRect.top - 200;
+        window.scrollTo({ top: scrollPosition, behavior: 'smooth' });
+      }
     });
   }
 };

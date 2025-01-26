@@ -44,13 +44,13 @@ export function Alert({
 }: AlertProps) {
   return (
     <div className={alertVariants({ variant })}>
-      <div className="filliny-flex filliny-items-center filliny-justify-between filliny-gap-5">
+      <div className="filliny-flex filliny-flex-col filliny-items-center filliny-justify-between filliny-gap-5">
         <div className="filliny-flex filliny-flex-col filliny-gap-1">
           <p className={titleVariants({ variant })}>{title}</p>
           <p className="filliny-text-sm filliny-text-muted-foreground">{description}</p>
         </div>
         {buttonText && (
-          <Button variant={variant} size="sm" className="filliny-gap-1.5" onClick={onButtonClick}>
+          <Button variant={variant} size="sm" className="filliny-w-full filliny-gap-1.5" onClick={onButtonClick}>
             {buttonText}
             {ButtonIcon && <ButtonIcon className="filliny-h-3.5 filliny-w-3.5" />}
           </Button>
