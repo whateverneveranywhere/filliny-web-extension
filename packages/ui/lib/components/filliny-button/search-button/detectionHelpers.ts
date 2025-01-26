@@ -252,230 +252,87 @@ const captureElement = async (element: HTMLElement): Promise<string> => {
 // Update getFieldLabelFromScreenshot to include field ID in logs
 const getFieldLabelFromScreenshot = async (element: HTMLElement, fieldId: string): Promise<string> => {
   try {
-    // Find the outermost wrapper before the next field
-    const getOutermostWrapper = (el: HTMLElement): HTMLElement => {
-      // Helper to find all form fields in the document
-      const getAllFormFields = (doc: Document): HTMLElement[] => {
-        return Array.from(
-          doc.querySelectorAll<HTMLElement>(
-            'input:not([type="hidden"]), select, textarea, [role="textbox"], [role="combobox"], [contenteditable="true"]',
-          ),
-        ).filter(field => isElementVisible(field) && !shouldSkipElement(field));
-      };
-
-      // Helper to check if an element contains other form fields besides the target
-      const containsOtherFields = (container: HTMLElement, target: HTMLElement): boolean => {
-        const fields = getAllFormFields(container.ownerDocument);
-        return fields.some(field => field !== target && container.contains(field) && !target.contains(field));
-      };
-
-      // Helper to find the nearest form fields before and after the current element
-      const findNearestFields = (
-        fields: HTMLElement[],
-        target: HTMLElement,
-      ): { prev: HTMLElement | null; next: HTMLElement | null } => {
-        const sortedFields = fields.sort((a, b) => {
-          const aRect = a.getBoundingClientRect();
-          const bRect = b.getBoundingClientRect();
-          // First compare by vertical position with a threshold
-          if (Math.abs(aRect.top - bRect.top) > 20) {
-            return aRect.top - bRect.top;
-          }
-          // If on same line, compare by horizontal position
-          return aRect.left - bRect.left;
-        });
-
-        const currentIndex = sortedFields.indexOf(target);
-        if (currentIndex === -1) return { prev: null, next: null };
-
-        return {
-          prev: currentIndex > 0 ? sortedFields[currentIndex - 1] : null,
-          next: currentIndex < sortedFields.length - 1 ? sortedFields[currentIndex + 1] : null,
-        };
-      };
-
-      // Helper to check if a container is a good boundary
-      const isGoodBoundary = (container: HTMLElement): boolean => {
-        // Check for common boundary indicators
-        const hasFormRole =
-          container.getAttribute('role') === 'group' ||
-          container.getAttribute('role') === 'form' ||
-          container.tagName.toLowerCase() === 'form';
-        const hasFormClass =
-          container.className.toLowerCase().includes('form-group') ||
-          container.className.toLowerCase().includes('form-row') ||
-          container.className.toLowerCase().includes('field-group');
-        const hasFieldsetLike =
-          container.tagName.toLowerCase() === 'fieldset' || container.querySelector('legend, label') !== null;
-
-        return hasFormRole || hasFormClass || hasFieldsetLike;
-      };
-
-      // Helper to check if an element is part of a group
-      const isPartOfGroup = (element: HTMLElement): boolean => {
-        const isCheckbox = element.matches('input[type="checkbox"], [role="checkbox"]');
-        const isRadio = element.matches('input[type="radio"], [role="radio"]');
-        if (!isCheckbox && !isRadio) return false;
-
-        // For radio buttons, check name attribute
-        if (isRadio && element instanceof HTMLInputElement) {
-          const name = element.getAttribute('name');
-          return !!name && document.querySelectorAll(`input[type="radio"][name="${name}"]`).length > 1;
-        }
-
-        // For checkboxes, check if they're part of a fieldset or group
-        const hasGroupContainer = !!element.closest('fieldset, [role="group"], [role="radiogroup"], [data-group]');
-        if (hasGroupContainer) return true;
-
-        // Check if there are sibling checkboxes nearby
-        const parent = element.parentElement;
-        if (!parent) return false;
-
-        const siblings = Array.from(parent.querySelectorAll<HTMLElement>('input[type="checkbox"], [role="checkbox"]'));
-        return siblings.length > 1;
-      };
-
-      // Helper to find the group container for grouped inputs
-      const findGroupContainer = (element: HTMLElement): HTMLElement | null => {
-        // First check for semantic group containers
-        const semanticGroup = element.closest('fieldset, [role="group"], [role="radiogroup"], [data-group]');
-        if (semanticGroup) return semanticGroup as HTMLElement;
-
-        // For radio buttons, find all inputs with the same name
-        if (element instanceof HTMLInputElement && element.type === 'radio') {
-          const name = element.getAttribute('name');
-          if (name) {
-            const allRadios = Array.from(
-              document.querySelectorAll<HTMLInputElement>(`input[type="radio"][name="${name}"]`),
-            );
-            if (allRadios.length > 1) {
-              // Find the closest common ancestor
-              let commonAncestor: HTMLElement | null = element.parentElement;
-              while (commonAncestor) {
-                if (allRadios.every(radio => commonAncestor?.contains(radio))) {
-                  return commonAncestor;
-                }
-                commonAncestor = commonAncestor.parentElement;
-              }
-            }
-          }
-        }
-
-        // For checkboxes, find the container with multiple checkboxes
-        const parent = element.parentElement;
-        if (!parent) return null;
-
-        let currentParent: HTMLElement | null = parent;
-        while (currentParent) {
-          const checkboxes = currentParent.querySelectorAll<HTMLElement>('input[type="checkbox"], [role="checkbox"]');
-          if (checkboxes.length > 1) {
-            return currentParent;
-          }
-          if (currentParent.matches('form, body')) break;
-          currentParent = currentParent.parentElement;
-        }
-
-        return null;
-      };
-
-      // Helper to check if a container has unrelated fields
-      const hasUnrelatedFields = (container: HTMLElement, groupedElement: HTMLElement): boolean => {
-        const isRadio = groupedElement.matches('input[type="radio"], [role="radio"]');
-        const isCheckbox = groupedElement.matches('input[type="checkbox"], [role="checkbox"]');
-
-        const fields = getAllFormFields(container.ownerDocument);
-        return fields.some(field => {
-          if (!container.contains(field)) return false;
-
-          // For radio buttons, check if it's part of the same group
-          if (isRadio && field.matches('input[type="radio"]')) {
-            const name = (groupedElement as HTMLInputElement).name;
-            return (field as HTMLInputElement).name !== name;
-          }
-
-          // For checkboxes, check if it's not a checkbox
-          if (isCheckbox) {
-            return !field.matches('input[type="checkbox"], [role="checkbox"]');
-          }
-
-          return true;
-        });
-      };
-
-      // Start the main logic
-      if (isPartOfGroup(el)) {
-        // Find the group container first
-        const groupContainer = findGroupContainer(el);
-        if (groupContainer) {
-          let bestContainer = groupContainer;
-          let currentEl: HTMLElement | null = groupContainer;
-
-          // Continue up until we find unrelated fields or reach a form boundary
-          while (currentEl && currentEl.parentElement) {
-            const parent: HTMLElement = currentEl.parentElement;
-
-            // Stop if we've reached a form or body
-            if (parent.matches('form, body')) break;
-
-            // Stop if we find unrelated fields
-            if (hasUnrelatedFields(parent, el)) break;
-
-            // This container looks good
-            bestContainer = parent;
-            currentEl = parent;
-          }
-
-          return bestContainer;
-        }
-      }
-
-      // For non-grouped elements, use the original logic
-      const allFields = getAllFormFields(el.ownerDocument);
-      const neighbors = findNearestFields(allFields, el);
-      let bestContainer: HTMLElement = el;
-      let currentEl: HTMLElement | null = el;
-
-      while (currentEl && currentEl.parentElement) {
-        const parent: HTMLElement = currentEl.parentElement;
-
-        if (parent.tagName.toLowerCase() === 'form' || parent.tagName.toLowerCase() === 'body') {
-          break;
-        }
-
-        const hasOtherFields = containsOtherFields(parent, el);
-
-        if (hasOtherFields) {
-          const parentRect = parent.getBoundingClientRect();
-          const elRect = el.getBoundingClientRect();
-          const isCompact = parentRect.height - elRect.height < 100;
-
-          if (isCompact || isGoodBoundary(parent)) {
-            bestContainer = parent;
-          }
-          break;
-        }
-
-        const containsPrevField = neighbors.prev ? parent.contains(neighbors.prev) : false;
-        const containsNextField = neighbors.next ? parent.contains(neighbors.next) : false;
-        if (containsPrevField || containsNextField) break;
-
-        bestContainer = parent;
-        currentEl = parent;
-      }
-
-      return bestContainer;
+    // Helper to find all form fields in the document
+    const getAllFormFields = (doc: Document): HTMLElement[] => {
+      return Array.from(
+        doc.querySelectorAll<HTMLElement>(
+          'input:not([type="hidden"]), select, textarea, [role="textbox"], [role="combobox"], [contenteditable="true"]',
+        ),
+      ).filter(field => isElementVisible(field) && !shouldSkipElement(field));
     };
 
-    const wrapper = getOutermostWrapper(element);
+    // Get all form fields in the document
+    const allFields = getAllFormFields(element.ownerDocument);
+    const currentFieldIndex = allFields.indexOf(element);
+
+    // Find the next and previous fields in the form
+    const nextField = allFields[currentFieldIndex + 1];
+    const prevField = allFields[currentFieldIndex - 1];
+
+    let bestContainer: HTMLElement = element;
+    let currentEl: HTMLElement | null = element;
+
+    // Traverse up the DOM tree until we find a container that contains other fields
+    // or until we reach a form/body element
+    while (currentEl && currentEl.parentElement) {
+      const parent: HTMLElement = currentEl.parentElement;
+
+      // Stop if we reach form or body
+      if (parent.tagName.toLowerCase() === 'form' || parent.tagName.toLowerCase() === 'body') {
+        break;
+      }
+
+      // Get all fields within this parent
+      const fieldsInParent = allFields.filter(field => parent.contains(field));
+
+      // If this parent contains our target field and either next or previous field,
+      // we've gone too far up - use the previous container
+      if (
+        fieldsInParent.includes(element) &&
+        ((nextField && fieldsInParent.includes(nextField)) || (prevField && fieldsInParent.includes(prevField)))
+      ) {
+        break;
+      }
+
+      // If this parent contains multiple fields but not our neighbors,
+      // check if the fields it contains are part of a different form group
+      const otherFields = fieldsInParent.filter(f => f !== element);
+      if (otherFields.length > 0) {
+        const isPartOfDifferentGroup = otherFields.some(field => {
+          // Check if field is part of a different logical group
+          const fieldRect = field.getBoundingClientRect();
+          const elRect = element.getBoundingClientRect();
+
+          // If vertical distance is more than 200px, consider it a different group
+          const verticalDistance = Math.abs(fieldRect.top - elRect.top);
+          if (verticalDistance > 200) return true;
+
+          // If horizontal distance is more than 300px, consider it a different group
+          const horizontalDistance = Math.abs(fieldRect.left - elRect.left);
+          if (horizontalDistance > 300) return true;
+
+          return false;
+        });
+
+        if (isPartOfDifferentGroup) {
+          break;
+        }
+      }
+
+      // Update best container and continue up
+      bestContainer = parent;
+      currentEl = parent;
+    }
+
     const wrapperInfo = {
       fieldId,
-      tagName: wrapper.tagName,
-      classes: wrapper.className,
+      tagName: bestContainer.tagName,
+      classes: bestContainer.className,
       dimensions: {
-        width: wrapper.offsetWidth,
-        height: wrapper.offsetHeight,
+        width: bestContainer.offsetWidth,
+        height: bestContainer.offsetHeight,
       },
-      textContent: wrapper.textContent?.trim(),
+      textContent: bestContainer.textContent?.trim(),
     };
     console.log('OCR - Found wrapper:', wrapperInfo);
 
@@ -495,7 +352,7 @@ const getFieldLabelFromScreenshot = async (element: HTMLElement, fieldId: string
     }
 
     // Use Chrome's native capture instead of html2canvas
-    const dataUrl = await captureElement(wrapper);
+    const dataUrl = await captureElement(bestContainer);
     console.log('OCR - Screenshot captured for field:', fieldId);
 
     // Initialize Tesseract with optimized settings
@@ -510,7 +367,7 @@ const getFieldLabelFromScreenshot = async (element: HTMLElement, fieldId: string
 
     // Configure Tesseract for speed
     await worker.setParameters({
-      tessedit_pageseg_mode: PSM.SINGLE_BLOCK,
+      tessedit_pageseg_mode: PSM.AUTO,
       tessedit_char_whitelist:
         'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,?!@#$%&*()-_+=[]{}|:;"\'<>/ ',
       tessjs_create_hocr: '0',
