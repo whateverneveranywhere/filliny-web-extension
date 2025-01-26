@@ -311,6 +311,125 @@ const getFieldLabelFromScreenshot = async (element: HTMLElement, fieldId: string
         return hasFormRole || hasFormClass || hasFieldsetLike;
       };
 
+      // Helper to check if an element is part of a group
+      const isPartOfGroup = (element: HTMLElement): boolean => {
+        const isCheckbox = element.matches('input[type="checkbox"], [role="checkbox"]');
+        const isRadio = element.matches('input[type="radio"], [role="radio"]');
+        if (!isCheckbox && !isRadio) return false;
+
+        // For radio buttons, check name attribute
+        if (isRadio && element instanceof HTMLInputElement) {
+          const name = element.getAttribute('name');
+          return !!name && document.querySelectorAll(`input[type="radio"][name="${name}"]`).length > 1;
+        }
+
+        // For checkboxes, check if they're part of a fieldset or group
+        const hasGroupContainer = !!element.closest('fieldset, [role="group"], [role="radiogroup"], [data-group]');
+        if (hasGroupContainer) return true;
+
+        // Check if there are sibling checkboxes nearby
+        const parent = element.parentElement;
+        if (!parent) return false;
+
+        const siblings = Array.from(parent.querySelectorAll<HTMLElement>('input[type="checkbox"], [role="checkbox"]'));
+        return siblings.length > 1;
+      };
+
+      // Helper to find the group container for grouped inputs
+      const findGroupContainer = (element: HTMLElement): HTMLElement | null => {
+        // First check for semantic group containers
+        const semanticGroup = element.closest('fieldset, [role="group"], [role="radiogroup"], [data-group]');
+        if (semanticGroup) return semanticGroup as HTMLElement;
+
+        // For radio buttons, find all inputs with the same name
+        if (element instanceof HTMLInputElement && element.type === 'radio') {
+          const name = element.getAttribute('name');
+          if (name) {
+            const allRadios = Array.from(
+              document.querySelectorAll<HTMLInputElement>(`input[type="radio"][name="${name}"]`),
+            );
+            if (allRadios.length > 1) {
+              // Find the closest common ancestor
+              let commonAncestor: HTMLElement | null = element.parentElement;
+              while (commonAncestor) {
+                if (allRadios.every(radio => commonAncestor?.contains(radio))) {
+                  return commonAncestor;
+                }
+                commonAncestor = commonAncestor.parentElement;
+              }
+            }
+          }
+        }
+
+        // For checkboxes, find the container with multiple checkboxes
+        const parent = element.parentElement;
+        if (!parent) return null;
+
+        let currentParent: HTMLElement | null = parent;
+        while (currentParent) {
+          const checkboxes = currentParent.querySelectorAll<HTMLElement>('input[type="checkbox"], [role="checkbox"]');
+          if (checkboxes.length > 1) {
+            return currentParent;
+          }
+          if (currentParent.matches('form, body')) break;
+          currentParent = currentParent.parentElement;
+        }
+
+        return null;
+      };
+
+      // Helper to check if a container has unrelated fields
+      const hasUnrelatedFields = (container: HTMLElement, groupedElement: HTMLElement): boolean => {
+        const isRadio = groupedElement.matches('input[type="radio"], [role="radio"]');
+        const isCheckbox = groupedElement.matches('input[type="checkbox"], [role="checkbox"]');
+
+        const fields = getAllFormFields(container.ownerDocument);
+        return fields.some(field => {
+          if (!container.contains(field)) return false;
+
+          // For radio buttons, check if it's part of the same group
+          if (isRadio && field.matches('input[type="radio"]')) {
+            const name = (groupedElement as HTMLInputElement).name;
+            return (field as HTMLInputElement).name !== name;
+          }
+
+          // For checkboxes, check if it's not a checkbox
+          if (isCheckbox) {
+            return !field.matches('input[type="checkbox"], [role="checkbox"]');
+          }
+
+          return true;
+        });
+      };
+
+      // Start the main logic
+      if (isPartOfGroup(el)) {
+        // Find the group container first
+        const groupContainer = findGroupContainer(el);
+        if (groupContainer) {
+          let bestContainer = groupContainer;
+          let currentEl: HTMLElement | null = groupContainer;
+
+          // Continue up until we find unrelated fields or reach a form boundary
+          while (currentEl && currentEl.parentElement) {
+            const parent: HTMLElement = currentEl.parentElement;
+
+            // Stop if we've reached a form or body
+            if (parent.matches('form, body')) break;
+
+            // Stop if we find unrelated fields
+            if (hasUnrelatedFields(parent, el)) break;
+
+            // This container looks good
+            bestContainer = parent;
+            currentEl = parent;
+          }
+
+          return bestContainer;
+        }
+      }
+
+      // For non-grouped elements, use the original logic
       const allFields = getAllFormFields(el.ownerDocument);
       const neighbors = findNearestFields(allFields, el);
       let bestContainer: HTMLElement = el;
@@ -319,34 +438,27 @@ const getFieldLabelFromScreenshot = async (element: HTMLElement, fieldId: string
       while (currentEl && currentEl.parentElement) {
         const parent: HTMLElement = currentEl.parentElement;
 
-        // Stop if we've reached a form or the document body
         if (parent.tagName.toLowerCase() === 'form' || parent.tagName.toLowerCase() === 'body') {
           break;
         }
 
-        // Check if this parent contains other form fields
         const hasOtherFields = containsOtherFields(parent, el);
 
-        // If this parent contains other fields, we need to be more careful
         if (hasOtherFields) {
-          // Check if this is still a valid container despite having other fields
           const parentRect = parent.getBoundingClientRect();
           const elRect = el.getBoundingClientRect();
-          const isCompact = parentRect.height - elRect.height < 100; // Arbitrary threshold
+          const isCompact = parentRect.height - elRect.height < 100;
 
-          // If the container is compact or looks like a good boundary, use it
           if (isCompact || isGoodBoundary(parent)) {
             bestContainer = parent;
           }
           break;
         }
 
-        // Check if this parent contains any of the neighbor fields
         const containsPrevField = neighbors.prev ? parent.contains(neighbors.prev) : false;
         const containsNextField = neighbors.next ? parent.contains(neighbors.next) : false;
         if (containsPrevField || containsNextField) break;
 
-        // This parent looks good, update our best container
         bestContainer = parent;
         currentEl = parent;
       }
