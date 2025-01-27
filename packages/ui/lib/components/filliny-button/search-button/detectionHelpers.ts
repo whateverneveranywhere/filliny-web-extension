@@ -192,55 +192,44 @@ const querySelectorAllFrames = (selector: string): Element[] => {
   return results;
 };
 
-// Add new helper for capturing element using Chrome APIs
+// Capture element using html2canvas
 const captureElement = async (element: HTMLElement): Promise<string> => {
-  const rect = element.getBoundingClientRect();
-
   try {
-    // Get current window ID
-    const currentWindow = await chrome.windows.getCurrent();
-    if (!currentWindow.id) {
-      throw new Error('Could not get current window ID');
-    }
+    const { default: html2canvas } = await import('html2canvas');
 
-    // Capture the visible tab with proper options
-    const dataUrl = await chrome.tabs.captureVisibleTab(currentWindow.id, { format: 'png' });
+    // Capture the element
+    const canvas = await html2canvas(element, {
+      logging: false,
+      useCORS: true,
+      scale: window.devicePixelRatio || 1,
+      allowTaint: true,
+      backgroundColor: null,
+      removeContainer: true,
+      onclone: (clonedDoc, node) => {
+        // Hide interactive elements in the clone for cleaner capture
+        const interactives = node.querySelectorAll('input, select, textarea, button');
+        interactives.forEach((el: Element) => {
+          if (el !== element) {
+            (el as HTMLElement).style.visibility = 'hidden';
+          }
+        });
+      },
+    });
 
-    // Create a canvas to crop the screenshot
-    const img = new Image();
-    const canvas = document.createElement('canvas');
+    // Convert to black and white for better OCR
     const ctx = canvas.getContext('2d');
-
     if (!ctx) {
       throw new Error('Could not get canvas context');
     }
 
-    // Wait for image to load
-    await new Promise<void>((resolve, reject) => {
-      img.onload = () => resolve();
-      img.onerror = () => reject(new Error('Failed to load image'));
-      img.src = dataUrl;
-    });
-
-    // Set canvas dimensions to match element
-    canvas.width = rect.width;
-    canvas.height = rect.height;
-
-    // Calculate device pixel ratio for retina displays
-    const dpr = window.devicePixelRatio || 1;
-
-    // Draw the cropped region
-    ctx.drawImage(
-      img,
-      rect.left * dpr,
-      rect.top * dpr,
-      rect.width * dpr,
-      rect.height * dpr,
-      0,
-      0,
-      rect.width,
-      rect.height,
-    );
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = imageData.data;
+    for (let i = 0; i < data.length; i += 4) {
+      const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+      const value = avg > 128 ? 255 : 0;
+      data[i] = data[i + 1] = data[i + 2] = value;
+    }
+    ctx.putImageData(imageData, 0, 0);
 
     return canvas.toDataURL('image/png');
   } catch (error) {
@@ -249,259 +238,456 @@ const captureElement = async (element: HTMLElement): Promise<string> => {
   }
 };
 
-// Update getFieldLabelFromScreenshot to include field ID in logs
-const getFieldLabelFromScreenshot = async (element: HTMLElement, fieldId: string): Promise<string> => {
+// Add OCR result cache
+const ocrCache = new Map<string, string>();
+
+// Helper to find the optimal parent container for OCR
+const findOptimalLabelContainer = (
+  element: HTMLElement,
+): {
+  container: HTMLElement;
+  reason: string;
+} => {
+  // Find all form fields in the document
+  const findFormFields = (root: Document): HTMLElement[] => {
+    return Array.from(
+      root.querySelectorAll<HTMLElement>(
+        'input:not([type="hidden"]), select, textarea, [role="textbox"], [role="combobox"], [contenteditable="true"]',
+      ),
+    ).filter(field => isElementVisible(field) && !shouldSkipElement(field));
+  };
+
+  // Get all fields and find current field's position
+  const allFields = findFormFields(element.ownerDocument);
+  const currentIndex = allFields.indexOf(element);
+
+  // Find prev/next fields if they exist
+  const prevField = currentIndex > 0 ? allFields[currentIndex - 1] : null;
+  const nextField = currentIndex < allFields.length - 1 ? allFields[currentIndex + 1] : null;
+
+  // Find the closest field (prev or next) based on DOM distance
+  const getClosestField = (): HTMLElement | null => {
+    if (!prevField && !nextField) return null;
+    if (!prevField) return nextField;
+    if (!nextField) return prevField;
+
+    // Compare DOM distances
+    let current = element;
+    let prevSteps = 0;
+    let nextSteps = 0;
+
+    // Count steps to prev field
+    while (current && !current.contains(prevField)) {
+      current = current.parentElement!;
+      prevSteps++;
+    }
+
+    // Count steps to next field
+    current = element;
+    while (current && !current.contains(nextField)) {
+      current = current.parentElement!;
+      nextSteps++;
+    }
+
+    return prevSteps <= nextSteps ? prevField : nextField;
+  };
+
+  // Find common ancestor with the closest field
+  const closestField = getClosestField();
+  if (!closestField) {
+    // If no other fields found, use minimal container
+    let container = element;
+    while (container.parentElement) {
+      const parent = container.parentElement;
+      const hasOtherInteractives = Array.from(parent.querySelectorAll('input, select, textarea, button')).some(
+        el => el !== element && isElementVisible(el as HTMLElement),
+      );
+
+      if (hasOtherInteractives) break;
+
+      const rect = parent.getBoundingClientRect();
+      if (rect.width > 800 || rect.height > 300) break;
+
+      container = parent;
+    }
+    return { container, reason: 'isolated' };
+  }
+
+  // Find the path from element to common ancestor
+  const getPathToAncestor = (el: HTMLElement, ancestor: HTMLElement): HTMLElement[] => {
+    const path: HTMLElement[] = [];
+    let current = el;
+    while (current && current !== ancestor) {
+      path.push(current);
+      current = current.parentElement!;
+    }
+    path.push(ancestor);
+    return path;
+  };
+
+  // Find common ancestor
+  let commonAncestor = element;
+  while (commonAncestor && !commonAncestor.contains(closestField)) {
+    commonAncestor = commonAncestor.parentElement!;
+  }
+
+  if (!commonAncestor || commonAncestor.tagName.toLowerCase() === 'body') {
+    return { container: element, reason: 'fallback' };
+  }
+
+  // Get the path from element to common ancestor
+  const pathToAncestor = getPathToAncestor(element, commonAncestor);
+
+  // Find the optimal container by checking each ancestor's content
+  let bestContainer = element;
+  let bestTextDensity = 0;
+
+  for (const container of pathToAncestor) {
+    // Skip if container includes other form fields
+    const hasOtherFields = Array.from(container.querySelectorAll('input, select, textarea, button')).some(
+      el => el !== element && el !== closestField && isElementVisible(el as HTMLElement),
+    );
+
+    if (hasOtherFields) break;
+
+    // Check container dimensions
+    const rect = container.getBoundingClientRect();
+    if (rect.width > 800 || rect.height > 300) break;
+
+    // Calculate text density (text length / area)
+    const text = container.textContent || '';
+    const area = rect.width * rect.height;
+    const density = area > 0 ? text.length / area : 0;
+
+    if (density > bestTextDensity) {
+      bestContainer = container;
+      bestTextDensity = density;
+    }
+  }
+
+  return {
+    container: bestContainer,
+    reason: bestContainer === element ? 'self' : 'structure',
+  };
+};
+
+// Add OCR worker pool management
+interface OCRWorkerPool {
+  workers: Array<{
+    worker: Tesseract.Worker;
+    busy: boolean;
+  }>;
+  maxWorkers: number;
+}
+
+let workerPool: OCRWorkerPool | null = null;
+
+const initWorkerPool = async (): Promise<OCRWorkerPool> => {
+  if (workerPool) return workerPool;
+
+  // Determine optimal number of workers based on hardware
+  const maxWorkers = navigator.hardwareConcurrency ? Math.min(navigator.hardwareConcurrency - 1, 4) : 2;
+
+  const { createWorker } = await import('tesseract.js');
+  const workers = await Promise.all(
+    Array(maxWorkers)
+      .fill(0)
+      .map(async () => ({
+        worker: await createWorker('eng', 1, {
+          logger: () => {}, // Disable logging for performance
+        }),
+        busy: false,
+      })),
+  );
+
+  // Configure all workers with optimized settings for better text capture
+  await Promise.all(
+    workers.map(({ worker }) =>
+      worker.setParameters({
+        tessedit_pageseg_mode: PSM.AUTO, // Use automatic page segmentation
+        tessedit_ocr_engine_mode: 3, // Use default engine mode for better accuracy
+        preserve_interword_spaces: '1',
+        tessjs_create_hocr: '0',
+        tessjs_create_tsv: '0',
+        tessjs_create_box: '0',
+        tessjs_create_unlv: '0',
+        tessjs_create_osd: '0',
+      }),
+    ),
+  );
+
+  workerPool = { workers, maxWorkers };
+  return workerPool;
+};
+
+const getAvailableWorker = async (): Promise<{ worker: Tesseract.Worker; release: () => void }> => {
+  const pool = await initWorkerPool();
+
+  // Find available worker or wait for one
+  const waitForWorker = async (): Promise<(typeof pool.workers)[0]> => {
+    const available = pool.workers.find(w => !w.busy);
+    if (available) return available;
+    await new Promise(resolve => setTimeout(resolve, 100));
+    return waitForWorker();
+  };
+
+  const workerInfo = await waitForWorker();
+  workerInfo.busy = true;
+
+  return {
+    worker: workerInfo.worker,
+    release: () => {
+      workerInfo.busy = false;
+    },
+  };
+};
+
+// Enhanced debug image saving with metadata
+const saveDebugImage = async (
+  dataUrl: string,
+  fieldId: string,
+  metadata: {
+    reason: string;
+    ocrText: string;
+    elementInfo: {
+      tagName: string;
+      classes: string;
+      type?: string;
+      id?: string;
+    };
+  },
+): Promise<void> => {
   try {
-    // Helper to find all form fields in the document
-    const getAllFormFields = (doc: Document): HTMLElement[] => {
-      return Array.from(
-        doc.querySelectorAll<HTMLElement>(
-          'input:not([type="hidden"]), select, textarea, [role="textbox"], [role="combobox"], [contenteditable="true"]',
-        ),
-      ).filter(field => isElementVisible(field) && !shouldSkipElement(field));
-    };
+    // Create debug info overlay
+    const debugCanvas = document.createElement('canvas');
+    const debugCtx = debugCanvas.getContext('2d');
+    if (!debugCtx) return;
 
-    // Get all form fields in the document
-    const allFields = getAllFormFields(element.ownerDocument);
-    const currentFieldIndex = allFields.indexOf(element);
+    // Load the original image
+    const img = new Image();
+    await new Promise((resolve, reject) => {
+      img.onload = resolve;
+      img.onerror = reject;
+      img.src = dataUrl;
+    });
 
-    // Find the next and previous fields in the form
-    const nextField = allFields[currentFieldIndex + 1];
-    const prevField = allFields[currentFieldIndex - 1];
+    // Set canvas size
+    debugCanvas.width = img.width;
+    debugCanvas.height = img.height + 60; // Extra space for debug info
 
-    let bestContainer: HTMLElement = element;
-    let currentEl: HTMLElement | null = element;
+    // Draw original image
+    debugCtx.drawImage(img, 0, 0);
 
-    // Traverse up the DOM tree until we find a container that contains other fields
-    // or until we reach a form/body element
-    while (currentEl && currentEl.parentElement) {
-      const parent: HTMLElement = currentEl.parentElement;
+    // Add debug information overlay
+    debugCtx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+    debugCtx.fillRect(0, img.height, debugCanvas.width, 60);
+    debugCtx.fillStyle = 'white';
+    debugCtx.font = '12px monospace';
 
-      // Stop if we reach form or body
-      if (parent.tagName.toLowerCase() === 'form' || parent.tagName.toLowerCase() === 'body') {
-        break;
-      }
+    const debugInfo = [
+      `Field: ${fieldId} | Type: ${metadata.elementInfo.type || metadata.elementInfo.tagName} | Reason: ${metadata.reason}`,
+      `OCR Text: "${metadata.ocrText}"`,
+      `Element: ${metadata.elementInfo.tagName}${metadata.elementInfo.id ? '#' + metadata.elementInfo.id : ''}.${metadata.elementInfo.classes}`,
+    ];
 
-      // Get all fields within this parent
-      const fieldsInParent = allFields.filter(field => parent.contains(field));
+    debugInfo.forEach((text, i) => {
+      debugCtx.fillText(text, 5, img.height + 15 + i * 15);
+    });
 
-      // If this parent contains our target field and either next or previous field,
-      // we've gone too far up - use the previous container
-      if (
-        fieldsInParent.includes(element) &&
-        ((nextField && fieldsInParent.includes(nextField)) || (prevField && fieldsInParent.includes(prevField)))
-      ) {
-        break;
-      }
+    // Save with debug info
+    const debugDataUrl = debugCanvas.toDataURL('image/png');
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
 
-      // If this parent contains multiple fields but not our neighbors,
-      // check if the fields it contains are part of a different form group
-      const otherFields = fieldsInParent.filter(f => f !== element);
-      if (otherFields.length > 0) {
-        const isPartOfDifferentGroup = otherFields.some(field => {
-          // Check if field is part of a different logical group
-          const fieldRect = field.getBoundingClientRect();
-          const elRect = element.getBoundingClientRect();
+    // Create a downloadable link
+    const link = document.createElement('a');
+    link.href = debugDataUrl;
+    link.download = `filliny-debug-${fieldId}-${timestamp}.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
 
-          // If vertical distance is more than 200px, consider it a different group
-          const verticalDistance = Math.abs(fieldRect.top - elRect.top);
-          if (verticalDistance > 200) return true;
-
-          // If horizontal distance is more than 300px, consider it a different group
-          const horizontalDistance = Math.abs(fieldRect.left - elRect.left);
-          if (horizontalDistance > 300) return true;
-
-          return false;
-        });
-
-        if (isPartOfDifferentGroup) {
-          break;
-        }
-      }
-
-      // Update best container and continue up
-      bestContainer = parent;
-      currentEl = parent;
-    }
-
-    const wrapperInfo = {
+    console.log('Debug image saved:', {
       fieldId,
-      tagName: bestContainer.tagName,
-      classes: bestContainer.className,
-      dimensions: {
-        width: bestContainer.offsetWidth,
-        height: bestContainer.offsetHeight,
-      },
-      textContent: bestContainer.textContent?.trim(),
-    };
-    console.log('OCR - Found wrapper:', wrapperInfo);
-
-    // If wrapper has clean text content that looks like a label, use it directly
-    const directText = wrapperInfo.textContent;
-    if (
-      directText &&
-      directText.length > 1 &&
-      directText.length < 100 &&
-      !directText.includes('{{') &&
-      !directText.includes('}}') &&
-      !/^[0-9.,$€£%]+$/.test(directText) &&
-      !/^[*_-]+$/.test(directText)
-    ) {
-      console.log('OCR - Using direct wrapper text as label:', { fieldId, label: directText });
-      return directText;
-    }
-
-    // Use Chrome's native capture instead of html2canvas
-    const dataUrl = await captureElement(bestContainer);
-    console.log('OCR - Screenshot captured for field:', fieldId);
-
-    // Initialize Tesseract with optimized settings
-    const { createWorker } = await import('tesseract.js');
-    const worker = await createWorker('eng', 1, {
-      logger: m => {
-        if (m.status === 'recognizing text') {
-          console.log('OCR - Recognition progress for field:', fieldId, Math.floor(m.progress * 100) + '%');
-        }
-      },
+      metadata,
+      timestamp,
     });
-
-    // Configure Tesseract for speed
-    await worker.setParameters({
-      tessedit_pageseg_mode: PSM.AUTO,
-      tessedit_char_whitelist:
-        'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,?!@#$%&*()-_+=[]{}|:;"\'<>/ ',
-      tessjs_create_hocr: '0',
-      tessjs_create_tsv: '0',
-      tessjs_create_box: '0',
-      tessjs_create_unlv: '0',
-      tessjs_create_osd: '0',
-    });
-
-    // Recognize text from the captured image
-    console.log('OCR - Starting text recognition for field:', fieldId);
-    const result = await worker.recognize(dataUrl);
-    console.log('OCR - Recognition completed for field:', fieldId);
-
-    // Clean up worker immediately
-    await worker.terminate();
-
-    // Process the extracted text with more detailed analysis
-    const rawText = result.data.text;
-    console.log('OCR - Raw detected text:', {
-      fieldId,
-      text: rawText,
-      confidence: result.data.confidence,
-      words: result.data.words?.map(w => ({ text: w.text, confidence: w.confidence })),
-    });
-
-    // Split into lines and normalize
-    const lines = rawText
-      .split('\n')
-      .map(line => line.trim())
-      .filter(line => line.length > 0);
-
-    console.log('OCR - Detected lines:', { fieldId, lines });
-
-    // First pass: Filter out obviously invalid lines
-    const validLines = lines.filter(line => {
-      const isValid =
-        line.length > 1 &&
-        !/^[0-9.,$€£%]+$/.test(line) && // Not just numbers/currency
-        !line.includes('{{') &&
-        !line.includes('}}') &&
-        !/^[*_-]+$/.test(line); // Not just decorative characters
-
-      console.log('OCR - Line validation:', {
-        fieldId,
-        line,
-        isValid,
-        length: line.length,
-        isNumeric: /^[0-9.,$€£%]+$/.test(line),
-        hasTemplate: line.includes('{{') || line.includes('}}'),
-        isDecorative: /^[*_-]+$/.test(line),
-      });
-
-      return isValid;
-    });
-
-    console.log('OCR - Valid lines:', { fieldId, validLines });
-
-    // Score each line based on likelihood of being a label
-    const scoredLines = validLines.map(line => {
-      let score = 0;
-      const text = line.trim();
-
-      const scoring = {
-        isQuestion: text.endsWith('?'),
-        isCommonPattern: !!text.match(/^(what|who|when|where|why|how|please|enter|select|choose|pick)/i),
-        hasPlaceholderWords:
-          text.toLowerCase().includes('select') ||
-          text.toLowerCase().includes('choose') ||
-          text.toLowerCase().includes('type') ||
-          text.toLowerCase().includes('enter') ||
-          text.toLowerCase().includes('your'),
-        isGoodLength: text.length > 3 && text.length < 100,
-        isCapitalized: !!text.match(/^[A-Z]/),
-      };
-
-      if (scoring.isQuestion) score += 10;
-      if (scoring.isCommonPattern) score += 5;
-      if (scoring.hasPlaceholderWords) score -= 3;
-      if (scoring.isGoodLength) score += 2;
-      if (scoring.isCapitalized) score += 1;
-
-      console.log('OCR - Scoring line:', {
-        fieldId,
-        text,
-        score,
-        scoring,
-      });
-
-      return { text, score };
-    });
-
-    // Sort by score and get the best candidate
-    scoredLines.sort((a, b) => b.score - a.score);
-
-    const bestLabel = scoredLines.length > 0 ? scoredLines[0].text : '';
-    console.log('OCR - Final label selection:', {
-      fieldId,
-      selectedLabel: bestLabel,
-      score: scoredLines[0]?.score,
-      allCandidates: scoredLines.map(l => `"${l.text}" (score: ${l.score})`),
-    });
-
-    // Return the best label if found
-    if (bestLabel) {
-      return bestLabel;
-    }
-
-    // If we didn't find a good label through OCR, try getting text content directly
-    if (directText) {
-      console.log('OCR - Falling back to direct text content:', { fieldId, directText });
-      return directText;
-    }
-
-    return '';
   } catch (e) {
-    console.error('OCR - Screenshot label detection failed:', { fieldId, error: e });
-    // Try getting text content directly as fallback
-    const directText = element.textContent?.trim() || '';
-    console.log('OCR - Error fallback to direct text content:', { fieldId, directText });
-    return directText;
+    console.warn('Failed to save debug image:', e);
   }
 };
 
-// Update getFieldLabel to ensure OCR labels are prioritized
+// Update processBatchOCR to use less restrictive text filtering
+const processBatchOCR = async (elements: HTMLElement[]): Promise<Map<string, string>> => {
+  const results = new Map<string, string>();
+  const batches: HTMLElement[][] = [];
+
+  console.log(`Starting OCR batch processing for ${elements.length} elements`);
+  console.time('batchOCRTotal');
+
+  // Split elements into batches based on available workers
+  const pool = await initWorkerPool();
+  const batchSize = Math.ceil(elements.length / pool.maxWorkers);
+
+  for (let i = 0; i < elements.length; i += batchSize) {
+    batches.push(elements.slice(i, i + batchSize));
+  }
+
+  console.log(`Created ${batches.length} batches with size ${batchSize}`);
+
+  // Process batches in parallel
+  await Promise.all(
+    batches.map(async (batch, batchIndex) => {
+      console.log(`Processing batch ${batchIndex + 1}/${batches.length}`);
+      console.time(`batch${batchIndex}`);
+
+      const { worker, release } = await getAvailableWorker();
+
+      try {
+        await Promise.all(
+          batch.map(async element => {
+            const cacheKey = element.getAttribute('data-filliny-id');
+            if (!cacheKey) return;
+
+            console.time(`element-${cacheKey}`);
+            try {
+              const { container, reason } = findOptimalLabelContainer(element);
+              const dataUrl = await captureElement(container);
+
+              console.log(`OCR processing for ${cacheKey}:`, {
+                container: {
+                  tagName: container.tagName,
+                  classes: container.className,
+                  dimensions: container.getBoundingClientRect(),
+                },
+                reason,
+              });
+
+              const result = await worker.recognize(dataUrl);
+
+              // Less restrictive text processing - keep more text
+              const detectedText = result.data.text
+                .split('\n')
+                .map(line => line.trim())
+                .filter(
+                  line =>
+                    line.length > 0 && // Keep any non-empty line
+                    !line.includes('{{') &&
+                    !line.includes('}}'),
+                )
+                .join(' ')
+                .trim()
+                .replace(/\s+/g, ' '); // Normalize whitespace
+
+              // Save debug image with OCR results
+              await saveDebugImage(dataUrl, cacheKey, {
+                reason,
+                ocrText: detectedText,
+                elementInfo: {
+                  tagName: element.tagName,
+                  classes: element.className,
+                  type: element instanceof HTMLInputElement ? element.type : undefined,
+                  id: element.id,
+                },
+              });
+
+              if (detectedText) {
+                results.set(cacheKey, detectedText);
+                ocrCache.set(cacheKey, detectedText);
+                console.log(`Successfully detected text for ${cacheKey}:`, detectedText);
+              } else {
+                console.log(`No text detected for ${cacheKey}`);
+              }
+            } catch (e) {
+              console.error('OCR failed for element:', {
+                fieldId: cacheKey,
+                error: e,
+              });
+            }
+            console.timeEnd(`element-${cacheKey}`);
+          }),
+        );
+      } finally {
+        release();
+        console.timeEnd(`batch${batchIndex}`);
+      }
+    }),
+  );
+
+  console.timeEnd('batchOCRTotal');
+  console.log('OCR batch processing complete:', {
+    totalElements: elements.length,
+    successfulDetections: results.size,
+    detectionRate: `${((results.size / elements.length) * 100).toFixed(1)}%`,
+  });
+
+  return results;
+};
+
+// Update getFieldLabelFromScreenshot to properly wait for batch results
+const getFieldLabelFromScreenshot = async (element: HTMLElement, fieldId: string): Promise<string> => {
+  try {
+    // Check cache first
+    const cacheKey = element.getAttribute('data-filliny-id') || fieldId;
+    if (ocrCache.has(cacheKey)) {
+      console.log('Using cached OCR result for:', { fieldId, label: ocrCache.get(cacheKey) });
+      return ocrCache.get(cacheKey)!;
+    }
+
+    // Process immediately if no batch in progress
+    if (batchQueue.size === 0) {
+      console.log('Processing single element immediately:', fieldId);
+      const results = await processBatchOCR([element]);
+      const label = results.get(cacheKey);
+      console.log('Single element OCR result:', { fieldId, label });
+      return label || '';
+    }
+
+    // Add to batch queue
+    console.log('Adding to batch queue:', fieldId);
+    batchQueue.set(cacheKey, element);
+
+    // If batch is full or timeout reached, process the batch
+    if (batchQueue.size >= BATCH_SIZE || Date.now() - lastBatchTime > BATCH_TIMEOUT) {
+      console.log('Processing batch due to:', batchQueue.size >= BATCH_SIZE ? 'size limit' : 'timeout');
+      const batchElements = Array.from(batchQueue.values());
+      batchQueue.clear();
+      lastBatchTime = Date.now();
+
+      const results = await processBatchOCR(batchElements);
+      const label = results.get(cacheKey);
+      console.log('Batch OCR result:', { fieldId, label });
+      return label || '';
+    }
+
+    // If we're still collecting batch items, process this element immediately
+    // instead of waiting for the batch to fill
+    console.log('Processing element while batch collects:', fieldId);
+    const results = await processBatchOCR([element]);
+    const label = results.get(cacheKey);
+    console.log('Individual OCR result:', { fieldId, label });
+    return label || '';
+  } catch (e) {
+    console.error('OCR failed:', e);
+    return '';
+  }
+};
+
+// Add batch processing constants and state
+const BATCH_SIZE = 10;
+const BATCH_TIMEOUT = 200; // ms
+const batchQueue = new Map<string, HTMLElement>();
+let lastBatchTime = Date.now();
+
+// Update getFieldLabel to use OCR first, then fallback strategies
 const getFieldLabel = async (element: HTMLElement, fieldId: string): Promise<string> => {
-  // First try OCR-based label detection
+  // Try OCR-based label detection first
   const ocrLabel = await getFieldLabelFromScreenshot(element, fieldId);
   if (ocrLabel) {
     console.log('Using OCR-detected label:', { fieldId, label: ocrLabel });
     return ocrLabel;
   }
 
-  console.log('OCR label not found, trying fallback strategies:', { fieldId });
+  console.log('OCR failed, trying fallback strategies:', { fieldId });
 
   // Fallback strategies if OCR fails
   const strategies = [
@@ -562,9 +748,9 @@ const getFieldLabel = async (element: HTMLElement, fieldId: string): Promise<str
       // Try to find preceding text nodes using XPath
       try {
         const xpathResult = doc.evaluate(
-          `./preceding-sibling::text()[normalize-space(.)!=''] | 
-           ./preceding-sibling::*/text()[normalize-space(.)!=''] |
-           ../text()[following-sibling::*[1][self::${element.tagName.toLowerCase()}]]`,
+          './preceding-sibling::text()[normalize-space(.)!=""] | ./preceding-sibling::*/text()[normalize-space(.)!=""] | ../text()[following-sibling::*[1][self::' +
+            element.tagName.toLowerCase() +
+            ']]',
           element,
           null,
           XPathResult.ORDERED_NODE_SNAPSHOT_TYPE,
@@ -578,14 +764,16 @@ const getFieldLabel = async (element: HTMLElement, fieldId: string): Promise<str
         }
 
         // Return the closest meaningful text
-        const relevantText = textNodes.reverse().find(
-          text =>
-            text.length > 1 &&
-            text.length < 200 &&
-            !/^[0-9.,$€£%]+$/.test(text) &&
-            !text.includes('{{') && // Skip template syntax
-            !text.includes('}}'),
-        );
+        const relevantText = textNodes
+          .reverse()
+          .find(
+            text =>
+              text.length > 1 &&
+              text.length < 200 &&
+              !/^[0-9.,$€£%]+$/.test(text) &&
+              !text.includes('{{') &&
+              !text.includes('}}'),
+          );
 
         if (relevantText) return relevantText;
       } catch (e) {
