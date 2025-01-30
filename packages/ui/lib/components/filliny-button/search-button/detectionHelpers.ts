@@ -1,5 +1,6 @@
 import type { Field, FieldType } from '@extension/shared';
 import { PSM } from 'tesseract.js';
+import { getConfig } from '@extension/shared';
 
 interface ReactElementProps {
   onSubmit?: () => void;
@@ -457,6 +458,11 @@ const saveDebugImage = async (
     };
   },
 ): Promise<void> => {
+  const config = getConfig();
+  if (!config.debug.saveScreenshots) {
+    return;
+  }
+
   try {
     // Create debug info overlay
     const debugCanvas = document.createElement('canvas');
@@ -520,9 +526,12 @@ const saveDebugImage = async (
 const processBatchOCR = async (elements: HTMLElement[]): Promise<Map<string, string>> => {
   const results = new Map<string, string>();
   const batches: HTMLElement[][] = [];
+  const config = getConfig();
 
-  console.log(`Starting OCR batch processing for ${elements.length} elements`);
-  console.time('batchOCRTotal');
+  if (config.debug.enableOCRLogs) {
+    console.log(`Starting OCR batch processing for ${elements.length} elements`);
+    console.time('batchOCRTotal');
+  }
 
   // Split elements into batches based on available workers
   const pool = await initWorkerPool();
@@ -532,13 +541,17 @@ const processBatchOCR = async (elements: HTMLElement[]): Promise<Map<string, str
     batches.push(elements.slice(i, i + batchSize));
   }
 
-  console.log(`Created ${batches.length} batches with size ${batchSize}`);
+  if (config.debug.enableOCRLogs) {
+    console.log(`Created ${batches.length} batches with size ${batchSize}`);
+  }
 
   // Process batches in parallel
   await Promise.all(
     batches.map(async (batch, batchIndex) => {
-      console.log(`Processing batch ${batchIndex + 1}/${batches.length}`);
-      console.time(`batch${batchIndex}`);
+      if (config.debug.enableOCRLogs) {
+        console.log(`Processing batch ${batchIndex + 1}/${batches.length}`);
+        console.time(`batch${batchIndex}`);
+      }
 
       const { worker, release } = await getAvailableWorker();
 
@@ -548,19 +561,24 @@ const processBatchOCR = async (elements: HTMLElement[]): Promise<Map<string, str
             const cacheKey = element.getAttribute('data-filliny-id');
             if (!cacheKey) return;
 
-            console.time(`element-${cacheKey}`);
+            if (config.debug.enableOCRLogs) {
+              console.time(`element-${cacheKey}`);
+            }
+
             try {
               const { container, reason } = findOptimalLabelContainer(element);
               const dataUrl = await captureElement(container);
 
-              console.log(`OCR processing for ${cacheKey}:`, {
-                container: {
-                  tagName: container.tagName,
-                  classes: container.className,
-                  dimensions: container.getBoundingClientRect(),
-                },
-                reason,
-              });
+              if (config.debug.enableOCRLogs) {
+                console.log(`OCR processing for ${cacheKey}:`, {
+                  container: {
+                    tagName: container.tagName,
+                    classes: container.className,
+                    dimensions: container.getBoundingClientRect(),
+                  },
+                  reason,
+                });
+              }
 
               const result = await worker.recognize(dataUrl);
 
@@ -578,7 +596,7 @@ const processBatchOCR = async (elements: HTMLElement[]): Promise<Map<string, str
                 .trim()
                 .replace(/\s+/g, ' '); // Normalize whitespace
 
-              // Save debug image with OCR results
+              // Save debug image with OCR results if enabled
               await saveDebugImage(dataUrl, cacheKey, {
                 reason,
                 ocrText: detectedText,
@@ -593,32 +611,42 @@ const processBatchOCR = async (elements: HTMLElement[]): Promise<Map<string, str
               if (detectedText) {
                 results.set(cacheKey, detectedText);
                 ocrCache.set(cacheKey, detectedText);
-                console.log(`Successfully detected text for ${cacheKey}:`, detectedText);
-              } else {
+                if (config.debug.enableOCRLogs) {
+                  console.log(`Successfully detected text for ${cacheKey}:`, detectedText);
+                }
+              } else if (config.debug.enableOCRLogs) {
                 console.log(`No text detected for ${cacheKey}`);
               }
             } catch (e) {
-              console.error('OCR failed for element:', {
-                fieldId: cacheKey,
-                error: e,
-              });
+              if (config.debug.enableOCRLogs) {
+                console.error('OCR failed for element:', {
+                  fieldId: cacheKey,
+                  error: e,
+                });
+              }
             }
-            console.timeEnd(`element-${cacheKey}`);
+            if (config.debug.enableOCRLogs) {
+              console.timeEnd(`element-${cacheKey}`);
+            }
           }),
         );
       } finally {
         release();
-        console.timeEnd(`batch${batchIndex}`);
+        if (config.debug.enableOCRLogs) {
+          console.timeEnd(`batch${batchIndex}`);
+        }
       }
     }),
   );
 
-  console.timeEnd('batchOCRTotal');
-  console.log('OCR batch processing complete:', {
-    totalElements: elements.length,
-    successfulDetections: results.size,
-    detectionRate: `${((results.size / elements.length) * 100).toFixed(1)}%`,
-  });
+  if (config.debug.enableOCRLogs) {
+    console.timeEnd('batchOCRTotal');
+    console.log('OCR batch processing complete:', {
+      totalElements: elements.length,
+      successfulDetections: results.size,
+      detectionRate: `${((results.size / elements.length) * 100).toFixed(1)}%`,
+    });
+  }
 
   return results;
 };
@@ -1002,7 +1030,7 @@ const detectRadioGroup = async (
   if (!name || processedGroups.has(name)) return null;
 
   // Find the parent form or form-like container
-  const container = element.closest('form, [data-filliny-confidence]');
+  const container = element.closest('form, [data-filliny-confidence], fieldset, [role="radiogroup"]');
   if (!container) return null;
 
   const groupElements = container.querySelectorAll<HTMLInputElement>(`input[type="radio"][name="${name}"]`);
@@ -1010,10 +1038,39 @@ const detectRadioGroup = async (
 
   if (visibleElements.length === 0) return null;
 
+  // Create field for the group
   const field = await createBaseField(visibleElements[0], index, 'radio');
+
+  // Find the common container for all radio buttons in the group
+  const commonContainer = findCommonContainer(visibleElements);
+  if (commonContainer) {
+    // Try to get a group label first from the container
+    const containerLabel = await getFieldLabel(commonContainer, field.id);
+    if (containerLabel && containerLabel !== 'Unlabeled field') {
+      field.label = containerLabel;
+    }
+  }
+
+  // Get labels for each radio option with optimized OCR
   field.options = await Promise.all(
     visibleElements.map(async el => {
-      const labelText = await getFieldLabel(el, field.id);
+      // Find the closest label container for this radio button
+      const labelContainer = findRadioLabelContainer(el);
+      let labelText = '';
+
+      if (labelContainer) {
+        // First try standard label detection methods
+        const standardLabel = await getStandardLabel(labelContainer);
+        if (standardLabel) {
+          labelText = standardLabel;
+        } else {
+          // If standard methods fail, use OCR with optimized container
+          const { container: ocrContainer } = findOptimalLabelContainer(labelContainer);
+          labelText = await getFieldLabelFromScreenshot(ocrContainer, field.id);
+        }
+      }
+
+      // Fallback to element value if no label found
       return {
         value: el.value,
         text: labelText || el.value,
@@ -1023,14 +1080,119 @@ const detectRadioGroup = async (
   );
 
   const selectedRadio = visibleElements.find(el => el.checked);
-  field.value = selectedRadio ? (await getFieldLabel(selectedRadio, field.id)) || selectedRadio.value : '';
+  field.value = selectedRadio ? field.options.find(opt => opt.value === selectedRadio.value)?.text || '' : '';
   field.testValue = visibleElements[0].getAttribute('data-test-value') || '';
 
-  // Add field ID to all radio buttons in group
-  visibleElements.forEach(el => el.setAttribute('data-filliny-id', field.id));
+  // Add field ID to all radio buttons in group and their containers
+  visibleElements.forEach(el => {
+    el.setAttribute('data-filliny-id', field.id);
+    const container = findRadioLabelContainer(el);
+    if (container) {
+      container.setAttribute('data-filliny-id', field.id);
+    }
+  });
 
   processedGroups.add(name);
   return field;
+};
+
+// Helper function to find the common container for a group of radio buttons
+const findCommonContainer = (elements: HTMLElement[]): HTMLElement | null => {
+  if (elements.length === 0) return null;
+  if (elements.length === 1) return elements[0].parentElement;
+
+  let commonAncestor = elements[0].parentElement;
+  while (commonAncestor) {
+    if (elements.every(el => commonAncestor?.contains(el))) {
+      // Check if this is a meaningful container (fieldset, div with role, etc.)
+      if (
+        commonAncestor.tagName.toLowerCase() === 'fieldset' ||
+        commonAncestor.getAttribute('role') === 'radiogroup' ||
+        commonAncestor.classList.contains('radio-group') ||
+        commonAncestor.querySelector('legend')
+      ) {
+        return commonAncestor;
+      }
+    }
+    commonAncestor = commonAncestor.parentElement;
+  }
+  return null;
+};
+
+// Helper function to find the best label container for a radio button
+const findRadioLabelContainer = (radio: HTMLElement): HTMLElement | null => {
+  // First check for an explicit label
+  if (radio.id) {
+    const explicitLabel = radio.ownerDocument.querySelector<HTMLElement>(`label[for="${radio.id}"]`);
+    if (explicitLabel) return explicitLabel;
+  }
+
+  // Check for wrapping label
+  const wrapperLabel = radio.closest('label');
+  if (wrapperLabel) return wrapperLabel;
+
+  // Look for adjacent label-like elements
+  const parent = radio.parentElement;
+  if (!parent) return null;
+
+  // Check siblings
+  const siblings = Array.from(parent.children);
+  const radioIndex = siblings.indexOf(radio);
+
+  // Check next sibling first (most common pattern)
+  if (radioIndex < siblings.length - 1) {
+    const next = siblings[radioIndex + 1];
+    if (isLabelLike(next)) return next as HTMLElement;
+  }
+
+  // Check previous sibling
+  if (radioIndex > 0) {
+    const prev = siblings[radioIndex - 1];
+    if (isLabelLike(prev)) return prev as HTMLElement;
+  }
+
+  // If no good container found, return parent as fallback
+  return parent;
+};
+
+// Helper to check if an element is likely to contain a label
+const isLabelLike = (element: Element): boolean => {
+  // First ensure we have an HTMLElement
+  if (!(element instanceof HTMLElement)) return false;
+
+  // Now TypeScript knows element is HTMLElement
+  const tagName = element.tagName.toLowerCase();
+  if (['label', 'span', 'div', 'p'].includes(tagName)) {
+    // Check if element has meaningful text content
+    const text = element.textContent?.trim() || '';
+    return text.length > 0 && text.length < 100 && !/^[0-9.,$€£%]+$/.test(text);
+  }
+  return false;
+};
+
+// Helper to get standard label without OCR
+const getStandardLabel = async (element: HTMLElement): Promise<string> => {
+  // Check for explicit text content
+  const text = element.textContent?.trim();
+  if (text && text.length > 0 && text.length < 100 && !/^[0-9.,$€£%]+$/.test(text)) {
+    return text;
+  }
+
+  // Check ARIA attributes
+  const ariaLabel = element.getAttribute('aria-label')?.trim();
+  if (ariaLabel) return ariaLabel;
+
+  // Check ARIA labelledby
+  const labelledBy = element.getAttribute('aria-labelledby');
+  if (labelledBy) {
+    const labelTexts = labelledBy
+      .split(/\s+/)
+      .map(id => element.ownerDocument.getElementById(id)?.textContent?.trim())
+      .filter(Boolean);
+    if (labelTexts.length) return labelTexts.join(' ');
+  }
+
+  return '';
 };
 
 const detectTextareaField = async (textarea: HTMLTextAreaElement, index: number): Promise<Field | null> => {

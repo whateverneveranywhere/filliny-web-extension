@@ -76,6 +76,10 @@ export const getMatchingWebsite = (websites: DTOProfileFillingForm['fillingWebsi
 interface ConfigEntry {
   cookieName: string;
   baseURL: string;
+  debug: {
+    saveScreenshots: boolean;
+    enableOCRLogs: boolean;
+  };
 }
 
 // Typed config object
@@ -83,14 +87,26 @@ const config: Record<WebappEnvs, ConfigEntry> = {
   dev: {
     cookieName: 'authjs.session-token',
     baseURL: 'http://localhost:3000',
+    debug: {
+      saveScreenshots: true,
+      enableOCRLogs: true,
+    },
   },
   preview: {
     cookieName: '__Secure-authjs.session-token',
     baseURL: 'https://dev.filliny-app.pages.dev',
+    debug: {
+      saveScreenshots: false,
+      enableOCRLogs: false,
+    },
   },
   prod: {
     cookieName: '__Secure-authjs.session-token',
     baseURL: 'https://prod.filliny.io',
+    debug: {
+      saveScreenshots: false,
+      enableOCRLogs: false,
+    },
   },
 };
 
