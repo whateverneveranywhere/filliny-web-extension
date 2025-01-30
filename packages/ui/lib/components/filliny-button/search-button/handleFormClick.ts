@@ -113,6 +113,7 @@ export const handleFormClick = async (
   testMode: boolean = false,
 ): Promise<void> => {
   event.preventDefault();
+  const totalStartTime = performance.now();
 
   const form = document.querySelector<HTMLFormElement>(`form[data-form-id="${formId}"]`);
   if (!form) {
@@ -126,8 +127,14 @@ export const handleFormClick = async (
   showLoadingIndicator(formId);
 
   try {
+    const startTime = performance.now();
     const fields = await detectFields(form);
     console.log('Form Click: Detected fields:', fields);
+
+    console.log(
+      `%c⏱ Detection took: ${((performance.now() - startTime) / 1000).toFixed(2)}s`,
+      'background: #059669; color: white; padding: 4px 8px; border-radius: 4px; font-size: 14px; font-weight: bold;',
+    );
 
     if (testMode) {
       console.log('Form Click: Running in test mode - using mock data');
@@ -203,6 +210,10 @@ export const handleFormClick = async (
           : 'Unknown error occurred';
     alert(`Failed to fill form: ${errorMessage}`);
   } finally {
+    console.log(
+      `%c⏱ Total process took: ${((performance.now() - totalStartTime) / 1000).toFixed(2)}s`,
+      'background: #059669; color: white; padding: 4px 8px; border-radius: 4px; font-size: 14px; font-weight: bold;',
+    );
     resetOverlays();
   }
 };

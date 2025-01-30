@@ -98,10 +98,17 @@ const updateCheckableField = (element: HTMLElement, field: Field): void => {
     initializedFields.add(field.id);
   }
 
-  // Convert field.value to boolean, handling all possible value types
-  const newCheckedState =
-    field.value !== undefined &&
-    ((field.value as unknown) === true || field.value === 'true' || Number(field.value) === 1);
+  // Convert field.value to boolean, handling string values more explicitly
+  const newCheckedState = (() => {
+    if (typeof field.value === 'boolean') return field.value;
+    if (typeof field.value === 'string') {
+      const value = field.value.toLowerCase();
+      return value === 'true' || value === 'yes' || value === 'on' || value === '1';
+    }
+    if (typeof field.value === 'number') return field.value === 1;
+    return false;
+  })();
+
   console.log('Updating checkbox:', {
     id: field.id,
     value: field.value,
@@ -176,8 +183,39 @@ const updateSelectField = (element: HTMLElement, field: Field): void => {
     })),
   });
 
-  // Set the value
-  element.value = field.testValue || field.value || '';
+  // Try to find the option by exact value first, then by text content
+  const valueToUse = field.testValue || field.value;
+  let found = false;
+
+  // First try exact value match
+  if (valueToUse) {
+    // Try to find by value attribute first
+    const optionByValue = Array.from(element.options).find(opt => opt.value === valueToUse);
+    if (optionByValue) {
+      element.value = optionByValue.value;
+      found = true;
+    } else {
+      // If not found by value, try to find by text content
+      const optionByText = Array.from(element.options).find(
+        opt => opt.text.trim() === valueToUse || opt.text.trim().toLowerCase() === valueToUse.toLowerCase(),
+      );
+      if (optionByText) {
+        element.value = optionByText.value;
+        found = true;
+      }
+    }
+  }
+
+  if (!found && valueToUse) {
+    console.warn('Could not find matching option for value:', {
+      fieldId: field.id,
+      value: valueToUse,
+      availableOptions: Array.from(element.options).map(opt => ({
+        value: opt.value,
+        text: opt.text,
+      })),
+    });
+  }
 
   // Trigger Select2 update if it's a Select2 field
   if (field.metadata?.framework === 'select2') {
@@ -230,11 +268,19 @@ const updateRadioGroup = (element: HTMLInputElement, field: Field): void => {
   if (valueToUse) {
     let foundMatch = false;
     groupElements.forEach(radio => {
-      const shouldCheck = radio.value === valueToUse;
+      // Check for exact value match first
+      let shouldCheck = radio.value === valueToUse;
+
+      // If no match found, try matching against label text
+      if (!shouldCheck && radio.labels?.[0]) {
+        const labelText = radio.labels[0].textContent?.trim();
+        shouldCheck = labelText === valueToUse || labelText?.toLowerCase() === valueToUse.toLowerCase();
+      }
+
       if (shouldCheck) {
         foundMatch = true;
         // Force React to notice the change
-        radio.checked = shouldCheck;
+        radio.checked = true;
 
         // Trigger native events
         dispatchEvent(radio, 'input');
@@ -263,7 +309,10 @@ const updateRadioGroup = (element: HTMLInputElement, field: Field): void => {
     if (!foundMatch) {
       console.error('No matching radio button found for value:', {
         valueToUse,
-        availableValues: Array.from(groupElements).map(el => el.value),
+        availableValues: Array.from(groupElements).map(el => ({
+          value: el.value,
+          label: el.labels?.[0]?.textContent,
+        })),
       });
     }
   } else {

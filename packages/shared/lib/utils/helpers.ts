@@ -88,8 +88,8 @@ const config: Record<WebappEnvs, ConfigEntry> = {
     cookieName: 'authjs.session-token',
     baseURL: 'http://localhost:3000',
     debug: {
-      saveScreenshots: true,
-      enableOCRLogs: true,
+      saveScreenshots: false,
+      enableOCRLogs: false,
     },
   },
   preview: {
