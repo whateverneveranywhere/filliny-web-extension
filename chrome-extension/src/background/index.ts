@@ -61,11 +61,11 @@ const handleApiRequest = (
     return;
   }
 
-  console.log('Background: Making API request to:', url);
+  // console.log('Background: Making API request to:', url);
 
   fetch(url, options)
     .then(async response => {
-      console.log('Background: API response status:', response.status);
+      // console.log('Background: API response status:', response.status);
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ message: response.statusText }));
@@ -77,7 +77,7 @@ const handleApiRequest = (
       }
 
       if (options.isStream) {
-        console.log('Background: Processing stream response');
+        // console.log('Background: Processing stream response');
         const reader = response.body?.getReader();
         if (!reader) {
           console.error('Background: No readable stream available');
@@ -95,14 +95,14 @@ const handleApiRequest = (
             if (!done && value) {
               // Convert Uint8Array to string
               const chunk = new TextDecoder().decode(value);
-              console.log('Background: Sending chunk:', chunk.substring(0, 100) + '...');
+              // console.log('Background: Sending chunk:', chunk.substring(0, 100) + '...');
               chrome.tabs.sendMessage(tabId, {
                 type: 'STREAM_CHUNK',
                 data: chunk,
               });
             }
           }
-          console.log('Background: Stream complete');
+          // console.log('Background: Stream complete');
           // Signal end of stream
           chrome.tabs.sendMessage(tabId, {
             type: 'STREAM_DONE',
@@ -120,7 +120,7 @@ const handleApiRequest = (
         sendResponse({ success: true }); // Acknowledge the request
       } else {
         const data = await response.json();
-        console.log('Background: Regular response data:', data);
+        // console.log('Background: Regular response data:', data);
         sendResponse({ data });
       }
     })

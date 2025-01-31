@@ -193,19 +193,42 @@ const querySelectorAllFrames = (selector: string): Element[] => {
   return results;
 };
 
-// Capture element using html2canvas
+// Capture element using html2canvas with optimized settings
 const captureElement = async (element: HTMLElement): Promise<string> => {
   try {
     const { default: html2canvas } = await import('html2canvas');
 
-    // Capture the element
+    // Get element dimensions
+    const rect = element.getBoundingClientRect();
+
+    // Calculate optimal scale based on element size
+    // We want to keep resolution reasonable for OCR while not being too high
+    // Target width around 800px for optimal OCR performance
+    const targetWidth = 800;
+    const scale = Math.min(targetWidth / rect.width, 1.5); // Cap at 1.5x
+
+    // Capture the element with optimized settings
     const canvas = await html2canvas(element, {
       logging: false,
       useCORS: true,
-      scale: window.devicePixelRatio || 1,
+      scale: scale * (window.devicePixelRatio || 1),
       allowTaint: true,
       backgroundColor: null,
       removeContainer: true,
+      width: rect.width,
+      height: rect.height,
+      // Optimize rendering
+      imageTimeout: 2000, // 2 second timeout for images
+      ignoreElements: el => {
+        // Ignore elements that won't contribute to label text
+        const tagName = el.tagName.toLowerCase();
+        return (
+          tagName === 'script' ||
+          tagName === 'style' ||
+          tagName === 'iframe' ||
+          (tagName === 'img' && !el.getAttribute('alt'))
+        );
+      },
       onclone: (clonedDoc, node) => {
         // Hide interactive elements in the clone for cleaner capture
         const interactives = node.querySelectorAll('input, select, textarea, button');
@@ -217,7 +240,7 @@ const captureElement = async (element: HTMLElement): Promise<string> => {
       },
     });
 
-    // Convert to black and white for better OCR
+    // Convert to black and white with optimized contrast for better OCR
     const ctx = canvas.getContext('2d');
     if (!ctx) {
       throw new Error('Could not get canvas context');
@@ -225,14 +248,34 @@ const captureElement = async (element: HTMLElement): Promise<string> => {
 
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const data = imageData.data;
+
+    // Optimize contrast and convert to black and white
+    const threshold = 128;
     for (let i = 0; i < data.length; i += 4) {
-      const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
-      const value = avg > 128 ? 255 : 0;
+      // Enhanced contrast calculation
+      const avg = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+      const value = avg > threshold ? 255 : 0;
       data[i] = data[i + 1] = data[i + 2] = value;
     }
     ctx.putImageData(imageData, 0, 0);
 
-    return canvas.toDataURL('image/png');
+    // Further reduce size if the canvas is still large
+    if (canvas.width > targetWidth) {
+      const scaleFactor = targetWidth / canvas.width;
+      const scaledCanvas = document.createElement('canvas');
+      scaledCanvas.width = canvas.width * scaleFactor;
+      scaledCanvas.height = canvas.height * scaleFactor;
+      const scaledCtx = scaledCanvas.getContext('2d');
+      if (scaledCtx) {
+        // Use better quality scaling
+        scaledCtx.imageSmoothingEnabled = true;
+        scaledCtx.imageSmoothingQuality = 'high';
+        scaledCtx.drawImage(canvas, 0, 0, scaledCanvas.width, scaledCanvas.height);
+        return scaledCanvas.toDataURL('image/png', 0.8); // Slightly reduced quality for better performance
+      }
+    }
+
+    return canvas.toDataURL('image/png', 0.8);
   } catch (error) {
     console.error('Failed to capture element:', error);
     throw error;
@@ -377,8 +420,11 @@ interface OCRWorkerPool {
   workers: Array<{
     worker: Tesseract.Worker;
     busy: boolean;
+    lastUsed: number;
   }>;
   maxWorkers: number;
+  totalProcessed: number;
+  lastCleanup: number;
 }
 
 let workerPool: OCRWorkerPool | null = null;
@@ -386,39 +432,84 @@ let workerPool: OCRWorkerPool | null = null;
 const initWorkerPool = async (): Promise<OCRWorkerPool> => {
   if (workerPool) return workerPool;
 
-  // Determine optimal number of workers based on hardware
-  const maxWorkers = navigator.hardwareConcurrency ? Math.min(navigator.hardwareConcurrency - 1, 4) : 2;
+  // Calculate optimal number of workers based on hardware and memory
+  const maxWorkers = Math.min(
+    navigator.hardwareConcurrency ? Math.max(Math.floor(navigator.hardwareConcurrency * 0.75), 2) : 2,
+    6, // Hard cap at 6 workers to prevent excessive resource usage
+  );
 
   const { createWorker } = await import('tesseract.js');
+
+  // Create workers in parallel
   const workers = await Promise.all(
     Array(maxWorkers)
       .fill(0)
       .map(async () => ({
         worker: await createWorker('eng', 1, {
           logger: () => {}, // Disable logging for performance
+          errorHandler: (err: Error) => console.warn('OCR worker error:', err),
         }),
         busy: false,
+        lastUsed: Date.now(),
       })),
   );
 
-  // Configure all workers with optimized settings for better text capture
+  // Configure all workers with optimized settings
   await Promise.all(
-    workers.map(({ worker }) =>
-      worker.setParameters({
-        tessedit_pageseg_mode: PSM.AUTO, // Use automatic page segmentation
-        tessedit_ocr_engine_mode: 3, // Use default engine mode for better accuracy
-        preserve_interword_spaces: '1',
+    workers.map(async ({ worker }) => {
+      await worker.setParameters({
+        tessedit_pageseg_mode: PSM.SINGLE_BLOCK, // Optimize for single text block
+        tessedit_ocr_engine_mode: 3, // Use default engine mode
         tessjs_create_hocr: '0',
         tessjs_create_tsv: '0',
         tessjs_create_box: '0',
         tessjs_create_unlv: '0',
         tessjs_create_osd: '0',
-      }),
-    ),
+        tessedit_do_invert: '0',
+        tessedit_enable_doc_dict: '0',
+        tessedit_unrej_any_wd: '0',
+        tessedit_minimal_rejection: '1',
+        tessedit_write_images: '0',
+      });
+    }),
   );
 
-  workerPool = { workers, maxWorkers };
+  workerPool = {
+    workers,
+    maxWorkers,
+    totalProcessed: 0,
+    lastCleanup: Date.now(),
+  };
+
+  // Set up periodic cleanup of idle workers
+  setInterval(() => cleanupIdleWorkers(), 60000); // Check every minute
+
   return workerPool;
+};
+
+// Add worker cleanup to prevent memory leaks
+const cleanupIdleWorkers = async () => {
+  if (!workerPool || Date.now() - workerPool.lastCleanup < 60000) return;
+
+  const idleTimeout = 300000; // 5 minutes
+  const now = Date.now();
+
+  // Keep at least 2 workers
+  const idleWorkers = workerPool.workers.filter(w => !w.busy && now - w.lastUsed > idleTimeout).slice(2);
+
+  if (idleWorkers.length > 0) {
+    await Promise.all(
+      idleWorkers.map(async w => {
+        const idx = workerPool!.workers.indexOf(w);
+        if (idx !== -1) {
+          await w.worker.terminate();
+          workerPool!.workers.splice(idx, 1);
+        }
+      }),
+    );
+
+    workerPool.lastCleanup = now;
+  }
 };
 
 const getAvailableWorker = async (): Promise<{ worker: Tesseract.Worker; release: () => void }> => {
@@ -525,126 +616,89 @@ const saveDebugImage = async (
 // Update processBatchOCR to use less restrictive text filtering
 const processBatchOCR = async (elements: HTMLElement[]): Promise<Map<string, string>> => {
   const results = new Map<string, string>();
-  const batches: HTMLElement[][] = [];
   const config = getConfig();
+  const startTime = Date.now();
 
   if (config.debug.enableOCRLogs) {
-    console.log(`Starting OCR batch processing for ${elements.length} elements`);
     console.time('batchOCRTotal');
   }
 
-  // Split elements into batches based on available workers
-  const pool = await initWorkerPool();
-  const batchSize = Math.ceil(elements.length / pool.maxWorkers);
+  try {
+    // Initialize worker pool
+    const pool = await initWorkerPool();
 
-  for (let i = 0; i < elements.length; i += batchSize) {
-    batches.push(elements.slice(i, i + batchSize));
-  }
+    // Create batches based on available workers
+    const batchSize = Math.ceil(elements.length / pool.maxWorkers);
+    const batches: HTMLElement[][] = [];
 
-  if (config.debug.enableOCRLogs) {
-    console.log(`Created ${batches.length} batches with size ${batchSize}`);
-  }
+    for (let i = 0; i < elements.length; i += batchSize) {
+      batches.push(elements.slice(i, i + batchSize));
+    }
 
-  // Process batches in parallel
-  await Promise.all(
-    batches.map(async (batch, batchIndex) => {
-      if (config.debug.enableOCRLogs) {
-        console.log(`Processing batch ${batchIndex + 1}/${batches.length}`);
-        console.time(`batch${batchIndex}`);
-      }
+    // Process batches in parallel
+    await Promise.all(
+      batches.map(async batch => {
+        const { worker, release } = await getAvailableWorker();
 
-      const { worker, release } = await getAvailableWorker();
-
-      try {
-        await Promise.all(
-          batch.map(async element => {
+        try {
+          // Process elements in batch sequentially but batches in parallel
+          for (const element of batch) {
             const cacheKey = element.getAttribute('data-filliny-id');
-            if (!cacheKey) return;
-
-            if (config.debug.enableOCRLogs) {
-              console.time(`element-${cacheKey}`);
-            }
+            if (!cacheKey) continue;
 
             try {
               const { container, reason } = findOptimalLabelContainer(element);
               const dataUrl = await captureElement(container);
 
-              if (config.debug.enableOCRLogs) {
-                console.log(`OCR processing for ${cacheKey}:`, {
-                  container: {
-                    tagName: container.tagName,
-                    classes: container.className,
-                    dimensions: container.getBoundingClientRect(),
-                  },
-                  reason,
-                });
-              }
-
               const result = await worker.recognize(dataUrl);
 
-              // Less restrictive text processing - keep more text
+              // Process OCR result
               const detectedText = result.data.text
                 .split('\n')
                 .map(line => line.trim())
-                .filter(
-                  line =>
-                    line.length > 0 && // Keep any non-empty line
-                    !line.includes('{{') &&
-                    !line.includes('}}'),
-                )
+                .filter(line => line.length > 0 && !line.includes('{{') && !line.includes('}}'))
                 .join(' ')
                 .trim()
-                .replace(/\s+/g, ' '); // Normalize whitespace
-
-              // Save debug image with OCR results if enabled
-              await saveDebugImage(dataUrl, cacheKey, {
-                reason,
-                ocrText: detectedText,
-                elementInfo: {
-                  tagName: element.tagName,
-                  classes: element.className,
-                  type: element instanceof HTMLInputElement ? element.type : undefined,
-                  id: element.id,
-                },
-              });
+                .replace(/\s+/g, ' ');
 
               if (detectedText) {
                 results.set(cacheKey, detectedText);
                 ocrCache.set(cacheKey, detectedText);
-                if (config.debug.enableOCRLogs) {
-                  console.log(`Successfully detected text for ${cacheKey}:`, detectedText);
-                }
-              } else if (config.debug.enableOCRLogs) {
-                console.log(`No text detected for ${cacheKey}`);
               }
-            } catch (e) {
-              if (config.debug.enableOCRLogs) {
-                console.error('OCR failed for element:', {
-                  fieldId: cacheKey,
-                  error: e,
+
+              // Save debug image if enabled
+              if (config.debug.saveScreenshots) {
+                await saveDebugImage(dataUrl, cacheKey, {
+                  reason,
+                  ocrText: detectedText,
+                  elementInfo: {
+                    tagName: element.tagName,
+                    classes: element.className,
+                    type: element instanceof HTMLInputElement ? element.type : undefined,
+                    id: element.id,
+                  },
                 });
               }
+            } catch (e) {
+              console.warn('OCR processing failed for element:', cacheKey, e);
             }
-            if (config.debug.enableOCRLogs) {
-              console.timeEnd(`element-${cacheKey}`);
-            }
-          }),
-        );
-      } finally {
-        release();
-        if (config.debug.enableOCRLogs) {
-          console.timeEnd(`batch${batchIndex}`);
+          }
+        } finally {
+          release();
         }
-      }
-    }),
-  );
+      }),
+    );
+  } catch (e) {
+    console.error('Batch OCR processing failed:', e);
+  }
 
   if (config.debug.enableOCRLogs) {
     console.timeEnd('batchOCRTotal');
-    console.log('OCR batch processing complete:', {
-      totalElements: elements.length,
+    console.log('OCR Performance:', {
+      totalTime: Date.now() - startTime,
+      elementsProcessed: elements.length,
       successfulDetections: results.size,
-      detectionRate: `${((results.size / elements.length) * 100).toFixed(1)}%`,
+      timePerElement: (Date.now() - startTime) / elements.length,
     });
   }
 
@@ -657,42 +711,42 @@ const getFieldLabelFromScreenshot = async (element: HTMLElement, fieldId: string
     // Check cache first
     const cacheKey = element.getAttribute('data-filliny-id') || fieldId;
     if (ocrCache.has(cacheKey)) {
-      console.log('Using cached OCR result for:', { fieldId, label: ocrCache.get(cacheKey) });
+      // console.log('Using cached OCR result for:', { fieldId, label: ocrCache.get(cacheKey) });
       return ocrCache.get(cacheKey)!;
     }
 
     // Process immediately if no batch in progress
     if (batchQueue.size === 0) {
-      console.log('Processing single element immediately:', fieldId);
+      // console.log('Processing single element immediately:', fieldId);
       const results = await processBatchOCR([element]);
       const label = results.get(cacheKey);
-      console.log('Single element OCR result:', { fieldId, label });
+      // console.log('Single element OCR result:', { fieldId, label });
       return label || '';
     }
 
     // Add to batch queue
-    console.log('Adding to batch queue:', fieldId);
+    // console.log('Adding to batch queue:', fieldId);
     batchQueue.set(cacheKey, element);
 
     // If batch is full or timeout reached, process the batch
     if (batchQueue.size >= BATCH_SIZE || Date.now() - lastBatchTime > BATCH_TIMEOUT) {
-      console.log('Processing batch due to:', batchQueue.size >= BATCH_SIZE ? 'size limit' : 'timeout');
+      // console.log('Processing batch due to:', batchQueue.size >= BATCH_SIZE ? 'size limit' : 'timeout');
       const batchElements = Array.from(batchQueue.values());
       batchQueue.clear();
       lastBatchTime = Date.now();
 
       const results = await processBatchOCR(batchElements);
       const label = results.get(cacheKey);
-      console.log('Batch OCR result:', { fieldId, label });
+      // console.log('Batch OCR result:', { fieldId, label });
       return label || '';
     }
 
     // If we're still collecting batch items, process this element immediately
     // instead of waiting for the batch to fill
-    console.log('Processing element while batch collects:', fieldId);
+    // console.log('Processing element while batch collects:', fieldId);
     const results = await processBatchOCR([element]);
     const label = results.get(cacheKey);
-    console.log('Individual OCR result:', { fieldId, label });
+    // console.log('Individual OCR result:', { fieldId, label });
     return label || '';
   } catch (e) {
     console.error('OCR failed:', e);
@@ -711,11 +765,11 @@ const getFieldLabel = async (element: HTMLElement, fieldId: string): Promise<str
   // Try OCR-based label detection first
   const ocrLabel = await getFieldLabelFromScreenshot(element, fieldId);
   if (ocrLabel) {
-    console.log('Using OCR-detected label:', { fieldId, label: ocrLabel });
+    // console.log('Using OCR-detected label:', { fieldId, label: ocrLabel });
     return ocrLabel;
   }
 
-  console.log('OCR failed, trying fallback strategies:', { fieldId });
+  // console.log('OCR failed, trying fallback strategies:', { fieldId });
 
   // Fallback strategies if OCR fails
   const strategies = [
@@ -831,7 +885,7 @@ const getFieldLabel = async (element: HTMLElement, fieldId: string): Promise<str
   for (const strategy of strategies) {
     const label = await strategy();
     if (label && !/^[0-9.,$€£%]+$/.test(label)) {
-      console.log('Using fallback label:', { fieldId, label, strategy: strategy.name });
+      // console.log('Using fallback label:', { fieldId, label, strategy: strategy.name });
       return label;
     }
   }

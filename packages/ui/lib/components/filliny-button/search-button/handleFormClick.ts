@@ -137,7 +137,7 @@ export const handleFormClick = async (
     );
 
     if (testMode) {
-      console.log('Form Click: Running in test mode - using mock data');
+      // console.log('Form Click: Running in test mode - using mock data');
       const mockResponse = fields.map(field => ({
         ...field,
         value: getMockValueForFieldType(field.type, field),
@@ -151,21 +151,21 @@ export const handleFormClick = async (
     const visitingUrl = window.location.href;
     const matchingWebsite = getMatchingWebsite((defaultProfile as DTOProfileFillingForm).fillingWebsites, visitingUrl);
 
-    console.log('Form Click: Setting up stream handler');
+    // console.log('Form Click: Setting up stream handler');
     // Set up message listener for streaming response
     const streamPromise = new Promise<void>((resolve, reject) => {
       const messageHandler = (message: { type: string; data?: string; error?: string }) => {
-        console.log('Form Click: Received message:', message.type);
+        // console.log('Form Click: Received message:', message.type);
         if (message.type === 'STREAM_CHUNK' && message.data) {
           try {
-            console.log('Form Click: Processing chunk:', message.data.substring(0, 100) + '...');
+            // console.log('Form Click: Processing chunk:', message.data.substring(0, 100) + '...');
             processChunks(message.data, fields);
           } catch (error) {
             console.error('Form Click: Error processing chunk:', error);
             // Don't reject here, continue processing other chunks
           }
         } else if (message.type === 'STREAM_DONE') {
-          console.log('Form Click: Stream complete');
+          // console.log('Form Click: Stream complete');
           chrome.runtime.onMessage.removeListener(messageHandler);
           resolve();
         } else if (message.type === 'STREAM_ERROR') {
@@ -178,7 +178,7 @@ export const handleFormClick = async (
       chrome.runtime.onMessage.addListener(messageHandler);
     });
 
-    console.log('Form Click: Making API call');
+    // console.log('Form Click: Making API call');
     // Make the API call
     const response = await aiFillService({
       contextText: matchingWebsite?.fillingContext || defaultProfile?.defaultFillingContext || '',
@@ -187,14 +187,14 @@ export const handleFormClick = async (
       preferences: defaultProfile?.preferences,
     });
 
-    console.log('Form Click: Got API response:', response);
+    // console.log('Form Click: Got API response:', response);
 
     if (response instanceof ReadableStream) {
-      console.log('Form Click: Processing stream response');
+      // console.log('Form Click: Processing stream response');
       // Wait for all streaming chunks to be processed
       await streamPromise;
     } else if (response.data) {
-      console.log('Form Click: Processing regular response');
+      // console.log('Form Click: Processing regular response');
       await updateFormFields(response.data, false);
     } else {
       console.error('Form Click: Invalid response format:', response);

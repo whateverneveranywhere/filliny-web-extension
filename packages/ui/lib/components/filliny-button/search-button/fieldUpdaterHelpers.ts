@@ -8,15 +8,34 @@ interface Select2Instance {
   trigger: (event: string, data: { val: string }) => void;
 }
 
+const simulateHumanTyping = async (element: HTMLInputElement | HTMLTextAreaElement, text: string): Promise<void> => {
+  // Focus the element first
+  element.focus();
+
+  // Clear existing text like a human would (select all + delete)
+  element.select();
+  element.value = '';
+  dispatchEvent(element, 'input');
+
+  // Type each character with random delays
+  for (let i = 0; i < text.length; i++) {
+    element.value += text[i];
+    dispatchEvent(element, 'input');
+  }
+
+  // Final change event after typing
+  dispatchEvent(element, 'change');
+  element.blur();
+};
+
 // Specialized field update helpers
-const updateInputField = (element: HTMLInputElement, field: Field): void => {
+const updateInputField = async (element: HTMLInputElement, field: Field): Promise<void> => {
   if (!initializedFields.has(field.id)) {
     addGlowingBorder(element);
     initializedFields.add(field.id);
   }
-  element.value = field.value || '';
-  dispatchEvent(element, 'input');
-  dispatchEvent(element, 'change');
+
+  await simulateHumanTyping(element, field.value || '');
 };
 
 const updateFileField = async (element: HTMLInputElement, field: Field, testMode: boolean): Promise<void> => {
@@ -92,13 +111,12 @@ const updateFileField = async (element: HTMLInputElement, field: Field, testMode
   }
 };
 
-const updateCheckableField = (element: HTMLElement, field: Field): void => {
+const updateCheckableField = async (element: HTMLElement, field: Field): Promise<void> => {
   if (!initializedFields.has(field.id)) {
     addGlowingBorder(element);
     initializedFields.add(field.id);
   }
 
-  // Convert field.value to boolean, handling string values more explicitly
   const newCheckedState = (() => {
     if (typeof field.value === 'boolean') return field.value;
     if (typeof field.value === 'string') {
@@ -109,217 +127,102 @@ const updateCheckableField = (element: HTMLElement, field: Field): void => {
     return false;
   })();
 
-  console.log('Updating checkbox:', {
-    id: field.id,
-    value: field.value,
-    newState: newCheckedState,
-    element: element.tagName,
-    currentState: element instanceof HTMLInputElement ? element.checked : element.getAttribute('aria-checked'),
-  });
-
   if (element instanceof HTMLInputElement) {
-    // Set checked state
-    element.checked = newCheckedState;
-
-    // Trigger native events in correct order
-    element.dispatchEvent(new Event('click', { bubbles: true }));
-    element.dispatchEvent(new Event('input', { bubbles: true }));
-    element.dispatchEvent(new Event('change', { bubbles: true }));
-
-    // Force React to notice the change
-    const nativeInputEvent = new Event('input', { bubbles: true });
-    const nativeChangeEvent = new Event('change', { bubbles: true });
-    Object.defineProperty(nativeInputEvent, 'target', { value: element });
-    Object.defineProperty(nativeChangeEvent, 'target', { value: element });
-    element.dispatchEvent(nativeInputEvent);
-    element.dispatchEvent(nativeChangeEvent);
-  } else {
-    if (newCheckedState) {
-      element.setAttribute('checked', '');
-      element.setAttribute('aria-checked', 'true');
-    } else {
-      element.removeAttribute('checked');
-      element.setAttribute('aria-checked', 'false');
+    // Only click if the state needs to change
+    if (element.checked !== newCheckedState) {
+      element.focus();
+      element.click(); // This simulates a real user click
+      element.blur();
     }
-    // Trigger events for custom elements
-    element.dispatchEvent(new Event('change', { bubbles: true }));
-  }
-
-  // Handle any framework-specific updates
-  if (element.closest('[data-reactroot]')) {
-    // Force React controlled components to update
-    const reactChangeEvent = new Event('change', { bubbles: true });
-    Object.defineProperty(reactChangeEvent, 'target', {
-      value: { checked: newCheckedState, type: 'checkbox' },
-    });
-    element.dispatchEvent(reactChangeEvent);
   }
 };
 
-const updateTextAreaField = (element: HTMLTextAreaElement, field: Field): void => {
+const updateTextAreaField = async (element: HTMLTextAreaElement, field: Field): Promise<void> => {
   if (!initializedFields.has(field.id)) {
     addGlowingBorder(element);
     initializedFields.add(field.id);
   }
-  element.value = field.value || '';
-  dispatchEvent(element, 'input');
-  dispatchEvent(element, 'change');
+
+  await simulateHumanTyping(element, field.value || '');
 };
 
-const updateSelectField = (element: HTMLElement, field: Field): void => {
+const updateSelectField = async (element: HTMLElement, field: Field): Promise<void> => {
   if (!(element instanceof HTMLSelectElement)) {
     console.warn('Expected HTMLSelectElement but got:', element.tagName);
     return;
   }
 
-  console.log('Updating select field:', {
-    elementId: element.id,
-    fieldId: field.id,
-    currentValue: element.value,
-    newValue: field.testValue || field.value,
-    options: Array.from(element.options).map(opt => ({
-      value: opt.value,
-      text: opt.text,
-    })),
+  const valueToUse = field.testValue || field.value;
+  if (!valueToUse) return;
+
+  // Focus the select element
+  element.focus();
+
+  // Find the target option
+  let targetOption: HTMLOptionElement | undefined;
+  Array.from(element.options).forEach(opt => {
+    if (opt.value === valueToUse || opt.text.trim() === valueToUse) {
+      targetOption = opt;
+    }
   });
 
-  // Try to find the option by exact value first, then by text content
-  const valueToUse = field.testValue || field.value;
-  let found = false;
+  if (targetOption) {
+    // Click to open dropdown
+    element.click();
 
-  // First try exact value match
-  if (valueToUse) {
-    // Try to find by value attribute first
-    const optionByValue = Array.from(element.options).find(opt => opt.value === valueToUse);
-    if (optionByValue) {
-      element.value = optionByValue.value;
-      found = true;
-    } else {
-      // If not found by value, try to find by text content
-      const optionByText = Array.from(element.options).find(
-        opt => opt.text.trim() === valueToUse || opt.text.trim().toLowerCase() === valueToUse.toLowerCase(),
-      );
-      if (optionByText) {
-        element.value = optionByText.value;
-        found = true;
+    // Select the option
+    element.value = targetOption.value;
+    dispatchEvent(element, 'change');
+
+    // If it's a Select2, trigger their custom events
+    if (field.metadata?.framework === 'select2') {
+      const select2Instance = (window as { jQuery?: (el: HTMLElement) => { data: (key: string) => Select2Instance } })
+        .jQuery?.(element)
+        ?.data?.('select2');
+
+      if (select2Instance) {
+        select2Instance.trigger('select', { val: element.value });
       }
     }
+
+    element.blur();
   }
-
-  if (!found && valueToUse) {
-    console.warn('Could not find matching option for value:', {
-      fieldId: field.id,
-      value: valueToUse,
-      availableOptions: Array.from(element.options).map(opt => ({
-        value: opt.value,
-        text: opt.text,
-      })),
-    });
-  }
-
-  // Trigger Select2 update if it's a Select2 field
-  if (field.metadata?.framework === 'select2') {
-    const select2Instance = (window as { jQuery?: (el: HTMLElement) => { data: (key: string) => Select2Instance } })
-      .jQuery?.(element)
-      ?.data?.('select2');
-
-    if (select2Instance) {
-      select2Instance.trigger('select', { val: element.value });
-    }
-  }
-
-  // Dispatch events
-  dispatchEvent(element, 'change');
-  dispatchEvent(element, 'input');
 };
 
 const updateButtonField = (element: HTMLButtonElement, field: Field): void => {
   element.innerText = field.value || element.innerText;
 };
 
-const updateRadioGroup = (element: HTMLInputElement, field: Field): void => {
-  console.log('Updating radio group:', {
-    elementId: element.id,
-    fieldId: field.id,
-    name: element.name,
-    testMode: !!field.testValue,
-    currentValue: element.value,
-    newValue: field.testValue || field.value,
-  });
-
+const updateRadioGroup = async (element: HTMLInputElement, field: Field): Promise<void> => {
   const form = element.closest('form');
-  if (!form) {
-    console.error('Radio group has no parent form:', element);
-    return;
-  }
+  if (!form) return;
 
   const groupElements = form.querySelectorAll<HTMLInputElement>(`input[type="radio"][name="${element.name}"]`);
-  console.log('Found radio group elements:', {
-    groupSize: groupElements.length,
-    elements: Array.from(groupElements).map(el => ({
-      value: el.value,
-      checked: el.checked,
-      label: el.labels?.[0]?.textContent,
-    })),
-  });
-
   const valueToUse = field.testValue || field.value || field.options?.[0]?.value;
 
   if (valueToUse) {
-    let foundMatch = false;
-    groupElements.forEach(radio => {
-      // Check for exact value match first
-      let shouldCheck = radio.value === valueToUse;
+    for (const radio of Array.from(groupElements)) {
+      const shouldCheck = radio.value === valueToUse || radio.labels?.[0]?.textContent?.trim() === valueToUse;
 
-      // If no match found, try matching against label text
-      if (!shouldCheck && radio.labels?.[0]) {
-        const labelText = radio.labels[0].textContent?.trim();
-        shouldCheck = labelText === valueToUse || labelText?.toLowerCase() === valueToUse.toLowerCase();
+      if (shouldCheck && !radio.checked) {
+        // Get the actual radio input element
+        const radioInput =
+          radio.type === 'radio' ? radio : radio.querySelector<HTMLInputElement>('input[type="radio"]');
+
+        if (radioInput) {
+          // Focus and click the radio input directly
+          radioInput.focus();
+          radioInput.click();
+          radioInput.blur();
+
+          if (!initializedFields.has(field.id)) {
+            addGlowingBorder(radio);
+            initializedFields.add(field.id);
+          }
+        }
+        break;
       }
-
-      if (shouldCheck) {
-        foundMatch = true;
-        // Force React to notice the change
-        radio.checked = true;
-
-        // Trigger native events
-        dispatchEvent(radio, 'input');
-        dispatchEvent(radio, 'change');
-
-        // Trigger React synthetic events
-        const nativeInputEvent = new Event('input', { bubbles: true });
-        const nativeChangeEvent = new Event('change', { bubbles: true });
-
-        // Add properties that React's synthetic events expect
-        Object.defineProperty(nativeInputEvent, 'target', { value: radio });
-        Object.defineProperty(nativeChangeEvent, 'target', { value: radio });
-
-        // Dispatch both native and React events
-        radio.dispatchEvent(nativeInputEvent);
-        radio.dispatchEvent(nativeChangeEvent);
-
-        // Force a click event which React definitely listens to
-        radio.click();
-
-        // Add visual feedback
-        addGlowingBorder(radio);
-      }
-    });
-
-    if (!foundMatch) {
-      console.error('No matching radio button found for value:', {
-        valueToUse,
-        availableValues: Array.from(groupElements).map(el => ({
-          value: el.value,
-          label: el.labels?.[0]?.textContent,
-        })),
-      });
     }
-  } else {
-    console.warn('No value available to set radio group:', {
-      fieldId: field.id,
-      name: element.name,
-    });
   }
 };
 
@@ -369,18 +272,6 @@ const assignTestValue = (field: Field): void => {
 };
 
 // Add these new specialized update helpers
-const updateSearchField = (element: HTMLInputElement, field: Field): void => {
-  if (!initializedFields.has(field.id)) {
-    addGlowingBorder(element);
-    initializedFields.add(field.id);
-  }
-  element.value = field.value || '';
-  // Search inputs often have associated clear buttons and search events
-  dispatchEvent(element, 'input');
-  dispatchEvent(element, 'change');
-  dispatchEvent(element, 'search');
-};
-
 const updateHiddenField = (element: HTMLInputElement, field: Field): void => {
   // No visual feedback for hidden fields
   element.value = field.value || '';
@@ -546,7 +437,13 @@ export const updateFormFields = async (fields: Field[], testMode: boolean = fals
     if (element instanceof HTMLInputElement) {
       switch (element.type) {
         case 'search':
-          updateSearchField(element, field);
+        case 'text':
+        case 'email':
+        case 'password':
+        case 'number':
+        case 'tel':
+        case 'url':
+          await updateInputField(element, field);
           break;
         case 'hidden':
           updateHiddenField(element, field);
@@ -558,18 +455,18 @@ export const updateFormFields = async (fields: Field[], testMode: boolean = fals
           await updateFileField(element, field, testMode);
           break;
         case 'radio':
-          updateRadioGroup(element, field);
+          await updateRadioGroup(element, field);
           break;
         case 'checkbox':
-          updateCheckableField(element, field);
+          await updateCheckableField(element, field);
           break;
         default:
-          updateInputField(element, field);
+          await updateInputField(element, field);
       }
     } else if (element instanceof HTMLTextAreaElement) {
-      updateTextAreaField(element, field);
+      await updateTextAreaField(element, field);
     } else if (element instanceof HTMLSelectElement) {
-      updateSelectField(element, field);
+      await updateSelectField(element, field);
     } else if (element instanceof HTMLButtonElement) {
       updateButtonField(element, field);
     }
@@ -579,6 +476,8 @@ export const updateFormFields = async (fields: Field[], testMode: boolean = fals
       triggerFocus: true,
       triggerValidation: field.required,
     });
+
+    // Add a small delay after each field update
   }
 };
 
@@ -605,26 +504,25 @@ export const dispatchEvent = (
 };
 
 // Stream processing (keep existing implementation)
-export const processChunks = (text: string, originalFields: Field[]): void => {
-  text.split('\n').forEach(chunk => {
+export const processChunks = async (text: string, originalFields: Field[]): Promise<void> => {
+  const chunks = text.split('\n');
+  for (const chunk of chunks) {
     if (chunk.trim()) {
       try {
         const jsonResponse = JSON.parse(chunk);
         if (jsonResponse?.data?.length) {
-          // Merge incoming fields with original field data
           const mergedFields = jsonResponse.data.map((field: Field) => {
             const originalField = originalFields.find(f => f.id === field.id);
             return originalField ? { ...originalField, ...field } : field;
           });
 
-          console.log(`Processing stream data for fields:`, mergedFields);
-          updateFormFields(mergedFields);
+          await updateFormFields(mergedFields);
         }
       } catch (e) {
         console.error('Failed to parse chunk:', e);
       }
     }
-  });
+  }
 };
 
 export const processStreamResponse = async (response: ReadableStream, originalFields: Field[]): Promise<void> => {
@@ -639,7 +537,7 @@ export const processStreamResponse = async (response: ReadableStream, originalFi
     }
 
     accumulatedResult += decoder.decode(value, { stream: true });
-    processChunks(accumulatedResult, originalFields);
+    await processChunks(accumulatedResult, originalFields);
     accumulatedResult = '';
 
     await reader.read().then(processText);
