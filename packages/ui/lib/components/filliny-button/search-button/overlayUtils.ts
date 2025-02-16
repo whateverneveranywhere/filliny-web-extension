@@ -1,11 +1,28 @@
 export const resetOverlays = (): void => {
-  document.querySelectorAll<HTMLDivElement>('div[style*="position: absolute"]').forEach(overlay => {
-    const parentForm = overlay.closest<HTMLFormElement>('form');
-    if (parentForm) {
-      parentForm.style.pointerEvents = 'auto';
-      delete parentForm.dataset.formId;
-    }
-    overlay.remove();
+  // Remove all form overlays
+  const overlaysContainer = document
+    .querySelector('#chrome-extension-filliny')
+    ?.shadowRoot?.querySelector('.overlays-container');
+  if (overlaysContainer) {
+    overlaysContainer.innerHTML = '';
+  }
+
+  // Reset all forms and form-like containers
+  const formElements = document.querySelectorAll<HTMLElement>(
+    'form[data-filliny-overlay-active], [data-filliny-form-container][data-filliny-overlay-active]',
+  );
+
+  formElements.forEach(form => {
+    form.classList.remove('filliny-pointer-events-none');
+    delete form.dataset.fillinyOverlayActive;
+    delete form.dataset.formId;
+  });
+
+  // Remove all highlights
+  const highlightedElements = document.querySelectorAll<HTMLElement>('[data-filliny-highlighted]');
+  highlightedElements.forEach(element => {
+    element.style.removeProperty('box-shadow');
+    delete element.dataset.fillinyHighlighted;
   });
 };
 

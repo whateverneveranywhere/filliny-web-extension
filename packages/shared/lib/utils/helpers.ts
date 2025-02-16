@@ -79,6 +79,7 @@ interface ConfigEntry {
   debug: {
     saveScreenshots: boolean;
     enableOCRLogs: boolean;
+    enableOCRFirst: boolean;
   };
 }
 
@@ -90,6 +91,7 @@ const config: Record<WebappEnvs, ConfigEntry> = {
     debug: {
       saveScreenshots: false,
       enableOCRLogs: false,
+      enableOCRFirst: true,
     },
   },
   preview: {
@@ -98,6 +100,7 @@ const config: Record<WebappEnvs, ConfigEntry> = {
     debug: {
       saveScreenshots: false,
       enableOCRLogs: false,
+      enableOCRFirst: true,
     },
   },
   prod: {
@@ -106,6 +109,7 @@ const config: Record<WebappEnvs, ConfigEntry> = {
     debug: {
       saveScreenshots: false,
       enableOCRLogs: false,
+      enableOCRFirst: true,
     },
   },
 };

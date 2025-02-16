@@ -1,6 +1,6 @@
 import { createRoot } from 'react-dom/client';
 import { FormsOverlay } from './FormsOverlay';
-import { detectFields } from './detectionHelpers';
+import { detectFields, detectFormLikeContainers } from './detectionHelpers';
 import { addGlowingBorder, findOrCreateShadowContainer, getFormPosition } from './overlayUtils';
 import type { HighlightFormsOptions } from './types';
 
@@ -15,8 +15,9 @@ export const highlightForms = async ({
     return;
   }
 
-  const forms = document.querySelectorAll<HTMLFormElement>('form');
-  if (forms.length === 0) {
+  // Use our new form detection logic
+  const formLikeContainers = await detectFormLikeContainers();
+  if (formLikeContainers.length === 0) {
     alert('No form found');
     return;
   }
@@ -29,7 +30,7 @@ export const highlightForms = async ({
     const existingOverlays = Array.from(overlaysContainer.querySelectorAll('[id^="overlay-"]'));
     existingOverlays.forEach(overlay => {
       const formId = overlay.id.replace('overlay-', '');
-      const form = document.querySelector(`[data-form-id="${formId}"]`) as HTMLFormElement;
+      const form = document.querySelector(`[data-form-id="${formId}"]`) as HTMLElement;
       if (form) {
         form.classList.remove('filliny-pointer-events-none');
         delete form.dataset.fillinyOverlayActive;
@@ -41,7 +42,7 @@ export const highlightForms = async ({
     // Remove all existing highlights
     const highlightedForms = Array.from(document.querySelectorAll('[data-filliny-highlighted]'));
     for (const form of highlightedForms) {
-      await removeFormHighlights(form as HTMLFormElement);
+      await removeFormHighlights(form as HTMLElement);
     }
   };
 
@@ -49,7 +50,7 @@ export const highlightForms = async ({
   await cleanup();
 
   // Convert forms to array and sort by their position in the document
-  const formsArray = Array.from(forms).sort((a, b) => {
+  const formsArray = formLikeContainers.sort((a, b) => {
     const rectA = a.getBoundingClientRect();
     const rectB = b.getBoundingClientRect();
     return rectA.top - rectB.top;
@@ -74,7 +75,7 @@ export const highlightForms = async ({
 };
 
 const createFormOverlay = (
-  form: HTMLFormElement,
+  form: HTMLElement,
   formId: string,
   overlaysContainer: HTMLDivElement,
   testMode: boolean,
@@ -163,7 +164,7 @@ const createFormOverlay = (
   });
 };
 
-const highlightFormFields = async (form: HTMLFormElement, isFirstForm: boolean = false): Promise<void> => {
+const highlightFormFields = async (form: HTMLElement, isFirstForm: boolean = false): Promise<void> => {
   const fields = await detectFields(form);
   const highlightedElements: HTMLElement[] = [];
 
@@ -189,7 +190,7 @@ const highlightFormFields = async (form: HTMLFormElement, isFirstForm: boolean =
   }
 };
 
-const removeFormHighlights = async (form: HTMLFormElement): Promise<void> => {
+const removeFormHighlights = async (form: HTMLElement): Promise<void> => {
   const fields = await detectFields(form);
   fields.forEach(field => {
     const element = form.querySelector<HTMLElement>(`[data-filliny-id="${field.id}"]`);

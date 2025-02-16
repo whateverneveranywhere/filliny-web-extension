@@ -115,8 +115,12 @@ export const handleFormClick = async (
   event.preventDefault();
   const totalStartTime = performance.now();
 
-  const form = document.querySelector<HTMLFormElement>(`form[data-form-id="${formId}"]`);
-  if (!form) {
+  // Look for both native forms and form-like containers
+  const formContainer = document.querySelector<HTMLElement>(
+    `form[data-form-id="${formId}"], [data-filliny-form-container][data-form-id="${formId}"]`,
+  );
+
+  if (!formContainer) {
     alert('Form not found. Please try again.');
     resetOverlays();
     highlightForms({ visionOnly: false });
@@ -128,7 +132,7 @@ export const handleFormClick = async (
 
   try {
     const startTime = performance.now();
-    const fields = await detectFields(form);
+    const fields = await detectFields(formContainer);
     console.log('Form Click: Detected fields:', fields);
 
     console.log(
