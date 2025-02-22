@@ -824,10 +824,13 @@ const getElementRole = (element: HTMLElement): string | null => {
   const role = element.getAttribute('role');
   if (role) return role;
 
-  // Check implicit roles based on element type
+  // Check input type for input elements
+  if (element instanceof HTMLInputElement) {
+    return element.type;
+  }
+
+  // Map HTML elements to implicit roles
   switch (element.tagName.toLowerCase()) {
-    case 'input':
-      return (element as HTMLInputElement).type;
     case 'select':
       return 'combobox';
     case 'textarea':
@@ -1099,72 +1102,74 @@ export const detectFields = async (
   let index = 0;
   const processedGroups = new Set<string>();
 
-  console.log('Using detection strategy:', strategy);
+  // Common selector for interactive elements
+  const commonSelector = [
+    'input:not([type="hidden"]):not([type="submit"])',
+    'select',
+    'textarea',
+    '[role="textbox"]',
+    '[role="combobox"]',
+    '[role="spinbutton"]',
+    '[contenteditable="true"]',
+    '[data-filliny-field]',
+  ].join(',');
 
-  if (strategy === 'ocr') {
-    // For OCR strategy, we'll process the entire container as one unit
-    // and extract fields using OCR techniques
-    const elements = Array.from(
-      container.querySelectorAll<HTMLElement>(
-        'input, select, textarea, [role="textbox"], [role="combobox"], [contenteditable="true"]',
-      ),
-    );
+  // Get all relevant elements once
+  const elements = Array.from(container.querySelectorAll<HTMLElement>(commonSelector)).filter(
+    element => !shouldSkipElement(element),
+  );
 
-    for (const element of elements) {
-      if (shouldSkipElement(element)) continue;
-
-      // For OCR strategy, we prioritize OCR-based label detection
-      const field = await createBaseField(element, index, getElementRole(element) || 'text', true);
-      if (field) {
-        fields.push(field);
-        index++;
-      }
-    }
-
+  // Early return if no elements found
+  if (!elements.length) {
     return fields;
   }
 
-  // For DOM strategy, use the existing DOM-based detection methods
-  const elements = Array.from(
-    container.querySelectorAll<HTMLElement>(
-      `input:not([type="hidden"]):not([type="submit"]),
-       select, 
-       textarea,
-       [role="textbox"],
-       [role="combobox"],
-       [role="spinbutton"],
-       [contenteditable="true"],
-       [data-filliny-field]`,
-    ),
-  );
-
+  // Process elements based on strategy
   for (const element of elements) {
-    if (shouldSkipElement(element)) continue;
-
-    const role = getElementRole(element);
-    let field: Field | null = null;
-
     try {
+      let field: Field | null = null;
+
+      // For OCR strategy, we use a simplified detection approach
+      if (strategy === 'ocr') {
+        field = await createBaseField(element, index, getElementRole(element) || 'text', true);
+        if (field) {
+          fields.push(field);
+          index++;
+        }
+        continue;
+      }
+
+      // For DOM strategy, use type-specific detection
+      const role = getElementRole(element);
+
       switch (role) {
         case 'checkbox':
         case 'switch':
           field = await detectCheckboxField(element, index);
           break;
+
         case 'radio':
-          if (element instanceof HTMLInputElement) {
+          if (element instanceof HTMLInputElement && !processedGroups.has(element.name)) {
             field = await detectRadioGroup(element, index, processedGroups);
           }
           break;
+
         case 'textbox':
         case 'spinbutton':
           field = await detectTextLikeField(element, index);
           break;
+
         case 'combobox':
           field = await detectSelectField(element, index);
           break;
+
         default:
-          // Handle native elements
+          // Handle native elements with type checking
           if (element instanceof HTMLInputElement) {
+            // Skip already processed radio groups
+            if (element.type === 'radio' && processedGroups.has(element.name)) {
+              continue;
+            }
             field = await detectInputField(element, index, isImplicitForm);
           } else if (element instanceof HTMLSelectElement) {
             field = await detectSelectField(element, index);
