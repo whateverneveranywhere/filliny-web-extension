@@ -1,18 +1,30 @@
-// Add OCR result cache
+import type { Worker, WorkerParams } from 'tesseract.js';
+
+// Global singleton worker for better resource management
+let globalWorker: Worker | null = null;
 const ocrCache = new Map<string, string>();
 
 // Add global CSP state
 let isCSPRestricted: boolean | null = null;
 
-// Add CSP detection helper
-export const checkCSPRestrictions = (): boolean => {
-  // If we've already checked, return cached result
+// Optimized image preprocessing settings
+const OPTIMAL_WIDTH = 400; // Narrower width for faster processing
+const CONTRAST_THRESHOLD = 128;
+const QUALITY = 0.6; // Reduced quality for faster processing
+
+interface PreprocessedImage {
+  dataUrl: string;
+  bounds: DOMRect;
+}
+
+// Enhanced CSP detection with detailed checks
+export const checkCSPRestrictions = async (): Promise<boolean> => {
+  // Return cached result if available
   if (isCSPRestricted !== null) {
     return isCSPRestricted;
   }
 
   try {
-    console.log('Checking CSP restrictions...');
     // Check meta tag CSP
     const metaCSP = document.querySelector('meta[http-equiv="Content-Security-Policy"]');
     if (metaCSP) {
@@ -20,27 +32,74 @@ export const checkCSPRestrictions = (): boolean => {
       if (
         cspContent.includes("'strict-dynamic'") ||
         cspContent.includes("script-src 'self'") ||
-        cspContent.includes("connect-src 'self'")
+        cspContent.includes("connect-src 'self'") ||
+        !cspContent.includes("'unsafe-eval'")
       ) {
-        console.log('CSP restrictions detected in meta tag');
+        console.warn('CSP restrictions detected in meta tag:', cspContent);
         isCSPRestricted = true;
         return true;
       }
     }
 
-    // Test WebAssembly support
+    // Check for WebAssembly support and restrictions
     try {
-      new WebAssembly.Module(new Uint8Array([0x0, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00]));
-      isCSPRestricted = false;
-      return false;
-    } catch (e) {
-      if (e instanceof WebAssembly.CompileError) {
-        console.log('WebAssembly blocked by CSP');
-        isCSPRestricted = true;
-        return true;
+      const wasmTest = new WebAssembly.Module(new Uint8Array([0x0, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00]));
+      if (!wasmTest) {
+        throw new Error('WebAssembly module creation failed');
       }
+    } catch (e) {
+      console.warn('WebAssembly blocked by CSP:', e);
+      isCSPRestricted = true;
+      return true;
     }
 
+    // Test data URL support
+    try {
+      const dataUrlTest = await fetch('data:text/plain;base64,SGVsbG8=');
+      if (!dataUrlTest.ok) {
+        throw new Error('Data URL fetch failed');
+      }
+    } catch (e) {
+      console.warn('Data URL loading blocked by CSP:', e);
+      isCSPRestricted = true;
+      return true;
+    }
+
+    // Additional security policy checks
+    const policies = await (async () => {
+      try {
+        const report = await new Promise(resolve => {
+          document.addEventListener(
+            'securitypolicyviolation',
+            e => {
+              resolve(e);
+            },
+            { once: true },
+          );
+
+          // Trigger a test violation
+          const script = document.createElement('script');
+          script.innerHTML = 'console.log("CSP test")';
+          document.head.appendChild(script);
+          document.head.removeChild(script);
+        });
+
+        if (report) {
+          console.warn('CSP violation detected:', report);
+          return true;
+        }
+      } catch (e) {
+        // Ignore errors in the test
+      }
+      return false;
+    })();
+
+    if (policies) {
+      isCSPRestricted = true;
+      return true;
+    }
+
+    // All checks passed
     isCSPRestricted = false;
     return false;
   } catch (error) {
@@ -50,93 +109,104 @@ export const checkCSPRestrictions = (): boolean => {
   }
 };
 
-// Capture element using html2canvas with optimized settings
-const captureElement = async (element: HTMLElement): Promise<string> => {
+// Initialize single worker with optimized settings
+const initializeWorker = async (): Promise<Worker | null> => {
+  // Check CSP restrictions before initializing
+  const restricted = await checkCSPRestrictions();
+  if (restricted) {
+    console.warn('Cannot initialize OCR worker due to CSP restrictions');
+    return null;
+  }
+
+  if (globalWorker) return globalWorker;
+
   try {
-    const { default: html2canvas } = await import('html2canvas');
+    const { createWorker } = await import('tesseract.js');
+    globalWorker = await createWorker();
 
-    // Get element dimensions
-    const rect = element.getBoundingClientRect();
-
-    // Calculate optimal scale based on element size
-    // We want to keep resolution reasonable for OCR while not being too high
-    // Target width around 800px for optimal OCR performance
-    const targetWidth = 800;
-    const scale = Math.min(targetWidth / rect.width, 1.5); // Cap at 1.5x
-
-    // Capture the element with optimized settings
-    const canvas = await html2canvas(element, {
-      logging: false,
-      useCORS: true,
-      scale: scale * (window.devicePixelRatio || 1),
-      allowTaint: true,
-      backgroundColor: null,
-      removeContainer: true,
-      width: rect.width,
-      height: rect.height,
-      // Optimize rendering
-      imageTimeout: 2000, // 2 second timeout for images
-      ignoreElements: el => {
-        // Ignore elements that won't contribute to label text
-        const tagName = el.tagName.toLowerCase();
-        return (
-          tagName === 'script' ||
-          tagName === 'style' ||
-          tagName === 'iframe' ||
-          (tagName === 'img' && !el.getAttribute('alt'))
-        );
-      },
-      onclone: (clonedDoc, node) => {
-        // Hide interactive elements in the clone for cleaner capture
-        const interactives = node.querySelectorAll('input, select, textarea, button');
-        interactives.forEach((el: Element) => {
-          if (el !== element) {
-            (el as HTMLElement).style.visibility = 'hidden';
-          }
-        });
-      },
+    // Configure worker with optimized settings
+    const worker = globalWorker as Worker & {
+      loadLanguage: (lang: string) => Promise<void>;
+      initialize: (lang: string) => Promise<void>;
+    };
+    await worker.loadLanguage('eng');
+    await worker.initialize('eng');
+    await worker.setParameters({
+      tessedit_char_whitelist: 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 :-_/\\.,',
+      tessedit_pageseg_mode: '1' as WorkerParams['tessedit_pageseg_mode'],
+      pdf_enabled: false,
+      hocr_enabled: false,
     });
 
-    // Convert to black and white with optimized contrast for better OCR
-    const ctx = canvas.getContext('2d');
-    if (!ctx) {
-      throw new Error('Could not get canvas context');
-    }
-
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const data = imageData.data;
-
-    // Optimize contrast and convert to black and white
-    const threshold = 128;
-    for (let i = 0; i < data.length; i += 4) {
-      // Enhanced contrast calculation
-      const avg = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
-      const value = avg > threshold ? 255 : 0;
-      data[i] = data[i + 1] = data[i + 2] = value;
-    }
-    ctx.putImageData(imageData, 0, 0);
-
-    // Further reduce size if the canvas is still large
-    if (canvas.width > targetWidth) {
-      const scaleFactor = targetWidth / canvas.width;
-      const scaledCanvas = document.createElement('canvas');
-      scaledCanvas.width = canvas.width * scaleFactor;
-      scaledCanvas.height = canvas.height * scaleFactor;
-      const scaledCtx = scaledCanvas.getContext('2d');
-      if (scaledCtx) {
-        // Use better quality scaling
-        scaledCtx.imageSmoothingEnabled = true;
-        scaledCtx.imageSmoothingQuality = 'high';
-        scaledCtx.drawImage(canvas, 0, 0, scaledCanvas.width, scaledCanvas.height);
-        return scaledCanvas.toDataURL('image/png', 0.8); // Slightly reduced quality for better performance
-      }
-    }
-
-    return canvas.toDataURL('image/png', 0.8);
+    return globalWorker;
   } catch (error) {
-    console.error('Failed to capture element:', error);
-    throw error;
+    console.error('Failed to initialize OCR worker:', error);
+    isCSPRestricted = true; // Mark as restricted on failure
+    return null;
   }
+};
+
+// Optimized image capture and preprocessing
+const captureAndPreprocess = async (element: HTMLElement): Promise<PreprocessedImage> => {
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d', { alpha: false })!;
+
+  // Get element bounds
+  const bounds = element.getBoundingClientRect();
+
+  // Calculate optimal scale
+  const scale = Math.min(OPTIMAL_WIDTH / bounds.width, 1);
+  const finalWidth = Math.round(bounds.width * scale);
+  const finalHeight = Math.round(bounds.height * scale);
+
+  // Set canvas size
+  canvas.width = finalWidth;
+  canvas.height = finalHeight;
+
+  // Draw with background for better contrast
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(0, 0, finalWidth, finalHeight);
+
+  // Use html2canvas for element capture
+  const { default: html2canvas } = await import('html2canvas');
+  const elementCanvas = await html2canvas(element, {
+    backgroundColor: '#FFFFFF',
+    logging: false,
+    removeContainer: true,
+    scale: 1,
+  });
+
+  // Scale down
+  ctx.drawImage(elementCanvas, 0, 0, finalWidth, finalHeight);
+
+  // Apply contrast enhancement
+  const imageData = ctx.getImageData(0, 0, finalWidth, finalHeight);
+  const data = imageData.data;
+
+  // Optimize with Uint8ClampedArray for better performance
+  const pixels = new Uint8ClampedArray(data.length);
+
+  // Process in chunks for better performance
+  const chunkSize = 16384;
+  for (let i = 0; i < data.length; i += chunkSize) {
+    const end = Math.min(i + chunkSize, data.length);
+    for (let j = i; j < end; j += 4) {
+      // Fast grayscale conversion
+      const gray = (data[j] * 0.299 + data[j + 1] * 0.587 + data[j + 2] * 0.114) | 0;
+      // Threshold to pure black/white
+      const value = gray > CONTRAST_THRESHOLD ? 255 : 0;
+      pixels[j] = pixels[j + 1] = pixels[j + 2] = value;
+      pixels[j + 3] = 255;
+    }
+  }
+
+  imageData.data.set(pixels);
+  ctx.putImageData(imageData, 0, 0);
+
+  return {
+    dataUrl: canvas.toDataURL('image/jpeg', QUALITY),
+    bounds,
+  };
 };
 
 // Helper to find the optimal parent container for OCR
@@ -146,203 +216,105 @@ export const findOptimalLabelContainer = (
   container: HTMLElement;
   reason: string;
 } => {
-  // Find all form fields in the document
-  const findFormFields = (root: Document): HTMLElement[] => {
-    return Array.from(
-      root.querySelectorAll<HTMLElement>(
-        'input:not([type="hidden"]), select, textarea, [role="textbox"], [role="combobox"], [contenteditable="true"]',
-      ),
-    ).filter(field => {
-      const style = getComputedStyle(field);
-      return style.display !== 'none' && style.visibility !== 'hidden';
-    });
-  };
-
-  // Get all fields and find current field's position
-  const allFields = findFormFields(element.ownerDocument);
-  const currentIndex = allFields.indexOf(element);
-
-  // Find prev/next fields if they exist
-  const prevField = currentIndex > 0 ? allFields[currentIndex - 1] : null;
-  const nextField = currentIndex < allFields.length - 1 ? allFields[currentIndex + 1] : null;
-
-  // Find the closest field (prev or next) based on DOM distance
-  const getClosestField = (): HTMLElement | null => {
-    if (!prevField && !nextField) return null;
-    if (!prevField) return nextField;
-    if (!nextField) return prevField;
-
-    // Compare DOM distances
-    let current = element;
-    let prevSteps = 0;
-    let nextSteps = 0;
-
-    // Count steps to prev field
-    while (current && !current.contains(prevField)) {
-      current = current.parentElement!;
-      prevSteps++;
-    }
-
-    // Count steps to next field
-    current = element;
-    while (current && !current.contains(nextField)) {
-      current = current.parentElement!;
-      nextSteps++;
-    }
-
-    return prevSteps <= nextSteps ? prevField : nextField;
-  };
-
-  // Find common ancestor with the closest field
-  const closestField = getClosestField();
-  if (!closestField) {
-    // If no other fields found, use minimal container
-    let container = element;
-    while (container.parentElement) {
-      const parent = container.parentElement;
-      const hasOtherInteractives = Array.from(parent.querySelectorAll('input, select, textarea, button')).some(
-        el => el !== element && getComputedStyle(el).display !== 'none',
-      );
-
-      if (hasOtherInteractives) break;
-
-      const rect = parent.getBoundingClientRect();
-      if (rect.width > 800 || rect.height > 300) break;
-
-      container = parent;
-    }
-    return { container, reason: 'isolated' };
+  // Quick check for explicit label
+  const id = element.id;
+  if (id) {
+    const label = document.querySelector(`label[for="${id}"]`);
+    if (label) return { container: label as HTMLElement, reason: 'explicit-label' };
   }
 
-  // Find common ancestor
-  let commonAncestor = element;
-  while (commonAncestor && !commonAncestor.contains(closestField)) {
-    commonAncestor = commonAncestor.parentElement!;
-  }
+  // Check for wrapping label
+  const labelParent = element.closest('label');
+  if (labelParent) return { container: labelParent, reason: 'wrapping-label' };
 
-  if (!commonAncestor || commonAncestor.tagName.toLowerCase() === 'body') {
-    return { container: element, reason: 'fallback' };
-  }
-
-  // Find the optimal container by checking each ancestor's content
-  let bestContainer = element;
-  let bestTextDensity = 0;
-
+  // Find closest text-containing element
+  let bestElement = element;
   let current = element;
-  while (current && current !== commonAncestor.parentElement) {
-    // Skip if container includes other form fields
-    const hasOtherFields = Array.from(current.querySelectorAll('input, select, textarea, button')).some(
-      el => el !== element && el !== closestField && getComputedStyle(el).display !== 'none',
-    );
+  let maxTextLength = 0;
 
-    if (hasOtherFields) break;
-
-    // Check container dimensions
-    const rect = current.getBoundingClientRect();
-    if (rect.width > 800 || rect.height > 300) break;
-
-    // Calculate text density (text length / area)
-    const text = current.textContent || '';
-    const area = rect.width * rect.height;
-    const density = area > 0 ? text.length / area : 0;
-
-    if (density > bestTextDensity) {
-      bestContainer = current;
-      bestTextDensity = density;
+  for (let i = 0; i < 3 && current.parentElement; i++) {
+    current = current.parentElement;
+    const textLength = (current.textContent || '').trim().length;
+    if (textLength > maxTextLength && textLength < 100) {
+      maxTextLength = textLength;
+      bestElement = current;
     }
-
-    current = current.parentElement!;
   }
 
   return {
-    container: bestContainer,
-    reason: bestContainer === element ? 'self' : 'structure',
+    container: bestElement,
+    reason: bestElement === element ? 'self' : 'text-density',
   };
 };
 
-// Update processWithCSPSafeOCR to use cached CSP check
-const processWithCSPSafeOCR = async (element: HTMLElement): Promise<string> => {
-  try {
-    // Use cached CSP check
-    if (isCSPRestricted === null) {
-      checkCSPRestrictions(); // This will set isCSPRestricted
-    }
+// Update batch processing to handle CSP restrictions
+export const getFieldLabelsFromOCR = async (
+  elements: Array<{ element: HTMLElement; fieldId: string }>,
+): Promise<Map<string, string>> => {
+  const results = new Map<string, string>();
 
-    if (isCSPRestricted) {
-      console.log('Using fallback methods (CSP restricted)');
-      return '';
-    }
-
-    // Continue with Tesseract OCR since site is not CSP restricted
-    const { container } = findOptimalLabelContainer(element);
-    const dataUrl = await captureElement(container);
-
-    try {
-      const { createWorker } = await import('tesseract.js');
-      const worker = await createWorker('eng', 1, {
-        logger: () => {},
-        errorHandler: (err: Error) => {
-          console.warn('Tesseract worker error:', err);
-        },
-      });
-
-      const result = await worker.recognize(dataUrl);
-      await worker.terminate();
-
-      const detectedText = result.data.text
-        .split('\n')
-        .map(line => line.trim())
-        .filter(line => line.length > 0)
-        .join(' ')
-        .trim();
-
-      if (detectedText) {
-        console.log('OCR successful:', detectedText);
-        return detectedText;
-      }
-
-      return '';
-    } catch (error) {
-      console.warn('OCR failed:', error);
-      return '';
-    }
-  } catch (error: unknown) {
-    if (error instanceof Error) {
-      console.error('Critical error in OCR process:', error);
-    }
-    return '';
+  // Early return if CSP restricted
+  if (await checkCSPRestrictions()) {
+    console.warn('OCR processing blocked by CSP restrictions');
+    return results;
   }
+
+  const worker = await initializeWorker();
+  if (!worker) {
+    console.warn('Could not initialize OCR worker');
+    return results;
+  }
+
+  // Process in smaller batches for better memory management
+  const BATCH_SIZE = 4;
+  for (let i = 0; i < elements.length; i += BATCH_SIZE) {
+    const batch = elements.slice(i, i + BATCH_SIZE);
+    const batchPromises = batch.map(async ({ element, fieldId }) => {
+      try {
+        const cacheKey = element.getAttribute('data-filliny-id') || fieldId;
+        if (ocrCache.has(cacheKey)) {
+          results.set(fieldId, ocrCache.get(cacheKey)!);
+          return;
+        }
+
+        const container = findOptimalLabelContainer(element);
+        const { dataUrl } = await captureAndPreprocess(container.container);
+
+        const {
+          data: { text },
+        } = await worker.recognize(dataUrl);
+        const label = text
+          .split('\n')
+          .map(line => line.trim())
+          .filter(line => line.length > 0)
+          .join(' ')
+          .trim();
+
+        if (label) {
+          results.set(fieldId, label);
+          ocrCache.set(cacheKey, label);
+        }
+      } catch (error) {
+        console.warn('OCR processing failed:', error);
+      }
+    });
+
+    await Promise.all(batchPromises);
+  }
+
+  return results;
 };
 
-// Main export for OCR-based label detection
+// Single field processing
 export const getFieldLabelFromOCR = async (element: HTMLElement, fieldId: string): Promise<string> => {
-  try {
-    const cacheKey = element.getAttribute('data-filliny-id') || fieldId;
+  const results = await getFieldLabelsFromOCR([{ element, fieldId }]);
+  return results.get(fieldId) || '';
+};
 
-    if (ocrCache.has(cacheKey)) {
-      console.log('Using cached OCR label for:', { fieldId, label: ocrCache.get(cacheKey) });
-      return ocrCache.get(cacheKey)!;
-    }
-
-    console.log('Cache miss, starting OCR for:', { fieldId });
-    const label = await processWithCSPSafeOCR(element);
-
-    if (label) {
-      ocrCache.set(cacheKey, label);
-      console.log('OCR detection complete:', { fieldId, label });
-    } else {
-      console.log('OCR detection failed to find label for:', { fieldId });
-    }
-
-    return label;
-  } catch (error: unknown) {
-    if (error instanceof Error) {
-      console.error('Error in OCR detection:', {
-        fieldId,
-        error: error.message,
-        stack: error.stack,
-      });
-    }
-    return '';
+// Cleanup
+export const cleanupOCR = async () => {
+  if (globalWorker) {
+    await globalWorker.terminate();
+    globalWorker = null;
   }
 };

@@ -9,21 +9,9 @@ interface Select2Instance {
 }
 
 const simulateHumanTyping = async (element: HTMLInputElement | HTMLTextAreaElement, text: string): Promise<void> => {
-  // Focus the element first
   element.focus();
-
-  // Clear existing text like a human would (select all + delete)
-  element.select();
-  element.value = '';
+  element.value = text;
   dispatchEvent(element, 'input');
-
-  // Type each character with random delays
-  for (let i = 0; i < text.length; i++) {
-    element.value += text[i];
-    dispatchEvent(element, 'input');
-  }
-
-  // Final change event after typing
   dispatchEvent(element, 'change');
   element.blur();
 };
@@ -155,37 +143,19 @@ const updateSelectField = async (element: HTMLElement, field: Field): Promise<vo
   const valueToUse = field.testValue || field.value;
   if (!valueToUse) return;
 
-  // Focus the select element
-  element.focus();
+  // Set value directly without focus/click events
+  element.value = valueToUse;
+  dispatchEvent(element, 'change');
 
-  // Find the target option
-  let targetOption: HTMLOptionElement | undefined;
-  Array.from(element.options).forEach(opt => {
-    if (opt.value === valueToUse || opt.text.trim() === valueToUse) {
-      targetOption = opt;
+  // Handle Select2 if needed
+  if (field.metadata?.framework === 'select2') {
+    const select2Instance = (window as { jQuery?: (el: HTMLElement) => { data: (key: string) => Select2Instance } })
+      .jQuery?.(element)
+      ?.data?.('select2');
+
+    if (select2Instance) {
+      select2Instance.trigger('select', { val: element.value });
     }
-  });
-
-  if (targetOption) {
-    // Click to open dropdown
-    element.click();
-
-    // Select the option
-    element.value = targetOption.value;
-    dispatchEvent(element, 'change');
-
-    // If it's a Select2, trigger their custom events
-    if (field.metadata?.framework === 'select2') {
-      const select2Instance = (window as { jQuery?: (el: HTMLElement) => { data: (key: string) => Select2Instance } })
-        .jQuery?.(element)
-        ?.data?.('select2');
-
-      if (select2Instance) {
-        select2Instance.trigger('select', { val: element.value });
-      }
-    }
-
-    element.blur();
   }
 };
 
@@ -377,108 +347,74 @@ const updateFormField = (element: HTMLElement, field: Field, testMode: boolean):
 
 // Main update function that delegates to specialized helpers
 export const updateFormFields = async (fields: Field[], testMode: boolean = false): Promise<void> => {
-  console.log('updateFormFields called:', { fieldsCount: fields.length, testMode });
-
-  for (const field of fields) {
-    console.log('Processing field:', {
-      id: field.id,
-      type: field.type,
-      label: field.label,
-      value: field.value,
-      testValue: field.testValue,
-      metadata: field.metadata,
-    });
-
-    // For Select2 fields, look for both the container and the actual select
-    let element: HTMLElement | null = null;
-    if (field.metadata?.framework === 'select2' && field.metadata.actualSelect) {
-      // Get the actual select element instead of the container
-      element = document.getElementById(field.metadata.actualSelect);
-      console.log('Found Select2 actual select:', {
-        id: field.metadata.actualSelect,
-        element: element?.tagName,
-        value: (element as HTMLSelectElement)?.value,
-      });
-    } else {
-      element = document.querySelector<HTMLElement>(`[data-filliny-id="${field.id}"]`);
-    }
-
-    console.log('Found element:', {
-      found: !!element,
-      elementType: element?.tagName,
-      elementId: element?.id,
-      dataFillinyId: element?.getAttribute('data-filliny-id'),
-    });
-
-    if (!element) {
-      console.warn('Element not found for field:', field.id);
-      continue;
-    }
-
-    // Only assign test values in test mode and for fields that support it
-    if (testMode && !field.testValue && (field.type === 'radio' || field.type === 'select')) {
-      console.log('Assigning test value for field:', field.id);
-      assignTestValue(field);
-    }
-
-    // Use testValue if in test mode and available
-    if (testMode && field.testValue) {
-      console.log('Using test value:', {
-        fieldId: field.id,
-        originalValue: field.value,
-        testValue: field.testValue,
-      });
-      field.value = field.testValue;
-    }
-
-    // Apply common updates and accessibility enhancements
-    updateFormField(element, field, testMode);
-
-    if (element instanceof HTMLInputElement) {
-      switch (element.type) {
-        case 'search':
-        case 'text':
-        case 'email':
-        case 'password':
-        case 'number':
-        case 'tel':
-        case 'url':
-          await updateInputField(element, field);
-          break;
-        case 'hidden':
-          updateHiddenField(element, field);
-          break;
-        case 'image':
-          updateImageField(element, field);
-          break;
-        case 'file':
-          await updateFileField(element, field, testMode);
-          break;
-        case 'radio':
-          await updateRadioGroup(element, field);
-          break;
-        case 'checkbox':
-          await updateCheckableField(element, field);
-          break;
-        default:
-          await updateInputField(element, field);
+  // Process all fields in parallel
+  await Promise.all(
+    fields.map(async field => {
+      let element: HTMLElement | null = null;
+      if (field.metadata?.framework === 'select2' && field.metadata.actualSelect) {
+        element = document.getElementById(field.metadata.actualSelect);
+      } else {
+        element = document.querySelector<HTMLElement>(`[data-filliny-id="${field.id}"]`);
       }
-    } else if (element instanceof HTMLTextAreaElement) {
-      await updateTextAreaField(element, field);
-    } else if (element instanceof HTMLSelectElement) {
-      await updateSelectField(element, field);
-    } else if (element instanceof HTMLButtonElement) {
-      updateButtonField(element, field);
-    }
 
-    // Trigger enhanced events with validation
-    dispatchEnhancedEvents(element, field.value || '', {
-      triggerFocus: true,
-      triggerValidation: field.required,
-    });
+      if (!element) {
+        console.warn('Element not found for field:', field.id);
+        return;
+      }
 
-    // Add a small delay after each field update
-  }
+      if (testMode && !field.testValue && (field.type === 'radio' || field.type === 'select')) {
+        assignTestValue(field);
+      }
+
+      if (testMode && field.testValue) {
+        field.value = field.testValue;
+      }
+
+      updateFormField(element, field, testMode);
+
+      if (element instanceof HTMLInputElement) {
+        switch (element.type) {
+          case 'search':
+          case 'text':
+          case 'email':
+          case 'password':
+          case 'number':
+          case 'tel':
+          case 'url':
+            await updateInputField(element, field);
+            break;
+          case 'hidden':
+            updateHiddenField(element, field);
+            break;
+          case 'image':
+            updateImageField(element, field);
+            break;
+          case 'file':
+            await updateFileField(element, field, testMode);
+            break;
+          case 'radio':
+            await updateRadioGroup(element, field);
+            break;
+          case 'checkbox':
+            await updateCheckableField(element, field);
+            break;
+          default:
+            await updateInputField(element, field);
+        }
+      } else if (element instanceof HTMLTextAreaElement) {
+        await updateTextAreaField(element, field);
+      } else if (element instanceof HTMLSelectElement) {
+        await updateSelectField(element, field);
+      } else if (element instanceof HTMLButtonElement) {
+        updateButtonField(element, field);
+      }
+
+      dispatchEnhancedEvents(element, field.value || '', {
+        triggerFocus: false, // Removed unnecessary focus events
+        triggerValidation: field.required,
+      });
+    }),
+  );
 };
 
 // Helper functions (keep existing ones)
@@ -506,6 +442,9 @@ export const dispatchEvent = (
 // Stream processing (keep existing implementation)
 export const processChunks = async (text: string, originalFields: Field[]): Promise<void> => {
   const chunks = text.split('\n');
+  const batchSize = 5; // Process fields in batches for better performance
+  const pendingUpdates: Field[][] = [];
+
   for (const chunk of chunks) {
     if (chunk.trim()) {
       try {
@@ -516,13 +455,19 @@ export const processChunks = async (text: string, originalFields: Field[]): Prom
             return originalField ? { ...originalField, ...field } : field;
           });
 
-          await updateFormFields(mergedFields);
+          // Split fields into batches
+          for (let i = 0; i < mergedFields.length; i += batchSize) {
+            pendingUpdates.push(mergedFields.slice(i, i + batchSize));
+          }
         }
       } catch (e) {
         console.error('Failed to parse chunk:', e);
       }
     }
   }
+
+  // Process all batches in parallel
+  await Promise.all(pendingUpdates.map(batch => updateFormFields(batch)));
 };
 
 export const processStreamResponse = async (response: ReadableStream, originalFields: Field[]): Promise<void> => {
