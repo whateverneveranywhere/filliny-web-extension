@@ -342,7 +342,7 @@ const detectInputField = async (
   index: number,
   testMode: boolean = false,
 ): Promise<Field | null> => {
-  if (!isElementVisible(input) || shouldSkipElement(input)) return null;
+  if (shouldSkipElement(input)) return null;
 
   const framework = detectFramework(input);
   const field = await createBaseField(input, index, input.type, testMode);
@@ -580,7 +580,7 @@ const detectDynamicSelectOptions = async (
 
 // Update detectSelectField to ensure we always have options
 const detectSelectField = async (select: HTMLSelectElement | HTMLElement, index: number): Promise<Field | null> => {
-  if (!isElementVisible(select) || shouldSkipElement(select)) return null;
+  if (shouldSkipElement(select)) return null;
 
   const field = await createBaseField(select, index, 'select');
 
@@ -616,7 +616,7 @@ const detectRadioGroup = async (
   if (!container) return null;
 
   const groupElements = container.querySelectorAll<HTMLInputElement>(`input[type="radio"][name="${name}"]`);
-  const visibleElements = Array.from(groupElements).filter(el => isElementVisible(el) && !shouldSkipElement(el));
+  const visibleElements = Array.from(groupElements).filter(el => !shouldSkipElement(el));
 
   if (visibleElements.length === 0) return null;
 
@@ -787,7 +787,7 @@ const detectTextareaField = async (textarea: HTMLTextAreaElement, index: number)
 };
 
 const detectCheckboxField = async (element: HTMLElement, index: number): Promise<Field | null> => {
-  if (!isElementVisible(element) || shouldSkipElement(element)) return null;
+  if (shouldSkipElement(element)) return null;
 
   const field = await createBaseField(element, index, 'checkbox');
 
@@ -1102,7 +1102,7 @@ export const detectFields = async (container: HTMLElement, isImplicitForm: boole
   );
 
   for (const element of elements) {
-    if (!isElementVisible(element) || shouldSkipElement(element)) continue;
+    if (shouldSkipElement(element)) continue;
 
     const role = getElementRole(element);
     let field: Field | null = null;
