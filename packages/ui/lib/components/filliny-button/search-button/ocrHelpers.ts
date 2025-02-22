@@ -5,7 +5,7 @@ const ocrCache = new Map<string, string>();
 let isCSPRestricted: boolean | null = null;
 
 // Add CSP detection helper
-const checkCSPRestrictions = (): boolean => {
+export const checkCSPRestrictions = (): boolean => {
   // If we've already checked, return cached result
   if (isCSPRestricted !== null) {
     return isCSPRestricted;

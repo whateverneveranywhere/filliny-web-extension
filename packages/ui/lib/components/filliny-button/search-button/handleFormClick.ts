@@ -6,6 +6,7 @@ import type { DTOProfileFillingForm } from '@extension/storage';
 import { profileStrorage } from '@extension/storage';
 import type { Field, FieldType } from '@extension/shared';
 import { aiFillService, getMatchingWebsite } from '@extension/shared';
+import { determineDetectionStrategy } from './strategyHelpers';
 
 const getMockValueForFieldType = (type: FieldType, field: Field): string => {
   const now = new Date();
@@ -132,12 +133,20 @@ export const handleFormClick = async (
 
   try {
     const startTime = performance.now();
-    const fields = await detectFields(formContainer);
+
+    const detectionStrategy = await determineDetectionStrategy(formContainer);
+    const fields = await detectFields(formContainer, false, detectionStrategy);
+
     console.log('Form Click: Detected fields:', fields);
 
     console.log(
       `%c⏱ Detection took: ${((performance.now() - startTime) / 1000).toFixed(2)}s`,
       'background: #059669; color: white; padding: 4px 8px; border-radius: 4px; font-size: 14px; font-weight: bold;',
+    );
+
+    console.log(
+      `%c🔍 Detection Method: ${detectionStrategy.toUpperCase()}`,
+      'background: #fbbf24; color: black; padding: 4px 8px; border-radius: 4px; font-size: 14px; font-weight: bold;',
     );
 
     if (testMode) {

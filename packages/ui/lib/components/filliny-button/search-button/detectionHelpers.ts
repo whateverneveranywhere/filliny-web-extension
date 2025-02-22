@@ -1086,19 +1086,56 @@ const generateUniqueSelectors = (element: HTMLElement): string[] => {
   return selectors;
 };
 
+// Update detection strategy type
+export type DetectionStrategy = 'ocr' | 'dom';
+
 // Restore the field detection functions that were accidentally removed
-export const detectFields = async (container: HTMLElement, isImplicitForm: boolean = false): Promise<Field[]> => {
+export const detectFields = async (
+  container: HTMLElement,
+  isImplicitForm: boolean = false,
+  strategy: DetectionStrategy = 'dom',
+): Promise<Field[]> => {
   const fields: Field[] = [];
   let index = 0;
   const processedGroups = new Set<string>();
 
-  // Process all elements and collect promises
+  console.log('Using detection strategy:', strategy);
+
+  if (strategy === 'ocr') {
+    // For OCR strategy, we'll process the entire container as one unit
+    // and extract fields using OCR techniques
+    const elements = Array.from(
+      container.querySelectorAll<HTMLElement>(
+        'input, select, textarea, [role="textbox"], [role="combobox"], [contenteditable="true"]',
+      ),
+    );
+
+    for (const element of elements) {
+      if (shouldSkipElement(element)) continue;
+
+      // For OCR strategy, we prioritize OCR-based label detection
+      const field = await createBaseField(element, index, getElementRole(element) || 'text', true);
+      if (field) {
+        fields.push(field);
+        index++;
+      }
+    }
+
+    return fields;
+  }
+
+  // For DOM strategy, use the existing DOM-based detection methods
   const elements = Array.from(
-    container.querySelectorAll<HTMLElement>(`
-      input[type="checkbox"], [role="checkbox"], [role="switch"],
-      input, select, textarea, [role="radio"], [role="textbox"],
-      [role="combobox"], [role="spinbutton"], [data-filliny-field]
-    `),
+    container.querySelectorAll<HTMLElement>(
+      `input:not([type="hidden"]):not([type="submit"]),
+       select, 
+       textarea,
+       [role="textbox"],
+       [role="combobox"],
+       [role="spinbutton"],
+       [contenteditable="true"],
+       [data-filliny-field]`,
+    ),
   );
 
   for (const element of elements) {
