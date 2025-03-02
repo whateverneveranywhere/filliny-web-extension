@@ -26,8 +26,8 @@ export interface Field {
   title?: string;
   label?: string;
   description?: string;
-  value?: string;
-  testValue?: string;
+  value?: string | string[];
+  testValue?: string | string[];
   options?: Array<{
     value: string;
     text: string;
@@ -58,6 +58,7 @@ export interface Field {
     actualSelect?: string;
     checkboxValue?: string;
     isExclusive?: boolean;
+    isMultiple?: boolean;
     groupName?: string;
   };
   xpath?: string;

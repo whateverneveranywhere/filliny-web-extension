@@ -6,8 +6,10 @@ import type { DTOProfileFillingForm } from '@extension/storage';
 import { profileStrorage } from '@extension/storage';
 import type { Field, FieldType } from '@extension/shared';
 import { aiFillService, getMatchingWebsite } from '@extension/shared';
-import { determineDetectionStrategy } from './strategyHelpers';
 
+/**
+ * Generate mock values for field testing
+ */
 const getMockValueForFieldType = (type: FieldType, field: Field): string => {
   const now = new Date();
 
@@ -83,22 +85,122 @@ const getMockValueForFieldType = (type: FieldType, field: Field): string => {
     case 'select': {
       if (!field.options?.length) return '';
 
-      // If there's a current value that matches an option, keep it
-      if (field.value) {
-        const matchingOption = field.options.find(opt => opt.value === field.value || opt.text === field.value);
-        if (matchingOption) return matchingOption.value;
+      // Check for a select element to examine options
+      const element = document.querySelector<HTMLElement>(`[data-filliny-id="${field.id}"]`);
+      if (element instanceof HTMLSelectElement) {
+        // Log available options for debugging
+        console.log(
+          `Test mode: Select options for ${field.id}:`,
+          Array.from(element.options).map(opt => ({
+            value: opt.value,
+            text: opt.text,
+            disabled: opt.disabled,
+          })),
+        );
+
+        // If there's a current value, keep it if available
+        if (field.value) {
+          // Try several strategies to match field.value to an option
+          let matchingOption: HTMLOptionElement | undefined;
+
+          // 1. Match by exact value
+          matchingOption = element.querySelector(`option[value="${field.value}"]`) as HTMLOptionElement;
+
+          // 2. Match by option text
+          if (!matchingOption) {
+            matchingOption = Array.from(element.options).find(
+              opt => opt.text === field.value || opt.text.toLowerCase() === String(field.value).toLowerCase(),
+            );
+          }
+
+          // 3. Match by numeric ID if possible
+          if (!matchingOption) {
+            const numValue = parseInt(String(field.value), 10);
+            if (!isNaN(numValue)) {
+              matchingOption = Array.from(element.options).find(opt => parseInt(opt.value, 10) === numValue);
+            }
+          }
+
+          if (matchingOption) {
+            console.log(
+              `Test mode: Using existing value ${field.value} for select ${field.id}, matched to option: ${matchingOption.text}`,
+            );
+            return matchingOption.value;
+          } else {
+            console.log(`Test mode: Couldn't match existing value ${field.value} to any option for select ${field.id}`);
+          }
+        }
+
+        // Skip placeholder options
+        const isPlaceholder = (option: HTMLOptionElement): boolean => {
+          const text = option.text.toLowerCase();
+          return (
+            text.includes('select') ||
+            text.includes('choose') ||
+            text.includes('pick') ||
+            text === '' ||
+            option.value === '' ||
+            option.disabled
+          );
+        };
+
+        // Find valid options (non-placeholder, not disabled)
+        const validOptions = Array.from(element.options).filter(opt => !isPlaceholder(opt));
+
+        if (validOptions.length > 0) {
+          // Pick a random valid option
+          const selectedOption = validOptions[Math.floor(Math.random() * validOptions.length)];
+          const selectedValue = selectedOption.value;
+          console.log(
+            `Test mode: Selected valid option with value ${selectedValue}, text: "${selectedOption.text}" for ${field.id}`,
+          );
+          return selectedValue;
+        }
+
+        // Fall back to first option if no valid options found
+        console.log(`Test mode: No valid options found, using first option for ${field.id}`);
+        return element.options[0]?.value || '';
       }
 
-      // Skip first option if it's a placeholder (e.g., "Select an option...")
-      const startIndex = field.options[0].text.toLowerCase().includes('select') ? 1 : 0;
-      if (startIndex < field.options.length) {
-        const randomIndex = startIndex + Math.floor(Math.random() * (field.options.length - startIndex));
-        return field.options[randomIndex].value;
+      // Fallback to using field options if direct element access fails
+      if (field.options?.length) {
+        // If there's a current value that matches an option, keep it
+        if (field.value) {
+          const matchingOption = field.options.find(
+            opt =>
+              opt.value === field.value ||
+              opt.text === field.value ||
+              opt.text.toLowerCase() === String(field.value).toLowerCase(),
+          );
+          if (matchingOption) {
+            console.log(`Test mode: Using existing value ${field.value} for select ${field.id} from field options`);
+            return matchingOption.value;
+          }
+        }
+
+        // Skip placeholder options
+        const nonPlaceholders = field.options.filter(opt => {
+          const text = opt.text.toLowerCase();
+          return !text.includes('select') && !text.includes('choose') && !text.includes('pick') && text !== '';
+        });
+
+        if (nonPlaceholders.length > 0) {
+          const selectedIndex = Math.floor(Math.random() * nonPlaceholders.length);
+          console.log(`Test mode: Using option ${selectedIndex} from field options for ${field.id}`);
+          return nonPlaceholders[selectedIndex].value;
+        }
+
+        // Last resort, use first option
+        console.log(`Test mode: Using first option from field options for ${field.id}`);
+        return field.options[0].value;
       }
-      return field.options[0].value;
+
+      // Last resort fallback
+      return 'option1';
     }
     case 'textarea':
-      return 'This is a sample textarea content for testing purposes.';
+      // Provide a longer multi-line sample for textareas to ensure they visibly update
+      return `This is a sample textarea content for testing purposes.\nThis form field supports multiple lines of text.\nFeel free to edit this example text.`;
     case 'button':
       return 'Click me';
     case 'fieldset':
@@ -108,10 +210,14 @@ const getMockValueForFieldType = (type: FieldType, field: Field): string => {
   }
 };
 
+/**
+ * Handle form click event
+ * This is the main entry point for form filling functionality
+ */
 export const handleFormClick = async (
   event: React.MouseEvent<HTMLButtonElement>,
   formId: string,
-  testMode: boolean = false,
+  testMode = false,
 ): Promise<void> => {
   event.preventDefault();
   const totalStartTime = performance.now();
@@ -134,28 +240,50 @@ export const handleFormClick = async (
   try {
     const startTime = performance.now();
 
-    const detectionStrategy = await determineDetectionStrategy(formContainer);
-    const fields = await detectFields(formContainer, false, detectionStrategy);
+    // Detect fields using DOM-only strategy
+    const fields = await detectFields(formContainer, false);
 
     console.log('Form Click: Detected fields:', fields);
-
     console.log(
       `%c⏱ Detection took: ${((performance.now() - startTime) / 1000).toFixed(2)}s`,
       'background: #059669; color: white; padding: 4px 8px; border-radius: 4px; font-size: 14px; font-weight: bold;',
     );
 
-    console.log(
-      `%c🔍 Detection Method: ${detectionStrategy.toUpperCase()}`,
-      'background: #fbbf24; color: black; padding: 4px 8px; border-radius: 4px; font-size: 14px; font-weight: bold;',
-    );
-
     if (testMode) {
-      // console.log('Form Click: Running in test mode - using mock data');
-      const mockResponse = fields.map(field => ({
-        ...field,
-        value: getMockValueForFieldType(field.type, field),
-      }));
-      await updateFormFields(mockResponse, testMode);
+      console.log('Running in test mode with example values');
+
+      // Create a visual indicator for test mode
+      const testModeIndicator = document.createElement('div');
+      testModeIndicator.textContent = 'Test Mode Active';
+      testModeIndicator.style.cssText =
+        'position: fixed; top: 20px; right: 20px; background: #4f46e5; color: white; padding: 8px 16px; border-radius: 4px; z-index: 10000; font-weight: bold;';
+      document.body.appendChild(testModeIndicator);
+
+      setTimeout(() => testModeIndicator.remove(), 5000);
+
+      // Use mock data for test mode - now with testValue properly set
+      const mockResponse = fields.map(field => {
+        const mockValue = getMockValueForFieldType(field.type, field);
+        return {
+          ...field,
+          // Set both value and testValue to ensure consistent behavior
+          value: mockValue,
+          testValue: mockValue,
+        };
+      });
+
+      // Log the mock values for debugging
+      console.log(
+        'Test mode: Mock values generated:',
+        mockResponse.map(f => ({
+          id: f.id,
+          type: f.type,
+          value: f.value,
+        })),
+      );
+
+      // Apply visual changes sequentially to simulate streaming updates
+      await simulateStreamingForTestMode(mockResponse);
       return;
     }
 
@@ -164,21 +292,17 @@ export const handleFormClick = async (
     const visitingUrl = window.location.href;
     const matchingWebsite = getMatchingWebsite((defaultProfile as DTOProfileFillingForm).fillingWebsites, visitingUrl);
 
-    // console.log('Form Click: Setting up stream handler');
     // Set up message listener for streaming response
     const streamPromise = new Promise<void>((resolve, reject) => {
       const messageHandler = (message: { type: string; data?: string; error?: string }) => {
-        // console.log('Form Click: Received message:', message.type);
         if (message.type === 'STREAM_CHUNK' && message.data) {
           try {
-            // console.log('Form Click: Processing chunk:', message.data.substring(0, 100) + '...');
             processChunks(message.data, fields);
           } catch (error) {
             console.error('Form Click: Error processing chunk:', error);
             // Don't reject here, continue processing other chunks
           }
         } else if (message.type === 'STREAM_DONE') {
-          // console.log('Form Click: Stream complete');
           chrome.runtime.onMessage.removeListener(messageHandler);
           resolve();
         } else if (message.type === 'STREAM_ERROR') {
@@ -191,7 +315,6 @@ export const handleFormClick = async (
       chrome.runtime.onMessage.addListener(messageHandler);
     });
 
-    // console.log('Form Click: Making API call');
     // Make the API call
     const response = await aiFillService({
       contextText: matchingWebsite?.fillingContext || defaultProfile?.defaultFillingContext || '',
@@ -200,14 +323,10 @@ export const handleFormClick = async (
       preferences: defaultProfile?.preferences,
     });
 
-    // console.log('Form Click: Got API response:', response);
-
     if (response instanceof ReadableStream) {
-      // console.log('Form Click: Processing stream response');
       // Wait for all streaming chunks to be processed
       await streamPromise;
     } else if (response.data) {
-      // console.log('Form Click: Processing regular response');
       await updateFormFields(response.data, false);
     } else {
       console.error('Form Click: Invalid response format:', response);
@@ -229,4 +348,15 @@ export const handleFormClick = async (
     );
     resetOverlays();
   }
+};
+
+/**
+ * Simulate streaming updates for test mode by updating fields in batches
+ * This creates a more realistic visual experience similar to regular streaming mode
+ */
+const simulateStreamingForTestMode = async (fields: Field[]): Promise<void> => {
+  // Process all fields at once for instant updates in test mode
+  console.log('Test mode: Processing all fields instantly');
+  await updateFormFields(fields, true);
+  console.log('Test mode: All fields processed');
 };

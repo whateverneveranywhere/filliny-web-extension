@@ -1,6 +1,4 @@
 import type { Field, FieldType } from '@extension/shared';
-import { getConfig } from '@extension/shared';
-import { getFieldLabelFromOCR, findOptimalLabelContainer } from './ocrHelpers';
 
 interface ReactElementProps {
   onSubmit?: () => void;
@@ -13,105 +11,72 @@ interface VueElement extends HTMLElement {
   __vue__?: unknown;
 }
 
-// Add new helper for computing element visibility with more robust checks
-const computeElementVisibility = (
-  element: HTMLElement,
-): {
-  isVisible: boolean;
-  hiddenReason?: string;
-} => {
-  // Check if element or any parent is hidden via CSS
-  const isHidden = (el: HTMLElement | null): boolean => {
-    while (el) {
-      const style = getComputedStyle(el);
-      const isFormControl = ['select', 'input', 'textarea'].includes(el.tagName.toLowerCase());
+// --- NEW HELPER: Query Shadow Roots ---
+const queryShadowRoot = (root: ShadowRoot, selector: string): HTMLElement[] => {
+  try {
+    return Array.from(root.querySelectorAll(selector));
+  } catch (e) {
+    console.warn('Error querying shadow root:', e);
+    return [];
+  }
+};
 
-      // More comprehensive visibility checks
-      if (
-        style.display === 'none' ||
-        style.visibility === 'hidden' ||
-        (!isFormControl && style.opacity === '0') ||
-        el.hasAttribute('hidden') ||
-        (style.position === 'absolute' && (parseInt(style.left) < -9999 || parseInt(style.top) < -9999))
-      ) {
-        return true;
+// --- Enhanced Visibility Checks ---
+const computeElementVisibility = (element: HTMLElement): { isVisible: boolean; hiddenReason?: string } => {
+  try {
+    const isHidden = (el: HTMLElement | null): boolean => {
+      while (el) {
+        const style = getComputedStyle(el);
+        const isFormControl = ['select', 'input', 'textarea'].includes(el.tagName.toLowerCase());
+        if (
+          style.display === 'none' ||
+          style.visibility === 'hidden' ||
+          (!isFormControl && parseFloat(style.opacity) === 0) ||
+          el.hasAttribute('hidden') ||
+          (style.position === 'absolute' && (parseInt(style.left) < -9999 || parseInt(style.top) < -9999))
+        ) {
+          return true;
+        }
+        el = el.parentElement;
       }
-      el = el.parentElement;
-    }
-    return false;
-  };
+      return false;
+    };
 
-  // Check dimensions and viewport position
-  const rect = element.getBoundingClientRect();
-  const hasZeroDimensions = !element.offsetWidth && !element.offsetHeight;
-  const isOutsideViewport =
-    rect.right <= 0 || rect.bottom <= 0 || rect.left >= window.innerWidth || rect.top >= window.innerHeight;
+    const rect = element.getBoundingClientRect();
+    const hasZeroDimensions = !element.offsetWidth && !element.offsetHeight;
+    const isOutsideViewport =
+      rect.right <= 0 || rect.bottom <= 0 || rect.left >= window.innerWidth || rect.top >= window.innerHeight;
 
-  // Special handling for form controls that might be styled differently
-  const isFormControl = ['select', 'input', 'textarea'].includes(element.tagName.toLowerCase());
+    const isFormControl = ['select', 'input', 'textarea'].includes(element.tagName.toLowerCase());
+    if (isFormControl && isHidden(element)) return { isVisible: false, hiddenReason: 'hidden-by-css' };
+    if (hasZeroDimensions) return { isVisible: false, hiddenReason: 'zero-dimensions' };
+    if (isOutsideViewport) return { isVisible: false, hiddenReason: 'outside-viewport' };
+    if (isHidden(element)) return { isVisible: false, hiddenReason: 'hidden-by-css' };
 
-  if (isFormControl) {
-    if (isHidden(element)) {
-      return { isVisible: false, hiddenReason: 'hidden-by-css' };
-    }
     return { isVisible: true };
+  } catch (error) {
+    console.error('Error computing visibility:', error);
+    return { isVisible: false, hiddenReason: 'error-computing' };
   }
-
-  if (hasZeroDimensions) {
-    return { isVisible: false, hiddenReason: 'zero-dimensions' };
-  }
-
-  if (isOutsideViewport) {
-    return { isVisible: false, hiddenReason: 'outside-viewport' };
-  }
-
-  if (isHidden(element)) {
-    return { isVisible: false, hiddenReason: 'hidden-by-css' };
-  }
-
-  return { isVisible: true };
 };
 
-// Update isElementVisible to use the new compute function
-const isElementVisible = (element: HTMLElement): boolean => {
-  const { isVisible } = computeElementVisibility(element);
-  return isVisible;
-};
+const isElementVisible = (element: HTMLElement): boolean => computeElementVisibility(element).isVisible;
 
+// --- Get Documents from All Frames (and Shadow DOM) ---
 const getAllFrameDocuments = (): Document[] => {
   const docs: Document[] = [document];
   const processedFrames = new Set<string>();
 
   const tryGetIframeDoc = (iframe: HTMLIFrameElement): Document | null => {
     try {
-      // Try different ways to access iframe content
-      if (iframe.contentDocument?.readyState === 'complete') {
-        return iframe.contentDocument;
-      }
-      if (iframe.contentWindow?.document?.readyState === 'complete') {
-        return iframe.contentWindow.document;
-      }
-      // If not complete but accessible, queue for retry
-      if (iframe.contentDocument || iframe.contentWindow?.document) {
-        setTimeout(() => {
-          const doc = tryGetIframeDoc(iframe);
-          if (doc && !processedFrames.has(iframe.src)) {
-            processedFrames.add(iframe.src);
-            docs.push(doc);
-            detectFormLikeContainers(); // Re-run detection
-          }
-        }, 500);
-      }
+      if (iframe.contentDocument?.readyState === 'complete') return iframe.contentDocument;
+      if (iframe.contentWindow?.document?.readyState === 'complete') return iframe.contentWindow.document;
     } catch (e) {
-      console.debug('Frame access restricted:', {
-        src: iframe.src,
-        error: (e as Error).message,
-      });
+      console.debug('Frame access restricted:', { src: iframe.src, error: (e as Error).message });
     }
     return null;
   };
 
-  // Process all iframes recursively
   const processIframes = (doc: Document) => {
     Array.from(doc.getElementsByTagName('iframe')).forEach(iframe => {
       if (!processedFrames.has(iframe.src)) {
@@ -119,7 +84,6 @@ const getAllFrameDocuments = (): Document[] => {
         if (iframeDoc) {
           processedFrames.add(iframe.src);
           docs.push(iframeDoc);
-          // Recursively process nested iframes
           processIframes(iframeDoc);
         }
       }
@@ -131,14 +95,11 @@ const getAllFrameDocuments = (): Document[] => {
   } catch (e) {
     console.warn('Error processing frames:', e);
   }
-
   return docs;
 };
 
-// Update the initialization to be more robust
 export const initializeIframeDetection = (): void => {
   let detectingForms = false;
-
   const safeDetectForms = () => {
     if (detectingForms) return;
     detectingForms = true;
@@ -148,157 +109,341 @@ export const initializeIframeDetection = (): void => {
     }, 0);
   };
 
-  // Watch for any DOM changes that might indicate new forms
   const observer = new MutationObserver(mutations => {
     const hasRelevantChanges = mutations.some(mutation =>
       Array.from(mutation.addedNodes).some(node => {
         if (node instanceof HTMLElement) {
-          return node.tagName === 'IFRAME' || node.tagName === 'FORM' || node.querySelector('form, iframe');
+          return node.tagName === 'IFRAME' || node.tagName === 'FORM' || !!node.querySelector('form, iframe');
         }
         return false;
       }),
     );
-
-    if (hasRelevantChanges) {
-      safeDetectForms();
-    }
+    if (hasRelevantChanges) safeDetectForms();
   });
 
-  observer.observe(document.body, {
-    childList: true,
-    subtree: true,
-  });
-
-  // Initial detection
+  observer.observe(document.body, { childList: true, subtree: true });
   safeDetectForms();
-
-  // Handle dynamic iframe loads
   window.addEventListener('load', safeDetectForms, { once: true });
   window.addEventListener('DOMContentLoaded', safeDetectForms, { once: true });
 };
 
-// Update querySelector to work across frames
 const querySelectorAllFrames = (selector: string): Element[] => {
   const results: Element[] = [];
   const documents = getAllFrameDocuments();
-
   for (const doc of documents) {
     try {
       results.push(...Array.from(doc.querySelectorAll(selector)));
+      // Also search in any shadow roots
+      Array.from(doc.querySelectorAll('*')).forEach(el => {
+        if (el.shadowRoot) {
+          results.push(...queryShadowRoot(el.shadowRoot, selector));
+        }
+      });
     } catch (e) {
       console.warn('Error querying in frame:', e);
     }
   }
-
   return results;
 };
 
-// Update getFieldLabel to maintain compatibility with existing calls
-export const getFieldLabel = async (
-  element: HTMLElement,
-  fieldIdOrConfig?: string | { enableOCRFirst?: boolean },
-): Promise<string> => {
-  // Get config first
-  const config = getConfig();
+// Global counter for fallback labels
+let fallbackLabelCounter = 1;
+const generateFallbackLabel = (): string => `Field ${fallbackLabelCounter++}`;
 
-  // Check if OCR should be tried first (either from config or passed parameter)
-  const shouldTryOCRFirst =
-    (typeof fieldIdOrConfig === 'object' && fieldIdOrConfig?.enableOCRFirst) || config.debug.enableOCRFirst;
+// --- NEW: Clean Up Candidate Text ---
+const cleanCandidateText = (text: string): string => {
+  let cleaned = text.trim();
+  // Remove trailing non-alphanumerics (e.g. "*", "✱")
+  cleaned = cleaned.replace(/[*✱\s]+$/g, '').trim();
+  // Replace multiple spaces with a single space
+  cleaned = cleaned.replace(/\s+/g, ' ');
+  return cleaned;
+};
 
-  // If OCR should be tried first, do it before other methods
-  if (shouldTryOCRFirst) {
-    const ocrLabel = await getFieldLabelFromOCR(element, typeof fieldIdOrConfig === 'string' ? fieldIdOrConfig : '');
-    if (ocrLabel && ocrLabel !== 'Unlabeled field' && !/^\d+$/.test(ocrLabel)) {
-      return ocrLabel;
+// --- NEW: Label Candidate Type ---
+interface LabelCandidate {
+  text: string;
+  confidence: number; // Lower means higher confidence
+  source: string;
+}
+
+// --- NEW: Aggregate Label Candidates ---
+// This function collects candidate labels from various sources.
+const aggregateLabelCandidates = async (element: HTMLElement): Promise<LabelCandidate[]> => {
+  const candidates: LabelCandidate[] = [];
+
+  try {
+    const addCandidate = (text: string, confidence: number, source: string) => {
+      const cleaned = cleanCandidateText(text);
+      if (isValidLabel(cleaned)) {
+        candidates.push({ text: cleaned, confidence, source });
+      }
+    };
+
+    // NEW: Check preceding sibling(s) of the field's parent for a label container
+    let current = element.parentElement;
+    while (current) {
+      const prev = current.previousElementSibling as HTMLElement;
+      const prevText = prev?.textContent;
+      if (prev && prevText && isValidLabel(prevText)) {
+        addCandidate(prevText, 12, 'preceding-sibling');
+        break;
+      }
+      current = current.parentElement;
     }
-  }
 
-  // Handle string case (fieldId) for non-OCR-first case
-  if (typeof fieldIdOrConfig === 'string' && !shouldTryOCRFirst) {
-    const ocrLabel = await getFieldLabelFromOCR(element, fieldIdOrConfig);
-    if (ocrLabel && ocrLabel !== 'Unlabeled field' && !/^\d+$/.test(ocrLabel)) {
-      return ocrLabel;
+    // 1. Explicit <label for="..."> (Highest confidence)
+    if (element.id) {
+      const labelEl = document.querySelector(`label[for="${element.id}"]`) as HTMLElement;
+      if (labelEl) {
+        const clone = labelEl.cloneNode(true) as HTMLElement;
+        clone.querySelectorAll('input, select, textarea').forEach(el => el.remove());
+        addCandidate(clone.textContent || '', 10, 'explicit-label');
+      }
     }
-  }
 
-  // Try standard HTML methods
-  const labelText = await getStandardLabel(element);
-  if (labelText) {
-    return labelText;
-  }
-
-  // Try ARIA attributes
-  const ariaLabel = element.getAttribute('aria-label')?.trim();
-  if (ariaLabel) {
-    return ariaLabel;
-  }
-
-  // Try finding associated label element
-  if (element.id) {
-    const labelElement = document.querySelector(`label[for="${element.id}"]`);
-    if (labelElement?.textContent) {
-      return labelElement.textContent.trim();
+    // 2. Wrapping <label>
+    const wrappingLabel = element.closest('label') as HTMLElement;
+    if (wrappingLabel) {
+      const clone = wrappingLabel.cloneNode(true) as HTMLElement;
+      clone.querySelectorAll('input, select, textarea').forEach(el => el.remove());
+      addCandidate(clone.textContent || '', 15, 'wrapping-label');
     }
-  }
 
-  // Try parent label
-  const parentLabel = element.closest('label');
-  if (parentLabel?.textContent) {
-    const clone = parentLabel.cloneNode(true) as HTMLElement;
-    clone.querySelectorAll('input, select, textarea').forEach(el => el.remove());
-    const text = clone.textContent?.trim() || '';
-    if (text) {
-      return text;
+    // 3. Closest container with 'label' in class
+    const containerWithLabel = element.closest("[class*='label']");
+    if (containerWithLabel && containerWithLabel !== element) {
+      addCandidate(
+        containerWithLabel.textContent || '',
+        (containerWithLabel.textContent?.split(/\s+/).length || 0) > 10 ? 18 : 20,
+        'closest-label-class',
+      );
     }
-  }
 
-  // Try OCR as a last resort if not tried first
-  if (!shouldTryOCRFirst) {
-    const ocrLabel = await getFieldLabelFromOCR(element, typeof fieldIdOrConfig === 'string' ? fieldIdOrConfig : '');
-    if (ocrLabel && ocrLabel !== 'Unlabeled field' && !/^\d+$/.test(ocrLabel)) {
-      return ocrLabel;
+    // 4. ARIA attributes
+    const ariaLabel = element.getAttribute('aria-label')?.trim() || '';
+    addCandidate(ariaLabel, 25, 'aria-label');
+    const ariaLabelledBy = element.getAttribute('aria-labelledby');
+    if (ariaLabelledBy) {
+      let combined = '';
+      for (const id of ariaLabelledBy.split(/\s+/)) {
+        const el = document.getElementById(id);
+        if (el) {
+          const clone = el.cloneNode(true) as HTMLElement;
+          clone.querySelectorAll('input, select, textarea').forEach(el => el.remove());
+          combined += (clone.textContent?.trim() || '') + ' ';
+        }
+      }
+      addCandidate(combined, 30, 'aria-labelledby');
     }
+
+    // 5. Shadow DOM labels
+    if (element.getRootNode() instanceof ShadowRoot) {
+      const shadowRoot = element.getRootNode() as ShadowRoot;
+      const shadowLabels = queryShadowRoot(shadowRoot, 'label');
+      for (const lab of shadowLabels) {
+        addCandidate(lab.textContent || '', 35, 'shadow-dom-label');
+      }
+    }
+
+    // 6. Nearby image labels (alt/title)
+    if (element.parentElement) {
+      const imgs = Array.from(element.parentElement.querySelectorAll('img')).filter(img =>
+        isNearbyElement(img, element),
+      );
+      for (const img of imgs) {
+        addCandidate(img.getAttribute('alt') || '', 40, 'img-alt');
+        addCandidate(img.getAttribute('title') || '', 45, 'img-title');
+      }
+    }
+
+    // 7. Proximity-based free text
+    const nearbyText = await findNearbyLabelText(element);
+    addCandidate(nearbyText, 50, 'nearby-text');
+
+    // 8. Attributes on the element: placeholder and title
+    addCandidate(element.getAttribute('placeholder') || '', 55, 'placeholder');
+    addCandidate(element.getAttribute('title') || '', 60, 'title-attr');
+
+    // 9. Derived from the name attribute
+    const nameAttr = element.getAttribute('name')?.trim() || '';
+    if (nameAttr) {
+      const nameCandidate = nameAttr
+        .split(/[._-]/)
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+        .join(' ')
+        .trim();
+      addCandidate(nameCandidate, 65, 'name-attr');
+    }
+
+    // 10. As a last resort, use the parent's text content
+    if (element.parentElement) {
+      addCandidate(element.parentElement.textContent || '', 70, 'parent-text');
+    }
+  } catch (error) {
+    console.warn('Error gathering label candidates:', error);
   }
 
-  // If all methods fail, try to extract from field attributes
-  const nameLabel = element
-    .getAttribute('name')
-    ?.split(/[._-]/)
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-    .join(' ')
-    .trim();
+  return candidates;
+};
 
-  if (nameLabel) {
-    return nameLabel;
+// --- Updated getFieldLabel using aggregated candidates ---
+export const getFieldLabel = async (element: HTMLElement): Promise<string> => {
+  try {
+    const candidates = await aggregateLabelCandidates(element);
+
+    // Sort by confidence (lower is better)
+    candidates.sort((a, b) => a.confidence - b.confidence);
+
+    // Return best candidate if its confidence is acceptable
+    if (candidates.length > 0 && candidates[0].confidence <= 75) {
+      return candidates[0].text;
+    }
+    return generateFallbackLabel();
+  } catch (error) {
+    console.error('Error in getFieldLabel:', error);
+    return generateFallbackLabel();
   }
+};
 
-  return 'Unlabeled field';
+// --- Improved Label Validation ---
+const isValidLabel = (text: string | undefined): boolean => {
+  if (!text) return false;
+  const trimmed = text.trim();
+  if (trimmed.length < 2) return false; // require at least 2 characters
+  if (!/[a-zA-Z0-9]/.test(trimmed)) return false; // must include alphanumerics
+  const placeholderTexts = [
+    'select',
+    'choose',
+    'pick',
+    'select one',
+    'please select',
+    'choose one',
+    '--',
+    'none',
+    'optional',
+    'required',
+    'select an option',
+    'choose an option',
+    'please choose',
+  ];
+  if (placeholderTexts.some(placeholder => trimmed.toLowerCase() === placeholder)) return false;
+  if (/^[^\w\s]+$/.test(trimmed)) return false; // solely punctuation
+  if (trimmed.split(/\s+/).length > 15) return false; // too many words
+  return true;
+};
+
+const isNearbyElement = (element1: HTMLElement, element2: HTMLElement): boolean => {
+  try {
+    const rect1 = element1.getBoundingClientRect();
+    const rect2 = element2.getBoundingClientRect();
+    const threshold = 50;
+    const isHorizontallyNear =
+      Math.abs(rect1.left - rect2.left) < threshold || Math.abs(rect1.right - rect2.right) < threshold;
+    const isVerticallyNear =
+      Math.abs(rect1.top - rect2.top) < threshold || Math.abs(rect1.bottom - rect2.bottom) < threshold;
+    return isHorizontallyNear || isVerticallyNear;
+  } catch (error) {
+    console.warn('Error in isNearbyElement:', error);
+    return false;
+  }
+};
+
+const findFormContainer = (element: HTMLElement): HTMLElement | null => {
+  try {
+    const formContainer = element.closest('[data-filliny-form-container="true"]');
+    if (formContainer) return formContainer as HTMLElement;
+    const formLikeContainer = element.closest('form, fieldset, [role="form"], [class*="form"], [class*="form-group"]');
+    if (formLikeContainer) return formLikeContainer as HTMLElement;
+    let currentElement = element.parentElement;
+    while (currentElement) {
+      const fields = getFormFields(currentElement);
+      if (fields.length >= 2) return currentElement;
+      currentElement = currentElement.parentElement;
+    }
+  } catch (error) {
+    console.warn('Error in findFormContainer:', error);
+  }
+  return null;
+};
+
+const findNearbyLabelText = async (element: HTMLElement): Promise<string> => {
+  try {
+    const rect = element.getBoundingClientRect();
+    const container = findFormContainer(element);
+    if (!container) return '';
+    const searchRegions = {
+      above: { top: rect.top - 100, bottom: rect.top, left: rect.left - 50, right: rect.right + 50 },
+      left: { top: rect.top - 20, bottom: rect.bottom + 20, left: Math.max(0, rect.left - 300), right: rect.left },
+    };
+
+    const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, {
+      acceptNode: node => {
+        if (
+          node.parentElement?.closest('input, select, textarea, [placeholder]') ||
+          node.parentElement?.getAttribute('role') === 'option' ||
+          node.parentElement?.matches("[class*='placeholder']")
+        ) {
+          return NodeFilter.FILTER_REJECT;
+        }
+        const txt = node.textContent?.trim();
+        return txt && isValidLabel(txt) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+      },
+    });
+
+    let bestText = '';
+    let bestScore = Infinity;
+    while (walker.nextNode()) {
+      const node = walker.currentNode;
+      const range = document.createRange();
+      range.selectNodeContents(node);
+      const textRect = range.getBoundingClientRect();
+      for (const [region, bounds] of Object.entries(searchRegions)) {
+        if (
+          textRect.right >= bounds.left &&
+          textRect.left <= bounds.right &&
+          textRect.bottom >= bounds.top &&
+          textRect.top <= bounds.bottom
+        ) {
+          const distance = region === 'above' ? rect.top - textRect.bottom : rect.left - textRect.right;
+          if (distance < 0) continue;
+          let score = distance;
+          if (region === 'above' && Math.abs(textRect.left - rect.left) < 20) score -= 50;
+          if (region === 'left' && Math.abs(textRect.top - rect.top) < 20) score -= 30;
+          const wordCount = (node.textContent || '').trim().split(/\s+/).length;
+          if (wordCount > 10) score -= 20;
+          if (score < bestScore) {
+            const candidate = node.textContent?.trim() || '';
+            if (
+              isValidLabel(candidate) &&
+              !(element instanceof HTMLInputElement && candidate.includes(element.value))
+            ) {
+              bestScore = score;
+              bestText = candidate;
+            }
+          }
+        }
+      }
+    }
+    return bestText;
+  } catch (error) {
+    console.warn('Error in findNearbyLabelText:', error);
+    return '';
+  }
 };
 
 const shouldSkipElement = (element: HTMLElement): boolean => {
-  // Skip disabled elements
-  if (element.hasAttribute('disabled')) return true;
-
-  // Skip readonly elements
-  if (element.hasAttribute('readonly')) return true;
-
-  // Skip elements with specific data attributes
-  if (element.getAttribute('data-filliny-skip') === 'true') return true;
-
-  // Skip elements that are part of autocomplete/datalist
-  if (element.hasAttribute('list')) return true;
-
-  return false;
+  return (
+    element.hasAttribute('disabled') ||
+    element.hasAttribute('readonly') ||
+    element.getAttribute('data-filliny-skip') === 'true' ||
+    element.hasAttribute('list')
+  );
 };
 
-// Add new helper to detect framework-specific properties
 const detectFramework = (
   element: HTMLElement,
-): {
-  framework: 'react' | 'angular' | 'vue' | 'vanilla';
-  props?: ReactElementProps;
-} => {
-  // Check for React
+): { framework: 'react' | 'angular' | 'vue' | 'vanilla'; props?: ReactElementProps } => {
   const reactKey = Object.keys(element).find(key => key.startsWith('__react') || key.startsWith('_reactProps'));
   if (reactKey) {
     return {
@@ -306,49 +451,32 @@ const detectFramework = (
       props: (element as unknown as { [key: string]: ReactElementProps })[reactKey],
     };
   }
-
-  // Check for Angular
-  if (element.hasAttribute('ng-model') || element.hasAttribute('[(ngModel)]')) {
-    return { framework: 'angular' };
-  }
-
-  // Check for Vue
-  if (element.hasAttribute('v-model') || (element as VueElement).__vue__) {
-    return { framework: 'vue' };
-  }
-
+  if (element.hasAttribute('ng-model') || element.hasAttribute('[(ngModel)]')) return { framework: 'angular' };
+  if (element.hasAttribute('v-model') || (element as VueElement).__vue__) return { framework: 'vue' };
   return { framework: 'vanilla' };
 };
 
-// Add new helper for tracking used IDs
 const usedFieldIds = new Set<string>();
-
 const getUniqueFieldId = (baseIndex: number): string => {
   let fieldId = `field-${baseIndex}`;
   let counter = baseIndex;
-
   while (usedFieldIds.has(fieldId)) {
     counter++;
     fieldId = `field-${counter}`;
   }
-
   usedFieldIds.add(fieldId);
   return fieldId;
 };
 
-// Update field detection to use framework information
 const detectInputField = async (
   input: HTMLInputElement,
   index: number,
   testMode: boolean = false,
 ): Promise<Field | null> => {
   if (shouldSkipElement(input)) return null;
-
   const framework = detectFramework(input);
   const field = await createBaseField(input, index, input.type, testMode);
   if (!field) return null;
-
-  // Special handling for Select2 inputs
   if (input.classList.contains('select2-focusser')) {
     const select2Container = input.closest('.select2-container');
     if (select2Container) {
@@ -358,11 +486,9 @@ const detectInputField = async (
         if (actualSelect) {
           const selectField = await createBaseField(actualSelect, index, 'select', testMode);
           if (!selectField) return null;
-
-          // Set data attribute on both elements
           select2Container.setAttribute('data-filliny-id', selectField.id);
           input.setAttribute('data-filliny-id', selectField.id);
-
+          const isMultiple = actualSelect.multiple;
           selectField.options = await Promise.all(
             Array.from(actualSelect.options).map(async opt => ({
               value: opt.value,
@@ -370,8 +496,6 @@ const detectInputField = async (
               selected: opt.selected,
             })),
           );
-
-          // Always select first valid option in test mode
           const validOptions = selectField.options.filter(
             opt =>
               opt.value &&
@@ -379,34 +503,32 @@ const detectInputField = async (
               !opt.text.includes('--') &&
               !opt.text.toLowerCase().includes('please select'),
           );
-
           if (validOptions.length > 0) {
-            selectField.testValue = validOptions[0].value;
-            selectField.value = validOptions[0].value; // Set the value immediately in test mode
+            if (isMultiple) {
+              selectField.testValue = validOptions.slice(0, 2).map(opt => opt.value);
+              selectField.value = validOptions.slice(0, 2).map(opt => opt.value);
+            } else {
+              selectField.testValue = validOptions[0].value;
+              selectField.value = validOptions[0].value;
+            }
           }
-
-          // Add Select2-specific metadata
           selectField.metadata = {
             framework: 'select2',
             select2Container: select2Container.id,
             actualSelect: selectId,
+            isMultiple,
             visibility: computeElementVisibility(actualSelect),
           };
-
           return selectField;
         }
       }
     }
   }
-
-  // Add framework-specific metadata
   field.metadata = {
     framework: framework.framework,
     frameworkProps: framework.props,
     visibility: computeElementVisibility(input),
   };
-
-  // Rest of the existing detection logic...
   switch (input.type) {
     case 'button':
     case 'submit':
@@ -426,10 +548,7 @@ const detectInputField = async (
     case 'number':
       field.value = input.value || '';
       if (input.type === 'number' || input.type === 'range') {
-        field.validation = {
-          ...field.validation,
-          step: Number(input.step) || 1,
-        };
+        field.validation = { ...field.validation, step: Number(input.step) || 1 };
       }
       return field;
     case 'file':
@@ -440,14 +559,11 @@ const detectInputField = async (
   }
 };
 
-// Add helper for detecting dynamic select options
 const detectDynamicSelectOptions = async (
   element: HTMLSelectElement | HTMLElement,
 ): Promise<Array<{ value: string; text: string; selected: boolean }>> => {
   const options: Array<{ value: string; text: string; selected: boolean }> = [];
-
   try {
-    // Strategy 1: Check if we're dealing with a native select
     if (element instanceof HTMLSelectElement) {
       return Array.from(element.options).map(opt => ({
         value: opt.value,
@@ -455,8 +571,6 @@ const detectDynamicSelectOptions = async (
         selected: opt.selected,
       }));
     }
-
-    // Strategy 2: Find any associated select by ID relationships
     const elementId = element.id || element.getAttribute('aria-controls') || element.getAttribute('aria-owns');
     if (elementId) {
       const associatedSelect = document.querySelector(
@@ -470,11 +584,8 @@ const detectDynamicSelectOptions = async (
         }));
       }
     }
-
-    // Strategy 3: Walk up the DOM to find the nearest common container
     let currentElement: HTMLElement | null = element;
     while (currentElement && !options.length) {
-      // Look for any select or option elements in this container
       const selectsAndOptions = Array.from(currentElement.children).filter(
         child =>
           child instanceof HTMLSelectElement ||
@@ -482,9 +593,7 @@ const detectDynamicSelectOptions = async (
           child.getAttribute('role') === 'listbox' ||
           child.getAttribute('role') === 'option',
       );
-
       if (selectsAndOptions.length > 0) {
-        // Found potential options container
         for (const el of selectsAndOptions) {
           if (el instanceof HTMLSelectElement) {
             return Array.from(el.options).map(opt => ({
@@ -499,7 +608,6 @@ const detectDynamicSelectOptions = async (
               selected: el.selected,
             });
           } else {
-            // Handle role="option" elements
             const value = el.getAttribute('data-value') || el.getAttribute('value') || el.textContent?.trim() || '';
             const text = el.textContent?.trim() || value;
             options.push({
@@ -511,8 +619,6 @@ const detectDynamicSelectOptions = async (
         }
         if (options.length) return options;
       }
-
-      // Strategy 4: Look for hidden inputs that might contain option data
       const hiddenInputs = currentElement.querySelectorAll('input[type="hidden"]');
       for (const input of Array.from(hiddenInputs)) {
         if (input instanceof HTMLInputElement && input.value) {
@@ -529,12 +635,10 @@ const detectDynamicSelectOptions = async (
               if (parsedOptions.length) return parsedOptions;
             }
           } catch {
-            // Not JSON data, continue
+            // Ignore JSON parse errors
           }
         }
       }
-
-      // Strategy 5: Check for sibling elements that might be options
       const siblings = Array.from(currentElement.children);
       const optionLikeElements = siblings.filter(
         sibling =>
@@ -542,7 +646,6 @@ const detectDynamicSelectOptions = async (
           sibling.tagName === 'OPTION' ||
           (sibling.tagName === 'LI' && sibling.closest('[role="listbox"]')),
       );
-
       if (optionLikeElements.length) {
         return optionLikeElements
           .map(opt => ({
@@ -552,11 +655,8 @@ const detectDynamicSelectOptions = async (
           }))
           .filter(opt => opt.value || opt.text);
       }
-
       currentElement = currentElement.parentElement;
     }
-
-    // Strategy 6: Look for a listbox/combobox relationship
     const listboxId = element.getAttribute('aria-controls') || element.getAttribute('aria-owns');
     if (listboxId) {
       const listbox = document.getElementById(listboxId);
@@ -574,32 +674,19 @@ const detectDynamicSelectOptions = async (
   } catch (error) {
     console.warn('Error in option detection:', error);
   }
-
   return options;
 };
 
-// Update detectSelectField to ensure we always have options
 const detectSelectField = async (select: HTMLSelectElement | HTMLElement, index: number): Promise<Field | null> => {
   if (shouldSkipElement(select)) return null;
-
   const field = await createBaseField(select, index, 'select');
-
-  // Get initial value
   field.value = select instanceof HTMLSelectElement ? select.value : select.getAttribute('value') || '';
-
-  // Detect options including dynamic ones
   const detectedOptions = await detectDynamicSelectOptions(select);
   field.options = detectedOptions;
-
-  // Set test value if options are available
   if (detectedOptions.length > 0) {
-    // Skip first option if it looks like a placeholder
     const startIndex = detectedOptions[0].text.toLowerCase().includes('select') ? 1 : 0;
-    if (startIndex < detectedOptions.length) {
-      field.testValue = detectedOptions[startIndex].value;
-    }
+    if (startIndex < detectedOptions.length) field.testValue = detectedOptions[startIndex].value;
   }
-
   return field;
 };
 
@@ -610,83 +697,48 @@ const detectRadioGroup = async (
 ): Promise<Field | null> => {
   const name = element.name;
   if (!name || processedGroups.has(name)) return null;
-
-  // Find the parent form or form-like container
   const container = element.closest('form, [data-filliny-confidence], fieldset, [role="radiogroup"]');
   if (!container) return null;
-
   const groupElements = container.querySelectorAll<HTMLInputElement>(`input[type="radio"][name="${name}"]`);
   const visibleElements = Array.from(groupElements).filter(el => !shouldSkipElement(el));
-
   if (visibleElements.length === 0) return null;
-
-  // Create field for the group
   const field = await createBaseField(visibleElements[0], index, 'radio');
-
-  // Find the common container for all radio buttons in the group
   const commonContainer = findCommonContainer(visibleElements);
   if (commonContainer) {
-    // Try to get a group label first from the container
-    const containerLabel = await getFieldLabel(commonContainer, field.id);
-    if (containerLabel && containerLabel !== 'Unlabeled field') {
-      field.label = containerLabel;
-    }
+    const containerLabel = await getFieldLabel(commonContainer);
+    if (containerLabel && containerLabel !== 'Unlabeled field') field.label = containerLabel;
   }
-
-  // Get labels for each radio option
   field.options = await Promise.all(
     visibleElements.map(async el => {
-      // Find the closest label container for this radio button
       const labelContainer = findRadioLabelContainer(el);
       let labelText = '';
-
       if (labelContainer) {
-        // First try standard label detection methods
         const standardLabel = await getStandardLabel(labelContainer);
         if (standardLabel) {
           labelText = standardLabel;
-        } else if (getConfig().debug.enableOCRFirst) {
-          // Only try OCR if enabled
-          const { container: ocrContainer } = findOptimalLabelContainer(labelContainer);
-          labelText = await getFieldLabelFromOCR(ocrContainer, field.id);
         }
       }
-
-      // Fallback to element value if no label found
-      return {
-        value: el.value,
-        text: labelText || el.value,
-        selected: el.checked,
-      };
+      return { value: el.value, text: labelText || el.value, selected: el.checked };
     }),
   );
-
   const selectedRadio = visibleElements.find(el => el.checked);
   field.value = selectedRadio ? field.options.find(opt => opt.value === selectedRadio.value)?.text || '' : '';
   field.testValue = visibleElements[0].getAttribute('data-test-value') || '';
-
-  // Add field ID to all radio buttons in group and their containers
   visibleElements.forEach(el => {
     el.setAttribute('data-filliny-id', field.id);
     const container = findRadioLabelContainer(el);
-    if (container) {
-      container.setAttribute('data-filliny-id', field.id);
-    }
+    if (container) container.setAttribute('data-filliny-id', field.id);
   });
-
   processedGroups.add(name);
   return field;
 };
 
-// Helper function to find the common container for a group of radio buttons
 const findCommonContainer = (elements: HTMLElement[]): HTMLElement | null => {
   if (elements.length === 0) return null;
   if (elements.length === 1) return elements[0].parentElement;
-
   let commonAncestor = elements[0].parentElement;
   while (commonAncestor) {
     if (elements.every(el => commonAncestor?.contains(el))) {
-      // Check if this is a meaningful container (fieldset, div with role, etc.)
       if (
         commonAncestor.tagName.toLowerCase() === 'fieldset' ||
         commonAncestor.getAttribute('role') === 'radiogroup' ||
@@ -701,85 +753,60 @@ const findCommonContainer = (elements: HTMLElement[]): HTMLElement | null => {
   return null;
 };
 
-// Helper function to find the best label container for a radio button
 const findRadioLabelContainer = (radio: HTMLElement): HTMLElement | null => {
-  // First check for an explicit label
   if (radio.id) {
     const explicitLabel = radio.ownerDocument.querySelector<HTMLElement>(`label[for="${radio.id}"]`);
     if (explicitLabel) return explicitLabel;
   }
-
-  // Check for wrapping label
   const wrapperLabel = radio.closest('label');
   if (wrapperLabel) return wrapperLabel;
-
-  // Look for adjacent label-like elements
   const parent = radio.parentElement;
   if (!parent) return null;
-
-  // Check siblings
   const siblings = Array.from(parent.children);
   const radioIndex = siblings.indexOf(radio);
-
-  // Check next sibling first (most common pattern)
   if (radioIndex < siblings.length - 1) {
     const next = siblings[radioIndex + 1];
     if (isLabelLike(next)) return next as HTMLElement;
   }
-
-  // Check previous sibling
   if (radioIndex > 0) {
     const prev = siblings[radioIndex - 1];
     if (isLabelLike(prev)) return prev as HTMLElement;
   }
-
-  // If no good container found, return parent as fallback
   return parent;
 };
 
-// Helper to check if an element is likely to contain a label
 const isLabelLike = (element: Element): boolean => {
-  // First ensure we have an HTMLElement
   if (!(element instanceof HTMLElement)) return false;
-
-  // Now TypeScript knows element is HTMLElement
   const tagName = element.tagName.toLowerCase();
   if (['label', 'span', 'div', 'p'].includes(tagName)) {
-    // Check if element has meaningful text content
     const text = element.textContent?.trim() || '';
     return text.length > 0 && text.length < 100 && !/^[0-9.,$€£%]+$/.test(text);
   }
   return false;
 };
 
-// Helper to get standard label without OCR
 const getStandardLabel = async (element: HTMLElement): Promise<string> => {
-  // Check for explicit text content
-  const text = element.textContent?.trim();
-  if (text && text.length > 0 && text.length < 100 && !/^[0-9.,$€£%]+$/.test(text)) {
-    return text;
+  try {
+    const text = element.textContent?.trim();
+    if (text && text.length > 0 && text.length < 100 && !/^[0-9.,$€£%]+$/.test(text)) return text;
+    const ariaLabel = element.getAttribute('aria-label')?.trim();
+    if (ariaLabel) return ariaLabel;
+    const labelledBy = element.getAttribute('aria-labelledby');
+    if (labelledBy) {
+      const labelTexts = labelledBy
+        .split(/\s+/)
+        .map(id => element.ownerDocument.getElementById(id)?.textContent?.trim())
+        .filter(Boolean);
+      if (labelTexts.length) return labelTexts.join(' ');
+    }
+  } catch (error) {
+    console.warn('Error in getStandardLabel:', error);
   }
-
-  // Check ARIA attributes
-  const ariaLabel = element.getAttribute('aria-label')?.trim();
-  if (ariaLabel) return ariaLabel;
-
-  // Check ARIA labelledby
-  const labelledBy = element.getAttribute('aria-labelledby');
-  if (labelledBy) {
-    const labelTexts = labelledBy
-      .split(/\s+/)
-      .map(id => element.ownerDocument.getElementById(id)?.textContent?.trim())
-      .filter(Boolean);
-    if (labelTexts.length) return labelTexts.join(' ');
-  }
-
   return '';
 };
 
 const detectTextareaField = async (textarea: HTMLTextAreaElement, index: number): Promise<Field | null> => {
   if (!isElementVisible(textarea) || shouldSkipElement(textarea)) return null;
-
   const field = await createBaseField(textarea, index, 'textarea');
   field.value = textarea.value || '';
   field.testValue = textarea.getAttribute('data-test-value') || '';
@@ -788,48 +815,31 @@ const detectTextareaField = async (textarea: HTMLTextAreaElement, index: number)
 
 const detectCheckboxField = async (element: HTMLElement, index: number): Promise<Field | null> => {
   if (shouldSkipElement(element)) return null;
-
   const field = await createBaseField(element, index, 'checkbox');
-
-  // Get the current state
   let isChecked = false;
-  if (element instanceof HTMLInputElement) {
-    isChecked = element.checked;
-  } else {
-    isChecked = element.getAttribute('aria-checked') === 'true' || element.hasAttribute('checked');
-  }
-
-  // Store boolean value as string
+  if (element instanceof HTMLInputElement) isChecked = element.checked;
+  else isChecked = element.getAttribute('aria-checked') === 'true' || element.hasAttribute('checked');
   field.value = isChecked.toString();
-
   field.metadata = {
     framework: 'vanilla',
-    visibility: { isVisible: isElementVisible(element) },
+    visibility: computeElementVisibility(element),
     checkboxValue: element instanceof HTMLInputElement ? element.value : 'on',
     isExclusive:
       element.hasAttribute('data-exclusive') ||
-      element.closest('[role="radiogroup"]') !== null ||
+      element.closest("[role='radiogroup']") !== null ||
       element.closest('fieldset[data-exclusive]') !== null,
     groupName:
       element instanceof HTMLInputElement
         ? element.name
         : element.getAttribute('data-group') || element.closest('fieldset')?.id,
   };
-
   return field;
 };
 
 const getElementRole = (element: HTMLElement): string | null => {
-  // Check explicit role first
   const role = element.getAttribute('role');
   if (role) return role;
-
-  // Check input type for input elements
-  if (element instanceof HTMLInputElement) {
-    return element.type;
-  }
-
-  // Map HTML elements to implicit roles
+  if (element instanceof HTMLInputElement) return element.type;
   switch (element.tagName.toLowerCase()) {
     case 'select':
       return 'combobox';
@@ -841,32 +851,17 @@ const getElementRole = (element: HTMLElement): string | null => {
 };
 
 const getElementValue = (element: HTMLElement): string => {
-  // Check standard value attribute
   const value = element.getAttribute('value') || '';
-
-  // Check aria-checked for checkbox-like elements
   const checked = element.getAttribute('aria-checked');
-  if (checked) {
-    return checked;
-  }
-
-  // Check data-state for custom components
+  if (checked) return checked;
   const state = element.getAttribute('data-state');
-  if (state) {
-    return state;
-  }
-
-  // For input-like elements
-  if (element instanceof HTMLInputElement) {
-    return element.value;
-  }
-
-  // For custom components, check inner text
+  if (state) return state;
+  if (element instanceof HTMLInputElement) return element.value;
   return value || element.textContent?.trim() || '';
 };
 
 const getFormFields = (element: HTMLElement): HTMLElement[] => {
-  const fields = Array.from(
+  return Array.from(
     element.querySelectorAll<HTMLElement>(
       `input:not([type="hidden"]):not([type="submit"]),
        select, 
@@ -883,38 +878,21 @@ const getFormFields = (element: HTMLElement): HTMLElement[] => {
        [class*="textbox"]`,
     ),
   ).filter(el => isElementVisible(el) && !shouldSkipElement(el));
-
-  return fields;
 };
 
-// Update detectFormLikeContainers to remove debug logs
 export const detectFormLikeContainers = async (): Promise<HTMLElement[]> => {
   const containers: HTMLElement[] = [];
   const documents = getAllFrameDocuments();
-
   for (const doc of documents) {
     try {
-      // First, get all native forms - these take precedence
       const nativeForms = Array.from(doc.querySelectorAll<HTMLFormElement>('form'));
       if (nativeForms.length > 0) {
         containers.push(...nativeForms);
-        continue; // Skip looking for form-like containers if we found native forms
+        continue;
       }
-
-      // If no native forms, look for form-like containers
       const allFields = getFormFields(doc.body);
-
       if (allFields.length >= 2) {
-        // Create a map of containers to their field counts
-        const containerFieldCounts = new Map<
-          HTMLElement,
-          {
-            fields: HTMLElement[];
-            depth: number;
-          }
-        >();
-
-        // For each field, walk up the DOM tree and count fields in each container
+        const containerFieldCounts = new Map<HTMLElement, { fields: HTMLElement[]; depth: number }>();
         allFields.forEach(field => {
           let current = field.parentElement;
           let depth = 0;
@@ -928,63 +906,39 @@ export const detectFormLikeContainers = async (): Promise<HTMLElement[]> => {
             depth++;
           }
         });
-
-        // Convert to array for sorting
         const containerEntries = Array.from(containerFieldCounts.entries());
-
-        // Sort containers by:
-        // 1. Number of fields (descending)
-        // 2. DOM depth (ascending - prefer shallower containers)
-        // 3. DOM position (ascending - prefer earlier in document)
         containerEntries.sort(([containerA, dataA], [containerB, dataB]) => {
-          // First compare by number of fields
           const fieldDiff = dataB.fields.length - dataA.fields.length;
           if (fieldDiff !== 0) return fieldDiff;
-
-          // If same number of fields, prefer shallower containers
           const depthDiff = dataA.depth - dataB.depth;
           if (depthDiff !== 0) return depthDiff;
-
-          // If same depth, prefer the one that appears earlier in DOM
           const position = containerA.compareDocumentPosition(containerB);
           if (position & Node.DOCUMENT_POSITION_FOLLOWING) return -1;
           if (position & Node.DOCUMENT_POSITION_PRECEDING) return 1;
           return 0;
         });
-
-        // Get the container with the most fields that's not nested in another container
         for (const [container, data] of containerEntries) {
-          // Skip if this container has too few fields
           if (data.fields.length < 2) continue;
-
-          // Skip if this container is nested inside an already selected container
           if (containers.some(selected => selected.contains(container))) continue;
-
-          // Skip if this container has mostly the same fields as an already selected container
           const hasOverlappingFields = containers.some(selected => {
             const selectedFields = getFormFields(selected);
             const commonFields = data.fields.filter(field => selectedFields.includes(field));
-            return commonFields.length >= data.fields.length * 0.5; // 50% overlap threshold
+            return commonFields.length >= data.fields.length * 0.5;
           });
-
           if (hasOverlappingFields) continue;
-
           container.setAttribute('data-filliny-form-container', 'true');
           containers.push(container);
-          break; // Only take the best container if no native forms
+          break;
         }
       }
     } catch (e) {
       console.error('Error in form detection:', e);
     }
   }
-
   return containers;
 };
 
-// Add new helper for XPath-based element location
 export const findElementByXPath = (xpath: string): HTMLElement | null => {
-  // Try direct XPath first
   for (const doc of getAllFrameDocuments()) {
     try {
       const result = doc.evaluate(xpath, doc, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
@@ -994,25 +948,19 @@ export const findElementByXPath = (xpath: string): HTMLElement | null => {
       console.warn('XPath evaluation failed:', e);
     }
   }
-
-  // Fallback to querySelector if XPath fails
   const elements = querySelectorAllFrames('[data-filliny-id]');
   return (elements[0] as HTMLElement) || null;
 };
 
-// Add helper to generate XPath for an element
 const getElementXPath = (element: HTMLElement): string => {
   if (!element.parentElement) return '';
-
   const idx =
     Array.from(element.parentElement.children)
       .filter(child => child.tagName === element.tagName)
       .indexOf(element) + 1;
-
   return `${getElementXPath(element.parentElement)}/${element.tagName.toLowerCase()}[${idx}]`;
 };
 
-// Update field creation to include XPath information
 const createBaseField = async (
   element: HTMLElement,
   index: number,
@@ -1020,11 +968,7 @@ const createBaseField = async (
   testMode: boolean = false,
 ): Promise<Field> => {
   const fieldId = getUniqueFieldId(index);
-
-  // Set the data attribute on the element
   element.setAttribute('data-filliny-id', fieldId);
-
-  // First detect all field properties except label
   const field: Field = {
     id: fieldId,
     type: type as FieldType,
@@ -1032,11 +976,7 @@ const createBaseField = async (
     uniqueSelectors: generateUniqueSelectors(element),
     value: '',
   };
-
-  // Now get the label using OCR as primary strategy
   field.label = await getFieldLabel(element);
-
-  // Generate default test values based on field type
   if (testMode) {
     switch (type) {
       case 'text':
@@ -1049,7 +989,6 @@ const createBaseField = async (
         field.testValue = '+1234567890';
         break;
       case 'select':
-        // Will be handled by Select2 specific code
         break;
       case 'number':
         field.testValue = '42';
@@ -1058,51 +997,32 @@ const createBaseField = async (
         field.testValue = `Test ${type}`;
     }
   }
-
   return field;
 };
 
-// Helper to generate multiple unique selectors for an element
 const generateUniqueSelectors = (element: HTMLElement): string[] => {
   const selectors: string[] = [];
-
-  // ID-based selector
-  if (element.id) {
-    selectors.push(`#${CSS.escape(element.id)}`);
-  }
-
-  // Class-based selector
+  if (element.id) selectors.push(`#${CSS.escape(element.id)}`);
   if (element.className) {
     const classSelector = Array.from(element.classList)
       .map(c => `.${CSS.escape(c)}`)
       .join('');
     if (classSelector) selectors.push(classSelector);
   }
-
-  // Attribute-based selectors
   ['name', 'type', 'role', 'aria-label'].forEach(attr => {
     if (element.hasAttribute(attr)) {
       selectors.push(`[${attr}="${CSS.escape(element.getAttribute(attr)!)}"]`);
     }
   });
-
   return selectors;
 };
 
-// Update detection strategy type
-export type DetectionStrategy = 'ocr' | 'dom';
+export type DetectionStrategy = 'dom';
 
-// Restore the field detection functions that were accidentally removed
-export const detectFields = async (
-  container: HTMLElement,
-  isImplicitForm: boolean = false,
-  strategy: DetectionStrategy = 'dom',
-): Promise<Field[]> => {
+export const detectFields = async (container: HTMLElement, isImplicitForm = false): Promise<Field[]> => {
   const fields: Field[] = [];
   let index = 0;
   const processedGroups = new Set<string>();
-
-  // Common selector for interactive elements
   const commonSelector = [
     'input:not([type="hidden"]):not([type="submit"])',
     'select',
@@ -1112,64 +1032,38 @@ export const detectFields = async (
     '[role="spinbutton"]',
     '[contenteditable="true"]',
     '[data-filliny-field]',
+    '[role="checkbox"]',
+    '[role="switch"]',
   ].join(',');
-
-  // Get all relevant elements once
   const elements = Array.from(container.querySelectorAll<HTMLElement>(commonSelector)).filter(
     element => !shouldSkipElement(element),
   );
-
-  // Early return if no elements found
-  if (!elements.length) {
-    return fields;
-  }
-
-  // Process elements based on strategy
+  if (!elements.length) return fields;
   for (const element of elements) {
     try {
       let field: Field | null = null;
 
-      // For OCR strategy, we use a simplified detection approach
-      if (strategy === 'ocr') {
-        field = await createBaseField(element, index, getElementRole(element) || 'text', true);
-        if (field) {
-          fields.push(field);
-          index++;
-        }
-        continue;
-      }
-
-      // For DOM strategy, use type-specific detection
       const role = getElementRole(element);
-
       switch (role) {
         case 'checkbox':
         case 'switch':
           field = await detectCheckboxField(element, index);
           break;
-
         case 'radio':
           if (element instanceof HTMLInputElement && !processedGroups.has(element.name)) {
             field = await detectRadioGroup(element, index, processedGroups);
           }
           break;
-
         case 'textbox':
         case 'spinbutton':
           field = await detectTextLikeField(element, index);
           break;
-
         case 'combobox':
           field = await detectSelectField(element, index);
           break;
-
         default:
-          // Handle native elements with type checking
           if (element instanceof HTMLInputElement) {
-            // Skip already processed radio groups
-            if (element.type === 'radio' && processedGroups.has(element.name)) {
-              continue;
-            }
+            if (element.type === 'radio' && processedGroups.has(element.name)) continue;
             field = await detectInputField(element, index, isImplicitForm);
           } else if (element instanceof HTMLSelectElement) {
             field = await detectSelectField(element, index);
@@ -1177,7 +1071,6 @@ export const detectFields = async (
             field = await detectTextareaField(element, index);
           }
       }
-
       if (field) {
         fields.push(field);
         index++;
@@ -1186,7 +1079,6 @@ export const detectFields = async (
       console.warn('Error detecting field:', e);
     }
   }
-
   return fields;
 };
 
