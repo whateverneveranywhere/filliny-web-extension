@@ -49,16 +49,7 @@ const manifest = withSidePanel({
     ...(env === 'preview' ? ['https://dev.filliny-app.pages.dev/*'] : []),
     ...(env === 'prod' ? ['https://app.filliny.io/*'] : []),
   ],
-  permissions: [
-    'storage',
-    'scripting',
-    'tabs',
-    'cookies',
-    'activeTab',
-    'notifications',
-    'desktopCapture',
-    'tabCapture',
-  ],
+  permissions: ['storage', 'scripting', 'tabs', 'cookies', 'activeTab', 'notifications'],
   background: {
     service_worker: 'background.iife.js',
     type: 'module',
