@@ -14,7 +14,7 @@ export default ts.config(
   js.configs.recommended,
   ...ts.configs.recommended,
   jsxA11y.flatConfigs.recommended,
-  eslintPluginImportX.flatConfigs.recommended,
+  // eslintPluginImportX.flatConfigs.recommended,
   eslintPluginImportX.flatConfigs.typescript,
   eslintPluginPrettierRecommended,
   ...fixupConfigRules(new FlatCompat().extends('plugin:react-hooks/recommended') as FixupConfigArray),
