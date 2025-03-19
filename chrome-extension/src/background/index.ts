@@ -130,3 +130,5 @@ const handleApiRequest = (
       sendResponse({ error: errorMessage });
     });
 };
+console.log('Background loaded');
+console.log("Edit 'chrome-extension/src/background/index.ts' and save to reload.");

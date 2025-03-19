@@ -1,6 +1,6 @@
-import initClient from '../initializers/initClient';
+import initClient from '../initializers/initClient.js';
 
-function addRefresh() {
+(() => {
   let pendingReload = false;
 
   initClient({
@@ -24,10 +24,10 @@ function addRefresh() {
 
   // reload when tab is visible
   function reloadWhenTabIsVisible(): void {
-    !document.hidden && pendingReload && reload();
+    if (!document.hidden && pendingReload) {
+      reload();
+    }
   }
 
   document.addEventListener('visibilitychange', reloadWhenTabIsVisible);
-}
-
-addRefresh();
+})();

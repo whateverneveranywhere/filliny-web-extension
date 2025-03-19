@@ -1,7 +1,8 @@
 {
   "name": "@extension/popup",
-  "version": "0.3.5",
+  "version": "0.4.3",
   "description": "chrome extension - popup",
+  "type": "module",
   "private": true,
   "sideEffects": true,
   "files": [
@@ -12,8 +13,8 @@
     "clean:turbo": "rimraf .turbo",
     "clean": "pnpm clean:turbo && pnpm clean:node_modules",
     "build": "vite build",
-    "dev": "cross-env __DEV__=true vite build --mode development",
-    "lint": "eslint . --ext .ts,.tsx",
+    "dev": "vite build --mode development",
+    "lint": "eslint .",
     "lint:fix": "pnpm lint --fix",
     "prettier": "prettier . --write --ignore-path ../../.prettierignore",
     "type-check": "tsc --noEmit"
@@ -23,6 +24,7 @@
     "@extension/storage": "workspace:*",
     "@extension/content-runtime-script": "workspace:*",
     "@extension/ui": "workspace:*",
+    "@extension/i18n": "workspace:*",
     "@tanstack/react-query": "^5.59.15"
   },
   "devDependencies": {

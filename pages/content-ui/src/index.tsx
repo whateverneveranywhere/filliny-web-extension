@@ -1,6 +1,7 @@
 import { createRoot } from 'react-dom/client';
 import App from '@src/App';
-import '@extension/ui/dist/global.css';
+// import '@extension/ui/dist/global.css';
+// @ts-expect-error Because file doesn't exist before build
 import tailwindcssOutput from '../dist/tailwind-output.css?inline';
 
 const root = document.createElement('div');

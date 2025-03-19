@@ -41,59 +41,37 @@ export default withUI({
 Add the following to the `index.tsx` file.
 
 ```tsx
-import '@extension/ui/dist/global.css';
+import '@extension/ui/lib/global.css';
 ```
 
-## Add Component
+## Add Custom Component
 
 Add the following to the `lib/components/index.ts` file.
 
 ```tsx
-export * from './Button';
+export * from './CustomComponent.js';
 ```
 
-Add the following to the `lib/components/Button.tsx` file.
+Add the following to the `lib/components/CustomComponent.tsx` file.
 
 ```tsx
 import { ComponentPropsWithoutRef } from 'react';
-import { cn } from '../utils';
+import { cn } from '@/lib/utils.js';
 
-export type ButtonProps = {
-  theme?: 'light' | 'dark';
-} & ComponentPropsWithoutRef<'button'>;
+type CustomComponentProps = ComponentPropsWithoutRef<'section'>;
 
-export function Button({ theme, className, children, ...props }: ButtonProps) {
-  return (
-    <button
-      className={cn(
-        className,
-        'mt-4 py-1 px-4 rounded shadow hover:scale-105',
-        theme === 'light' ? 'bg-white text-black' : 'bg-black text-white',
-      )}
-      {...props}>
-      {children}
-    </button>
-  );
+export function CustomComponent({ children, ...props }: CustomComponentProps) {
+  return <section {...props}>{children}</section>;
 }
 ```
 
 ## Usage
 
 ```tsx
-import { Button } from '@extension/ui';
+import { CustomComponent } from '@extension/ui';
 
-export default function ToggleButton() {
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
-
-  const toggle = () => {
-    setTheme(theme === 'light' ? 'dark' : 'light');
-  };
-
-  return (
-    <Button theme={theme} onClick={toggle}>
-      Toggle
-    </Button>
-  );
+export default function Page() {
+  return <CustomComponent>Hi, I'm a custom component.</CustomComponent>;
 }
 ```
 
@@ -116,13 +94,13 @@ Create a file named `components.json` in the `packages/ui` directory with the fo
 ```json
 {
   "$schema": "https://ui.shadcn.com/schema.json",
-  "style": "default",
+  "style": "new-york",
   "rsc": false,
   "tsx": true,
   "tailwind": {
     "config": "tailwind.config.ts",
     "css": "lib/global.css",
-    "baseColor": "neutral",
+    "baseColor": "zinc",
     "cssVariables": true,
     "prefix": ""
   },
@@ -130,8 +108,10 @@ Create a file named `components.json` in the `packages/ui` directory with the fo
     "components": "@/lib/components",
     "utils": "@/lib/utils",
     "ui": "@/lib/components/ui",
-    "lib": "@/lib"
-  }
+    "lib": "@/lib",
+    "hooks": "@/lib/hooks"
+  },
+  "iconLibrary": "lucide"
 }
 ```
 
@@ -140,16 +120,17 @@ Create a file named `components.json` in the `packages/ui` directory with the fo
 Run the following command from the root of your project:
 
 ```shell
-pnpm add tailwindcss-animate class-variance-authority -F ui
+pnpm add tailwindcss-animate class-variance-authority tailwind-merge lucide-react -F ui
 ```
 
 3. Edit `withUI.ts` in `lib` folder
 
-This configuration file is from the manual guide. You can refer to the manual guide to modify the configuration file. ([`Configure tailwind.config.js`](https://ui.shadcn.com/docs/installation/manual))
+This configuration file is from the manual guide. You can refer to the manual guide to modify the configuration file. ([
+`Configure tailwind.config.js`](https://ui.shadcn.com/docs/installation/manual))
 
 ```ts
 import deepmerge from 'deepmerge';
-import type { Config } from 'tailwindcss/types/config';
+import type { Config } from 'tailwindcss';
 import { fontFamily } from 'tailwindcss/defaultTheme';
 import tailwindAnimate from 'tailwindcss-animate';
 
@@ -238,7 +219,8 @@ const shadcnConfig = {
 
 4. Edit `global.css` in `lib` folder
 
-This configuration also comes from the manual guide. You can refer to the manual guide to modify the configuration file. ([`Configure styles`](https://ui.shadcn.com/docs/installation/manual))
+This configuration also comes from the manual guide. You can refer to the manual guide to modify the configuration
+file. ([`Configure styles`](https://ui.shadcn.com/docs/installation/manual))
 
 ```css
 @tailwind base;
@@ -246,81 +228,60 @@ This configuration also comes from the manual guide. You can refer to the manual
 @tailwind utilities;
 
 @layer base {
-    :root {
-        --background: 0 0% 100%;
-        --foreground: 222.2 47.4% 11.2%;
+  :host, :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 47.4% 11.2%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 47.4% 11.2%;
+    --primary: 222.2 47.4% 11.2%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 100% 50%;
+    --destructive-foreground: 210 40% 98%;
+    --ring: 215 20.2% 65.1%;
+    --radius: 0.5rem;
+  }
 
-        --muted: 210 40% 96.1%;
-        --muted-foreground: 215.4 16.3% 46.9%;
-
-        --popover: 0 0% 100%;
-        --popover-foreground: 222.2 47.4% 11.2%;
-
-        --border: 214.3 31.8% 91.4%;
-        --input: 214.3 31.8% 91.4%;
-
-        --card: 0 0% 100%;
-        --card-foreground: 222.2 47.4% 11.2%;
-
-        --primary: 222.2 47.4% 11.2%;
-        --primary-foreground: 210 40% 98%;
-
-        --secondary: 210 40% 96.1%;
-        --secondary-foreground: 222.2 47.4% 11.2%;
-
-        --accent: 210 40% 96.1%;
-        --accent-foreground: 222.2 47.4% 11.2%;
-
-        --destructive: 0 100% 50%;
-        --destructive-foreground: 210 40% 98%;
-
-        --ring: 215 20.2% 65.1%;
-
-        --radius: 0.5rem;
-    }
-
-    .dark {
-        --background: 224 71% 4%;
-        --foreground: 213 31% 91%;
-
-        --muted: 223 47% 11%;
-        --muted-foreground: 215.4 16.3% 56.9%;
-
-        --accent: 216 34% 17%;
-        --accent-foreground: 210 40% 98%;
-
-        --popover: 224 71% 4%;
-        --popover-foreground: 215 20.2% 65.1%;
-
-        --border: 216 34% 17%;
-        --input: 216 34% 17%;
-
-        --card: 224 71% 4%;
-        --card-foreground: 213 31% 91%;
-
-        --primary: 210 40% 98%;
-        --primary-foreground: 222.2 47.4% 1.2%;
-
-        --secondary: 222.2 47.4% 11.2%;
-        --secondary-foreground: 210 40% 98%;
-
-        --destructive: 0 63% 31%;
-        --destructive-foreground: 210 40% 98%;
-
-        --ring: 216 34% 17%;
-
-        --radius: 0.5rem;
-    }
+  .dark {
+    --background: 224 71% 4%;
+    --foreground: 213 31% 91%;
+    --muted: 223 47% 11%;
+    --muted-foreground: 215.4 16.3% 56.9%;
+    --accent: 216 34% 17%;
+    --accent-foreground: 210 40% 98%;
+    --popover: 224 71% 4%;
+    --popover-foreground: 215 20.2% 65.1%;
+    --border: 216 34% 17%;
+    --input: 216 34% 17%;
+    --card: 224 71% 4%;
+    --card-foreground: 213 31% 91%;
+    --primary: 210 40% 98%;
+    --primary-foreground: 222.2 47.4% 1.2%;
+    --secondary: 222.2 47.4% 11.2%;
+    --secondary-foreground: 210 40% 98%;
+    --destructive: 0 63% 31%;
+    --destructive-foreground: 210 40% 98%;
+    --ring: 216 34% 17%;
+  }
 }
 
 @layer base {
-    * {
-        @apply border-border;
-    }
-    body {
-        @apply bg-background text-foreground;
-        font-feature-settings: "rlig" 1, "calt" 1;
-    }
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply font-sans antialiased bg-background text-foreground;
+  }
 }
 ```
 
@@ -336,19 +297,35 @@ pnpm dlx shadcn@latest add button -c ./packages/ui
 
 This will add the shadcn button component to your UI package.
 
-Remember to adjust any paths or package names if your project structure differs from the assumed layout in this guide. 
+Remember to adjust any paths or package names if your project structure differs from the assumed layout in this guide.
 
 6. Export components
-
-Make the `index.ts` file in the `components/ui` directory export the button component:
-
-```ts
-export * from './button';
-```
 
 Edit the `index.ts` file in the `packages/ui` directory to export the shadcn ui component:
 
 ```ts
-// export * from './lib/components'; // remove this line: duplicated button component
-export * from './lib/components/ui';
+//...
+export * from './lib/components/ui/button';
+```
+
+7. Apply global.css
+
+If you want to use shadcn components in content-ui ShadowDOM, you need to import ui package's global.css in the content-ui `tailwind-input.css`
+
+```css
+@import '@extension/ui/lib/global.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+```
+
+If you want to use shadcn components in other pages, you need to import ui package's global.css in the `src/index.css`
+
+```css
+@import '@extension/ui/lib/global.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 ```
