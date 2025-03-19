@@ -1,7 +1,7 @@
-import { StorageEnum } from '../base/enums';
-import { createStorage } from '../base/base';
-import type { BaseStorage } from '../base/types';
-import type { DTOProfileFillingForm } from '../types';
+import { StorageEnum } from '../base/enums.js';
+import { createStorage } from '../base/base.js';
+import type { BaseStorage } from '../base/types.js';
+import type { DTOProfileFillingForm } from '../types/index.js';
 
 type ProfileStrorage = BaseStorage<DTOProfileFillingForm | undefined> & {
   setDefaultProfile: (activeProfile: DTOProfileFillingForm | undefined) => Promise<void>;

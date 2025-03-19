@@ -5,7 +5,8 @@ import {
   getProfilesListService,
   getSuggestedWebsitesService,
   getTonesListService,
-} from '../../services/api/Profiles';
+} from '../../services/api/Profiles/index.js';
+import type { DTOTone, DTOpov } from '@extension/storage';
 
 export const useProfilesListQuery = () =>
   useQuery({
@@ -32,7 +33,7 @@ export const useTonesListQuery = () => {
   return useQuery({
     queryKey: ['tones'],
     queryFn: getTonesListService,
-    select: data => data.map(item => ({ label: item.label, value: String(item.id) })),
+    select: (data: DTOTone[]) => data.map((item: DTOTone) => ({ label: item.label, value: String(item.id) })),
   });
 };
 
@@ -40,6 +41,6 @@ export const usePOVListQuery = () => {
   return useQuery({
     queryKey: ['povs'],
     queryFn: getPOVsListService,
-    select: data => data.map(item => ({ label: item.label, value: String(item.id) })),
+    select: (data: DTOpov[]) => data.map((item: DTOpov) => ({ label: item.label, value: String(item.id) })),
   });
 };

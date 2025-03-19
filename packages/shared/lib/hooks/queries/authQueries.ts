@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { authHealthCheckService } from '../../services';
+import { authHealthCheckService } from '../../services/api/Auth/index.js';
 import { authStorage } from '@extension/storage';
 import { useEffect } from 'react';
 

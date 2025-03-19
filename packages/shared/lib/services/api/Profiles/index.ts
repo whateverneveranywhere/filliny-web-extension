@@ -5,8 +5,8 @@ import type {
   DTOSuggestedWebsite,
   DTOTone,
 } from '@extension/storage';
-import { apiEndpoints } from '../../endpoints';
-import { httpService } from '../../httpService';
+import { apiEndpoints } from '../../endpoints.js';
+import { httpService } from '../../httpService.js';
 
 const {
   auth: {

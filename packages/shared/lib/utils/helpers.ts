@@ -1,6 +1,6 @@
 import { authStorage, positionStorage, profileStrorage, type DTOProfileFillingForm } from '@extension/storage';
-import type { ErrorResponse, GetAuthTokenResponse, Request } from './shared-types';
-import { BackgroundActions, WebappEnvs } from './shared-types';
+import type { ErrorResponse, GetAuthTokenResponse, Request } from './shared-types.js';
+import { BackgroundActions, WebappEnvs } from './shared-types.js';
 
 export const getFaviconUrl = (url: string) => {
   return `https://www.google.com/s2/favicons?sz=64&domain_url=${url}`;
@@ -27,12 +27,12 @@ export const isValidUrl = (url: string) => {
   try {
     new URL(url);
     return true;
-  } catch (_) {
+  } catch (__) {
     try {
       // Try adding https:// if no protocol is specified
       new URL(`https://${url}`);
       return true;
-    } catch (_) {
+    } catch (__) {
       return false;
     }
   }

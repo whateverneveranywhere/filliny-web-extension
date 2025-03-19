@@ -1,1 +1,1 @@
-export * from './profileStrorage';
+export * from './profileStrorage.js';

@@ -1,1 +1,1 @@
-export * from './profileMutations';
+export * from './profileMutations.js';

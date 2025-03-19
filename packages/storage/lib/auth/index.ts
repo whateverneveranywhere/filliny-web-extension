@@ -1,1 +1,1 @@
-export * from './authStorage';
+export * from './authStorage.js';

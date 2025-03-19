@@ -1,1 +1,1 @@
-export * from './positionStorage';
+export * from './positionStorage.js';

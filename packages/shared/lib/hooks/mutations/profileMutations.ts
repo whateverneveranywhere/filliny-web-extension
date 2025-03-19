@@ -4,7 +4,7 @@ import {
   createFillingProfileService,
   deleteFillingProfileByIdService,
   editFillingProfileService,
-} from '../../services';
+} from '../../services/api/Profiles/index.js';
 import type { DTOProfileFillingForm } from '@extension/storage';
 
 export const useChangeActiveFillingProfileMutation = () => {

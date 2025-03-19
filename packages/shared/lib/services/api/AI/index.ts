@@ -1,6 +1,6 @@
-import { apiEndpoints } from '../../endpoints';
-import type { DTOFillPayload, Field } from '../../types';
-import { getConfig } from '../../../utils/helpers';
+import { apiEndpoints } from '../../endpoints.js';
+import type { DTOFillPayload, Field } from '../../types/ai.js';
+import { getConfig } from '../../../utils/helpers.js';
 
 const {
   version,
