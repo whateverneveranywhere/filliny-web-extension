@@ -27,12 +27,14 @@ export const isValidUrl = (url: string) => {
   try {
     new URL(url);
     return true;
-  } catch (__) {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  } catch (error) {
     try {
       // Try adding https:// if no protocol is specified
       new URL(`https://${url}`);
       return true;
-    } catch (__) {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    } catch (error) {
       return false;
     }
   }
@@ -108,11 +110,57 @@ const handleGetAuthToken = (
 };
 
 export const getConfig = (webappEnv?: WebappEnvs): ConfigEntry => {
-  // Get env from import.meta.env or fallback to LOCAL
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const importMeta = (globalThis as any).import?.meta;
-  const env = (importMeta?.env?.VITE_WEBAPP_ENV as WebappEnvs) || WebappEnvs.DEV;
-  return config[webappEnv || env];
+  // Try to get environment from various sources with fallbacks
+
+  // First, try passed environment parameter
+  if (webappEnv && Object.values(WebappEnvs).includes(webappEnv)) {
+    return config[webappEnv];
+  }
+
+  try {
+    // Next, try to get from import.meta.env (for Vite contexts)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const importMeta = (globalThis as any).import?.meta;
+    const viteEnv = importMeta?.env?.VITE_WEBAPP_ENV;
+
+    if (viteEnv && Object.values(WebappEnvs).includes(viteEnv as WebappEnvs)) {
+      return config[viteEnv as WebappEnvs];
+    }
+
+    // Try to get from extension storage if available
+    if (typeof chrome !== 'undefined' && chrome.storage) {
+      // This is async, but for immediate use we need to fallback to a default
+      chrome.storage.local.get('webapp_env', result => {
+        if (result.webapp_env && Object.values(WebappEnvs).includes(result.webapp_env)) {
+          // Store for future use in this context
+          if (typeof sessionStorage !== 'undefined') {
+            sessionStorage.setItem('filliny_webapp_env', result.webapp_env);
+          }
+        }
+      });
+
+      // Check if we have a cached value from a previous storage retrieval
+      if (typeof sessionStorage !== 'undefined') {
+        const cachedEnv = sessionStorage.getItem('filliny_webapp_env');
+        if (cachedEnv && Object.values(WebappEnvs).includes(cachedEnv as WebappEnvs)) {
+          return config[cachedEnv as WebappEnvs];
+        }
+      }
+    }
+
+    // Finally, check if process.env is available (for Node.js environments)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const processEnv = (globalThis as any).process?.env;
+    if (processEnv?.VITE_WEBAPP_ENV && Object.values(WebappEnvs).includes(processEnv.VITE_WEBAPP_ENV as WebappEnvs)) {
+      return config[processEnv.VITE_WEBAPP_ENV as WebappEnvs];
+    }
+  } catch (error) {
+    console.error('Error determining environment:', error);
+  }
+
+  // Default to PREVIEW for safety rather than DEV
+  // This prevents accidental localhost redirects in production
+  return config[WebappEnvs.PREVIEW];
 };
 
 const handleAuthTokenChanged = (

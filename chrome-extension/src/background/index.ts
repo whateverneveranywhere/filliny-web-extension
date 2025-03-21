@@ -1,8 +1,34 @@
-import { getConfig, handleAction, setupAuthTokenListener } from '@extension/shared';
+import { getConfig, handleAction, setupAuthTokenListener, WebappEnvs } from '@extension/shared';
 import 'webextension-polyfill';
 
 // Add this near the top of the file, after imports
 setupAuthTokenListener();
+
+// Store the current environment in storage for consistent access across contexts
+function storeEnvironmentInStorage() {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const importMeta = (globalThis as any).import?.meta;
+    const env = importMeta?.env?.VITE_WEBAPP_ENV;
+
+    if (env && Object.values(WebappEnvs).includes(env)) {
+      chrome.storage.local.set({ webapp_env: env }, () => {
+        console.log(`Environment ${env} stored in extension storage`);
+      });
+    } else {
+      // Default to PREVIEW if no environment is specified
+      // This prevents accidental localhost redirects in production
+      chrome.storage.local.set({ webapp_env: WebappEnvs.PREVIEW }, () => {
+        console.log(`Default environment PREVIEW stored in extension storage`);
+      });
+    }
+  } catch (error) {
+    console.error('Error storing environment:', error);
+  }
+}
+
+// Initialize environment storage
+storeEnvironmentInStorage();
 
 // Listen for messages from other parts of the extension
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
