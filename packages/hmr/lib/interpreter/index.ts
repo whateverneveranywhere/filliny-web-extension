@@ -1,4 +1,4 @@
-import type { SerializedMessage, WebSocketMessage } from '../types.js';
+import type { SerializedMessage, WebSocketMessage } from "../types.js";
 
 export default {
   send: (message: WebSocketMessage): SerializedMessage => JSON.stringify(message),

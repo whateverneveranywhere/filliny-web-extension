@@ -1,29 +1,29 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery } from "@tanstack/react-query";
 import {
   getFillingProfileByIdService,
   getPOVsListService,
   getProfilesListService,
   getSuggestedWebsitesService,
   getTonesListService,
-} from '../../services/api/Profiles/index.js';
-import type { DTOTone, DTOpov } from '@extension/storage';
+} from "../../services/api/Profiles/index.js";
+import type { DTOTone, DTOpov } from "@extension/storage";
 
 export const useProfilesListQuery = () =>
   useQuery({
-    queryKey: ['profilesList'],
+    queryKey: ["profilesList"],
     queryFn: getProfilesListService,
   });
 
 export const useSuggestedWebsites = () => {
   return useQuery({
-    queryKey: ['recommendedWebsites'],
+    queryKey: ["recommendedWebsites"],
     queryFn: getSuggestedWebsitesService,
   });
 };
 
 export const useFillingProfileById = (id: string) => {
   return useQuery({
-    queryKey: ['fillingProfileById', id],
+    queryKey: ["fillingProfileById", id],
     queryFn: () => getFillingProfileByIdService(id),
     enabled: !!id,
   });
@@ -31,7 +31,7 @@ export const useFillingProfileById = (id: string) => {
 
 export const useTonesListQuery = () => {
   return useQuery({
-    queryKey: ['tones'],
+    queryKey: ["tones"],
     queryFn: getTonesListService,
     select: (data: DTOTone[]) => data.map((item: DTOTone) => ({ label: item.label, value: String(item.id) })),
   });
@@ -39,7 +39,7 @@ export const useTonesListQuery = () => {
 
 export const usePOVListQuery = () => {
   return useQuery({
-    queryKey: ['povs'],
+    queryKey: ["povs"],
     queryFn: getPOVsListService,
     select: (data: DTOpov[]) => data.map((item: DTOpov) => ({ label: item.label, value: String(item.id) })),
   });

@@ -1,10 +1,10 @@
-import * as React from 'react';
-import { type DialogProps } from '@radix-ui/react-dialog';
-import { Command as CommandPrimitive } from 'cmdk';
-import { Search } from 'lucide-react';
+import * as React from "react";
+import { type DialogProps } from "@radix-ui/react-dialog";
+import { Command as CommandPrimitive } from "cmdk";
+import { Search } from "lucide-react";
 
-import { cn } from '@/lib/utils';
-import { Dialog, DialogContent } from '../ui/dialog';
+import { cn } from "@/lib/utils";
+import { Dialog, DialogContent } from "../ui/dialog";
 
 const Command = React.forwardRef<
   React.ElementRef<typeof CommandPrimitive>,
@@ -13,7 +13,7 @@ const Command = React.forwardRef<
   <CommandPrimitive
     ref={ref}
     className={cn(
-      'filliny-flex filliny-h-full filliny-w-full filliny-flex-col filliny-overflow-hidden filliny-rounded-md filliny-bg-popover filliny-text-popover-foreground',
+      "filliny-flex filliny-h-full filliny-w-full filliny-flex-col filliny-overflow-hidden filliny-rounded-md filliny-bg-popover filliny-text-popover-foreground",
       className,
     )}
     {...props}
@@ -39,13 +39,12 @@ const CommandInput = React.forwardRef<
   React.ElementRef<typeof CommandPrimitive.Input>,
   React.ComponentPropsWithoutRef<typeof CommandPrimitive.Input>
 >(({ className, ...props }, ref) => (
-  // eslint-disable-next-line react/no-unknown-property
   <div className="filliny-flex filliny-items-center filliny-border-b filliny-px-3" cmdk-input-wrapper="">
     <Search className="filliny-mr-2 filliny-size-4 filliny-shrink-0 filliny-opacity-50" />
     <CommandPrimitive.Input
       ref={ref}
       className={cn(
-        'filliny-flex filliny-h-11 filliny-w-full filliny-rounded-md filliny-bg-transparent filliny-py-3 filliny-text-sm filliny-outline-none placeholder:filliny-text-muted-foreground disabled:filliny-cursor-not-allowed disabled:filliny-opacity-50',
+        "filliny-flex filliny-h-11 filliny-w-full filliny-rounded-md filliny-bg-transparent filliny-py-3 filliny-text-sm filliny-outline-none placeholder:filliny-text-muted-foreground disabled:filliny-cursor-not-allowed disabled:filliny-opacity-50",
         className,
       )}
       {...props}
@@ -61,7 +60,7 @@ const CommandList = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <CommandPrimitive.List
     ref={ref}
-    className={cn('filliny-max-h-[300px] filliny-overflow-y-auto filliny-overflow-x-hidden', className)}
+    className={cn("filliny-max-h-[300px] filliny-overflow-y-auto filliny-overflow-x-hidden", className)}
     {...props}
   />
 ));
@@ -84,7 +83,7 @@ const CommandGroup = React.forwardRef<
   <CommandPrimitive.Group
     ref={ref}
     className={cn(
-      'filliny-overflow-hidden filliny-p-1 filliny-text-foreground [&_[cmdk-group-heading]]:filliny-px-2 [&_[cmdk-group-heading]]:filliny-py-1.5 [&_[cmdk-group-heading]]:filliny-text-xs [&_[cmdk-group-heading]]:filliny-font-medium [&_[cmdk-group-heading]]:filliny-text-muted-foreground',
+      "filliny-overflow-hidden filliny-p-1 filliny-text-foreground [&_[cmdk-group-heading]]:filliny-px-2 [&_[cmdk-group-heading]]:filliny-py-1.5 [&_[cmdk-group-heading]]:filliny-text-xs [&_[cmdk-group-heading]]:filliny-font-medium [&_[cmdk-group-heading]]:filliny-text-muted-foreground",
       className,
     )}
     {...props}
@@ -99,7 +98,7 @@ const CommandSeparator = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <CommandPrimitive.Separator
     ref={ref}
-    className={cn('-filliny-mx-1 filliny-h-px filliny-bg-border', className)}
+    className={cn("-filliny-mx-1 filliny-h-px filliny-bg-border", className)}
     {...props}
   />
 ));
@@ -124,12 +123,12 @@ CommandItem.displayName = CommandPrimitive.Item.displayName;
 const CommandShortcut = ({ className, ...props }: React.HTMLAttributes<HTMLSpanElement>) => {
   return (
     <span
-      className={cn('filliny-ml-auto filliny-text-xs filliny-tracking-widest filliny-text-muted-foreground', className)}
+      className={cn("filliny-ml-auto filliny-text-xs filliny-tracking-widest filliny-text-muted-foreground", className)}
       {...props}
     />
   );
 };
-CommandShortcut.displayName = 'CommandShortcut';
+CommandShortcut.displayName = "CommandShortcut";
 
 export {
   Command,

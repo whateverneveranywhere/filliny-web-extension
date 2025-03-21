@@ -1,7 +1,7 @@
-import { getConfig, useDashboardOverview } from '@extension/shared';
-import { ProfileSelector } from './profile-selector';
-import { TokenDisplay } from '../components';
-import { Logo } from '../components/Logo';
+import { getConfig, useDashboardOverview } from "@extension/shared";
+import { ProfileSelector } from "./profile-selector";
+import { TokenDisplay } from "../components";
+import { Logo } from "../components/Logo";
 
 const config = getConfig();
 

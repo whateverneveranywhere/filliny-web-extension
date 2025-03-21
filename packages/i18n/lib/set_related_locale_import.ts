@@ -1,13 +1,13 @@
-import { lstatSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-import type { SupportedLanguagesKeysType, SupportedLanguagesWithoutRegionKeysType } from './types.js';
-import { I18N_FILE_PATH } from './consts.js';
+import { lstatSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { resolve } from "node:path";
+import type { SupportedLanguagesKeysType, SupportedLanguagesWithoutRegionKeysType } from "./types.js";
+import { I18N_FILE_PATH } from "./consts.js";
 
 export default () => {
-  const locale = Intl.DateTimeFormat().resolvedOptions().locale.replace('-', '_') as SupportedLanguagesKeysType;
-  const localeWithoutRegion = locale.split('_')[0] as SupportedLanguagesWithoutRegionKeysType;
+  const locale = Intl.DateTimeFormat().resolvedOptions().locale.replace("-", "_") as SupportedLanguagesKeysType;
+  const localeWithoutRegion = locale.split("_")[0] as SupportedLanguagesWithoutRegionKeysType;
 
-  const localesDir = resolve(import.meta.dirname, '..', '..', 'locales');
+  const localesDir = resolve(import.meta.dirname, "..", "..", "locales");
   const readLocalesFolder = readdirSync(localesDir);
 
   const implementedLocales = readLocalesFolder.map(innerDir => {
@@ -17,10 +17,10 @@ export default () => {
     return;
   });
 
-  const i18nFileSplitContent = readFileSync(I18N_FILE_PATH, 'utf-8').split('\n');
+  const i18nFileSplitContent = readFileSync(I18N_FILE_PATH, "utf-8").split("\n");
 
-  if (process.env['CEB_DEV_LOCALE']) {
-    i18nFileSplitContent[1] = `import localeJSON from '../locales/${process.env['CEB_DEV_LOCALE']}/messages.json' with { type: 'json' };`;
+  if (process.env["CEB_DEV_LOCALE"]) {
+    i18nFileSplitContent[1] = `import localeJSON from '../locales/${process.env["CEB_DEV_LOCALE"]}/messages.json' with { type: 'json' };`;
   } else {
     if (implementedLocales.includes(locale)) {
       i18nFileSplitContent[1] = `import localeJSON from '../locales/${locale}/messages.json' with { type: 'json' };`;
@@ -32,7 +32,7 @@ export default () => {
   }
 
   // Join lines back together
-  const updatedI18nFile = i18nFileSplitContent.join('\n');
+  const updatedI18nFile = i18nFileSplitContent.join("\n");
 
-  writeFileSync(I18N_FILE_PATH, updatedI18nFile, 'utf-8');
+  writeFileSync(I18N_FILE_PATH, updatedI18nFile, "utf-8");
 };

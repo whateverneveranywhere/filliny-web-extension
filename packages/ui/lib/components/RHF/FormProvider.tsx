@@ -1,6 +1,6 @@
-import React from 'react';
-import type { UseFormReturn } from 'react-hook-form';
-import { FormProvider as Form } from 'react-hook-form';
+import type React from "react";
+import type { UseFormReturn } from "react-hook-form";
+import { FormProvider as Form } from "react-hook-form";
 
 type Props = {
   children: React.ReactNode;

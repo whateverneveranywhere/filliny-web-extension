@@ -1,9 +1,9 @@
-import * as React from 'react';
-import * as SheetPrimitive from '@radix-ui/react-dialog';
-import { cva, type VariantProps } from 'class-variance-authority';
-import { X } from 'lucide-react';
+import * as React from "react";
+import * as SheetPrimitive from "@radix-ui/react-dialog";
+import { cva, type VariantProps } from "class-variance-authority";
+import { X } from "lucide-react";
 
-import { cn } from '@/lib/utils';
+import { cn } from "@/lib/utils";
 
 const Sheet = SheetPrimitive.Root;
 
@@ -19,7 +19,7 @@ const SheetOverlay = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <SheetPrimitive.Overlay
     className={cn(
-      'filliny-fixed filliny-inset-0 filliny-z-50 filliny-bg-black/80  data-[state=open]:filliny-animate-in data-[state=closed]:filliny-animate-out data-[state=closed]:filliny-fade-out-0 data-[state=open]:filliny-fade-in-0',
+      "filliny-fixed filliny-inset-0 filliny-z-50 filliny-bg-black/80  data-[state=open]:filliny-animate-in data-[state=closed]:filliny-animate-out data-[state=closed]:filliny-fade-out-0 data-[state=open]:filliny-fade-in-0",
       className,
     )}
     {...props}
@@ -29,20 +29,20 @@ const SheetOverlay = React.forwardRef<
 SheetOverlay.displayName = SheetPrimitive.Overlay.displayName;
 
 const sheetVariants = cva(
-  'filliny-fixed filliny-z-50 filliny-gap-4 filliny-bg-background filliny-p-6 filliny-shadow-lg filliny-transition filliny-ease-in-out data-[state=closed]:filliny-duration-300 data-[state=open]:filliny-duration-500 data-[state=open]:filliny-animate-in data-[state=closed]:filliny-animate-out',
+  "filliny-fixed filliny-z-50 filliny-gap-4 filliny-bg-background filliny-p-6 filliny-shadow-lg filliny-transition filliny-ease-in-out data-[state=closed]:filliny-duration-300 data-[state=open]:filliny-duration-500 data-[state=open]:filliny-animate-in data-[state=closed]:filliny-animate-out",
   {
     variants: {
       side: {
-        top: 'filliny-inset-x-0 filliny-top-0 filliny-border-b data-[state=closed]:filliny-slide-out-to-top data-[state=open]:filliny-slide-in-from-top',
+        top: "filliny-inset-x-0 filliny-top-0 filliny-border-b data-[state=closed]:filliny-slide-out-to-top data-[state=open]:filliny-slide-in-from-top",
         bottom:
-          'filliny-inset-x-0 filliny-bottom-0 filliny-border-t data-[state=closed]:filliny-slide-out-to-bottom data-[state=open]:filliny-slide-in-from-bottom',
-        left: 'filliny-inset-y-0 filliny-left-0 filliny-h-full filliny-w-3/4 filliny-border-r data-[state=closed]:filliny-slide-out-to-left data-[state=open]:filliny-slide-in-from-left sm:filliny-max-w-sm',
+          "filliny-inset-x-0 filliny-bottom-0 filliny-border-t data-[state=closed]:filliny-slide-out-to-bottom data-[state=open]:filliny-slide-in-from-bottom",
+        left: "filliny-inset-y-0 filliny-left-0 filliny-h-full filliny-w-3/4 filliny-border-r data-[state=closed]:filliny-slide-out-to-left data-[state=open]:filliny-slide-in-from-left sm:filliny-max-w-sm",
         right:
-          'filliny-inset-y-0 filliny-right-0 filliny-h-full filliny-w-3/4  filliny-border-l data-[state=closed]:filliny-slide-out-to-right data-[state=open]:filliny-slide-in-from-right sm:filliny-max-w-sm',
+          "filliny-inset-y-0 filliny-right-0 filliny-h-full filliny-w-3/4  filliny-border-l data-[state=closed]:filliny-slide-out-to-right data-[state=open]:filliny-slide-in-from-right sm:filliny-max-w-sm",
       },
     },
     defaultVariants: {
-      side: 'right',
+      side: "right",
     },
   },
 );
@@ -52,7 +52,7 @@ interface SheetContentProps
     VariantProps<typeof sheetVariants> {}
 
 const SheetContent = React.forwardRef<React.ElementRef<typeof SheetPrimitive.Content>, SheetContentProps>(
-  ({ side = 'right', className, children, ...props }, ref) => (
+  ({ side = "right", className, children, ...props }, ref) => (
     <SheetPortal>
       <SheetOverlay />
       <SheetPrimitive.Content ref={ref} className={cn(sheetVariants({ side }), className)} {...props}>
@@ -70,24 +70,24 @@ SheetContent.displayName = SheetPrimitive.Content.displayName;
 const SheetHeader = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
   <div
     className={cn(
-      'filliny-flex filliny-flex-col filliny-space-y-2 filliny-text-center sm:filliny-text-left',
+      "filliny-flex filliny-flex-col filliny-space-y-2 filliny-text-center sm:filliny-text-left",
       className,
     )}
     {...props}
   />
 );
-SheetHeader.displayName = 'SheetHeader';
+SheetHeader.displayName = "SheetHeader";
 
 const SheetFooter = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
   <div
     className={cn(
-      'filliny-flex filliny-flex-col-reverse sm:filliny-flex-row sm:filliny-justify-end sm:filliny-space-x-2',
+      "filliny-flex filliny-flex-col-reverse sm:filliny-flex-row sm:filliny-justify-end sm:filliny-space-x-2",
       className,
     )}
     {...props}
   />
 );
-SheetFooter.displayName = 'SheetFooter';
+SheetFooter.displayName = "SheetFooter";
 
 const SheetTitle = React.forwardRef<
   React.ElementRef<typeof SheetPrimitive.Title>,
@@ -95,7 +95,7 @@ const SheetTitle = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <SheetPrimitive.Title
     ref={ref}
-    className={cn('filliny-text-lg filliny-font-semibold filliny-text-foreground', className)}
+    className={cn("filliny-text-lg filliny-font-semibold filliny-text-foreground", className)}
     {...props}
   />
 ));
@@ -107,7 +107,7 @@ const SheetDescription = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <SheetPrimitive.Description
     ref={ref}
-    className={cn('filliny-text-sm filliny-text-muted-foreground', className)}
+    className={cn("filliny-text-sm filliny-text-muted-foreground", className)}
     {...props}
   />
 ));

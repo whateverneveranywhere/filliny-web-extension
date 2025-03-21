@@ -1,22 +1,21 @@
-/* eslint-disable react/no-unescaped-entities */
-import React, { useCallback } from 'react';
-import { useFieldArray, useFormContext } from 'react-hook-form';
-import { Plus } from 'lucide-react';
-import { WebsitePreviewCard } from './WebsitePreviewCard';
-import { Button } from '../ui/button';
-import { Badge } from '../ui/badge';
-import { ScrollArea, ScrollBar } from '../ui/scroll-area';
-import { RHFShadcnCheckbox, RHFShadcnTextField, RHFShadcnTextarea } from '../RHF';
-import { getFaviconUrl, useSuggestedWebsites, usePlanLimits } from '@extension/shared';
-import type { ProfileFormTypes } from '@/lib/containers/profile-form';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui';
-import { cn } from '@/lib/utils';
-import { UpgradeBanner } from '../alerts';
+import React, { useCallback } from "react";
+import { useFieldArray, useFormContext } from "react-hook-form";
+import { Plus } from "lucide-react";
+import { WebsitePreviewCard } from "./WebsitePreviewCard";
+import { Button } from "../ui/button";
+import { Badge } from "../ui/badge";
+import { ScrollArea, ScrollBar } from "../ui/scroll-area";
+import { RHFShadcnCheckbox, RHFShadcnTextField, RHFShadcnTextarea } from "../RHF";
+import { getFaviconUrl, useSuggestedWebsites, usePlanLimits } from "@extension/shared";
+import type { ProfileFormTypes } from "@/lib/containers/profile-form";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui";
+import { cn } from "@/lib/utils";
+import { UpgradeBanner } from "../alerts";
 
 // Separate component for recommended websites section
 const RecommendedWebsites = ({ onWebsiteSelect }: { onWebsiteSelect: (value: string) => void }) => {
   const { data: recommendedWebsites, isLoading } = useSuggestedWebsites();
-  const { fields } = useFieldArray({ name: 'fillingWebsites' });
+  const { fields } = useFieldArray({ name: "fillingWebsites" });
   const { hasReachedLimit } = usePlanLimits();
 
   if (isLoading) {
@@ -36,10 +35,10 @@ const RecommendedWebsites = ({ onWebsiteSelect }: { onWebsiteSelect: (value: str
               <Badge
                 variant="outline"
                 className={cn(
-                  'filliny-flex filliny-items-center filliny-gap-1',
+                  "filliny-flex filliny-items-center filliny-gap-1",
                   hasReachedLimit(fields.length)
-                    ? 'filliny-cursor-not-allowed filliny-opacity-50'
-                    : 'filliny-cursor-pointer hover:filliny-bg-accent',
+                    ? "filliny-cursor-not-allowed filliny-opacity-50"
+                    : "filliny-cursor-pointer hover:filliny-bg-accent",
                 )}
                 onClick={() => !hasReachedLimit && onWebsiteSelect(item.value)}>
                 <img
@@ -88,7 +87,7 @@ function StepperForm1() {
   const { control, watch } = useFormContext<ProfileFormTypes>();
   const { fields, append, remove } = useFieldArray({
     control,
-    name: 'fillingWebsites',
+    name: "fillingWebsites",
   });
   const { currentPlan, maxWebsites, hasReachedLimit } = usePlanLimits();
   const websitesReachedLimit = hasReachedLimit(fields.length);
@@ -97,9 +96,9 @@ function StepperForm1() {
     if (websitesReachedLimit) return;
 
     append({
-      fillingContext: '',
+      fillingContext: "",
       isRootLoad: true,
-      websiteUrl: '',
+      websiteUrl: "",
       isNew: true,
     });
   }, [append, websitesReachedLimit]);
@@ -109,7 +108,7 @@ function StepperForm1() {
       if (websitesReachedLimit) return;
 
       append({
-        fillingContext: '',
+        fillingContext: "",
         isRootLoad: true,
         websiteUrl,
         isNew: false,
@@ -118,7 +117,7 @@ function StepperForm1() {
     [append, websitesReachedLimit],
   );
 
-  const latestWebsiteValues = watch('fillingWebsites');
+  const latestWebsiteValues = watch("fillingWebsites");
 
   return (
     <div className="filliny-flex filliny-flex-col filliny-gap-4">

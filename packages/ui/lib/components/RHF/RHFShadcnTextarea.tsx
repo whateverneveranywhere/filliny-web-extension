@@ -1,11 +1,11 @@
 // components/TextInput.tsx
-import React from 'react';
-import { useFormContext } from 'react-hook-form';
+import React from "react";
+import { useFormContext } from "react-hook-form";
 
-import type { GeneralFormProps } from '@extension/shared';
+import type { GeneralFormProps } from "@extension/shared";
 
-import { FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '../ui/form';
-import { Textarea } from '../ui/textarea';
+import { FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "../ui/form";
+import { Textarea } from "../ui/textarea";
 
 interface Props extends GeneralFormProps {
   placeholder?: string;

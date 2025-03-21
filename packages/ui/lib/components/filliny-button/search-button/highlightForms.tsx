@@ -1,24 +1,24 @@
-import { createRoot } from 'react-dom/client';
-import { FormsOverlay } from './FormsOverlay';
-import { detectFields, detectFormLikeContainers } from './detectionHelpers';
-import { addGlowingBorder, findOrCreateShadowContainer, getFormPosition } from './overlayUtils';
-import type { HighlightFormsOptions } from './types';
+import { createRoot } from "react-dom/client";
+import { FormsOverlay } from "./FormsOverlay";
+import { detectFields, detectFormLikeContainers } from "./detectionHelpers";
+import { addGlowingBorder, findOrCreateShadowContainer, getFormPosition } from "./overlayUtils";
+import type { HighlightFormsOptions } from "./types";
 
 export const highlightForms = async ({
   visionOnly = false,
   testMode = false,
 }: HighlightFormsOptions): Promise<void> => {
-  const shadowRoot = document.querySelector('#chrome-extension-filliny')?.shadowRoot;
+  const shadowRoot = document.querySelector("#chrome-extension-filliny")?.shadowRoot;
 
   if (!shadowRoot) {
-    console.error('No shadow root found');
+    console.error("No shadow root found");
     return;
   }
 
   // Use our new form detection logic
   const formLikeContainers = await detectFormLikeContainers();
   if (formLikeContainers.length === 0) {
-    alert('No form found');
+    alert("No form found");
     return;
   }
 
@@ -29,10 +29,10 @@ export const highlightForms = async ({
     // Remove all existing overlays
     const existingOverlays = Array.from(overlaysContainer.querySelectorAll('[id^="overlay-"]'));
     existingOverlays.forEach(overlay => {
-      const formId = overlay.id.replace('overlay-', '');
+      const formId = overlay.id.replace("overlay-", "");
       const form = document.querySelector(`[data-form-id="${formId}"]`) as HTMLElement;
       if (form) {
-        form.classList.remove('filliny-pointer-events-none');
+        form.classList.remove("filliny-pointer-events-none");
         delete form.dataset.fillinyOverlayActive;
         delete form.dataset.formId;
       }
@@ -40,7 +40,7 @@ export const highlightForms = async ({
     });
 
     // Remove all existing highlights
-    const highlightedForms = Array.from(document.querySelectorAll('[data-filliny-highlighted]'));
+    const highlightedForms = Array.from(document.querySelectorAll("[data-filliny-highlighted]"));
     for (const form of highlightedForms) {
       await removeFormHighlights(form as HTMLElement);
     }
@@ -87,9 +87,9 @@ const createFormOverlay = (
   }
 
   // Create container without affecting the form yet
-  const formOverlayContainer = document.createElement('div');
+  const formOverlayContainer = document.createElement("div");
   formOverlayContainer.id = `overlay-${formId}`;
-  formOverlayContainer.className = 'filliny-pointer-events-auto filliny-relative filliny-w-full filliny-h-full';
+  formOverlayContainer.className = "filliny-pointer-events-auto filliny-relative filliny-w-full filliny-h-full";
 
   // Get initial position before making any DOM changes
   const initialPosition = getFormPosition(form);
@@ -102,14 +102,14 @@ const createFormOverlay = (
         if (overlay) {
           // Only hide overlays that aren't the first form
           if (!isFirstForm) {
-            overlay.style.visibility = entry.isIntersecting ? 'visible' : 'hidden';
+            overlay.style.visibility = entry.isIntersecting ? "visible" : "hidden";
           }
         }
       });
     },
     {
       threshold: 0.1, // Show overlay when at least 10% of the form is visible
-      rootMargin: '100px', // Add some margin to prevent flickering
+      rootMargin: "100px", // Add some margin to prevent flickering
     },
   );
 
@@ -121,8 +121,8 @@ const createFormOverlay = (
     // Use dataset modifications in a single batch
     const formUpdates = () => {
       form.dataset.formId = formId;
-      form.dataset.fillinyOverlayActive = 'true';
-      form.classList.add('filliny-pointer-events-none');
+      form.dataset.fillinyOverlayActive = "true";
+      form.classList.add("filliny-pointer-events-none");
     };
 
     // Add container to shadow DOM
@@ -136,7 +136,7 @@ const createFormOverlay = (
       formOverlayContainer.remove();
       // Batch cleanup operations
       requestAnimationFrame(() => {
-        form.classList.remove('filliny-pointer-events-none');
+        form.classList.remove("filliny-pointer-events-none");
         delete form.dataset.fillinyOverlayActive;
         delete form.dataset.formId;
       });
@@ -156,7 +156,7 @@ const createFormOverlay = (
           const isFormInView = formRect.top >= 0 && formRect.top <= window.innerHeight;
           if (!isFormInView) {
             const scrollPosition = window.scrollY + formRect.top - 200;
-            window.scrollTo({ top: scrollPosition, behavior: 'smooth' });
+            window.scrollTo({ top: scrollPosition, behavior: "smooth" });
           }
         }
       });
@@ -171,8 +171,8 @@ const highlightFormFields = async (form: HTMLElement, isFirstForm: boolean = fal
   fields.forEach(field => {
     const element = form.querySelector<HTMLElement>(`[data-filliny-id="${field.id}"]`);
     if (element) {
-      addGlowingBorder(element, 'black');
-      element.dataset.fillinyHighlighted = 'true';
+      addGlowingBorder(element, "black");
+      element.dataset.fillinyHighlighted = "true";
       highlightedElements.push(element);
     }
   });
@@ -184,7 +184,7 @@ const highlightFormFields = async (form: HTMLElement, isFirstForm: boolean = fal
       const isFormInView = formRect.top >= 0 && formRect.top <= window.innerHeight;
       if (!isFormInView) {
         const scrollPosition = window.scrollY + formRect.top - 200;
-        window.scrollTo({ top: scrollPosition, behavior: 'smooth' });
+        window.scrollTo({ top: scrollPosition, behavior: "smooth" });
       }
     });
   }
@@ -195,7 +195,7 @@ const removeFormHighlights = async (form: HTMLElement): Promise<void> => {
   fields.forEach(field => {
     const element = form.querySelector<HTMLElement>(`[data-filliny-id="${field.id}"]`);
     if (element && element.dataset.fillinyHighlighted) {
-      element.style.removeProperty('box-shadow');
+      element.style.removeProperty("box-shadow");
       delete element.dataset.fillinyHighlighted;
     }
   });

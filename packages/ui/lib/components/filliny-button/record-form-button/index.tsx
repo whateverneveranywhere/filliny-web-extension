@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
-import { highlightForms } from '../search-button/highlightForms';
-import type { ButtonComponentProps } from '../button-wrapper';
-import { Button } from '../../ui';
+import type React from "react";
+import { useEffect, useState } from "react";
+import { highlightForms } from "../search-button/highlightForms";
+import type { ButtonComponentProps } from "../button-wrapper";
+import { Button } from "../../ui";
 
 const RecordFormButton: React.FC<ButtonComponentProps> = () => {
   const [isDOMReady, setIsDOMReady] = useState(false);
@@ -15,23 +16,23 @@ const RecordFormButton: React.FC<ButtonComponentProps> = () => {
       setIsDOMReady(false);
     };
 
-    if (document.readyState === 'complete') {
+    if (document.readyState === "complete") {
       setIsDOMReady(true);
     } else {
-      window.addEventListener('load', handleLoad);
-      window.addEventListener('beforeunload', handleUnload);
+      window.addEventListener("load", handleLoad);
+      window.addEventListener("beforeunload", handleUnload);
     }
 
     return () => {
-      window.removeEventListener('load', handleLoad);
-      window.removeEventListener('beforeunload', handleUnload);
+      window.removeEventListener("load", handleLoad);
+      window.removeEventListener("beforeunload", handleUnload);
     };
   }, []);
 
   return (
     <Button
-      variant={'default'}
-      size={'icon'}
+      variant={"default"}
+      size={"icon"}
       className="filliny-size-9 filliny-rounded-full filliny-bg-black filliny-text-white hover:filliny-bg-black"
       onClick={() => highlightForms({ visionOnly: true })}
       disabled={!isDOMReady}>

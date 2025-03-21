@@ -1,14 +1,14 @@
 // components/TextInput.tsx
-import React from 'react';
-import { useFormContext } from 'react-hook-form';
+import React from "react";
+import { useFormContext } from "react-hook-form";
 
-import type { GeneralFormProps } from '@extension/shared';
+import type { GeneralFormProps } from "@extension/shared";
 
-import { FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '../ui/form';
-import { Input } from '../ui/input';
+import { FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "../ui/form";
+import { Input } from "../ui/input";
 
 interface Props extends GeneralFormProps {
-  fieldType?: 'number' | 'text' | 'email' | 'password';
+  fieldType?: "number" | "text" | "email" | "password";
 }
 
 function RHFShadcnTextField({
@@ -19,7 +19,7 @@ function RHFShadcnTextField({
   value: externalValue,
   onChange: externalOnChange,
   required,
-  fieldType = 'text',
+  fieldType = "text",
 }: Props) {
   const { control } = useFormContext();
 
@@ -38,7 +38,7 @@ function RHFShadcnTextField({
               type={fieldType}
               placeholder={placeholder}
               onChange={e => {
-                const value = fieldType === 'number' ? Number(e.target.value) : String(e.target.value);
+                const value = fieldType === "number" ? Number(e.target.value) : String(e.target.value);
 
                 const newEvent = { ...e, target: { ...e.target, value } };
 

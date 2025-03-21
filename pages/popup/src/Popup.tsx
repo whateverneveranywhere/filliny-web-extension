@@ -1,47 +1,47 @@
-import '@src/Popup.css';
-import { useStorage, withErrorBoundary, withSuspense } from '@extension/shared';
-import { exampleThemeStorage } from '@extension/storage';
-import type { ComponentPropsWithoutRef } from 'react';
-import { Button } from '@extension/ui';
-import { t } from '@extension/i18n';
+import "@src/Popup.css";
+import { useStorage, withErrorBoundary, withSuspense } from "@extension/shared";
+import { exampleThemeStorage } from "@extension/storage";
+import type { ComponentPropsWithoutRef } from "react";
+import { Button } from "@extension/ui";
+import { t } from "@extension/i18n";
 
 const notificationOptions = {
-  type: 'basic',
-  iconUrl: chrome.runtime.getURL('icon-34.png'),
-  title: 'Injecting content script error',
-  message: 'You cannot inject script here!',
+  type: "basic",
+  iconUrl: chrome.runtime.getURL("icon-34.png"),
+  title: "Injecting content script error",
+  message: "You cannot inject script here!",
 } as const;
 
 const Popup = () => {
   const theme = useStorage(exampleThemeStorage);
-  const isLight = theme === 'light';
-  const logo = 'popup/logo.svg';
+  const isLight = theme === "light";
+  const logo = "popup/logo.svg";
   const goGithubSite = () =>
-    chrome.tabs.create({ url: 'https://github.com/Jonghakseo/chrome-extension-boilerplate-react-vite' });
+    chrome.tabs.create({ url: "https://github.com/Jonghakseo/chrome-extension-boilerplate-react-vite" });
 
   const injectContentScript = async () => {
     const [tab] = await chrome.tabs.query({ currentWindow: true, active: true });
 
-    if (tab.url!.startsWith('about:') || tab.url!.startsWith('chrome:')) {
-      chrome.notifications.create('inject-error', notificationOptions);
+    if (tab.url!.startsWith("about:") || tab.url!.startsWith("chrome:")) {
+      chrome.notifications.create("inject-error", notificationOptions);
     }
 
     await chrome.scripting
       .executeScript({
         target: { tabId: tab.id! },
-        files: ['/content-runtime/index.iife.js'],
+        files: ["/content-runtime/index.iife.js"],
       })
       .catch(err => {
         // Handling errors related to other paths
-        if (err.message.includes('Cannot access a chrome:// URL')) {
-          chrome.notifications.create('inject-error', notificationOptions);
+        if (err.message.includes("Cannot access a chrome:// URL")) {
+          chrome.notifications.create("inject-error", notificationOptions);
         }
       });
   };
 
   return (
-    <div className={`App ${isLight ? 'filliny-bg-slate-50' : 'filliny-bg-gray-800'}`}>
-      <header className={`App-header ${isLight ? 'filliny-text-gray-900' : 'filliny-text-gray-100'}`}>
+    <div className={`App ${isLight ? "filliny-bg-slate-50" : "filliny-bg-gray-800"}`}>
+      <header className={`App-header ${isLight ? "filliny-text-gray-900" : "filliny-text-gray-100"}`}>
         <button onClick={goGithubSite}>
           <img src={chrome.runtime.getURL(logo)} className="App-logo" alt="logo" />
         </button>
@@ -50,22 +50,22 @@ const Popup = () => {
         </p>
         <button
           className={
-            'font-bold mt-4 py-1 px-4 rounded shadow hover:scale-105 ' +
-            (isLight ? 'filliny-bg-blue-200 filliny-text-black' : 'filliny-bg-gray-700 filliny-text-white')
+            "font-bold mt-4 py-1 px-4 rounded shadow hover:scale-105 " +
+            (isLight ? "filliny-bg-blue-200 filliny-text-black" : "filliny-bg-gray-700 filliny-text-white")
           }
           onClick={injectContentScript}>
           Click to inject Content Script
         </button>
-        <ToggleButton>{t('toggleTheme')}</ToggleButton>
+        <ToggleButton>{t("toggleTheme")}</ToggleButton>
       </header>
     </div>
   );
 };
 
-const ToggleButton = (props: ComponentPropsWithoutRef<'button'>) => {
+const ToggleButton = (props: ComponentPropsWithoutRef<"button">) => {
   // const theme = useStorage(exampleThemeStorage);
   return (
-    <Button variant={'default'} className="bg-slate-50" onClick={exampleThemeStorage.toggle}>
+    <Button variant={"default"} className="bg-slate-50" onClick={exampleThemeStorage.toggle}>
       {props.children}
     </Button>
   );

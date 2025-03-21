@@ -1,39 +1,39 @@
 export const resetOverlays = (): void => {
   // Remove all form overlays
   const overlaysContainer = document
-    .querySelector('#chrome-extension-filliny')
-    ?.shadowRoot?.querySelector('.overlays-container');
+    .querySelector("#chrome-extension-filliny")
+    ?.shadowRoot?.querySelector(".overlays-container");
   if (overlaysContainer) {
-    overlaysContainer.innerHTML = '';
+    overlaysContainer.innerHTML = "";
   }
 
   // Reset all forms and form-like containers
   const formElements = document.querySelectorAll<HTMLElement>(
-    'form[data-filliny-overlay-active], [data-filliny-form-container][data-filliny-overlay-active]',
+    "form[data-filliny-overlay-active], [data-filliny-form-container][data-filliny-overlay-active]",
   );
 
   formElements.forEach(form => {
-    form.classList.remove('filliny-pointer-events-none');
+    form.classList.remove("filliny-pointer-events-none");
     delete form.dataset.fillinyOverlayActive;
     delete form.dataset.formId;
   });
 
   // Remove all highlights
-  const highlightedElements = document.querySelectorAll<HTMLElement>('[data-filliny-highlighted]');
+  const highlightedElements = document.querySelectorAll<HTMLElement>("[data-filliny-highlighted]");
   highlightedElements.forEach(element => {
-    element.style.removeProperty('box-shadow');
+    element.style.removeProperty("box-shadow");
     delete element.dataset.fillinyHighlighted;
   });
 };
 
-export const addGlowingBorder = (element: HTMLElement, color: string = 'green'): void => {
+export const addGlowingBorder = (element: HTMLElement, color: string = "green"): void => {
   Object.assign(element.style, {
     boxShadow: `0 0 10px 2px ${color}`,
-    transition: 'box-shadow 0.3s ease-in-out',
+    transition: "box-shadow 0.3s ease-in-out",
   });
 
   setTimeout(() => {
-    element.style.boxShadow = '';
+    element.style.boxShadow = "";
   }, 2000);
 };
 
@@ -44,26 +44,26 @@ export const showLoadingIndicator = (formId: string): void => {
   const overlay = form.querySelector<HTMLDivElement>('div[data-highlight-overlay="true"]');
   if (!overlay) return;
 
-  overlay.innerHTML = '';
+  overlay.innerHTML = "";
   overlay.appendChild(createSpinner());
   appendSpinnerAnimation();
 };
 
 const createSpinner = (): HTMLDivElement => {
-  const spinner = document.createElement('div');
+  const spinner = document.createElement("div");
   Object.assign(spinner.style, {
-    border: '4px solid rgba(0, 0, 0, 0.1)',
-    borderLeftColor: '#fff',
-    borderRadius: '50%',
-    width: '36px',
-    height: '36px',
-    animation: 'spin 1s linear infinite',
+    border: "4px solid rgba(0, 0, 0, 0.1)",
+    borderLeftColor: "#fff",
+    borderRadius: "50%",
+    width: "36px",
+    height: "36px",
+    animation: "spin 1s linear infinite",
   });
   return spinner;
 };
 
 const appendSpinnerAnimation = (): void => {
-  const animation = document.createElement('style');
+  const animation = document.createElement("style");
   animation.innerHTML = `
     @keyframes spin {
       to {
@@ -75,7 +75,7 @@ const appendSpinnerAnimation = (): void => {
 };
 
 export const disableOtherButtons = (formId: string): void => {
-  document.querySelectorAll<HTMLButtonElement>('button[data-form-id]').forEach(button => {
+  document.querySelectorAll<HTMLButtonElement>("button[data-form-id]").forEach(button => {
     if (button.dataset.formId !== formId) {
       button.disabled = true;
     }
@@ -87,8 +87,8 @@ export const createElementWithStyles = (tag: string, id: string, styles: Partial
   const element = document.createElement(tag);
   element.id = id;
   Object.assign(element.style, {
-    position: 'absolute',
-    pointerEvents: 'none',
+    position: "absolute",
+    pointerEvents: "none",
     ...styles,
   });
   return element;
@@ -114,14 +114,14 @@ export const getFormPosition = (form: HTMLElement) => {
 };
 
 export const findOrCreateShadowContainer = (shadowRoot: ShadowRoot): HTMLDivElement => {
-  let container = shadowRoot.querySelector('#filliny-overlays-container') as HTMLDivElement;
+  let container = shadowRoot.querySelector("#filliny-overlays-container") as HTMLDivElement;
 
   if (!container) {
-    container = createElementWithStyles('div', 'filliny-overlays-container', {
-      top: '0',
-      left: '0',
-      width: '100%',
-      height: '100%',
+    container = createElementWithStyles("div", "filliny-overlays-container", {
+      top: "0",
+      left: "0",
+      width: "100%",
+      height: "100%",
     }) as HTMLDivElement;
     shadowRoot.appendChild(container);
   }

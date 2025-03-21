@@ -1,7 +1,7 @@
-import * as React from 'react';
-import * as ProgressPrimitive from '@radix-ui/react-progress';
+import * as React from "react";
+import * as ProgressPrimitive from "@radix-ui/react-progress";
 
-import { cn } from '@/lib/utils';
+import { cn } from "@/lib/utils";
 
 const Progress = React.forwardRef<
   React.ElementRef<typeof ProgressPrimitive.Root>,
@@ -10,7 +10,7 @@ const Progress = React.forwardRef<
   <ProgressPrimitive.Root
     ref={ref}
     className={cn(
-      'filliny-relative filliny-h-4 filliny-w-full filliny-overflow-hidden filliny-rounded-full filliny-bg-secondary',
+      "filliny-relative filliny-h-4 filliny-w-full filliny-overflow-hidden filliny-rounded-full filliny-bg-secondary",
       className,
     )}
     {...props}>

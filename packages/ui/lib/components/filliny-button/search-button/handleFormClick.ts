@@ -1,11 +1,11 @@
-import { highlightForms } from './highlightForms';
-import { detectFields } from './detectionHelpers';
-import { processChunks, updateFormFields } from './fieldUpdaterHelpers';
-import { disableOtherButtons, resetOverlays, showLoadingIndicator } from './overlayUtils';
-import type { DTOProfileFillingForm } from '@extension/storage';
-import { profileStrorage } from '@extension/storage';
-import type { Field, FieldType } from '@extension/shared';
-import { aiFillService, getMatchingWebsite } from '@extension/shared';
+import { highlightForms } from "./highlightForms";
+import { detectFields } from "./detectionHelpers";
+import { processChunks, updateFormFields } from "./fieldUpdaterHelpers";
+import { disableOtherButtons, resetOverlays, showLoadingIndicator } from "./overlayUtils";
+import type { DTOProfileFillingForm } from "@extension/storage";
+import { profileStrorage } from "@extension/storage";
+import type { Field, FieldType } from "@extension/shared";
+import { aiFillService, getMatchingWebsite } from "@extension/shared";
 
 /**
  * Generate mock values for field testing
@@ -15,36 +15,36 @@ const getMockValueForFieldType = (type: FieldType, field: Field): string => {
 
   switch (type) {
     // Basic input types
-    case 'text':
-      return 'Sample text input';
-    case 'password':
-      return 'P@ssw0rd123';
-    case 'email':
-      return 'test@example.com';
-    case 'tel':
-      return '+1-555-0123';
-    case 'url':
-      return 'https://example.com';
-    case 'search':
-      return 'search query';
+    case "text":
+      return "Sample text input";
+    case "password":
+      return "P@ssw0rd123";
+    case "email":
+      return "test@example.com";
+    case "tel":
+      return "+1-555-0123";
+    case "url":
+      return "https://example.com";
+    case "search":
+      return "search query";
 
     // Date and time inputs
-    case 'date':
-      return now.toISOString().split('T')[0];
-    case 'datetime-local':
+    case "date":
+      return now.toISOString().split("T")[0];
+    case "datetime-local":
       return now.toISOString().slice(0, 16);
-    case 'month':
-      return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    case 'week': {
+    case "month":
+      return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    case "week": {
       const weekNum = Math.ceil((now.getDate() + 6) / 7);
-      return `${now.getFullYear()}-W${String(weekNum).padStart(2, '0')}`;
+      return `${now.getFullYear()}-W${String(weekNum).padStart(2, "0")}`;
     }
-    case 'time':
-      return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    case "time":
+      return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
 
     // Numeric inputs
-    case 'number':
-    case 'range': {
+    case "number":
+    case "range": {
       const min = field.validation?.min ?? 0;
       const max = field.validation?.max ?? 100;
       const step = field.validation?.step ?? 1;
@@ -52,38 +52,38 @@ const getMockValueForFieldType = (type: FieldType, field: Field): string => {
     }
 
     // Color input
-    case 'color':
-      return '#FF0000';
+    case "color":
+      return "#FF0000";
 
     // Complex input types
-    case 'file':
-      return 'https://example.com/sample.pdf';
-    case 'checkbox': {
+    case "file":
+      return "https://example.com/sample.pdf";
+    case "checkbox": {
       const element = document.querySelector<HTMLElement>(`[data-filliny-id="${field.id}"]`);
       if (element) {
         // Determine current state
         const isCurrentlyChecked =
           element instanceof HTMLInputElement
             ? element.checked
-            : element.hasAttribute('checked') || element.getAttribute('aria-checked') === 'true';
+            : element.hasAttribute("checked") || element.getAttribute("aria-checked") === "true";
 
         // Return the opposite state
         return (!isCurrentlyChecked).toString();
       }
-      return 'true'; // Default to checking the box if element not found
+      return "true"; // Default to checking the box if element not found
     }
-    case 'radio': {
+    case "radio": {
       if (field.options?.length) {
         // Prefer boolean values if available
-        const booleanOption = field.options.find(opt => ['true', 'false'].includes(opt.value));
+        const booleanOption = field.options.find(opt => ["true", "false"].includes(opt.value));
         if (booleanOption) return booleanOption.value;
         // Otherwise return first option
         return field.options[0].value;
       }
-      return 'true';
+      return "true";
     }
-    case 'select': {
-      if (!field.options?.length) return '';
+    case "select": {
+      if (!field.options?.length) return "";
 
       // Check for a select element to examine options
       const element = document.querySelector<HTMLElement>(`[data-filliny-id="${field.id}"]`);
@@ -135,11 +135,11 @@ const getMockValueForFieldType = (type: FieldType, field: Field): string => {
         const isPlaceholder = (option: HTMLOptionElement): boolean => {
           const text = option.text.toLowerCase();
           return (
-            text.includes('select') ||
-            text.includes('choose') ||
-            text.includes('pick') ||
-            text === '' ||
-            option.value === '' ||
+            text.includes("select") ||
+            text.includes("choose") ||
+            text.includes("pick") ||
+            text === "" ||
+            option.value === "" ||
             option.disabled
           );
         };
@@ -159,7 +159,7 @@ const getMockValueForFieldType = (type: FieldType, field: Field): string => {
 
         // Fall back to first option if no valid options found
         console.log(`Test mode: No valid options found, using first option for ${field.id}`);
-        return element.options[0]?.value || '';
+        return element.options[0]?.value || "";
       }
 
       // Fallback to using field options if direct element access fails
@@ -181,7 +181,7 @@ const getMockValueForFieldType = (type: FieldType, field: Field): string => {
         // Skip placeholder options
         const nonPlaceholders = field.options.filter(opt => {
           const text = opt.text.toLowerCase();
-          return !text.includes('select') && !text.includes('choose') && !text.includes('pick') && text !== '';
+          return !text.includes("select") && !text.includes("choose") && !text.includes("pick") && text !== "";
         });
 
         if (nonPlaceholders.length > 0) {
@@ -196,17 +196,17 @@ const getMockValueForFieldType = (type: FieldType, field: Field): string => {
       }
 
       // Last resort fallback
-      return 'option1';
+      return "option1";
     }
-    case 'textarea':
+    case "textarea":
       // Provide a longer multi-line sample for textareas to ensure they visibly update
       return `This is a sample textarea content for testing purposes.\nThis form field supports multiple lines of text.\nFeel free to edit this example text.`;
-    case 'button':
-      return 'Click me';
-    case 'fieldset':
-      return '';
+    case "button":
+      return "Click me";
+    case "fieldset":
+      return "";
     default:
-      return 'Sample test value';
+      return "Sample test value";
   }
 };
 
@@ -228,7 +228,7 @@ export const handleFormClick = async (
   );
 
   if (!formContainer) {
-    alert('Form not found. Please try again.');
+    alert("Form not found. Please try again.");
     resetOverlays();
     highlightForms({ visionOnly: false });
     return;
@@ -243,20 +243,20 @@ export const handleFormClick = async (
     // Detect fields using DOM-only strategy
     const fields = await detectFields(formContainer, false);
 
-    console.log('Form Click: Detected fields:', fields);
+    console.log("Form Click: Detected fields:", fields);
     console.log(
       `%c⏱ Detection took: ${((performance.now() - startTime) / 1000).toFixed(2)}s`,
-      'background: #059669; color: white; padding: 4px 8px; border-radius: 4px; font-size: 14px; font-weight: bold;',
+      "background: #059669; color: white; padding: 4px 8px; border-radius: 4px; font-size: 14px; font-weight: bold;",
     );
 
     if (testMode) {
-      console.log('Running in test mode with example values');
+      console.log("Running in test mode with example values");
 
       // Create a visual indicator for test mode
-      const testModeIndicator = document.createElement('div');
-      testModeIndicator.textContent = 'Test Mode Active';
+      const testModeIndicator = document.createElement("div");
+      testModeIndicator.textContent = "Test Mode Active";
       testModeIndicator.style.cssText =
-        'position: fixed; top: 20px; right: 20px; background: #4f46e5; color: white; padding: 8px 16px; border-radius: 4px; z-index: 10000; font-weight: bold;';
+        "position: fixed; top: 20px; right: 20px; background: #4f46e5; color: white; padding: 8px 16px; border-radius: 4px; z-index: 10000; font-weight: bold;";
       document.body.appendChild(testModeIndicator);
 
       setTimeout(() => testModeIndicator.remove(), 5000);
@@ -274,7 +274,7 @@ export const handleFormClick = async (
 
       // Log the mock values for debugging
       console.log(
-        'Test mode: Mock values generated:',
+        "Test mode: Mock values generated:",
         mockResponse.map(f => ({
           id: f.id,
           type: f.type,
@@ -295,20 +295,20 @@ export const handleFormClick = async (
     // Set up message listener for streaming response
     const streamPromise = new Promise<void>((resolve, reject) => {
       const messageHandler = (message: { type: string; data?: string; error?: string }) => {
-        if (message.type === 'STREAM_CHUNK' && message.data) {
+        if (message.type === "STREAM_CHUNK" && message.data) {
           try {
             processChunks(message.data, fields);
           } catch (error) {
-            console.error('Form Click: Error processing chunk:', error);
+            console.error("Form Click: Error processing chunk:", error);
             // Don't reject here, continue processing other chunks
           }
-        } else if (message.type === 'STREAM_DONE') {
+        } else if (message.type === "STREAM_DONE") {
           chrome.runtime.onMessage.removeListener(messageHandler);
           resolve();
-        } else if (message.type === 'STREAM_ERROR') {
-          console.error('Form Click: Stream error:', message.error);
+        } else if (message.type === "STREAM_ERROR") {
+          console.error("Form Click: Stream error:", message.error);
           chrome.runtime.onMessage.removeListener(messageHandler);
-          reject(new Error(message.error || 'Stream error'));
+          reject(new Error(message.error || "Stream error"));
         }
       };
 
@@ -317,7 +317,7 @@ export const handleFormClick = async (
 
     // Make the API call
     const response = await aiFillService({
-      contextText: matchingWebsite?.fillingContext || defaultProfile?.defaultFillingContext || '',
+      contextText: matchingWebsite?.fillingContext || defaultProfile?.defaultFillingContext || "",
       formData: fields,
       websiteUrl: visitingUrl,
       preferences: defaultProfile?.preferences,
@@ -329,22 +329,22 @@ export const handleFormClick = async (
     } else if (response.data) {
       await updateFormFields(response.data, false);
     } else {
-      console.error('Form Click: Invalid response format:', response);
-      throw new Error('Invalid response format from API');
+      console.error("Form Click: Invalid response format:", response);
+      throw new Error("Invalid response format from API");
     }
   } catch (error) {
-    console.error('Form Click: Error processing AI fill service:', error);
+    console.error("Form Click: Error processing AI fill service:", error);
     const errorMessage =
       error instanceof Error
         ? error.message
-        : typeof error === 'object'
+        : typeof error === "object"
           ? JSON.stringify(error)
-          : 'Unknown error occurred';
+          : "Unknown error occurred";
     alert(`Failed to fill form: ${errorMessage}`);
   } finally {
     console.log(
       `%c⏱ Total process took: ${((performance.now() - totalStartTime) / 1000).toFixed(2)}s`,
-      'background: #059669; color: white; padding: 4px 8px; border-radius: 4px; font-size: 14px; font-weight: bold;',
+      "background: #059669; color: white; padding: 4px 8px; border-radius: 4px; font-size: 14px; font-weight: bold;",
     );
     resetOverlays();
   }
@@ -356,7 +356,7 @@ export const handleFormClick = async (
  */
 const simulateStreamingForTestMode = async (fields: Field[]): Promise<void> => {
   // Process all fields at once for instant updates in test mode
-  console.log('Test mode: Processing all fields instantly');
+  console.log("Test mode: Processing all fields instantly");
   await updateFormFields(fields, true);
-  console.log('Test mode: All fields processed');
+  console.log("Test mode: All fields processed");
 };

@@ -1,20 +1,20 @@
-import { createRoot } from 'react-dom/client';
-import App from '@src/App';
+import { createRoot } from "react-dom/client";
+import App from "@src/App";
 // import '@extension/ui/dist/global.css';
 // @ts-expect-error Because file doesn't exist before build
-import tailwindcssOutput from '../dist/tailwind-output.css?inline';
+import tailwindcssOutput from "../dist/tailwind-output.css?inline";
 
-const root = document.createElement('div');
-root.id = 'chrome-extension-filliny';
-root.style.height = '0';
-root.style.width = '0';
+const root = document.createElement("div");
+root.id = "chrome-extension-filliny";
+root.style.height = "0";
+root.style.width = "0";
 
 document.documentElement.appendChild(root);
 
-const rootIntoShadow = document.createElement('div');
-rootIntoShadow.id = 'filliny-shadow-root';
+const rootIntoShadow = document.createElement("div");
+rootIntoShadow.id = "filliny-shadow-root";
 
-const shadowRoot = root.attachShadow({ mode: 'open' });
+const shadowRoot = root.attachShadow({ mode: "open" });
 
 const combinedStyles = `
   ${tailwindcssOutput}
@@ -92,8 +92,8 @@ const combinedStyles = `
   }
 `;
 
-if (navigator.userAgent.includes('Firefox')) {
-  const styleElement = document.createElement('style');
+if (navigator.userAgent.includes("Firefox")) {
+  const styleElement = document.createElement("style");
   styleElement.innerHTML = combinedStyles;
   shadowRoot.appendChild(styleElement);
 } else {

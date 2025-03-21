@@ -1,28 +1,28 @@
-import type { LucideIcon } from 'lucide-react';
-import { Button } from '../ui';
-import { cva, type VariantProps } from 'class-variance-authority';
+import type { LucideIcon } from "lucide-react";
+import { Button } from "../ui";
+import { cva, type VariantProps } from "class-variance-authority";
 
-const alertVariants = cva('filliny-rounded-lg filliny-border filliny-p-4', {
+const alertVariants = cva("filliny-rounded-lg filliny-border filliny-p-4", {
   variants: {
     variant: {
-      default: 'filliny-border-primary/20 filliny-bg-primary/5',
-      destructive: 'filliny-border-destructive/20 filliny-bg-destructive/5',
+      default: "filliny-border-primary/20 filliny-bg-primary/5",
+      destructive: "filliny-border-destructive/20 filliny-bg-destructive/5",
     },
   },
   defaultVariants: {
-    variant: 'default',
+    variant: "default",
   },
 });
 
-const titleVariants = cva('filliny-text-lg filliny-font-medium', {
+const titleVariants = cva("filliny-text-lg filliny-font-medium", {
   variants: {
     variant: {
-      default: 'filliny-text-primary',
-      destructive: 'filliny-text-primary',
+      default: "filliny-text-primary",
+      destructive: "filliny-text-primary",
     },
   },
   defaultVariants: {
-    variant: 'default',
+    variant: "default",
   },
 });
 
@@ -40,7 +40,7 @@ export function Alert({
   buttonText,
   buttonIcon: ButtonIcon,
   onButtonClick,
-  variant = 'default',
+  variant = "default",
 }: AlertProps) {
   return (
     <div className={alertVariants({ variant })}>

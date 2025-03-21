@@ -1,7 +1,7 @@
-import type { ReactNode, CSSProperties } from 'react';
-import React from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui';
+import type { ReactNode, CSSProperties } from "react";
+import type React from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui";
 
 export interface ButtonComponentProps {
   isHovered: boolean;
@@ -19,7 +19,7 @@ export interface ButtonWrapperProps {
 const ButtonWrapper: React.FC<ButtonWrapperProps> = ({ children, isHovered, isDragging, position, tooltipContent }) => (
   <AnimatePresence>
     <motion.div
-      style={{ position: 'absolute', ...position }}
+      style={{ position: "absolute", ...position }}
       className="filliny-z-[1000000000001] filliny-p-2"
       initial={{ x: 0, y: 0 }}
       animate={{
@@ -33,7 +33,7 @@ const ButtonWrapper: React.FC<ButtonWrapperProps> = ({ children, isHovered, isDr
         transition: { duration: 0.3, delay: 0.1 },
       }}>
       <div
-        className={`filliny-transition-opacity ${isHovered || isDragging ? 'filliny-opacity-100' : 'filliny-opacity-0'}`}>
+        className={`filliny-transition-opacity ${isHovered || isDragging ? "filliny-opacity-100" : "filliny-opacity-0"}`}>
         <TooltipProvider delayDuration={0}>
           <Tooltip>
             <TooltipTrigger asChild>

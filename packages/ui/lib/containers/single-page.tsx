@@ -1,12 +1,12 @@
-import { getConfig } from '@extension/shared';
-import { Logo } from '../components/Logo';
-import { Button } from '../components/ui';
-import { PageLayout } from '../layout';
+import { getConfig } from "@extension/shared";
+import { Logo } from "../components/Logo";
+import { Button } from "../components/ui";
+import { PageLayout } from "../layout";
 
 function SigninPage() {
   const config = getConfig();
   const handleLoginClick = () => {
-    window.open(config.baseURL + '/auth/sign-in', '_blank');
+    window.open(config.baseURL + "/auth/sign-in", "_blank");
   };
 
   return (

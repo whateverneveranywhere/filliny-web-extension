@@ -1,5 +1,5 @@
-import { getConfig, handleAction, setupAuthTokenListener, WebappEnvs } from '@extension/shared';
-import 'webextension-polyfill';
+import { getConfig, handleAction, setupAuthTokenListener, WebappEnvs } from "@extension/shared";
+import "webextension-polyfill";
 
 // Add this near the top of the file, after imports
 setupAuthTokenListener();
@@ -23,7 +23,7 @@ function storeEnvironmentInStorage() {
       });
     }
   } catch (error) {
-    console.error('Error storing environment:', error);
+    console.error("Error storing environment:", error);
   }
 }
 
@@ -33,7 +33,7 @@ storeEnvironmentInStorage();
 // Listen for messages from other parts of the extension
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   // Handle API requests separately from other actions
-  if (request.type === 'API_REQUEST') {
+  if (request.type === "API_REQUEST") {
     handleApiRequest(request, sender, sendResponse);
     return true; // Keep the message channel open for async response
   }
@@ -43,7 +43,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
 // Handle extension installation
 chrome.runtime.onInstalled.addListener(details => {
-  if (details.reason === 'install') {
+  if (details.reason === "install") {
     const config = getConfig();
     chrome.tabs.create({
       url: `${config.baseURL}/auth/sign-in`,
@@ -63,7 +63,7 @@ chrome.action.onClicked.addListener(async tab => {
 
 // Define the message type
 interface APIRequestMessage {
-  type: 'API_REQUEST';
+  type: "API_REQUEST";
   url: string;
   options: {
     method: string;
@@ -83,7 +83,7 @@ const handleApiRequest = (
   const tabId = sender.tab?.id;
 
   if (!tabId) {
-    sendResponse({ error: 'No valid tab ID found' });
+    sendResponse({ error: "No valid tab ID found" });
     return;
   }
 
@@ -95,9 +95,9 @@ const handleApiRequest = (
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ message: response.statusText }));
-        console.error('Background: API error:', errorData);
+        console.error("Background: API error:", errorData);
         sendResponse({
-          error: typeof errorData === 'object' ? errorData.message || JSON.stringify(errorData) : 'Request failed',
+          error: typeof errorData === "object" ? errorData.message || JSON.stringify(errorData) : "Request failed",
         });
         return;
       }
@@ -106,8 +106,8 @@ const handleApiRequest = (
         // console.log('Background: Processing stream response');
         const reader = response.body?.getReader();
         if (!reader) {
-          console.error('Background: No readable stream available');
-          sendResponse({ error: 'No readable stream available' });
+          console.error("Background: No readable stream available");
+          sendResponse({ error: "No readable stream available" });
           return;
         }
 
@@ -123,7 +123,7 @@ const handleApiRequest = (
               const chunk = new TextDecoder().decode(value);
               // console.log('Background: Sending chunk:', chunk.substring(0, 100) + '...');
               chrome.tabs.sendMessage(tabId, {
-                type: 'STREAM_CHUNK',
+                type: "STREAM_CHUNK",
                 data: chunk,
               });
             }
@@ -131,13 +131,13 @@ const handleApiRequest = (
           // console.log('Background: Stream complete');
           // Signal end of stream
           chrome.tabs.sendMessage(tabId, {
-            type: 'STREAM_DONE',
+            type: "STREAM_DONE",
           });
         } catch (error) {
-          console.error('Background: Stream error:', error);
-          const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+          console.error("Background: Stream error:", error);
+          const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
           chrome.tabs.sendMessage(tabId, {
-            type: 'STREAM_ERROR',
+            type: "STREAM_ERROR",
             error: errorMessage,
           });
           sendResponse({ error: errorMessage });
@@ -151,10 +151,10 @@ const handleApiRequest = (
       }
     })
     .catch(error => {
-      console.error('Background: Fetch error:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      console.error("Background: Fetch error:", error);
+      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
       sendResponse({ error: errorMessage });
     });
 };
-console.log('Background loaded');
+console.log("Background loaded");
 console.log("Edit 'chrome-extension/src/background/index.ts' and save to reload.");

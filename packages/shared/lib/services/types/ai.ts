@@ -1,22 +1,22 @@
-import type { DTOFillingPrefrences } from '@extension/storage';
+import type { DTOFillingPrefrences } from "@extension/storage";
 
 export type InputFieldType =
-  | 'text'
-  | 'password'
-  | 'email'
-  | 'number'
-  | 'tel'
-  | 'url'
-  | 'search'
-  | 'color'
-  | 'date'
-  | 'datetime-local'
-  | 'month'
-  | 'week'
-  | 'time'
-  | 'range';
+  | "text"
+  | "password"
+  | "email"
+  | "number"
+  | "tel"
+  | "url"
+  | "search"
+  | "color"
+  | "date"
+  | "datetime-local"
+  | "month"
+  | "week"
+  | "time"
+  | "range";
 
-export type FieldType = InputFieldType | 'select' | 'checkbox' | 'radio' | 'textarea' | 'button' | 'file' | 'fieldset';
+export type FieldType = InputFieldType | "select" | "checkbox" | "radio" | "textarea" | "button" | "file" | "fieldset";
 
 export interface Field {
   id: string;
@@ -43,7 +43,7 @@ export interface Field {
     step?: number;
   };
   metadata?: {
-    framework: 'react' | 'angular' | 'vue' | 'vanilla' | 'select2';
+    framework: "react" | "angular" | "vue" | "vanilla" | "select2";
     frameworkProps?: {
       onSubmit?: () => void;
       onChange?: () => void;

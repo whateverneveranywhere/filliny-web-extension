@@ -1,17 +1,17 @@
-import { useRef, useState } from 'react';
-import type { CSSProperties } from 'react';
-import type { DragEndEvent } from '@dnd-kit/core';
-import { DndContext, useDraggable } from '@dnd-kit/core';
-import { restrictToVerticalAxis } from '@dnd-kit/modifiers';
-import { CSS } from '@dnd-kit/utilities';
-import { useStorage } from '@extension/shared';
-import { LogoButton } from './logo-button';
-import { FillinyVisionButton } from './filliny-vision-button';
-import { SupportRequestButton } from './support-request-button';
-import { ButtonWrapper, type ButtonComponentProps } from './button-wrapper';
-import { FillinyTestModeFillerButton } from './test-mode-button';
-import { positionStorage } from '@extension/storage';
-import { DragButton } from './drag-button';
+import { useRef, useState } from "react";
+import type { CSSProperties } from "react";
+import type { DragEndEvent } from "@dnd-kit/core";
+import { DndContext, useDraggable } from "@dnd-kit/core";
+import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
+import { CSS } from "@dnd-kit/utilities";
+import { useStorage } from "@extension/shared";
+import { LogoButton } from "./logo-button";
+import { FillinyVisionButton } from "./filliny-vision-button";
+import { SupportRequestButton } from "./support-request-button";
+import { ButtonWrapper, type ButtonComponentProps } from "./button-wrapper";
+import { FillinyTestModeFillerButton } from "./test-mode-button";
+import { positionStorage } from "@extension/storage";
+import { DragButton } from "./drag-button";
 
 interface ButtonConfig {
   Component: React.FC<ButtonComponentProps>;
@@ -27,19 +27,19 @@ interface Position {
 const buttonComponents: ButtonConfig[] = [
   {
     Component: FillinyTestModeFillerButton,
-    position: { top: '-28px', left: '-8px' },
-    tooltipContent: 'Test form filling functionality',
+    position: { top: "-28px", left: "-8px" },
+    tooltipContent: "Test form filling functionality",
   },
-  { Component: DragButton, position: { top: '15px', left: '-25px' }, tooltipContent: 'Drag to reposition the button' },
+  { Component: DragButton, position: { top: "15px", left: "-25px" }, tooltipContent: "Drag to reposition the button" },
   {
     Component: SupportRequestButton,
-    position: { top: '32px', left: '-8px' },
-    tooltipContent: 'Get help or report an issue',
+    position: { top: "32px", left: "-8px" },
+    tooltipContent: "Get help or report an issue",
   },
   {
     Component: FillinyVisionButton,
-    position: { top: '-10px', left: '-25px' },
-    tooltipContent: 'Highlight fillable form fields',
+    position: { top: "-10px", left: "-25px" },
+    tooltipContent: "Highlight fillable form fields",
   },
 ];
 
@@ -49,15 +49,15 @@ const DraggableButton = ({ position }: { position: Position }) => {
   const dragHandleRef = useRef<HTMLDivElement>(null);
 
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-    id: 'filliny-button',
+    id: "filliny-button",
   });
 
   const style: CSSProperties = {
-    position: 'fixed',
+    position: "fixed",
     top: position.y,
     right: 10,
     transform: CSS.Transform.toString(transform),
-    touchAction: 'none',
+    touchAction: "none",
     zIndex: 1000000000000,
   };
 

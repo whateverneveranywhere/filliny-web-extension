@@ -1,7 +1,7 @@
-import fs from 'node:fs';
-import path from 'node:path';
-import type { PluginOption } from 'vite';
-import { IS_FIREFOX } from '@extension/env';
+import fs from "node:fs";
+import path from "node:path";
+import type { PluginOption } from "vite";
+import { IS_FIREFOX } from "@extension/env";
 
 /**
  * make entry point file for content script cache busting
@@ -10,33 +10,33 @@ export function makeEntryPointPlugin(): PluginOption {
   const cleanupTargets = new Set<string>();
 
   return {
-    name: 'make-entry-point-plugin',
+    name: "make-entry-point-plugin",
     generateBundle(options, bundle) {
       const outputDir = options.dir;
 
       if (!outputDir) {
-        throw new Error('Output directory not found');
+        throw new Error("Output directory not found");
       }
 
       for (const module of Object.values(bundle)) {
         const fileName = path.basename(module.fileName);
-        const newFileName = fileName.replace('.js', '_dev.js');
+        const newFileName = fileName.replace(".js", "_dev.js");
 
         switch (module.type) {
-          case 'asset':
-            if (fileName.endsWith('.map')) {
+          case "asset":
+            if (fileName.endsWith(".map")) {
               cleanupTargets.add(path.resolve(outputDir, fileName));
 
-              const originalFileName = fileName.replace('.map', '');
+              const originalFileName = fileName.replace(".map", "");
               const replacedSource = String(module.source).replaceAll(originalFileName, newFileName);
 
-              module.source = '';
+              module.source = "";
               fs.writeFileSync(path.resolve(outputDir, newFileName), replacedSource);
               break;
             }
             break;
 
-          case 'chunk': {
+          case "chunk": {
             fs.writeFileSync(path.resolve(outputDir, newFileName), module.code);
 
             if (IS_FIREFOX) {
@@ -64,7 +64,7 @@ export function makeEntryPointPlugin(): PluginOption {
  */
 function extractContentDir(outputDir: string) {
   const parts = outputDir.split(path.sep);
-  const distIndex = parts.indexOf('dist');
+  const distIndex = parts.indexOf("dist");
 
   if (distIndex !== -1 && distIndex < parts.length - 1) {
     return parts.slice(distIndex + 1);

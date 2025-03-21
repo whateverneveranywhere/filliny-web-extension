@@ -4,9 +4,9 @@ import type {
   DTOProfileFillingForm,
   DTOSuggestedWebsite,
   DTOTone,
-} from '@extension/storage';
-import { apiEndpoints } from '../../endpoints.js';
-import { httpService } from '../../httpService.js';
+} from "@extension/storage";
+import { apiEndpoints } from "../../endpoints.js";
+import { httpService } from "../../httpService.js";
 
 const {
   auth: {

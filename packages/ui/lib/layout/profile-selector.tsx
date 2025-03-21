@@ -1,23 +1,23 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { z } from 'zod';
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { z } from "zod";
 import {
   useActiveProfile,
   useBoolean,
   useChangeActiveFillingProfileMutation,
   useDeleteProfileByIdMutation,
   useProfilesListQuery,
-} from '@extension/shared';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { toast } from '@/lib/hooks/use-toast';
-import { Plus } from 'lucide-react';
-import type { DTOProfileFillingForm } from '@extension/storage';
-import { profileStrorage } from '@extension/storage';
-import { ProfileForm } from '@/lib/containers/profile-form';
-import FormProvider from '../components/RHF/FormProvider';
-import { RHFShadcnComboBox } from '../components/RHF';
-import { Button } from '../components';
-import { Drawer } from '../components/Drawer';
+} from "@extension/shared";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { toast } from "@/lib/hooks/use-toast";
+import { Plus } from "lucide-react";
+import type { DTOProfileFillingForm } from "@extension/storage";
+import { profileStrorage } from "@extension/storage";
+import { ProfileForm } from "@/lib/containers/profile-form";
+import FormProvider from "../components/RHF/FormProvider";
+import { RHFShadcnComboBox } from "../components/RHF";
+import { Button } from "../components";
+import { Drawer } from "../components/Drawer";
 
 const schema = z.object({
   defaultActiveProfileId: z.string(),
@@ -35,10 +35,10 @@ function ProfileSelector() {
 
   const methods = useForm({
     defaultValues: {
-      defaultActiveProfileId: String(activeProfileId || ''),
+      defaultActiveProfileId: String(activeProfileId || ""),
     },
     resolver: zodResolver(schema),
-    mode: 'onChange',
+    mode: "onChange",
   });
 
   const { setValue } = methods;
@@ -50,7 +50,7 @@ function ProfileSelector() {
 
       try {
         await updateActiveProfile({ activeProfileId: nextActiveId });
-        setValue('defaultActiveProfileId', nextActiveId);
+        setValue("defaultActiveProfileId", nextActiveId);
 
         // Find the new active profile from the profiles list
         const newActiveProfile = profiles?.find(profile => String(profile.id) === nextActiveId);
@@ -58,10 +58,10 @@ function ProfileSelector() {
           await profileStrorage.setDefaultProfile(newActiveProfile as unknown as DTOProfileFillingForm);
         }
 
-        toast({ title: 'Profile updated successfully' });
+        toast({ title: "Profile updated successfully" });
       } catch (error) {
         console.error(error);
-        toast({ variant: 'destructive', title: 'Failed to update profile' });
+        toast({ variant: "destructive", title: "Failed to update profile" });
       }
     },
     [activeProfileId, profiles, updateActiveProfile, setValue],
@@ -85,15 +85,15 @@ function ProfileSelector() {
             const newActiveProfile = remainingProfiles[deletedIndex] || remainingProfiles[deletedIndex - 1];
             if (newActiveProfile) {
               await updateActiveProfile({ activeProfileId: String(newActiveProfile.id) });
-              setValue('defaultActiveProfileId', String(newActiveProfile.id));
+              setValue("defaultActiveProfileId", String(newActiveProfile.id));
             }
           }
         }
 
-        toast({ title: 'Profile deleted successfully' });
+        toast({ title: "Profile deleted successfully" });
       } catch (error) {
         console.error(error);
-        toast({ variant: 'destructive', title: 'Failed to delete profile' });
+        toast({ variant: "destructive", title: "Failed to delete profile" });
       }
     },
     [deleteProfile, refetchProfiles, activeProfileId, profiles, updateActiveProfile, setValue],
@@ -126,7 +126,7 @@ function ProfileSelector() {
     if (!activeProfile && profiles?.length) {
       const activeFromApi = profiles.find(item => item.isActive);
       if (activeFromApi) {
-        setValue('defaultActiveProfileId', String(activeFromApi.id));
+        setValue("defaultActiveProfileId", String(activeFromApi.id));
       }
     }
   }, [profiles, activeProfile, setValue]);
@@ -134,7 +134,7 @@ function ProfileSelector() {
   // Add this useEffect to watch for changes in defaultStorageProfile
   useEffect(() => {
     if (activeProfile?.id) {
-      setValue('defaultActiveProfileId', String(activeProfile.id));
+      setValue("defaultActiveProfileId", String(activeProfile.id));
     }
   }, [activeProfile, setValue]);
 
@@ -161,10 +161,10 @@ function ProfileSelector() {
           onDelete={handleDeleteProfile}
           onEdit={handleEditProfile}
           onChange={handleProfileChange}
-          value={methods.watch('defaultActiveProfileId')}
+          value={methods.watch("defaultActiveProfileId")}
           name="defaultActiveProfileId"
           className="filliny-w-full"
-          title={''}
+          title={""}
         />
       </FormProvider>
 
@@ -175,7 +175,7 @@ function ProfileSelector() {
       <Drawer
         hideFooter
         open={profileModal.value}
-        title={editingId ? 'Edit Profile' : 'New Profile'}
+        title={editingId ? "Edit Profile" : "New Profile"}
         onOpenChange={handleDrawerChange}>
         <div className="filliny-h-[70vh] filliny-overflow-y-auto">
           <ProfileForm id={editingId} onFormSubmit={handleFormSubmit} />

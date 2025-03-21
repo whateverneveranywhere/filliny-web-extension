@@ -1,6 +1,6 @@
-import { apiEndpoints } from '../../endpoints.js';
-import { httpService } from '../../httpService.js';
-import type { DTOOverview } from '../../types/dashboard.js';
+import { apiEndpoints } from "../../endpoints.js";
+import { httpService } from "../../httpService.js";
+import type { DTOOverview } from "../../types/dashboard.js";
 
 const {
   auth: {

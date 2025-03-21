@@ -1,5 +1,5 @@
 export interface AuthHealthCheck {
-  status: 'success' | 'error';
+  status: "success" | "error";
 
   user: {
     id: string;

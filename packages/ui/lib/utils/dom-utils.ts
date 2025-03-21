@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState } from "react";
 
 export const useDOMReady = () => {
   const [isDOMReady, setIsDOMReady] = useState(false);
@@ -7,16 +7,16 @@ export const useDOMReady = () => {
     const handleLoad = () => setIsDOMReady(true);
     const handleUnload = () => setIsDOMReady(false);
 
-    if (document.readyState === 'complete') {
+    if (document.readyState === "complete") {
       setIsDOMReady(true);
     } else {
-      window.addEventListener('load', handleLoad);
-      window.addEventListener('beforeunload', handleUnload);
+      window.addEventListener("load", handleLoad);
+      window.addEventListener("beforeunload", handleUnload);
     }
 
     return () => {
-      window.removeEventListener('load', handleLoad);
-      window.removeEventListener('beforeunload', handleUnload);
+      window.removeEventListener("load", handleLoad);
+      window.removeEventListener("beforeunload", handleUnload);
     };
   }, []);
 

@@ -1,8 +1,8 @@
-import * as React from 'react';
-import * as DialogPrimitive from '@radix-ui/react-dialog';
-import { X } from 'lucide-react';
+import * as React from "react";
+import * as DialogPrimitive from "@radix-ui/react-dialog";
+import { X } from "lucide-react";
 
-import { cn } from '@/lib/utils';
+import { cn } from "@/lib/utils";
 
 const Dialog = DialogPrimitive.Root;
 
@@ -19,7 +19,7 @@ const DialogOverlay = React.forwardRef<
   <DialogPrimitive.Overlay
     ref={ref}
     className={cn(
-      'filliny-fixed filliny-inset-0 filliny-z-50 filliny-bg-black/80 filliny- data-[state=open]:filliny-animate-in data-[state=closed]:filliny-animate-out data-[state=closed]:filliny-fade-out-0 data-[state=open]:filliny-fade-in-0',
+      "filliny-fixed filliny-inset-0 filliny-z-50 filliny-bg-black/80 filliny- data-[state=open]:filliny-animate-in data-[state=closed]:filliny-animate-out data-[state=closed]:filliny-fade-out-0 data-[state=open]:filliny-fade-in-0",
       className,
     )}
     {...props}
@@ -36,7 +36,7 @@ const DialogContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        'filliny-fixed filliny-left-[50%] filliny-top-[50%] filliny-z-50 filliny-grid filliny-w-full filliny-max-w-lg filliny-translate-x-[-50%] filliny-translate-y-[-50%] filliny-gap-4 filliny-border filliny-bg-background filliny-p-6 filliny-shadow-lg filliny-duration-200 data-[state=open]:filliny-animate-in data-[state=closed]:filliny-animate-out data-[state=closed]:filliny-fade-out-0 data-[state=open]:filliny-fade-in-0 data-[state=closed]:filliny-zoom-out-95 data-[state=open]:filliny-zoom-in-95 data-[state=closed]:filliny-slide-out-to-left-1/2 data-[state=closed]:filliny-slide-out-to-top-[48%] data-[state=open]:filliny-slide-in-from-left-1/2 data-[state=open]:filliny-slide-in-from-top-[48%] sm:filliny-rounded-lg',
+        "filliny-fixed filliny-left-[50%] filliny-top-[50%] filliny-z-50 filliny-grid filliny-w-full filliny-max-w-lg filliny-translate-x-[-50%] filliny-translate-y-[-50%] filliny-gap-4 filliny-border filliny-bg-background filliny-p-6 filliny-shadow-lg filliny-duration-200 data-[state=open]:filliny-animate-in data-[state=closed]:filliny-animate-out data-[state=closed]:filliny-fade-out-0 data-[state=open]:filliny-fade-in-0 data-[state=closed]:filliny-zoom-out-95 data-[state=open]:filliny-zoom-in-95 data-[state=closed]:filliny-slide-out-to-left-1/2 data-[state=closed]:filliny-slide-out-to-top-[48%] data-[state=open]:filliny-slide-in-from-left-1/2 data-[state=open]:filliny-slide-in-from-top-[48%] sm:filliny-rounded-lg",
         className,
       )}
       {...props}>
@@ -53,24 +53,24 @@ DialogContent.displayName = DialogPrimitive.Content.displayName;
 const DialogHeader = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
   <div
     className={cn(
-      'filliny-flex filliny-flex-col filliny-space-y-1.5 filliny-text-center sm:filliny-text-left',
+      "filliny-flex filliny-flex-col filliny-space-y-1.5 filliny-text-center sm:filliny-text-left",
       className,
     )}
     {...props}
   />
 );
-DialogHeader.displayName = 'DialogHeader';
+DialogHeader.displayName = "DialogHeader";
 
 const DialogFooter = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
   <div
     className={cn(
-      'filliny-flex filliny-flex-col-reverse sm:filliny-flex-row sm:filliny-justify-end sm:filliny-space-x-2',
+      "filliny-flex filliny-flex-col-reverse sm:filliny-flex-row sm:filliny-justify-end sm:filliny-space-x-2",
       className,
     )}
     {...props}
   />
 );
-DialogFooter.displayName = 'DialogFooter';
+DialogFooter.displayName = "DialogFooter";
 
 const DialogTitle = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Title>,
@@ -78,7 +78,7 @@ const DialogTitle = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Title
     ref={ref}
-    className={cn('filliny-text-lg filliny-font-semibold filliny-leading-none filliny-tracking-tight', className)}
+    className={cn("filliny-text-lg filliny-font-semibold filliny-leading-none filliny-tracking-tight", className)}
     {...props}
   />
 ));
@@ -90,7 +90,7 @@ const DialogDescription = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Description
     ref={ref}
-    className={cn('filliny-text-sm filliny-text-muted-foreground', className)}
+    className={cn("filliny-text-sm filliny-text-muted-foreground", className)}
     {...props}
   />
 ));

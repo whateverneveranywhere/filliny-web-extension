@@ -1,7 +1,7 @@
-import { BackgroundActions, useStorage, withErrorBoundary, withSuspense } from '@extension/shared';
-import { authStorage } from '@extension/storage';
-import { RouterProvider, SigninPage } from '@extension/ui';
-import { useEffect } from 'react';
+import { BackgroundActions, useStorage, withErrorBoundary, withSuspense } from "@extension/shared";
+import { authStorage } from "@extension/storage";
+import { RouterProvider, SigninPage } from "@extension/ui";
+import { useEffect } from "react";
 
 const HomePage = () => {
   const auth = useStorage(authStorage);
@@ -12,7 +12,7 @@ const HomePage = () => {
       if (response && response.success && response.success.token) {
         authStorage.setToken(response.success.token);
       } else {
-        console.error('Failed to get auth token:', response);
+        console.error("Failed to get auth token:", response);
       }
     });
   }, []);

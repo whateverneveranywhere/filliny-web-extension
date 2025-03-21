@@ -1,6 +1,6 @@
-import { StorageEnum } from '../base/enums.js';
-import { createStorage } from '../base/base.js';
-import type { BaseStorage } from '../base/types.js';
+import { StorageEnum } from "../base/enums.js";
+import { createStorage } from "../base/base.js";
+import type { BaseStorage } from "../base/types.js";
 
 interface Position {
   x: number;
@@ -17,9 +17,9 @@ const defaultPosition: Position = {
   y: 0,
 };
 
-const isClient = typeof window !== 'undefined';
+const isClient = typeof window !== "undefined";
 const storage = isClient
-  ? createStorage<Position>('filliny-button-position', defaultPosition, {
+  ? createStorage<Position>("filliny-button-position", defaultPosition, {
       storageEnum: StorageEnum.Local,
       liveUpdate: true,
     })

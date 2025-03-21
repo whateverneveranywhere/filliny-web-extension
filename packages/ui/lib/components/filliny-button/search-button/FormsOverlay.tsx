@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { handleFormClick } from './handleFormClick';
-import { X, Wand2, Loader2 } from 'lucide-react';
-import { disableOtherButtons, showLoadingIndicator } from './overlayUtils';
-import { Button } from '../../ui';
-import type { OverlayPosition } from './types';
+import type React from "react";
+import { useState, useEffect, useRef } from "react";
+import { handleFormClick } from "./handleFormClick";
+import { X, Wand2, Loader2 } from "lucide-react";
+import { disableOtherButtons, showLoadingIndicator } from "./overlayUtils";
+import { Button } from "../../ui";
+import type { OverlayPosition } from "./types";
 
 interface OverlayProps {
   formId: string;
@@ -64,8 +65,8 @@ const FormsOverlay: React.FC<OverlayProps> = ({ formId, initialPosition, onDismi
     };
 
     // Update on scroll
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    document.addEventListener('scroll', handleScroll, { passive: true, capture: true });
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    document.addEventListener("scroll", handleScroll, { passive: true, capture: true });
 
     // Update on resize
     const resizeObserver = new ResizeObserver(handleScroll);
@@ -88,8 +89,8 @@ const FormsOverlay: React.FC<OverlayProps> = ({ formId, initialPosition, onDismi
       if (rafId) {
         cancelAnimationFrame(rafId);
       }
-      window.removeEventListener('scroll', handleScroll);
-      document.removeEventListener('scroll', handleScroll, { capture: true });
+      window.removeEventListener("scroll", handleScroll);
+      document.removeEventListener("scroll", handleScroll, { capture: true });
       resizeObserver.disconnect();
       mutationObserver.disconnect();
     };
@@ -119,8 +120,8 @@ const FormsOverlay: React.FC<OverlayProps> = ({ formId, initialPosition, onDismi
         filliny-transition-all filliny-duration-300
         ${
           loading
-            ? 'filliny-bg-black/40 filliny-backdrop-blur-sm'
-            : 'filliny-rounded-lg filliny-bg-black/30 filliny-backdrop-blur-md hover:filliny-bg-black/40'
+            ? "filliny-bg-black/40 filliny-backdrop-blur-sm"
+            : "filliny-rounded-lg filliny-bg-black/30 filliny-backdrop-blur-md hover:filliny-bg-black/40"
         }
       `}
       style={{

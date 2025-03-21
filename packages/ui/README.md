@@ -29,19 +29,19 @@ pnpm install
 Add the following to the `tailwind.config.ts` file.
 
 ```ts
-import baseConfig from '@extension/tailwindcss-config';
-import { withUI } from '@extension/ui';
+import baseConfig from "@extension/tailwindcss-config";
+import { withUI } from "@extension/ui";
 
 export default withUI({
   ...baseConfig,
-  content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
+  content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
 });
 ```
 
 Add the following to the `index.tsx` file.
 
 ```tsx
-import '@extension/ui/lib/global.css';
+import "@extension/ui/lib/global.css";
 ```
 
 ## Add Custom Component
@@ -49,16 +49,16 @@ import '@extension/ui/lib/global.css';
 Add the following to the `lib/components/index.ts` file.
 
 ```tsx
-export * from './CustomComponent.js';
+export * from "./CustomComponent.js";
 ```
 
 Add the following to the `lib/components/CustomComponent.tsx` file.
 
 ```tsx
-import { ComponentPropsWithoutRef } from 'react';
-import { cn } from '@/lib/utils.js';
+import { ComponentPropsWithoutRef } from "react";
+import { cn } from "@/lib/utils.js";
 
-type CustomComponentProps = ComponentPropsWithoutRef<'section'>;
+type CustomComponentProps = ComponentPropsWithoutRef<"section">;
 
 export function CustomComponent({ children, ...props }: CustomComponentProps) {
   return <section {...props}>{children}</section>;
@@ -68,7 +68,7 @@ export function CustomComponent({ children, ...props }: CustomComponentProps) {
 ## Usage
 
 ```tsx
-import { CustomComponent } from '@extension/ui';
+import { CustomComponent } from "@extension/ui";
 
 export default function Page() {
   return <CustomComponent>Hi, I'm a custom component.</CustomComponent>;
@@ -129,87 +129,87 @@ This configuration file is from the manual guide. You can refer to the manual gu
 `Configure tailwind.config.js`](https://ui.shadcn.com/docs/installation/manual))
 
 ```ts
-import deepmerge from 'deepmerge';
-import type { Config } from 'tailwindcss';
-import { fontFamily } from 'tailwindcss/defaultTheme';
-import tailwindAnimate from 'tailwindcss-animate';
+import deepmerge from "deepmerge";
+import type { Config } from "tailwindcss";
+import { fontFamily } from "tailwindcss/defaultTheme";
+import tailwindAnimate from "tailwindcss-animate";
 
 export function withUI(tailwindConfig: Config): Config {
   return deepmerge(
     shadcnConfig,
     deepmerge(tailwindConfig, {
-      content: ['./node_modules/@extension/ui/lib/**/*.{tsx,ts,js,jsx}'],
+      content: ["./node_modules/@extension/ui/lib/**/*.{tsx,ts,js,jsx}"],
     }),
   );
 }
 
 const shadcnConfig = {
-  darkMode: ['class'],
+  darkMode: ["class"],
   theme: {
     container: {
       center: true,
-      padding: '2rem',
+      padding: "2rem",
       screens: {
-        '2xl': '1400px',
+        "2xl": "1400px",
       },
     },
     extend: {
       colors: {
-        border: 'hsl(var(--border))',
-        input: 'hsl(var(--input))',
-        ring: 'hsl(var(--ring))',
-        background: 'hsl(var(--background))',
-        foreground: 'hsl(var(--foreground))',
+        border: "hsl(var(--border))",
+        input: "hsl(var(--input))",
+        ring: "hsl(var(--ring))",
+        background: "hsl(var(--background))",
+        foreground: "hsl(var(--foreground))",
         primary: {
-          DEFAULT: 'hsl(var(--primary))',
-          foreground: 'hsl(var(--primary-foreground))',
+          DEFAULT: "hsl(var(--primary))",
+          foreground: "hsl(var(--primary-foreground))",
         },
         secondary: {
-          DEFAULT: 'hsl(var(--secondary))',
-          foreground: 'hsl(var(--secondary-foreground))',
+          DEFAULT: "hsl(var(--secondary))",
+          foreground: "hsl(var(--secondary-foreground))",
         },
         destructive: {
-          DEFAULT: 'hsl(var(--destructive))',
-          foreground: 'hsl(var(--destructive-foreground))',
+          DEFAULT: "hsl(var(--destructive))",
+          foreground: "hsl(var(--destructive-foreground))",
         },
         muted: {
-          DEFAULT: 'hsl(var(--muted))',
-          foreground: 'hsl(var(--muted-foreground))',
+          DEFAULT: "hsl(var(--muted))",
+          foreground: "hsl(var(--muted-foreground))",
         },
         accent: {
-          DEFAULT: 'hsl(var(--accent))',
-          foreground: 'hsl(var(--accent-foreground))',
+          DEFAULT: "hsl(var(--accent))",
+          foreground: "hsl(var(--accent-foreground))",
         },
         popover: {
-          DEFAULT: 'hsl(var(--popover))',
-          foreground: 'hsl(var(--popover-foreground))',
+          DEFAULT: "hsl(var(--popover))",
+          foreground: "hsl(var(--popover-foreground))",
         },
         card: {
-          DEFAULT: 'hsl(var(--card))',
-          foreground: 'hsl(var(--card-foreground))',
+          DEFAULT: "hsl(var(--card))",
+          foreground: "hsl(var(--card-foreground))",
         },
       },
       borderRadius: {
         lg: `var(--radius)`,
         md: `calc(var(--radius) - 2px)`,
-        sm: 'calc(var(--radius) - 4px)',
+        sm: "calc(var(--radius) - 4px)",
       },
       fontFamily: {
-        sans: ['var(--font-sans)', ...fontFamily.sans],
+        sans: ["var(--font-sans)", ...fontFamily.sans],
       },
       keyframes: {
-        'accordion-down': {
-          from: { height: '0' },
-          to: { height: 'var(--radix-accordion-content-height)' },
+        "accordion-down": {
+          from: { height: "0" },
+          to: { height: "var(--radix-accordion-content-height)" },
         },
-        'accordion-up': {
-          from: { height: 'var(--radix-accordion-content-height)' },
-          to: { height: '0' },
+        "accordion-up": {
+          from: { height: "var(--radix-accordion-content-height)" },
+          to: { height: "0" },
         },
       },
       animation: {
-        'accordion-down': 'accordion-down 0.2s ease-out',
-        'accordion-up': 'accordion-up 0.2s ease-out',
+        "accordion-down": "accordion-down 0.2s ease-out",
+        "accordion-up": "accordion-up 0.2s ease-out",
       },
     },
   },
@@ -228,7 +228,8 @@ file. ([`Configure styles`](https://ui.shadcn.com/docs/installation/manual))
 @tailwind utilities;
 
 @layer base {
-  :host, :root {
+  :host,
+  :root {
     --background: 0 0% 100%;
     --foreground: 222.2 47.4% 11.2%;
     --muted: 210 40% 96.1%;
@@ -293,8 +294,6 @@ Finally, run this command from the root of your project to add the button compon
 pnpm dlx shadcn@latest add button -c ./packages/ui
 ```
 
-
-
 This will add the shadcn button component to your UI package.
 
 Remember to adjust any paths or package names if your project structure differs from the assumed layout in this guide.
@@ -305,7 +304,7 @@ Edit the `index.ts` file in the `packages/ui` directory to export the shadcn ui 
 
 ```ts
 //...
-export * from './lib/components/ui/button';
+export * from "./lib/components/ui/button";
 ```
 
 7. Apply global.css
@@ -313,7 +312,7 @@ export * from './lib/components/ui/button';
 If you want to use shadcn components in content-ui ShadowDOM, you need to import ui package's global.css in the content-ui `tailwind-input.css`
 
 ```css
-@import '@extension/ui/lib/global.css';
+@import "@extension/ui/lib/global.css";
 
 @tailwind base;
 @tailwind components;
@@ -323,7 +322,7 @@ If you want to use shadcn components in content-ui ShadowDOM, you need to import
 If you want to use shadcn components in other pages, you need to import ui package's global.css in the `src/index.css`
 
 ```css
-@import '@extension/ui/lib/global.css';
+@import "@extension/ui/lib/global.css";
 
 @tailwind base;
 @tailwind components;

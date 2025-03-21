@@ -1,5 +1,5 @@
-import { useRef, useSyncExternalStore } from 'react';
-import type { BaseStorage } from '@extension/storage';
+import { useRef, useSyncExternalStore } from "react";
+import type { BaseStorage } from "@extension/storage";
 
 type WrappedPromise = ReturnType<typeof wrapPromise>;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -26,15 +26,15 @@ export const useStorage = <
 };
 
 const wrapPromise = <R,>(promise: Promise<R>) => {
-  let status = 'pending';
+  let status = "pending";
   let result: R;
   const suspender = promise.then(
     r => {
-      status = 'success';
+      status = "success";
       result = r;
     },
     e => {
-      status = 'error';
+      status = "error";
       result = e;
     },
   );
@@ -42,9 +42,9 @@ const wrapPromise = <R,>(promise: Promise<R>) => {
   return {
     read() {
       switch (status) {
-        case 'pending':
+        case "pending":
           throw suspender;
-        case 'error':
+        case "error":
           throw result;
         default:
           return result;

@@ -1,6 +1,6 @@
-import { authStorage, positionStorage, profileStrorage, type DTOProfileFillingForm } from '@extension/storage';
-import type { ErrorResponse, GetAuthTokenResponse, Request } from './shared-types.js';
-import { BackgroundActions, WebappEnvs } from './shared-types.js';
+import { authStorage, positionStorage, profileStrorage, type DTOProfileFillingForm } from "@extension/storage";
+import type { ErrorResponse, GetAuthTokenResponse, Request } from "./shared-types.js";
+import { BackgroundActions, WebappEnvs } from "./shared-types.js";
 
 export const getFaviconUrl = (url: string) => {
   return `https://www.google.com/s2/favicons?sz=64&domain_url=${url}`;
@@ -11,8 +11,8 @@ export const cleanUrl = (url: string) => {
     const parsedUrl = new URL(url);
     return parsedUrl.hostname;
   } catch (error) {
-    console.error('Invalid URL:', error);
-    return '';
+    console.error("Invalid URL:", error);
+    return "";
   }
 };
 
@@ -20,7 +20,7 @@ export const isValidUrl = (url: string) => {
   if (!url) return false;
 
   // Handle relative URLs by prepending the current origin
-  if (url.startsWith('/')) {
+  if (url.startsWith("/")) {
     url = window.location.origin + url;
   }
 
@@ -48,7 +48,7 @@ export const formatToK = (number: number): string => {
   return number.toString();
 };
 
-export const getMatchingWebsite = (websites: DTOProfileFillingForm['fillingWebsites'], currentUrl: string) => {
+export const getMatchingWebsite = (websites: DTOProfileFillingForm["fillingWebsites"], currentUrl: string) => {
   if (!isValidUrl(currentUrl)) {
     return null;
   }
@@ -83,16 +83,16 @@ interface ConfigEntry {
 // Typed config object
 const config: Record<WebappEnvs, ConfigEntry> = {
   dev: {
-    cookieName: 'authjs.session-token',
-    baseURL: 'http://localhost:3000',
+    cookieName: "authjs.session-token",
+    baseURL: "http://localhost:3000",
   },
   preview: {
-    cookieName: '__Secure-authjs.session-token',
-    baseURL: 'https://dev.filliny-app.pages.dev',
+    cookieName: "__Secure-authjs.session-token",
+    baseURL: "https://dev.filliny-app.pages.dev",
   },
   prod: {
-    cookieName: '__Secure-authjs.session-token',
-    baseURL: 'https://prod.filliny.io',
+    cookieName: "__Secure-authjs.session-token",
+    baseURL: "https://prod.filliny.io",
   },
 };
 
@@ -128,20 +128,20 @@ export const getConfig = (webappEnv?: WebappEnvs): ConfigEntry => {
     }
 
     // Try to get from extension storage if available
-    if (typeof chrome !== 'undefined' && chrome.storage) {
+    if (typeof chrome !== "undefined" && chrome.storage) {
       // This is async, but for immediate use we need to fallback to a default
-      chrome.storage.local.get('webapp_env', result => {
+      chrome.storage.local.get("webapp_env", result => {
         if (result.webapp_env && Object.values(WebappEnvs).includes(result.webapp_env)) {
           // Store for future use in this context
-          if (typeof sessionStorage !== 'undefined') {
-            sessionStorage.setItem('filliny_webapp_env', result.webapp_env);
+          if (typeof sessionStorage !== "undefined") {
+            sessionStorage.setItem("filliny_webapp_env", result.webapp_env);
           }
         }
       });
 
       // Check if we have a cached value from a previous storage retrieval
-      if (typeof sessionStorage !== 'undefined') {
-        const cachedEnv = sessionStorage.getItem('filliny_webapp_env');
+      if (typeof sessionStorage !== "undefined") {
+        const cachedEnv = sessionStorage.getItem("filliny_webapp_env");
         if (cachedEnv && Object.values(WebappEnvs).includes(cachedEnv as WebappEnvs)) {
           return config[cachedEnv as WebappEnvs];
         }
@@ -155,7 +155,7 @@ export const getConfig = (webappEnv?: WebappEnvs): ConfigEntry => {
       return config[processEnv.VITE_WEBAPP_ENV as WebappEnvs];
     }
   } catch (error) {
-    console.error('Error determining environment:', error);
+    console.error("Error determining environment:", error);
   }
 
   // Default to PREVIEW for safety rather than DEV
@@ -202,7 +202,7 @@ export const handleAction = (
       return true;
 
     default:
-      sendResponse({ error: { error: 'Invalid action' } });
+      sendResponse({ error: { error: "Invalid action" } });
       return false;
   }
 };
@@ -216,9 +216,9 @@ export const getCurrentVistingUrl = (): Promise<string> => {
       }
       const activeTab = tabs[0];
       if (activeTab) {
-        resolve(activeTab.url || '');
+        resolve(activeTab.url || "");
       } else {
-        reject('No active tab found');
+        reject("No active tab found");
       }
     });
   });

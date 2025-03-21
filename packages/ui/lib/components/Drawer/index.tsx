@@ -1,4 +1,4 @@
-import React from 'react';
+import type React from "react";
 import {
   Button,
   DrawerClose,
@@ -8,7 +8,7 @@ import {
   DrawerHeader,
   DrawerTitle,
   Drawer as ShadcnDrawer,
-} from '../ui';
+} from "../ui";
 
 interface Props {
   hideFooter?: boolean;
@@ -46,17 +46,17 @@ function Drawer(props: Props) {
         <div className="filliny-mx-auto filliny-w-full">
           <DrawerHeader>
             <DrawerTitle className="filliny-text-center">{title}</DrawerTitle>
-            {description && <DrawerDescription>{description}</DrawerDescription>}{' '}
+            {description && <DrawerDescription>{description}</DrawerDescription>}{" "}
           </DrawerHeader>
           <div className="filliny-p-2">{children}</div>
           {!hideFooter && (
             <DrawerFooter>
               <Button loading={isLoading} disabled={isSubmitDisabled || isLoading} type="submit" onClick={onConfirm}>
-                {submitBtnText || 'Submit'}
+                {submitBtnText || "Submit"}
               </Button>
               <DrawerClose asChild>
                 <Button onClick={onCancel} variant="outline">
-                  {cancelBtnText || 'Cancel'}
+                  {cancelBtnText || "Cancel"}
                 </Button>
               </DrawerClose>
             </DrawerFooter>

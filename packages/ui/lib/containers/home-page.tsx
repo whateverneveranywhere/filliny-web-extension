@@ -1,5 +1,4 @@
-/* eslint-disable react/no-unescaped-entities */
-import { useEffect } from 'react';
+import { useEffect } from "react";
 import {
   useDashboardOverview,
   useCreateFillingProfileMutation,
@@ -7,15 +6,15 @@ import {
   useActiveTabUrl,
   useActiveProfile,
   usePlanLimits,
-} from '@extension/shared';
-import type { DTOProfileFillingForm } from '@extension/storage';
-import { profileStrorage } from '@extension/storage';
+} from "@extension/shared";
+import type { DTOProfileFillingForm } from "@extension/storage";
+import { profileStrorage } from "@extension/storage";
 
-import { Alert, AlertDescription, AlertTitle, Loading, NoTokensAlert } from '../components';
-import { QuickAddWebsiteToProfile } from './quick-add-website';
-import { ActiveProfileWebsitePreview } from './active-profile-website-preview';
-import { PageLayout } from '../layout';
-import { useToast } from '../hooks/use-toast';
+import { Alert, AlertDescription, AlertTitle, Loading, NoTokensAlert } from "../components";
+import { QuickAddWebsiteToProfile } from "./quick-add-website";
+import { ActiveProfileWebsitePreview } from "./active-profile-website-preview";
+import { PageLayout } from "../layout";
+import { useToast } from "../hooks/use-toast";
 
 const useProfileManagement = (url: string) => {
   const { toast } = useToast();
@@ -49,30 +48,30 @@ const useProfileManagement = (url: string) => {
       }
     } catch (error) {
       toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'An unexpected error occurred',
+        variant: "destructive",
+        title: "Error",
+        description: error instanceof Error ? error.message : "An unexpected error occurred",
       });
-      console.error('Error adding website:', error);
+      console.error("Error adding website:", error);
     }
   };
 
   const handleCreateProfile = async () => {
     const newProfileData: DTOProfileFillingForm = {
-      profileName: 'First profile',
-      defaultFillingContext: 'Fill the form with example mock data',
+      profileName: "First profile",
+      defaultFillingContext: "Fill the form with example mock data",
       preferences: {
         isFormal: true,
         isGapFillingAllowed: true,
         povId: 1,
         toneId: 1,
       },
-      fillingWebsites: [{ fillingContext: '', isRootLoad: true, websiteUrl: url }],
+      fillingWebsites: [{ fillingContext: "", isRootLoad: true, websiteUrl: url }],
     };
 
     const createdProfile = await createProfile({ data: newProfileData });
     profileStrorage.setDefaultProfile(createdProfile);
-    toast({ title: 'Profile created and set as default' });
+    toast({ title: "Profile created and set as default" });
   };
 
   const handleUpdateProfile = async () => {
@@ -82,12 +81,12 @@ const useProfileManagement = (url: string) => {
       id: activeProfileId,
       data: {
         ...activeProfile,
-        fillingWebsites: [...activeProfile.fillingWebsites, { fillingContext: '', isRootLoad: true, websiteUrl: url }],
+        fillingWebsites: [...activeProfile.fillingWebsites, { fillingContext: "", isRootLoad: true, websiteUrl: url }],
       },
     };
 
     await editProfile(updatedProfileData);
-    toast({ title: 'Website added to profile successfully' });
+    toast({ title: "Website added to profile successfully" });
   };
 
   return {
@@ -110,7 +109,7 @@ const HomePage = () => {
     matchingWebsite,
   } = useActiveTabUrl({
     websites: activeProfile?.fillingWebsites,
-    mode: 'activeTab',
+    mode: "activeTab",
   });
 
   const { handleQuickAdd, isLoading: isProfileLoading, currentPlan, maxWebsites } = useProfileManagement(activeTabUrl);

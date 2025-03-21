@@ -1,10 +1,10 @@
-import React from 'react';
-import { RHFShadcnTextField, RHFShadcnTextarea } from '../RHF';
+import React from "react";
+import { RHFShadcnTextField, RHFShadcnTextarea } from "../RHF";
 
 function StepperForm2() {
   return (
     <>
-      {' '}
+      {" "}
       <div className="filliny-grid filliny-gap-4">
         <RHFShadcnTextField name="profileName" title="Filling profile's name" />
 

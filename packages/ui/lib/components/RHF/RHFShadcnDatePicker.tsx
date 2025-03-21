@@ -1,16 +1,16 @@
 // components/TextInput.tsx
-import { format, parseISO } from 'date-fns';
-import { CalendarIcon } from 'lucide-react';
-import React, { useMemo } from 'react';
-import { Controller, useFormContext } from 'react-hook-form';
+import { format, parseISO } from "date-fns";
+import { CalendarIcon } from "lucide-react";
+import React, { useMemo } from "react";
+import { Controller, useFormContext } from "react-hook-form";
 
-import { cn } from '@/lib/utils';
-import type { GeneralFormProps } from '@extension/shared';
+import { cn } from "@/lib/utils";
+import type { GeneralFormProps } from "@extension/shared";
 
-import { Button } from '../ui/button';
-import { Calendar } from '../ui/calendar';
-import { FormControl, FormDescription, FormItem, FormLabel, FormMessage } from '../ui/form';
-import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
+import { Button } from "../ui/button";
+import { Calendar } from "../ui/calendar";
+import { FormControl, FormDescription, FormItem, FormLabel, FormMessage } from "../ui/form";
+import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 
 function RHFShadcnDatePicker({
   title,
@@ -38,10 +38,10 @@ function RHFShadcnDatePicker({
                 <Button
                   variant="outline"
                   className={cn(
-                    'filliny-pl-3 filliny-text-left filliny-font-normal filliny-w-full',
-                    !field.value && 'filliny-text-muted-foreground',
+                    "filliny-pl-3 filliny-text-left filliny-font-normal filliny-w-full",
+                    !field.value && "filliny-text-muted-foreground",
                   )}>
-                  {field.value ? format(field.value, 'PPP') : <span>{placeholder || 'Pick a date'}</span>}
+                  {field.value ? format(field.value, "PPP") : <span>{placeholder || "Pick a date"}</span>}
                   <CalendarIcon className="filliny-ml-auto filliny-size-4 filliny-opacity-50" />
                 </Button>
               </FormControl>
@@ -60,7 +60,7 @@ function RHFShadcnDatePicker({
                   }
                 }}
                 selected={field?.value ? parseISO(field?.value) : UTCtoUserDate}
-                disabled={date => date > new Date() || date < new Date('1900-01-01')}
+                disabled={date => date > new Date() || date < new Date("1900-01-01")}
                 initialFocus
               />
             </PopoverContent>

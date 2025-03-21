@@ -1,13 +1,14 @@
 /* eslint-disable jsx-a11y/no-static-element-interactions */
 /* eslint-disable jsx-a11y/click-events-have-key-events */
-import { ChevronDown, ChevronUp, Loader2, Globe, ExternalLink, Trash } from 'lucide-react';
-import React, { useState } from 'react';
-import { Button } from '../ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
-import { cn } from '@/lib/utils';
-import { getFaviconUrl } from '@extension/shared';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui';
-import { Skeleton } from '../ui/skeleton';
+import { ChevronDown, ChevronUp, Loader2, Globe, ExternalLink, Trash } from "lucide-react";
+import type React from "react";
+import { useState } from "react";
+import { Button } from "../ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
+import { cn } from "@/lib/utils";
+import { getFaviconUrl } from "@extension/shared";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui";
+import { Skeleton } from "../ui/skeleton";
 
 interface Props {
   websiteURL: string;
@@ -45,16 +46,16 @@ function WebsitePreviewCard({
   const [faviconError, setFaviconError] = useState(false);
 
   const formattedURL = getFormattedURL(websiteURL, isRootLoad);
-  const isValidURL = websiteURL && websiteURL !== 'about:blank';
+  const isValidURL = websiteURL && websiteURL !== "about:blank";
 
   const handleVisitWebsite = () => {
     if (isValidURL) {
-      window.open(websiteURL, '_blank');
+      window.open(websiteURL, "_blank");
     }
   };
 
   return (
-    <Card className={cn('w-full transition-all duration-200 hover:shadow-md', className)}>
+    <Card className={cn("w-full transition-all duration-200 hover:shadow-md", className)}>
       <CardHeader className="filliny-w-full filliny-space-y-0 !filliny-p-2">
         <CardTitle className="filliny-flex filliny-w-full filliny-items-center filliny-gap-4 !filliny-p-1">
           {/* Favicon Section */}
@@ -84,12 +85,12 @@ function WebsitePreviewCard({
                 <TooltipTrigger asChild>
                   <div
                     className={cn(
-                      'filliny-flex filliny-items-center filliny-gap-2 filliny-w-full filliny-flex-nowrap',
-                      isValidURL && 'filliny-cursor-pointer filliny-hover:filliny-text-primary',
+                      "filliny-flex filliny-items-center filliny-gap-2 filliny-w-full filliny-flex-nowrap",
+                      isValidURL && "filliny-cursor-pointer filliny-hover:filliny-text-primary",
                     )}
                     onClick={handleVisitWebsite}>
                     <span className="filliny-truncate filliny-text-sm filliny-font-medium">
-                      {formattedURL || 'Enter website URL'}
+                      {formattedURL || "Enter website URL"}
                     </span>
                     {isValidURL && (
                       <ExternalLink className="filliny-h-4 filliny-w-4 filliny-shrink-0 filliny-text-muted-foreground" />
@@ -97,7 +98,7 @@ function WebsitePreviewCard({
                   </div>
                 </TooltipTrigger>
                 <TooltipContent side="top">
-                  <p className="filliny-text-sm">{isValidURL ? websiteURL : 'No valid URL provided'}</p>
+                  <p className="filliny-text-sm">{isValidURL ? websiteURL : "No valid URL provided"}</p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
@@ -141,7 +142,7 @@ function WebsitePreviewCard({
       </CardHeader>
 
       {isExpanded && children && (
-        <CardContent className={cn('p-4 pt-0', 'animate-in fade-in-0 slide-in-from-top-2 duration-200')}>
+        <CardContent className={cn("p-4 pt-0", "animate-in fade-in-0 slide-in-from-top-2 duration-200")}>
           {children}
         </CardContent>
       )}

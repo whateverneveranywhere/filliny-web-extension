@@ -1,6 +1,6 @@
-import { useActiveTabUrl, useStorage } from '@extension/shared';
-import { authStorage, profileStrorage } from '@extension/storage';
-import { FillinyButton } from '@extension/ui';
+import { useActiveTabUrl, useStorage } from "@extension/shared";
+import { authStorage, profileStrorage } from "@extension/storage";
+import { FillinyButton } from "@extension/ui";
 
 export default function App() {
   const auth = useStorage(authStorage);
@@ -8,7 +8,7 @@ export default function App() {
 
   const { isLoading, matchingWebsite } = useActiveTabUrl({
     websites: defaultStorageProfile?.fillingWebsites,
-    mode: 'currentPage',
+    mode: "currentPage",
   });
 
   return (

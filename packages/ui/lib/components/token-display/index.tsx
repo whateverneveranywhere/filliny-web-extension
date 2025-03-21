@@ -1,8 +1,8 @@
-import { formatToK, getConfig } from '@extension/shared';
-import { Button } from '../ui/button';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger, Loading } from '../ui';
-import { RefreshCw } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { formatToK, getConfig } from "@extension/shared";
+import { Button } from "../ui/button";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger, Loading } from "../ui";
+import { RefreshCw } from "lucide-react";
+import { useState, useEffect } from "react";
 
 interface TokenDisplayProps {
   tokens?: number;
@@ -66,7 +66,7 @@ function TokenDisplay({ tokens = 0, onRefresh, isRefetching = false, isLoading =
               onClick={handleRefresh}
               disabled={isRefetching || isOnCooldown || !onRefresh}
               className={`filliny-h-8 filliny-w-8 filliny-transition-all hover:filliny-bg-muted ${
-                isRefetching ? 'filliny-animate-spin filliny-text-muted-foreground' : 'hover:filliny-text-primary'
+                isRefetching ? "filliny-animate-spin filliny-text-muted-foreground" : "hover:filliny-text-primary"
               }`}>
               {cooldownSeconds ? <span>{cooldownSeconds}s</span> : <RefreshCw className="filliny-h-4 filliny-w-4" />}
             </Button>
@@ -79,7 +79,7 @@ function TokenDisplay({ tokens = 0, onRefresh, isRefetching = false, isLoading =
             href={`${config.baseURL}/pricing?tab=token`}
             target="_blank"
             rel="noopener noreferrer">
-            <Button size={'sm'} variant={'default'} className="filliny-w-full">
+            <Button size={"sm"} variant={"default"} className="filliny-w-full">
               Purchase More Tokens
             </Button>
           </a>

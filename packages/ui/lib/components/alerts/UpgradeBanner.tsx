@@ -1,6 +1,6 @@
-import { ExternalLink } from 'lucide-react';
-import { getConfig, useActiveProfile, usePlanLimits } from '@extension/shared';
-import { Alert } from './Alert';
+import { ExternalLink } from "lucide-react";
+import { getConfig, useActiveProfile, usePlanLimits } from "@extension/shared";
+import { Alert } from "./Alert";
 
 export default function UpgradeBanner() {
   const { currentPlan, maxWebsites, hasReachedLimit } = usePlanLimits();
@@ -13,8 +13,8 @@ export default function UpgradeBanner() {
   }
 
   const title = `${currentPlan} • ${maxWebsites} websites`;
-  const description = 'Upgrade your plan to add more websites and unlock additional features';
-  const handleUpgrade = () => window.open(`${getConfig().baseURL}/pricing`, '_blank');
+  const description = "Upgrade your plan to add more websites and unlock additional features";
+  const handleUpgrade = () => window.open(`${getConfig().baseURL}/pricing`, "_blank");
 
   return (
     <div className="filliny-w-full">

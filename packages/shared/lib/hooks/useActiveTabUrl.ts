@@ -1,18 +1,18 @@
-import { useEffect, useState, useCallback, useMemo } from 'react';
-import { getCurrentVistingUrl, getMatchingWebsite, isValidUrl } from '../utils/index.js';
-import type { DTOProfileFillingForm } from '@extension/storage';
+import { useEffect, useState, useCallback, useMemo } from "react";
+import { getCurrentVistingUrl, getMatchingWebsite, isValidUrl } from "../utils/index.js";
+import type { DTOProfileFillingForm } from "@extension/storage";
 
 interface UseActiveTabUrlReturn {
   activeTabUrl: string;
   isLoading: boolean;
   isValid: boolean;
-  matchingWebsite: DTOProfileFillingForm['fillingWebsites'][0] | null;
+  matchingWebsite: DTOProfileFillingForm["fillingWebsites"][0] | null;
   currentPageUrl: string;
 }
 
 interface UseActiveTabUrlProps {
-  websites?: DTOProfileFillingForm['fillingWebsites'];
-  mode?: 'activeTab' | 'currentPage' | 'both';
+  websites?: DTOProfileFillingForm["fillingWebsites"];
+  mode?: "activeTab" | "currentPage" | "both";
 }
 
 interface TabUpdateListeners {
@@ -23,7 +23,7 @@ interface TabUpdateListeners {
 }
 
 const getTabListeners = (): TabUpdateListeners => {
-  const isChromeAvailable = typeof chrome !== 'undefined' && chrome.tabs;
+  const isChromeAvailable = typeof chrome !== "undefined" && chrome.tabs;
 
   return {
     onActivated: callback => {
@@ -50,16 +50,16 @@ const getTabListeners = (): TabUpdateListeners => {
 };
 
 const getCurrentTabUrl = async (): Promise<string> => {
-  if (typeof chrome === 'undefined' || !chrome.tabs) {
-    return '';
+  if (typeof chrome === "undefined" || !chrome.tabs) {
+    return "";
   }
   return getCurrentVistingUrl();
 };
 
-const getCurrentPageUrl = () => window.location?.href || '';
+const getCurrentPageUrl = () => window.location?.href || "";
 
-export const useActiveTabUrl = ({ websites, mode = 'both' }: UseActiveTabUrlProps = {}): UseActiveTabUrlReturn => {
-  const [activeTabUrl, setActiveTabUrl] = useState<string>('');
+export const useActiveTabUrl = ({ websites, mode = "both" }: UseActiveTabUrlProps = {}): UseActiveTabUrlReturn => {
+  const [activeTabUrl, setActiveTabUrl] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const currentPageUrl = getCurrentPageUrl();
 
@@ -67,10 +67,10 @@ export const useActiveTabUrl = ({ websites, mode = 'both' }: UseActiveTabUrlProp
     try {
       setIsLoading(true);
       const tabUrl = await getCurrentTabUrl();
-      setActiveTabUrl(tabUrl || '');
+      setActiveTabUrl(tabUrl || "");
     } catch (error) {
-      console.error('Error fetching URL:', error);
-      setActiveTabUrl('');
+      console.error("Error fetching URL:", error);
+      setActiveTabUrl("");
     } finally {
       setIsLoading(false);
     }
@@ -79,11 +79,11 @@ export const useActiveTabUrl = ({ websites, mode = 'both' }: UseActiveTabUrlProp
   const matchingWebsite = useMemo(() => {
     if (!websites) return null;
 
-    if (mode === 'currentPage') {
+    if (mode === "currentPage") {
       return getMatchingWebsite(websites, currentPageUrl);
     }
 
-    if (mode === 'activeTab') {
+    if (mode === "activeTab") {
       return getMatchingWebsite(websites, activeTabUrl);
     }
 
@@ -95,7 +95,7 @@ export const useActiveTabUrl = ({ websites, mode = 'both' }: UseActiveTabUrlProp
   }, [updateUrl]);
 
   useEffect(() => {
-    if (mode !== 'currentPage') {
+    if (mode !== "currentPage") {
       const tabListeners = getTabListeners();
       const handleTabUpdate = () => updateUrl();
 
@@ -114,7 +114,7 @@ export const useActiveTabUrl = ({ websites, mode = 'both' }: UseActiveTabUrlProp
     activeTabUrl,
     currentPageUrl,
     isLoading,
-    isValid: mode === 'currentPage' ? isValidUrl(currentPageUrl) : isValidUrl(activeTabUrl),
+    isValid: mode === "currentPage" ? isValidUrl(currentPageUrl) : isValidUrl(activeTabUrl),
     matchingWebsite,
   };
 };

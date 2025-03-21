@@ -1,7 +1,7 @@
-import { createReadStream, createWriteStream, existsSync, mkdirSync } from 'node:fs';
-import { posix, resolve } from 'node:path';
-import fg from 'fast-glob';
-import { AsyncZipDeflate, Zip } from 'fflate';
+import { createReadStream, createWriteStream, existsSync, mkdirSync } from "node:fs";
+import { posix, resolve } from "node:path";
+import fg from "fast-glob";
+import { AsyncZipDeflate, Zip } from "fflate";
 
 // Converts bytes to megabytes
 function toMB(bytes: number): number {
@@ -32,11 +32,11 @@ function streamFileToZip(
   zip.add(data);
 
   createReadStream(absPath)
-    .on('data', (chunk: string | Buffer) =>
-      typeof chunk === 'string' ? data.push(Buffer.from(chunk), false) : data.push(chunk, false),
+    .on("data", (chunk: string | Buffer) =>
+      typeof chunk === "string" ? data.push(Buffer.from(chunk), false) : data.push(chunk, false),
     )
-    .on('end', () => data.push(new Uint8Array(0), true))
-    .on('error', error => {
+    .on("end", () => data.push(new Uint8Array(0), true))
+    .on("error", error => {
       onAbort();
       onError(error);
     });
@@ -62,8 +62,8 @@ export const zipBundle = async (
 
   const fileList = await fg(
     [
-      '**/*', // Pick all nested files
-      ...(!withMaps ? ['!**/(*.js.map|*.css.map)'] : []), // Exclude source maps conditionally
+      "**/*", // Pick all nested files
+      ...(!withMaps ? ["!**/(*.js.map|*.css.map)"] : []), // Exclude source maps conditionally
     ],
     {
       cwd: distDirectory,

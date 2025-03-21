@@ -1,9 +1,9 @@
 export type ValueOf<T> = T[keyof T];
 
 export enum WebappEnvs {
-  DEV = 'dev',
-  PREVIEW = 'preview',
-  PROD = 'prod',
+  DEV = "dev",
+  PREVIEW = "preview",
+  PROD = "prod",
 }
 
 export interface FormOption {
@@ -29,11 +29,11 @@ export interface GeneralFormProps {
 }
 
 export interface TextInputProps extends GeneralFormProps {
-  variant: 'text' | 'checkbox' | 'date' | 'switch' | 'number' | 'url' | 'email' | 'textarea';
+  variant: "text" | "checkbox" | "date" | "switch" | "number" | "url" | "email" | "textarea";
 }
 
 export interface WithOptionsProps extends GeneralFormProps {
-  variant: 'radio' | 'select' | 'combobox';
+  variant: "radio" | "select" | "combobox";
   options: FormOptions;
 }
 
@@ -64,9 +64,9 @@ export interface StepperProps {
 
 // Define reusable action types
 export enum BackgroundActions {
-  GET_AUTH_TOKEN = 'GET_AUTH_TOKEN',
-  AUTH_TOKEN_CHANGED = 'AUTH_TOKEN_CHANGED',
-  INVALID_ACTION = 'INVALID_ACTION',
+  GET_AUTH_TOKEN = "GET_AUTH_TOKEN",
+  AUTH_TOKEN_CHANGED = "AUTH_TOKEN_CHANGED",
+  INVALID_ACTION = "INVALID_ACTION",
   // Add future actions here
 }
 

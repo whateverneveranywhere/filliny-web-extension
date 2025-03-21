@@ -1,10 +1,10 @@
-import React from 'react';
+import React from "react";
 
 interface Props {
   width?: number;
   height?: number;
 }
-const logo = 'popup/logo.svg';
+const logo = "popup/logo.svg";
 
 function Logo(props: Props) {
   const { height = 40, width = 40 } = props;
