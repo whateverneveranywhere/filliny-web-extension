@@ -7,6 +7,18 @@
     "description": "Extension name",
     "message": "Filliny - AI 폼 자동완성"
   },
+  "extensionNameDev": {
+    "description": "Extension name for development environment",
+    "message": "Filliny DEV - AI 폼 자동완성"
+  },
+  "extensionNamePreview": {
+    "description": "Extension name for preview environment",
+    "message": "Filliny PREVIEW - AI 폼 자동완성"
+  },
+  "extensionNameProd": {
+    "description": "Extension name for production environment",
+    "message": "Filliny - AI 폼 자동완성"
+  },
   "toggleTheme": {
     "message": "테마 변경"
   },

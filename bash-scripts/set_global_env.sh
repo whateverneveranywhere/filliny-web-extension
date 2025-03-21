@@ -17,8 +17,8 @@ validate_key() {
   local is_editable_section="${2:-false}"
 
   if [[ -n "$key" && ! "$key" =~ ^# ]]; then
-    if [[ "$is_editable_section" == true && ! "$key" =~ ^CEB_ ]]; then
-      echo "Invalid key: <$key>. All keys in the editable section must start with 'CEB_'."
+    if [[ "$is_editable_section" == true && ! "$key" =~ ^CEB_ && "$key" != "VITE_WEBAPP_ENV" ]]; then
+      echo "Invalid key: <$key>. All keys in the editable section must start with 'CEB_' or be 'VITE_WEBAPP_ENV'."
       exit 1
     elif [[ "$is_editable_section" == false && ! "$key" =~ ^CLI_CEB_ ]]; then
       echo "Invalid key: <$key>. All CLI keys must start with 'CLI_CEB_'."
@@ -79,7 +79,7 @@ create_new_file() {
     echo "# THOSE VALUES ARE EDITABLE"
 
     # Copy existing env values, without CLI section
-    grep -E '^CEB_' .env
+    grep -E '^CEB_|^VITE_WEBAPP_ENV' .env
   } > "$temp_file"
 
   mv "$temp_file" .env

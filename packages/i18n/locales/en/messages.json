@@ -7,6 +7,18 @@
     "description": "Extension name",
     "message": "Filliny - AI Form Filling Assistant"
   },
+  "extensionNameDev": {
+    "description": "Extension name for development environment",
+    "message": "Filliny DEV - AI Form Filling Assistant"
+  },
+  "extensionNamePreview": {
+    "description": "Extension name for preview environment",
+    "message": "Filliny PREVIEW - AI Form Filling Assistant"
+  },
+  "extensionNameProd": {
+    "description": "Extension name for production environment",
+    "message": "Filliny - AI Form Filling Assistant"
+  },
   "toggleTheme": {
     "message": "Toggle theme"
   },

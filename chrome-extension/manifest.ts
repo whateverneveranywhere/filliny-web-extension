@@ -2,6 +2,30 @@ import { readFileSync } from 'node:fs';
 
 const packageJson = JSON.parse(readFileSync('./package.json', 'utf8'));
 
+// WebappEnvs enum definition
+enum WebappEnvs {
+  DEV = 'dev',
+  PREVIEW = 'preview',
+  PROD = 'prod',
+}
+
+// Get environment from process.env
+const env = (process.env.VITE_WEBAPP_ENV as WebappEnvs) || WebappEnvs.DEV;
+
+// Get the appropriate extension name message key based on the environment
+const getExtensionNameKey = (environment: WebappEnvs): string => {
+  switch (environment) {
+    case WebappEnvs.DEV:
+      return '__MSG_extensionNameDev__';
+    case WebappEnvs.PREVIEW:
+      return '__MSG_extensionNamePreview__';
+    case WebappEnvs.PROD:
+      return '__MSG_extensionNameProd__';
+    default:
+      return '__MSG_extensionName__';
+  }
+};
+
 /**
  * @prop default_locale
  * if you want to support multiple languages, you can use the following reference
@@ -20,7 +44,7 @@ const packageJson = JSON.parse(readFileSync('./package.json', 'utf8'));
 const manifest = {
   manifest_version: 3,
   default_locale: 'en',
-  name: '__MSG_extensionName__',
+  name: getExtensionNameKey(env),
   browser_specific_settings: {
     gecko: {
       id: 'example@example.com',
