@@ -110,20 +110,33 @@ const handleGetAuthToken = (
 };
 
 export const getConfig = (webappEnv?: WebappEnvs): ConfigEntry => {
-  // Try to get environment from various sources with fallbacks
-
   // First, try passed environment parameter
   if (webappEnv && Object.values(WebappEnvs).includes(webappEnv)) {
+    console.log("Using explicitly passed environment:", webappEnv);
     return config[webappEnv];
   }
 
   try {
+    // Check if we're running in a development environment (localhost)
+    if (typeof window !== "undefined") {
+      try {
+        const hostname = window.location.hostname;
+        if (hostname === "localhost" || hostname === "127.0.0.1") {
+          console.log("Using DEV environment based on hostname:", hostname);
+          return config[WebappEnvs.DEV];
+        }
+      } catch {
+        // Ignore errors with window
+      }
+    }
+
     // Next, try to get from import.meta.env (for Vite contexts)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const importMeta = (globalThis as any).import?.meta;
     const viteEnv = importMeta?.env?.VITE_WEBAPP_ENV;
 
     if (viteEnv && Object.values(WebappEnvs).includes(viteEnv as WebappEnvs)) {
+      console.log("Using environment from import.meta.env:", viteEnv);
       return config[viteEnv as WebappEnvs];
     }
 
@@ -131,7 +144,7 @@ export const getConfig = (webappEnv?: WebappEnvs): ConfigEntry => {
     if (typeof chrome !== "undefined" && chrome.storage) {
       // This is async, but for immediate use we need to fallback to a default
       chrome.storage.local.get("webapp_env", result => {
-        if (result.webapp_env && Object.values(WebappEnvs).includes(result.webapp_env)) {
+        if (result.webapp_env && Object.values(WebappEnvs).includes(result.webapp_env as WebappEnvs)) {
           // Store for future use in this context
           if (typeof sessionStorage !== "undefined") {
             sessionStorage.setItem("filliny_webapp_env", result.webapp_env);
@@ -143,6 +156,7 @@ export const getConfig = (webappEnv?: WebappEnvs): ConfigEntry => {
       if (typeof sessionStorage !== "undefined") {
         const cachedEnv = sessionStorage.getItem("filliny_webapp_env");
         if (cachedEnv && Object.values(WebappEnvs).includes(cachedEnv as WebappEnvs)) {
+          console.log("Using environment from sessionStorage:", cachedEnv);
           return config[cachedEnv as WebappEnvs];
         }
       }
@@ -152,15 +166,28 @@ export const getConfig = (webappEnv?: WebappEnvs): ConfigEntry => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const processEnv = (globalThis as any).process?.env;
     if (processEnv?.VITE_WEBAPP_ENV && Object.values(WebappEnvs).includes(processEnv.VITE_WEBAPP_ENV as WebappEnvs)) {
+      console.log("Using environment from process.env:", processEnv.VITE_WEBAPP_ENV);
       return config[processEnv.VITE_WEBAPP_ENV as WebappEnvs];
+    }
+
+    // Check if we're in development mode based on CLI flags
+    if (processEnv?.CLI_CEB_DEV === "true") {
+      console.log("Using DEV environment because CLI_CEB_DEV is true");
+      return config[WebappEnvs.DEV];
+    }
+
+    // Check for development NODE_ENV
+    if (processEnv?.NODE_ENV === "development") {
+      console.log("Using DEV environment because NODE_ENV is 'development'");
+      return config[WebappEnvs.DEV];
     }
   } catch (error) {
     console.error("Error determining environment:", error);
   }
 
-  // Default to PREVIEW for safety rather than DEV
-  // This prevents accidental localhost redirects in production
-  return config[WebappEnvs.PREVIEW];
+  // Default to DEV for local development and testing
+  console.log("Defaulting to DEV environment");
+  return config[WebappEnvs.DEV];
 };
 
 const handleAuthTokenChanged = (

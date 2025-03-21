@@ -11,15 +11,14 @@ function storeEnvironmentInStorage() {
     const importMeta = (globalThis as any).import?.meta;
     const env = importMeta?.env?.VITE_WEBAPP_ENV;
 
-    if (env && Object.values(WebappEnvs).includes(env)) {
+    if (env && Object.values(WebappEnvs).includes(env as WebappEnvs)) {
       chrome.storage.local.set({ webapp_env: env }, () => {
         console.log(`Environment ${env} stored in extension storage`);
       });
     } else {
-      // Default to PREVIEW if no environment is specified
-      // This prevents accidental localhost redirects in production
-      chrome.storage.local.set({ webapp_env: WebappEnvs.PREVIEW }, () => {
-        console.log(`Default environment PREVIEW stored in extension storage`);
+      // Default to DEV if no valid environment is specified
+      chrome.storage.local.set({ webapp_env: WebappEnvs.DEV }, () => {
+        console.log(`Default environment DEV stored in extension storage`);
       });
     }
   } catch (error) {
@@ -45,6 +44,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 chrome.runtime.onInstalled.addListener(details => {
   if (details.reason === "install") {
     const config = getConfig();
+    console.log("[Background] Opening install URL:", `${config.baseURL}/auth/sign-in`);
     chrome.tabs.create({
       url: `${config.baseURL}/auth/sign-in`,
     });

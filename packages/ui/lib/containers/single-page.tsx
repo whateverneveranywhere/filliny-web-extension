@@ -5,8 +5,11 @@ import { PageLayout } from "../layout";
 
 function SigninPage() {
   const config = getConfig();
+  console.log("[SigninPage] Using URL:", config.baseURL);
+
   const handleLoginClick = () => {
-    window.open(config.baseURL + "/auth/sign-in", "_blank");
+    console.log("[SigninPage] Opening login URL:", `${config.baseURL}/auth/sign-in`);
+    window.open(`${config.baseURL}/auth/sign-in`, "_blank");
   };
 
   return (

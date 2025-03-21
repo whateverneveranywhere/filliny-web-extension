@@ -19,6 +19,7 @@ function TokenDisplay({ tokens = 0, onRefresh, isRefetching = false, isLoading =
   const formattedTokens = tokens.toLocaleString();
   const abbreviatedTokens = formatToK(tokens);
   const config = getConfig();
+  console.log("[TokenDisplay] Using URL:", config.baseURL);
 
   const handleRefresh = async () => {
     if (isRefetching || isOnCooldown || !onRefresh) return;
@@ -65,9 +66,7 @@ function TokenDisplay({ tokens = 0, onRefresh, isRefetching = false, isLoading =
               variant="ghost"
               onClick={handleRefresh}
               disabled={isRefetching || isOnCooldown || !onRefresh}
-              className={`filliny-h-8 filliny-w-8 filliny-transition-all hover:filliny-bg-muted ${
-                isRefetching ? "filliny-animate-spin filliny-text-muted-foreground" : "hover:filliny-text-primary"
-              }`}>
+              className="filliny-h-8 filliny-w-8 filliny-transition-all hover:filliny-bg-muted">
               {cooldownSeconds ? <span>{cooldownSeconds}s</span> : <RefreshCw className="filliny-h-4 filliny-w-4" />}
             </Button>
           </div>

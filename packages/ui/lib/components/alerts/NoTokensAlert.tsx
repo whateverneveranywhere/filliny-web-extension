@@ -3,6 +3,9 @@ import { getConfig } from "@extension/shared";
 import { Alert } from "./Alert";
 
 export default function NoTokensAlert() {
+  const config = getConfig();
+  console.log("[NoTokensAlert] Using URL:", config.baseURL);
+
   return (
     <Alert
       variant="destructive"
@@ -10,7 +13,7 @@ export default function NoTokensAlert() {
       description="Purchase AI tokens to start using AI features and form filling capabilities"
       buttonText="Purchase Tokens"
       buttonIcon={ExternalLink}
-      onButtonClick={() => window.open(`${getConfig().baseURL}/pricing?tab=token`, "_blank")}
+      onButtonClick={() => window.open(`${config.baseURL}/pricing?tab=token`, "_blank")}
     />
   );
 }

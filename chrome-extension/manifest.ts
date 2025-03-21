@@ -10,7 +10,16 @@ enum WebappEnvs {
 }
 
 // Get environment from process.env
-const env = (process.env.VITE_WEBAPP_ENV as WebappEnvs) || WebappEnvs.DEV;
+const envFromEnv = process.env.VITE_WEBAPP_ENV || "";
+console.log(`[manifest.ts] Environment from VITE_WEBAPP_ENV: "${envFromEnv}"`);
+
+// Use the environment if it's valid, otherwise default to DEV
+const env = Object.values(WebappEnvs).includes(envFromEnv as WebappEnvs) ? (envFromEnv as WebappEnvs) : WebappEnvs.DEV;
+
+console.log(`[manifest.ts] Using environment for extension name: "${env}"`);
+console.log(
+  `[manifest.ts] Extension name will be: ${env === WebappEnvs.PROD ? "Filliny" : `Filliny ${env.toUpperCase()}`}`,
+);
 
 // Get the appropriate extension name message key based on the environment
 const getExtensionNameKey = (environment: WebappEnvs): string => {
@@ -22,7 +31,9 @@ const getExtensionNameKey = (environment: WebappEnvs): string => {
     case WebappEnvs.PROD:
       return "__MSG_extensionNameProd__";
     default:
-      return "__MSG_extensionName__";
+      // Default to DEV naming if an unknown environment is provided
+      console.warn(`Unknown environment: ${environment}, using DEV extension name`);
+      return "__MSG_extensionNameDev__";
   }
 };
 
