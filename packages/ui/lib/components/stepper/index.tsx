@@ -5,7 +5,6 @@ import type { StepperProps } from "@extension/shared";
 function Stepper({ steps, handleNext, handlePrev, handleFinish, isLoading, currentStep }: StepperProps) {
   const nextStep = async () => {
     if (currentStep < steps.length - 1) {
-      currentStep + 1;
       handleNext();
     } else {
       handleFinish();

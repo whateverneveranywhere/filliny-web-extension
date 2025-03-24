@@ -240,7 +240,7 @@ const updateCheckable = (element: HTMLElement, checked: boolean): void => {
       try {
         // Use instant scroll instead of smooth
         element.scrollIntoView({ block: "center" });
-      } catch (e) {
+      } catch {
         // Fallback to simple scroll
         element.scrollIntoView();
       }
@@ -1680,7 +1680,8 @@ const updateField = async (element: HTMLElement, field: Field, isTestMode = fals
 
         // Force a redraw to ensure the value is displayed
         element.style.display = "none";
-        element.offsetHeight; // Force reflow
+        // Force reflow
+        void element.offsetHeight;
         element.style.display = "";
       }
 

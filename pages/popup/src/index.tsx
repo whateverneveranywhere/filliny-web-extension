@@ -1,3 +1,4 @@
+import "@packages/shared/src/utils/console-suppressor";
 import { createRoot } from "react-dom/client";
 import "@src/index.css";
 import "@extension/ui/lib/global.css";

@@ -48,9 +48,6 @@ const getExtensionNameKey = (environment: WebappEnvs): string => {
  *
  * @prop permissions
  * Firefox doesn't support sidePanel (It will be deleted in manifest parser)
- *
- * @prop content_scripts
- * css: ['content.css'], // public folder
  */
 const manifest = {
   manifest_version: 3,
@@ -66,7 +63,6 @@ const manifest = {
   description: "__MSG_extensionDescription__",
   host_permissions: ["<all_urls>"],
   permissions: ["storage", "tabs", "notifications", "sidePanel", "cookies"],
-  options_page: "options/index.html",
   background: {
     service_worker: "background.js",
     type: "module",
@@ -85,10 +81,6 @@ const manifest = {
     },
     {
       matches: ["http://*/*", "https://*/*", "<all_urls>"],
-      js: ["content-ui/index.iife.js"],
-    },
-    {
-      matches: ["http://*/*", "https://*/*", "<all_urls>"],
       js: ["content-runtime/index.iife.js"],
     },
     {
@@ -96,7 +88,6 @@ const manifest = {
       css: ["content.css"],
     },
   ],
-  devtools_page: "devtools/index.html",
   web_accessible_resources: [
     {
       resources: ["*.js", "*.css", "*.svg", "icon-128.png", "icon-34.png"],

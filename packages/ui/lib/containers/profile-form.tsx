@@ -92,7 +92,7 @@ function ProfileForm({ id, onFormSubmit }: Props) {
     (formData: ProfileFormTypes): DTOProfileFillingForm => ({
       ...formData,
       // filter out the user side isNew variable before sending to api
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+
       fillingWebsites: formData.fillingWebsites.map(({ isNew, ...rest }) => rest),
       preferences: {
         ...formData.preferences,
