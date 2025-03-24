@@ -65,7 +65,7 @@ const manifest = {
   version: packageJson.version,
   description: "__MSG_extensionDescription__",
   host_permissions: ["<all_urls>"],
-  permissions: ["storage", "scripting", "tabs", "notifications", "sidePanel", "cookies"],
+  permissions: ["storage", "tabs", "notifications", "sidePanel", "cookies"],
   options_page: "options/index.html",
   background: {
     service_worker: "background.js",
@@ -86,6 +86,10 @@ const manifest = {
     {
       matches: ["http://*/*", "https://*/*", "<all_urls>"],
       js: ["content-ui/index.iife.js"],
+    },
+    {
+      matches: ["http://*/*", "https://*/*", "<all_urls>"],
+      js: ["content-runtime/index.iife.js"],
     },
     {
       matches: ["http://*/*", "https://*/*", "<all_urls>"],
