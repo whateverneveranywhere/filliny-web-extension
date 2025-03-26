@@ -5,7 +5,7 @@ import { Logo } from "../components/Logo";
 
 const config = getConfig();
 // Dashboard path for the dashboard route
-const dashboardPath = "/auth/dashboard";
+const dashboardPath = "/dashboard";
 
 function Header() {
   const { data, refetch, isRefetching, isLoading } = useDashboardOverview();
