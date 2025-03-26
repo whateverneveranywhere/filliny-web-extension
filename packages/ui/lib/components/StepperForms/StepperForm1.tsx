@@ -6,11 +6,15 @@ import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { ScrollArea, ScrollBar } from "../ui/scroll-area";
 import { RHFShadcnCheckbox, RHFShadcnTextField, RHFShadcnTextarea } from "../RHF";
-import { getFaviconUrl, useSuggestedWebsites, usePlanLimits } from "@extension/shared";
+import { getFaviconUrl, useSuggestedWebsites, usePlanLimits, getConfig } from "@extension/shared";
 import type { ProfileFormTypes } from "@/lib/containers/profile-form";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui";
 import { cn } from "@/lib/utils";
 import { UpgradeBanner } from "../alerts";
+
+// Get base URL for example placeholder
+const config = getConfig();
+const baseExampleURL = config.baseURL;
 
 // Separate component for recommended websites section
 const RecommendedWebsites = ({ onWebsiteSelect }: { onWebsiteSelect: (value: string) => void }) => {
@@ -67,7 +71,7 @@ const RecommendedWebsites = ({ onWebsiteSelect }: { onWebsiteSelect: (value: str
 export const WebsiteFormFields = ({ index }: { index: number }) => (
   <div className="filliny-grid filliny-gap-4">
     <RHFShadcnTextField
-      placeholder="https://filliny.io"
+      placeholder={baseExampleURL}
       name={`fillingWebsites[${index}].websiteUrl`}
       title="Website's URL"
     />

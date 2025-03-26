@@ -14,8 +14,12 @@ const SupportRequestButton: React.FC<ButtonComponentProps> = () => {
 
       const config = getConfig();
 
+      // Define the support request path directly
+      const supportRequestPath = "/auth/dashboard/support-request";
       const queryString = new URLSearchParams(bugDetails as Record<string, string>).toString();
-      window.location.href = `${config.baseURL}/dashboard/support-request?${queryString}`;
+
+      // Combine base URL with path
+      window.location.href = `${config.baseURL}${supportRequestPath}?${queryString}`;
     } catch (error) {
       console.error(error);
     }

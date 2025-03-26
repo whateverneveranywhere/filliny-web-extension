@@ -4,6 +4,8 @@ import { TokenDisplay } from "../components";
 import { Logo } from "../components/Logo";
 
 const config = getConfig();
+// Dashboard path for the dashboard route
+const dashboardPath = "/auth/dashboard";
 
 function Header() {
   const { data, refetch, isRefetching, isLoading } = useDashboardOverview();
@@ -32,7 +34,7 @@ function Header() {
 
         {/* Right section - 1/5 width */}
         <div className="filliny-flex filliny-w-1/5 filliny-items-center filliny-justify-end filliny-gap-3">
-          <a href={`${config.baseURL}/dashboard`} target="_blank" rel="noopener noreferrer">
+          <a href={`${config.baseURL}${dashboardPath}`} target="_blank" rel="noopener noreferrer">
             <Logo width={40} height={40} />
           </a>
         </div>
