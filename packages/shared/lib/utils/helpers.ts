@@ -92,7 +92,7 @@ const config: Record<WebappEnvs, ConfigEntry> = {
   },
   prod: {
     cookieName: "__Secure-authjs.session-token",
-    baseURL: "https://prod.filliny.io",
+    baseURL: "https://filliny.io",
   },
 };
 
@@ -117,17 +117,28 @@ export const getConfig = (webappEnv?: WebappEnvs): ConfigEntry => {
   }
 
   try {
-    // Check if we're running in a development environment (localhost)
-    if (typeof window !== "undefined") {
-      try {
-        const hostname = window.location.hostname;
-        if (hostname === "localhost" || hostname === "127.0.0.1") {
-          console.log("Using DEV environment based on hostname:", hostname);
-          return config[WebappEnvs.DEV];
+    // First try to get from extension storage if available
+    if (typeof chrome !== "undefined" && chrome.storage) {
+      // Check if we have a cached value from a previous storage retrieval
+      if (typeof sessionStorage !== "undefined") {
+        const cachedEnv = sessionStorage.getItem("filliny_webapp_env");
+        if (cachedEnv && Object.values(WebappEnvs).includes(cachedEnv as WebappEnvs)) {
+          console.log("Using environment from sessionStorage:", cachedEnv);
+          return config[cachedEnv as WebappEnvs];
         }
-      } catch {
-        // Ignore errors with window
       }
+
+      // Try to get from chrome.storage.local, and set an async cache
+      // For immediate use we'll continue with other checks
+      chrome.storage.local.get("webapp_env", result => {
+        if (result.webapp_env && Object.values(WebappEnvs).includes(result.webapp_env as WebappEnvs)) {
+          // Store for future use in this context
+          if (typeof sessionStorage !== "undefined") {
+            sessionStorage.setItem("filliny_webapp_env", result.webapp_env);
+            console.log("Updated sessionStorage with environment from chrome.storage:", result.webapp_env);
+          }
+        }
+      });
     }
 
     // Next, try to get from import.meta.env (for Vite contexts)
@@ -140,29 +151,7 @@ export const getConfig = (webappEnv?: WebappEnvs): ConfigEntry => {
       return config[viteEnv as WebappEnvs];
     }
 
-    // Try to get from extension storage if available
-    if (typeof chrome !== "undefined" && chrome.storage) {
-      // This is async, but for immediate use we need to fallback to a default
-      chrome.storage.local.get("webapp_env", result => {
-        if (result.webapp_env && Object.values(WebappEnvs).includes(result.webapp_env as WebappEnvs)) {
-          // Store for future use in this context
-          if (typeof sessionStorage !== "undefined") {
-            sessionStorage.setItem("filliny_webapp_env", result.webapp_env);
-          }
-        }
-      });
-
-      // Check if we have a cached value from a previous storage retrieval
-      if (typeof sessionStorage !== "undefined") {
-        const cachedEnv = sessionStorage.getItem("filliny_webapp_env");
-        if (cachedEnv && Object.values(WebappEnvs).includes(cachedEnv as WebappEnvs)) {
-          console.log("Using environment from sessionStorage:", cachedEnv);
-          return config[cachedEnv as WebappEnvs];
-        }
-      }
-    }
-
-    // Finally, check if process.env is available (for Node.js environments)
+    // Check if process.env is available (for Node.js environments)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const processEnv = (globalThis as any).process?.env;
     if (processEnv?.VITE_WEBAPP_ENV && Object.values(WebappEnvs).includes(processEnv.VITE_WEBAPP_ENV as WebappEnvs)) {
@@ -174,6 +163,20 @@ export const getConfig = (webappEnv?: WebappEnvs): ConfigEntry => {
     if (processEnv?.CLI_CEB_DEV === "true") {
       console.log("Using DEV environment because CLI_CEB_DEV is true");
       return config[WebappEnvs.DEV];
+    }
+
+    // Check if we're running in a development environment (localhost)
+    // This is now lower priority since we want to respect the stored environment
+    if (typeof window !== "undefined") {
+      try {
+        const hostname = window.location.hostname;
+        if (hostname === "localhost" || hostname === "127.0.0.1") {
+          console.log("Using DEV environment based on hostname:", hostname);
+          return config[WebappEnvs.DEV];
+        }
+      } catch {
+        // Ignore errors with window
+      }
     }
 
     // Check for development NODE_ENV

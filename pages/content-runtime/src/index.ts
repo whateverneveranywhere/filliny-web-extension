@@ -1,4 +1,3 @@
-import "@extension/shared/src/utils/console-suppressor";
 import { mount } from "@src/Root";
 
 console.log("runtime script loaded");

@@ -4,7 +4,6 @@ import "@extension/ui/lib/global.css";
 import SidePanel from "@src/SidePanel";
 import { ThemeProvider, Toaster } from "@extension/ui";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import "@packages/shared/src/utils/console-suppressor";
 
 const queryClient = new QueryClient();
 

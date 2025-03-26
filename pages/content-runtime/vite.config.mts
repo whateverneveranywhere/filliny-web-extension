@@ -19,5 +19,16 @@ export default withPageConfig({
       entry: resolve(srcDir, "index.ts"),
     },
     outDir: resolve(rootDir, "..", "..", "dist", "content-runtime"),
+    rollupOptions: {
+      // Mark shared packages as external to prevent build errors
+      external: [/^@extension\/shared(\/.*)?$/],
+      output: {
+        // Provide global variable names for externals
+        globals: {
+          "@extension/shared": "ExtensionShared",
+          "@extension/shared/lib/utils/helpers": "ExtensionSharedHelpers",
+        },
+      },
+    },
   },
 });

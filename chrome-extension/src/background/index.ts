@@ -7,22 +7,57 @@ setupAuthTokenListener();
 // Store the current environment in storage for consistent access across contexts
 function storeEnvironmentInStorage() {
   try {
+    // Determine environment from various sources
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const importMeta = (globalThis as any).import?.meta;
-    const env = importMeta?.env?.VITE_WEBAPP_ENV;
+    const viteEnv = importMeta?.env?.VITE_WEBAPP_ENV;
 
-    if (env && Object.values(WebappEnvs).includes(env as WebappEnvs)) {
-      chrome.storage.local.set({ webapp_env: env }, () => {
-        console.log(`Environment ${env} stored in extension storage`);
-      });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const processEnv = (globalThis as any).process?.env;
+    const nodeEnv = processEnv?.VITE_WEBAPP_ENV;
+
+    // Use vite env first, then node env, or default to PROD for safety in production builds
+    let env: WebappEnvs;
+
+    if (viteEnv && Object.values(WebappEnvs).includes(viteEnv as WebappEnvs)) {
+      env = viteEnv as WebappEnvs;
+      console.log(`Using environment from import.meta.env: ${env}`);
+    } else if (nodeEnv && Object.values(WebappEnvs).includes(nodeEnv as WebappEnvs)) {
+      env = nodeEnv as WebappEnvs;
+      console.log(`Using environment from process.env: ${env}`);
     } else {
-      // Default to DEV if no valid environment is specified
-      chrome.storage.local.set({ webapp_env: WebappEnvs.DEV }, () => {
-        console.log(`Default environment DEV stored in extension storage`);
-      });
+      // In a production build where environment variables might not be available,
+      // default to PROD for safety
+      env = WebappEnvs.PROD;
+      console.log(`No environment detected, defaulting to PROD environment for safety`);
     }
+
+    // Store the environment in extension storage
+    chrome.storage.local.set({ webapp_env: env }, () => {
+      if (chrome.runtime.lastError) {
+        console.error("Error storing environment:", chrome.runtime.lastError);
+      } else {
+        console.log(`Environment ${env} stored in extension storage`);
+
+        // Also store in session storage for immediate access
+        if (typeof sessionStorage !== "undefined") {
+          try {
+            sessionStorage.setItem("filliny_webapp_env", env);
+          } catch (e) {
+            console.error("Failed to store environment in sessionStorage:", e);
+          }
+        }
+      }
+    });
   } catch (error) {
-    console.error("Error storing environment:", error);
+    console.error("Error in storeEnvironmentInStorage:", error);
+
+    // Fallback: attempt to store PROD as default in case of errors
+    try {
+      chrome.storage.local.set({ webapp_env: WebappEnvs.PROD });
+    } catch {
+      // Last-resort error handling - at this point we've done what we can
+    }
   }
 }
 
@@ -43,11 +78,31 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 // Handle extension installation
 chrome.runtime.onInstalled.addListener(details => {
   if (details.reason === "install") {
-    const config = getConfig();
-    console.log("[Background] Opening install URL:", `${config.baseURL}/auth/sign-in`);
-    chrome.tabs.create({
-      url: `${config.baseURL}/auth/sign-in`,
-    });
+    // Ensure environment is stored first
+    storeEnvironmentInStorage();
+
+    // Use a short timeout to ensure storage has time to be set
+    setTimeout(() => {
+      // Get environment from storage first, or use getConfig as fallback
+      chrome.storage.local.get("webapp_env", result => {
+        let configToUse: ReturnType<typeof getConfig>;
+
+        if (result.webapp_env && Object.values(WebappEnvs).includes(result.webapp_env as WebappEnvs)) {
+          // Get config for the stored environment
+          configToUse = getConfig(result.webapp_env as WebappEnvs);
+          console.log("[Background] Using environment from storage:", result.webapp_env);
+        } else {
+          // Fallback to getConfig's determination
+          configToUse = getConfig();
+          console.log("[Background] Using environment from getConfig");
+        }
+
+        console.log("[Background] Opening install URL:", `${configToUse.baseURL}/auth/sign-in`);
+        chrome.tabs.create({
+          url: `${configToUse.baseURL}/auth/sign-in`,
+        });
+      });
+    }, 100); // Small delay to ensure storage has time to be set
   }
 });
 
