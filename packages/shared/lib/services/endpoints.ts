@@ -14,7 +14,6 @@ export const apiEndpoints = {
     dashboard: {
       base: `${"/auth"}/dashboard`,
       overview: `${"/auth"}/dashboard/overview`,
-      supportRequest: `${"/auth"}/dashboard/support-request`,
     },
     ai: {
       base: `${"/auth"}/ai`,
