@@ -34,13 +34,16 @@ const HomePage = () => {
     // Get configuration on component mount
     try {
       const config = getConfig();
-      // Determine which environment is being used
+      // Determine which environment is being used by comparing baseURL
       let currentEnv = "unknown";
-      Object.values(WebappEnvs).forEach(env => {
-        if (config.baseURL === getConfig(env as WebappEnvs).baseURL) {
-          currentEnv = env;
-        }
-      });
+
+      if (config.baseURL === "http://localhost:3000") {
+        currentEnv = WebappEnvs.DEV;
+      } else if (config.baseURL === "https://dev.filliny-app.pages.dev") {
+        currentEnv = WebappEnvs.PREVIEW;
+      } else if (config.baseURL === "https://filliny.io") {
+        currentEnv = WebappEnvs.PROD;
+      }
 
       setConfigInfo({
         env: currentEnv,

@@ -83,24 +83,13 @@ chrome.runtime.onInstalled.addListener(details => {
 
     // Use a short timeout to ensure storage has time to be set
     setTimeout(() => {
-      // Get environment from storage first, or use getConfig as fallback
-      chrome.storage.local.get("webapp_env", result => {
-        let configToUse: ReturnType<typeof getConfig>;
+      // Get environment config directly - our new getConfig is smart enough to handle everything
+      const configToUse = getConfig();
+      console.log("[Background] Using environment config:", configToUse.baseURL);
 
-        if (result.webapp_env && Object.values(WebappEnvs).includes(result.webapp_env as WebappEnvs)) {
-          // Get config for the stored environment
-          configToUse = getConfig(result.webapp_env as WebappEnvs);
-          console.log("[Background] Using environment from storage:", result.webapp_env);
-        } else {
-          // Fallback to getConfig's determination
-          configToUse = getConfig();
-          console.log("[Background] Using environment from getConfig");
-        }
-
-        console.log("[Background] Opening install URL:", `${configToUse.baseURL}/auth/sign-in`);
-        chrome.tabs.create({
-          url: `${configToUse.baseURL}/auth/sign-in`,
-        });
+      console.log("[Background] Opening install URL:", `${configToUse.baseURL}/auth/sign-in`);
+      chrome.tabs.create({
+        url: `${configToUse.baseURL}/auth/sign-in`,
       });
     }, 100); // Small delay to ensure storage has time to be set
   }

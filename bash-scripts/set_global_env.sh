@@ -88,4 +88,16 @@ create_new_file() {
 # Main script execution
 parse_arguments "$@"
 validate_env_keys
+
+# Check if VITE_WEBAPP_ENV is set in environment variables
+if [[ -n "${VITE_WEBAPP_ENV}" ]]; then
+  # Override the VITE_WEBAPP_ENV in the file with the environment variable
+  sed -i.bak "s/^VITE_WEBAPP_ENV=.*/VITE_WEBAPP_ENV=${VITE_WEBAPP_ENV}/" .env
+  rm -f .env.bak
+  echo "Updated VITE_WEBAPP_ENV to ${VITE_WEBAPP_ENV} in .env file"
+else
+  # Don't change the existing value if not set in environment
+  echo "Keeping existing VITE_WEBAPP_ENV in .env file"
+fi
+
 create_new_file

@@ -109,30 +109,55 @@ const handleGetAuthToken = (
   });
 };
 
-export const getConfig = (webappEnv?: WebappEnvs): ConfigEntry => {
-  // First, try passed environment parameter
-  if (webappEnv && Object.values(WebappEnvs).includes(webappEnv)) {
-    console.log("Using explicitly passed environment:", webappEnv);
-    return config[webappEnv];
+// Define a constant with the build-time environment that will be embedded in the built code
+// This value is replaced at build time by Vite with the actual environment
+//
+// IMPORTANT: In Vite, import.meta.env.VITE_* variables are statically replaced during build
+// and the replacement happens before TypeScript compilation.
+//
+// Use a special comment to trick the linter without affecting the replacement
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const VITE_WEBAPP_ENV = (import.meta as any).env?.VITE_WEBAPP_ENV as WebappEnvs;
+console.log("Build-time VITE_WEBAPP_ENV:", VITE_WEBAPP_ENV);
+
+export const getConfig = (): ConfigEntry => {
+  // Get cached environment from memory to avoid repeated calculations
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const globalThis_any = globalThis as any;
+  if (globalThis_any.__CACHED_ENV_CONFIG__) {
+    console.log("Using cached config:", globalThis_any.__CACHED_ENV_CONFIG__.baseURL);
+    return globalThis_any.__CACHED_ENV_CONFIG__;
   }
 
+  console.log("getConfig called - determining environment");
+
   try {
-    // First try to get from extension storage if available
+    // First, try to use the build-time environment variable from Vite
+    // This will be statically replaced during build, so we need to check if it exists
+    if (VITE_WEBAPP_ENV && Object.values(WebappEnvs).includes(VITE_WEBAPP_ENV)) {
+      console.log("Using build-time environment:", VITE_WEBAPP_ENV);
+      const envConfig = config[VITE_WEBAPP_ENV];
+      globalThis_any.__CACHED_ENV_CONFIG__ = envConfig;
+      return envConfig;
+    }
+
+    // Try to get from extension storage if available
     if (typeof chrome !== "undefined" && chrome.storage) {
-      // Check if we have a cached value from a previous storage retrieval
+      // Check if we have a cached value from sessionStorage
       if (typeof sessionStorage !== "undefined") {
         const cachedEnv = sessionStorage.getItem("filliny_webapp_env");
         if (cachedEnv && Object.values(WebappEnvs).includes(cachedEnv as WebappEnvs)) {
           console.log("Using environment from sessionStorage:", cachedEnv);
-          return config[cachedEnv as WebappEnvs];
+          const envConfig = config[cachedEnv as WebappEnvs];
+          globalThis_any.__CACHED_ENV_CONFIG__ = envConfig;
+          return envConfig;
         }
       }
 
-      // Try to get from chrome.storage.local, and set an async cache
-      // For immediate use we'll continue with other checks
+      // For async settings, still set sessionStorage for next time
+      // but don't halt execution waiting for results
       chrome.storage.local.get("webapp_env", result => {
         if (result.webapp_env && Object.values(WebappEnvs).includes(result.webapp_env as WebappEnvs)) {
-          // Store for future use in this context
           if (typeof sessionStorage !== "undefined") {
             sessionStorage.setItem("filliny_webapp_env", result.webapp_env);
             console.log("Updated sessionStorage with environment from chrome.storage:", result.webapp_env);
@@ -141,56 +166,71 @@ export const getConfig = (webappEnv?: WebappEnvs): ConfigEntry => {
       });
     }
 
-    // Next, try to get from import.meta.env (for Vite contexts)
+    // Access process.env for any other environment checks
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const processEnv = (globalThis as any).process?.env;
+
+    // Try Vite's import.meta.env (works in development)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const importMeta = (globalThis as any).import?.meta;
     const viteEnv = importMeta?.env?.VITE_WEBAPP_ENV;
-
     if (viteEnv && Object.values(WebappEnvs).includes(viteEnv as WebappEnvs)) {
       console.log("Using environment from import.meta.env:", viteEnv);
-      return config[viteEnv as WebappEnvs];
+      const envConfig = config[viteEnv as WebappEnvs];
+      globalThis_any.__CACHED_ENV_CONFIG__ = envConfig;
+      return envConfig;
     }
 
-    // Check if process.env is available (for Node.js environments)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const processEnv = (globalThis as any).process?.env;
-    if (processEnv?.VITE_WEBAPP_ENV && Object.values(WebappEnvs).includes(processEnv.VITE_WEBAPP_ENV as WebappEnvs)) {
-      console.log("Using environment from process.env:", processEnv.VITE_WEBAPP_ENV);
-      return config[processEnv.VITE_WEBAPP_ENV as WebappEnvs];
-    }
+    // Development indicators - this section should only run if no explicit env is set
 
-    // Check if we're in development mode based on CLI flags
+    // Check if CLI_CEB_DEV flag is set to true
     if (processEnv?.CLI_CEB_DEV === "true") {
       console.log("Using DEV environment because CLI_CEB_DEV is true");
-      return config[WebappEnvs.DEV];
+      const envConfig = config[WebappEnvs.DEV];
+      globalThis_any.__CACHED_ENV_CONFIG__ = envConfig;
+      return envConfig;
     }
 
-    // Check if we're running in a development environment (localhost)
-    // This is now lower priority since we want to respect the stored environment
+    // Check hostname (for local development)
     if (typeof window !== "undefined") {
       try {
         const hostname = window.location.hostname;
         if (hostname === "localhost" || hostname === "127.0.0.1") {
           console.log("Using DEV environment based on hostname:", hostname);
-          return config[WebappEnvs.DEV];
+          const envConfig = config[WebappEnvs.DEV];
+          globalThis_any.__CACHED_ENV_CONFIG__ = envConfig;
+          return envConfig;
         }
       } catch {
-        // Ignore errors with window
+        // Ignore window errors
       }
     }
 
-    // Check for development NODE_ENV
+    // Check NODE_ENV
     if (processEnv?.NODE_ENV === "development") {
       console.log("Using DEV environment because NODE_ENV is 'development'");
-      return config[WebappEnvs.DEV];
+      const envConfig = config[WebappEnvs.DEV];
+      globalThis_any.__CACHED_ENV_CONFIG__ = envConfig;
+      return envConfig;
+    }
+
+    // Last resort - assume production for non-development environments
+    // This ensures production is used when no other indicators are present
+    if (processEnv?.NODE_ENV !== "development" && processEnv?.CLI_CEB_DEV !== "true") {
+      console.log("Using PROD environment (no development indicators present)");
+      const envConfig = config[WebappEnvs.PROD];
+      globalThis_any.__CACHED_ENV_CONFIG__ = envConfig;
+      return envConfig;
     }
   } catch (error) {
     console.error("Error determining environment:", error);
   }
 
-  // Default to DEV for local development and testing
+  // Default to DEV as last resort
   console.log("Defaulting to DEV environment");
-  return config[WebappEnvs.DEV];
+  const defaultConfig = config[WebappEnvs.DEV];
+  globalThis_any.__CACHED_ENV_CONFIG__ = defaultConfig;
+  return defaultConfig;
 };
 
 const handleAuthTokenChanged = (
@@ -255,8 +295,8 @@ export const getCurrentVistingUrl = (): Promise<string> => {
 };
 
 // Add a new function to listen for cookie changes
-export const setupAuthTokenListener = (webappEnv?: WebappEnvs) => {
-  const envConfig = getConfig(webappEnv);
+export const setupAuthTokenListener = () => {
+  const envConfig = getConfig();
 
   // Listen for changes to the specific cookie
   chrome.cookies.onChanged.addListener(changeInfo => {
