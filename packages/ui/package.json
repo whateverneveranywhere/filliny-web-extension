@@ -1,6 +1,6 @@
 {
   "name": "@extension/ui",
-  "version": "1.0.2",
+  "version": "1.0.21",
   "description": "chrome extension - ui components",
   "type": "module",
   "private": true,
@@ -69,7 +69,7 @@
     "domhandler": "^5.0.3",
     "framer-motion": "^11.11.9",
     "html2canvas": "1",
-    "lucide-react": "^1.0.2.0",
+    "lucide-react": "^1.0.21.0",
     "react-day-picker": "8.10.1",
     "react-draggable": "^4.4.6",
     "react-hook-form": "^7.53.1",
