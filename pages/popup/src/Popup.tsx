@@ -5,12 +5,7 @@ import type { ComponentPropsWithoutRef } from "react";
 import { Button } from "@extension/ui";
 import { t } from "@extension/i18n";
 
-const notificationOptions = {
-  type: "basic",
-  iconUrl: chrome.runtime.getURL("icon-34.png"),
-  title: "Content script activation",
-  message: "Failed to activate the content script!",
-} as const;
+const errorMessage = "Failed to activate the content script!";
 
 const Popup = () => {
   const theme = useStorage(exampleThemeStorage);
@@ -31,7 +26,7 @@ const Popup = () => {
 
       // Check if we can interact with this URL
       if (tab.url && (tab.url.startsWith("about:") || tab.url.startsWith("chrome:"))) {
-        chrome.notifications.create("activation-error", notificationOptions);
+        console.error("Cannot interact with this URL type:", errorMessage);
         return;
       }
 
@@ -39,10 +34,7 @@ const Popup = () => {
       chrome.tabs.sendMessage(tab.id, { type: "ACTIVATE_CONTENT_RUNTIME" }, response => {
         if (chrome.runtime.lastError) {
           console.error("Content script communication error:", chrome.runtime.lastError);
-          chrome.notifications.create("activation-error", {
-            ...notificationOptions,
-            message: "Failed to communicate with the page. Content script might not be loaded.",
-          });
+          console.error("Failed to communicate with the page. Content script might not be loaded.");
           return;
         }
 
@@ -50,7 +42,6 @@ const Popup = () => {
       });
     } catch (err) {
       console.error("Failed to activate content runtime:", err);
-      chrome.notifications.create("activation-error", notificationOptions);
     }
   };
 

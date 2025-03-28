@@ -62,7 +62,7 @@ const manifest = {
   version: packageJson.version,
   description: "__MSG_extensionDescription__",
   host_permissions: ["<all_urls>"],
-  permissions: ["storage", "tabs", "notifications", "sidePanel", "cookies"],
+  permissions: ["storage", "tabs", "sidePanel", "cookies"],
   background: {
     service_worker: "background.js",
     type: "module",
