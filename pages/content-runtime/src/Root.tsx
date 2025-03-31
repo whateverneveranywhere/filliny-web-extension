@@ -3,11 +3,33 @@ import App from "@src/App";
 import injectedStyle from "@src/index.css?inline";
 
 export function mount() {
+  // Check if our element already exists to avoid duplication
+  const existingRoot = document.getElementById("chrome-extension-filliny");
+  if (existingRoot) {
+    console.log("Runtime content view: Root element already exists, skipping initialization");
+    return;
+  }
+
+  // If it doesn't exist, create and append it
   const root = document.createElement("div");
   root.id = "chrome-extension-filliny";
 
-  document.body.append(root);
+  // Only append to body if it exists
+  if (document.body) {
+    document.body.append(root);
+  } else {
+    // If body doesn't exist yet, wait for DOM content loaded
+    window.addEventListener("DOMContentLoaded", () => {
+      document.body.append(root);
+      initializeShadowRoot(root);
+    });
+    return;
+  }
 
+  initializeShadowRoot(root);
+}
+
+function initializeShadowRoot(root: HTMLElement) {
   const rootIntoShadow = document.createElement("div");
   rootIntoShadow.id = "filliny-shadow-root";
 
