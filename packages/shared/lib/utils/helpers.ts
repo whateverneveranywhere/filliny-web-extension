@@ -55,7 +55,7 @@ export const getMatchingWebsite = (websites: DTOProfileFillingForm["fillingWebsi
 
   const currentUrlObj = new URL(currentUrl);
 
-  return (
+  const match =
     websites.find(({ websiteUrl, isRootLoad }) => {
       if (!isValidUrl(websiteUrl)) {
         return false;
@@ -70,8 +70,9 @@ export const getMatchingWebsite = (websites: DTOProfileFillingForm["fillingWebsi
         // Check if the paths match (excluding query parameters)
         return websiteUrlObj.origin === currentUrlObj.origin && websiteUrlObj.pathname === currentUrlObj.pathname;
       }
-    }) || null
-  );
+    }) || null;
+
+  return match;
 };
 
 // Interface for config entries

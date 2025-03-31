@@ -7,29 +7,34 @@ setupAuthTokenListener();
 // Store the current environment in storage for consistent access across contexts
 function storeEnvironmentInStorage() {
   try {
-    // Determine environment from various sources
+    // Get the environment from the same source as getConfig()
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const importMeta = (globalThis as any).import?.meta;
     const viteEnv = importMeta?.env?.VITE_WEBAPP_ENV;
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const processEnv = (globalThis as any).process?.env;
-    const nodeEnv = processEnv?.VITE_WEBAPP_ENV;
-
-    // Use vite env first, then node env, or default to PROD for safety in production builds
+    // Use the same environment detection logic as in getConfig()
     let env: WebappEnvs;
 
     if (viteEnv && Object.values(WebappEnvs).includes(viteEnv as WebappEnvs)) {
       env = viteEnv as WebappEnvs;
       console.log(`Using environment from import.meta.env: ${env}`);
-    } else if (nodeEnv && Object.values(WebappEnvs).includes(nodeEnv as WebappEnvs)) {
-      env = nodeEnv as WebappEnvs;
-      console.log(`Using environment from process.env: ${env}`);
+    } else if (typeof window !== "undefined") {
+      // Check hostname (for local development)
+      try {
+        const hostname = window.location.hostname;
+        if (hostname === "localhost" || hostname === "127.0.0.1") {
+          env = WebappEnvs.DEV;
+        } else {
+          // Default to prod for non-dev environments
+          env = WebappEnvs.PROD;
+        }
+      } catch {
+        // Default to prod if can't determine
+        env = WebappEnvs.PROD;
+      }
     } else {
-      // In a production build where environment variables might not be available,
-      // default to PROD for safety
+      // Default to prod as safest option
       env = WebappEnvs.PROD;
-      console.log(`No environment detected, defaulting to PROD environment for safety`);
     }
 
     // Store the environment in extension storage
@@ -52,9 +57,15 @@ function storeEnvironmentInStorage() {
   } catch (error) {
     console.error("Error in storeEnvironmentInStorage:", error);
 
-    // Fallback: attempt to store PROD as default in case of errors
+    // Fallback: use the dev environment if in development
     try {
-      chrome.storage.local.set({ webapp_env: WebappEnvs.PROD });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const processEnv = (globalThis as any).process?.env;
+      const isDev = processEnv?.NODE_ENV === "development";
+
+      chrome.storage.local.set({
+        webapp_env: isDev ? WebappEnvs.DEV : WebappEnvs.PROD,
+      });
     } catch {
       // Last-resort error handling - at this point we've done what we can
     }
