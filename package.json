@@ -1,6 +1,6 @@
 {
   "name": "filliny",
-  "version": "1.0.21",
+  "version": "1.0.22",
   "description": "Filliny - AI-powered form filling assistant that makes completing online forms effortless and intelligent",
   "license": "MIT",
   "private": true,
@@ -40,7 +40,8 @@
     "copy_env": "bash bash-scripts/copy_env.sh",
     "set-global-env": "bash bash-scripts/set_global_env.sh",
     "postinstall": "pnpm build:eslint && pnpm copy_env",
-    "module-manager": "pnpm -F module-manager start"
+    "module-manager": "pnpm -F module-manager start",
+    "update-all-versions": "bash bash-scripts/update_all_versions.sh"
   },
   "dependencies": {
     "react": "19.0.0",
