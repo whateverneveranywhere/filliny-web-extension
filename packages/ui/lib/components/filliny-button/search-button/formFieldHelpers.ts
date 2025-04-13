@@ -1,21 +1,20 @@
 import type { Field } from "@extension/shared";
-import { updateSelect } from "./field-types/select";
-import { updateCheckable } from "./field-types/checkable";
-import { updateFileInput } from "./field-types/file";
-import { updateTextField, updateContentEditable } from "./field-types/text";
-import { addVisualFeedback, getStringValue } from "./field-types/utils";
-
-// Core utilities for field updates
-// ----------------------------------------
-
-// Main field updating function
-// ----------------------------------------
+import {
+  updateCheckable,
+  updateFileInput,
+  updateSelect,
+  updateTextField,
+  updateContentEditable,
+  addVisualFeedback,
+  getStringValue,
+} from "./field-types";
+import { processChunks, processStreamResponse } from "./fieldUpdaterHelpers";
 
 /**
  * Update a form field with the provided value
  * This is the main entry point for field updates
  */
-const updateField = async (element: HTMLElement, field: Field, isTestMode = false): Promise<void> => {
+export const updateField = async (element: HTMLElement, field: Field, isTestMode = false): Promise<void> => {
   try {
     // Skip elements that shouldn't be updated
     if (
@@ -118,7 +117,7 @@ const updateField = async (element: HTMLElement, field: Field, isTestMode = fals
           await updateFileInput(element, fileValue);
           break;
         }
-        // Use the new updateTextField function for all text-like inputs
+        // Use the updateTextField function for all text-like inputs
         case "text":
         case "email":
         case "url":
@@ -193,9 +192,6 @@ const updateField = async (element: HTMLElement, field: Field, isTestMode = fals
     console.error(`Error updating field ${field.id}:`, error);
   }
 };
-
-// Form update API
-// ----------------------------------------
 
 /**
  * Update multiple form fields with their values
@@ -454,82 +450,5 @@ export const updateFormFields = async (fields: Field[], testMode = false): Promi
   }
 };
 
-/**
- * Process streaming response chunks
- */
-export const processChunks = async (text: string, originalFields: Field[], previousPartial = ""): Promise<string> => {
-  try {
-    // Combine with any previous partial data
-    const combinedText = previousPartial + text;
-    const lines = combinedText.split("\n");
-
-    // The last line might be incomplete, so save it for the next chunk
-    let partial = "";
-    if (combinedText[combinedText.length - 1] !== "\n") {
-      partial = lines.pop() || "";
-    }
-
-    // Process each complete JSON line
-    const fieldsToUpdate: Field[] = [];
-
-    for (const line of lines) {
-      if (!line.trim()) continue;
-
-      try {
-        const jsonResponse = JSON.parse(line);
-        if (jsonResponse?.data?.length) {
-          // Merge with original fields to maintain metadata
-          const mergedFields = jsonResponse.data.map((updatedField: Field) => {
-            const originalField = originalFields.find(f => f.id === updatedField.id);
-            return originalField ? { ...originalField, ...updatedField } : updatedField;
-          });
-
-          fieldsToUpdate.push(...mergedFields);
-        }
-      } catch (e) {
-        console.warn("Failed to parse JSON line:", e);
-      }
-    }
-
-    // Update fields if we have any
-    if (fieldsToUpdate.length > 0) {
-      await updateFormFields(fieldsToUpdate);
-    }
-
-    return partial;
-  } catch (error) {
-    console.error("Error processing chunks:", error);
-    return previousPartial;
-  }
-};
-
-/**
- * Process a stream response
- */
-export const processStreamResponse = async (response: ReadableStream, originalFields: Field[]): Promise<void> => {
-  try {
-    const reader = response.getReader();
-    const decoder = new TextDecoder();
-    let remainder = "";
-
-    const processText = async (result: ReadableStreamReadResult<Uint8Array>): Promise<void> => {
-      if (result.done) {
-        // Process any remaining text
-        if (remainder) {
-          await processChunks("\n", originalFields, remainder);
-        }
-        return;
-      }
-
-      const chunkText = decoder.decode(result.value, { stream: true });
-      remainder = await processChunks(chunkText, originalFields, remainder);
-
-      // Continue reading
-      await reader.read().then(processText);
-    };
-
-    await reader.read().then(processText);
-  } catch (error) {
-    console.error("Error processing stream response:", error);
-  }
-};
+// Re-export stream processing functions from utils
+export { processChunks, processStreamResponse };

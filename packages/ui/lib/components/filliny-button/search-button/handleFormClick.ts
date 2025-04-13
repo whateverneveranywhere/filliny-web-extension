@@ -1,6 +1,6 @@
 import { highlightForms } from "./highlightForms";
 import { detectFields } from "./detectionHelpers";
-import { processChunks, updateFormFields } from "./fieldUpdaterHelpers";
+import { processChunks, updateFormFields } from "./formFieldHelpers";
 import { disableOtherButtons, resetOverlays, showLoadingIndicator } from "./overlayUtils";
 import type { DTOProfileFillingForm } from "@extension/storage";
 import { profileStrorage } from "@extension/storage";
