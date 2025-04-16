@@ -1,6 +1,11 @@
 /**
  * Safely get a string value from potentially complex field values
  */
+import type { Field, FieldType } from "@extension/shared";
+
+// Track used field IDs to ensure uniqueness
+const usedFieldIds = new Set<string>();
+
 export const getStringValue = (value: unknown): string => {
   if (value === null || value === undefined) return "";
   if (Array.isArray(value)) return value.join(",");
@@ -220,4 +225,99 @@ export const simulateTyping = async (element: HTMLElement, value: string): Promi
       element.blur();
     }
   }
+};
+
+/**
+ * Get an XPath expression that identifies an element
+ */
+export const getElementXPath = (element: HTMLElement): string => {
+  if (!element.parentElement) return "";
+  const idx =
+    Array.from(element.parentElement.children)
+      .filter(child => child.tagName === element.tagName)
+      .indexOf(element) + 1;
+  return `${getElementXPath(element.parentElement)}/${element.tagName.toLowerCase()}[${idx}]`;
+};
+
+/**
+ * Generate unique selectors for an element to help with identification
+ */
+export const generateUniqueSelectors = (element: HTMLElement): string[] => {
+  const selectors: string[] = [];
+  if (element.id) selectors.push(`#${CSS.escape(element.id)}`);
+  if (element.className) {
+    const classSelector = Array.from(element.classList)
+      .map(c => `.${CSS.escape(c)}`)
+      .join("");
+    if (classSelector) selectors.push(classSelector);
+  }
+  ["name", "type", "role", "aria-label"].forEach(attr => {
+    if (element.hasAttribute(attr)) {
+      selectors.push(`[${attr}="${CSS.escape(element.getAttribute(attr)!)}"]`);
+    }
+  });
+  return selectors;
+};
+
+/**
+ * Get a unique field ID
+ */
+export const getUniqueFieldId = (baseIndex: number): string => {
+  let fieldId = `field-${baseIndex}`;
+  let counter = baseIndex;
+  while (usedFieldIds.has(fieldId)) {
+    counter++;
+    fieldId = `field-${counter}`;
+  }
+  usedFieldIds.add(fieldId);
+  return fieldId;
+};
+
+/**
+ * Create a base field object with common properties
+ */
+export const createBaseField = async (
+  element: HTMLElement,
+  index: number,
+  type: string,
+  testMode: boolean = false,
+): Promise<Field> => {
+  const fieldId = getUniqueFieldId(index);
+  element.setAttribute("data-filliny-id", fieldId);
+  const field: Field = {
+    id: fieldId,
+    type: type as FieldType,
+    xpath: getElementXPath(element),
+    uniqueSelectors: generateUniqueSelectors(element),
+    value: "",
+  };
+  field.label = await getFieldLabel(element);
+  if (testMode) {
+    switch (type) {
+      case "text":
+        field.testValue = "Test text";
+        break;
+      case "email":
+        field.testValue = "test@example.com";
+        break;
+      case "tel":
+        field.testValue = "+1234567890";
+        break;
+      case "select":
+        break;
+      case "number":
+        field.testValue = "42";
+        break;
+      default:
+        field.testValue = `Test ${type}`;
+    }
+  }
+  return field;
+};
+
+// This is a placeholder for getFieldLabel which needs to be imported from detectionHelpers
+export const getFieldLabel = async (element: HTMLElement): Promise<string> => {
+  // This function will be properly implemented in detectionHelpers.ts
+  // For now, return a placeholder value
+  return element.getAttribute("placeholder") || element.getAttribute("aria-label") || "Field";
 };

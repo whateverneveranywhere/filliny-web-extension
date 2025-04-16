@@ -1,4 +1,5 @@
-import { dispatchEvent } from "./utils";
+import { dispatchEvent, createBaseField } from "./utils";
+import type { Field } from "@extension/shared";
 
 /**
  * React Select handler for specialized React Select components
@@ -927,4 +928,233 @@ export const updateSelect = (element: HTMLSelectElement, value: string | string[
   } catch (error) {
     console.error("Error updating select:", error);
   }
+};
+
+/**
+ * Detect select fields from a set of elements
+ * Handles both native selects and custom select components
+ */
+export const detectSelectFields = async (
+  elements: HTMLElement[],
+  baseIndex: number,
+  testMode: boolean = false,
+): Promise<Field[]> => {
+  const fields: Field[] = [];
+
+  // Get all select elements and custom select elements
+  const selectElements = elements.filter(
+    element =>
+      element instanceof HTMLSelectElement ||
+      element.getAttribute("role") === "combobox" ||
+      element.getAttribute("role") === "listbox" ||
+      element.classList.contains("select2-container") ||
+      element.classList.contains("chosen-container"),
+  );
+
+  for (let i = 0; i < selectElements.length; i++) {
+    const element = selectElements[i];
+
+    // Skip disabled/hidden elements
+    if (
+      element.hasAttribute("disabled") ||
+      element.hasAttribute("readonly") ||
+      element.getAttribute("aria-hidden") === "true" ||
+      window.getComputedStyle(element).display === "none" ||
+      window.getComputedStyle(element).visibility === "hidden"
+    ) {
+      continue;
+    }
+
+    // Create the field
+    const field = await createBaseField(element, baseIndex + i, "select", testMode);
+
+    // Detect if it's a multi-select
+    let isMultiple = false;
+    if (element instanceof HTMLSelectElement) {
+      isMultiple = element.multiple;
+    } else {
+      isMultiple = element.getAttribute("aria-multiselectable") === "true" || element.hasAttribute("multiple");
+    }
+
+    // Handle different select implementations
+    if (element instanceof HTMLSelectElement) {
+      // Standard HTML select - get options directly
+      field.options = Array.from(element.options).map(opt => ({
+        value: opt.value,
+        text: opt.text.trim() || opt.value,
+        selected: opt.selected,
+      }));
+
+      field.value = isMultiple ? Array.from(element.selectedOptions).map(opt => opt.value) : element.value;
+
+      field.metadata = {
+        framework: "vanilla",
+        visibility: { isVisible: true },
+        isMultiple,
+      };
+    } else {
+      // Custom select implementation - need to find options
+      field.options = await detectDynamicSelectOptions(element);
+
+      // Set current value based on selected options
+      const selectedOptions = field.options.filter(opt => opt.selected);
+      field.value = isMultiple
+        ? selectedOptions.map(opt => opt.value)
+        : selectedOptions.length > 0
+          ? selectedOptions[0].value
+          : "";
+
+      // Try to detect the framework
+      const framework = detectSelectFramework(element);
+      field.metadata = {
+        framework: framework,
+        visibility: { isVisible: true },
+        isMultiple,
+      };
+    }
+
+    // Set test value for test mode
+    if (testMode && field.options && field.options.length > 0) {
+      // Skip placeholder options like "Select one", "--", etc.
+      const validOptions = field.options.filter(
+        opt =>
+          opt.value &&
+          !opt.text.toLowerCase().includes("select") &&
+          !opt.text.includes("--") &&
+          !opt.text.toLowerCase().includes("please select"),
+      );
+
+      if (validOptions.length > 0) {
+        if (isMultiple) {
+          // For multi-select, pick first two valid options
+          field.testValue = validOptions.slice(0, 2).map(opt => opt.value);
+        } else {
+          // For single select, pick first valid option
+          field.testValue = validOptions[0].value;
+        }
+      }
+    }
+
+    fields.push(field);
+  }
+
+  return fields;
+};
+
+/**
+ * Detect framework for select element
+ */
+const detectSelectFramework = (element: HTMLElement): "react" | "angular" | "vue" | "vanilla" | "select2" => {
+  // Check for Select2
+  if (
+    element.classList.contains("select2-container") ||
+    element.classList.contains("select2-focusser") ||
+    element.closest(".select2-container")
+  ) {
+    return "select2";
+  }
+
+  // Check for React
+  const reactKey = Object.keys(element).find(key => key.startsWith("__react") || key.startsWith("_reactProps"));
+  if (reactKey) return "react";
+
+  // Check for Angular
+  if (
+    element.hasAttribute("ng-model") ||
+    element.hasAttribute("[(ngModel)]") ||
+    element.hasAttribute("formControlName")
+  ) {
+    return "angular";
+  }
+
+  // Check for Vue
+  if (element.hasAttribute("v-model") || "__vue__" in element) {
+    return "vue";
+  }
+
+  return "vanilla";
+};
+
+/**
+ * Detect options for dynamic/custom select components
+ */
+const detectDynamicSelectOptions = async (
+  element: HTMLElement,
+): Promise<Array<{ value: string; text: string; selected: boolean }>> => {
+  const options: Array<{ value: string; text: string; selected: boolean }> = [];
+
+  try {
+    // For Select2, look for the actual select element
+    if (element.classList.contains("select2-container")) {
+      const selectId = element.getAttribute("id")?.replace("s2id_", "");
+      if (selectId) {
+        const actualSelect = document.getElementById(selectId) as HTMLSelectElement;
+        if (actualSelect && actualSelect instanceof HTMLSelectElement) {
+          return Array.from(actualSelect.options).map(opt => ({
+            value: opt.value,
+            text: opt.text.trim() || opt.value,
+            selected: opt.selected,
+          }));
+        }
+      }
+    }
+
+    // Check for aria relationships
+    const listId = element.getAttribute("aria-controls") || element.getAttribute("aria-owns");
+    if (listId) {
+      const listbox = document.getElementById(listId);
+      if (listbox) {
+        const listOptions = Array.from(listbox.querySelectorAll('[role="option"]'));
+        if (listOptions.length > 0) {
+          return listOptions.map(opt => ({
+            value: opt.getAttribute("data-value") || opt.getAttribute("value") || opt.textContent?.trim() || "",
+            text: opt.textContent?.trim() || "",
+            selected: opt.getAttribute("aria-selected") === "true" || opt.hasAttribute("selected"),
+          }));
+        }
+      }
+    }
+
+    // Check for option-like children
+    const optionElements = element.querySelectorAll('option, [role="option"]');
+    if (optionElements.length > 0) {
+      return Array.from(optionElements).map(opt => ({
+        value: opt.getAttribute("value") || opt.textContent?.trim() || "",
+        text: opt.textContent?.trim() || "",
+        selected:
+          opt instanceof HTMLOptionElement
+            ? opt.selected
+            : opt.getAttribute("aria-selected") === "true" || opt.hasAttribute("selected"),
+      }));
+    }
+
+    // Look for hidden input with JSON data
+    const hiddenInputs = element.querySelectorAll('input[type="hidden"]');
+    for (const input of Array.from(hiddenInputs)) {
+      if (input instanceof HTMLInputElement && input.value) {
+        try {
+          const parsed = JSON.parse(input.value);
+          if (Array.isArray(parsed)) {
+            const parsedOptions = parsed
+              .map(item => ({
+                value: String(item.value || item.id || ""),
+                text: String(item.label || item.text || item.name || ""),
+                selected: Boolean(item.selected),
+              }))
+              .filter(opt => opt.value || opt.text);
+
+            if (parsedOptions.length > 0) {
+              return parsedOptions;
+            }
+          }
+        } catch {
+          // Ignore JSON parse errors
+        }
+      }
+    }
+  } catch (error) {
+    console.warn("Error detecting select options:", error);
+  }
+
+  return options;
 };

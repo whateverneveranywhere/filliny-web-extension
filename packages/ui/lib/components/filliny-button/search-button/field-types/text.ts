@@ -1,4 +1,178 @@
-import { dispatchEvent, simulateTyping, addVisualFeedback } from "./utils";
+import { dispatchEvent, simulateTyping, addVisualFeedback, createBaseField } from "./utils";
+import type { Field } from "@extension/shared";
+
+/**
+ * Detect and analyze text input fields
+ * Includes various input types like email, url, password, search
+ */
+export const detectTextField = async (
+  elements: HTMLElement[],
+  baseIndex: number,
+  testMode: boolean = false,
+): Promise<Field[]> => {
+  const fields: Field[] = [];
+
+  // Process standard input elements
+  const inputFields = elements.filter(
+    el =>
+      el instanceof HTMLInputElement &&
+      [
+        "text",
+        "email",
+        "password",
+        "search",
+        "tel",
+        "url",
+        "number",
+        "date",
+        "datetime-local",
+        "month",
+        "week",
+        "time",
+      ].includes((el as HTMLInputElement).type),
+  );
+
+  if (inputFields.length > 0) {
+    const results = await detectInputField(inputFields, baseIndex, testMode);
+    fields.push(...results);
+  }
+
+  // Process textarea elements
+  const textareaFields = elements.filter(el => el instanceof HTMLTextAreaElement);
+
+  for (let i = 0; i < textareaFields.length; i++) {
+    const element = textareaFields[i];
+    const field = await createBaseField(element, baseIndex + fields.length + i, "textarea", testMode);
+
+    // Additional textarea-specific metadata
+    field.metadata = {
+      framework: "vanilla",
+      visibility: { isVisible: true },
+    };
+    field.placeholder = (element as HTMLTextAreaElement).placeholder;
+    field.name = (element as HTMLTextAreaElement).name || "";
+
+    fields.push(field);
+  }
+
+  // Process contentEditable elements
+  const editableFields = elements.filter(
+    el =>
+      el.isContentEditable &&
+      !el.querySelector("input, textarea, select") && // Skip if it contains other input elements
+      !(el.textContent || "").includes("\n\n\n"), // Skip if it looks like a rich text editor
+  );
+
+  for (let i = 0; i < editableFields.length; i++) {
+    const element = editableFields[i];
+    const field = await createBaseField(element, baseIndex + fields.length + i, "contentEditable", testMode);
+
+    // Additional contentEditable metadata
+    field.name = element.getAttribute("aria-label") || element.id || "";
+
+    fields.push(field);
+  }
+
+  return fields;
+};
+
+/**
+ * Detect and analyze standard input fields
+ */
+export const detectInputField = async (
+  elements: HTMLElement[],
+  baseIndex: number,
+  testMode: boolean = false,
+): Promise<Field[]> => {
+  const fields: Field[] = [];
+
+  for (let i = 0; i < elements.length; i++) {
+    const element = elements[i] as HTMLInputElement;
+
+    // Skip hidden and disabled inputs
+    if (
+      element.type === "hidden" ||
+      element.disabled ||
+      element.readOnly ||
+      element.getAttribute("aria-hidden") === "true" ||
+      window.getComputedStyle(element).display === "none" ||
+      window.getComputedStyle(element).visibility === "hidden"
+    ) {
+      continue;
+    }
+
+    // Create field based on input type
+    const fieldType = element.type as string;
+    const field = await createBaseField(element, baseIndex + i, fieldType, testMode);
+
+    // Add input-specific metadata
+    field.name = element.name || "";
+    field.placeholder = element.placeholder || "";
+
+    // Add validation properties
+    field.validation = field.validation || {};
+    if (element.maxLength > 0) field.validation.maxLength = element.maxLength;
+    if (element.minLength > 0) field.validation.minLength = element.minLength;
+
+    if (element.type === "number" || element.type === "range") {
+      field.validation = field.validation || {};
+      field.validation.min = element.min ? Number(element.min) : undefined;
+      field.validation.max = element.max ? Number(element.max) : undefined;
+      field.validation.step = element.step ? Number(element.step) : undefined;
+    }
+
+    if (element.required) {
+      field.required = true;
+    }
+
+    if (element.pattern) {
+      field.validation = field.validation || {};
+      field.validation.pattern = element.pattern;
+    }
+
+    // Set value based on test mode
+    if (testMode) {
+      switch (element.type) {
+        case "email": {
+          field.testValue = "test@example.com";
+          break;
+        }
+        case "password": {
+          field.testValue = "TestPassword123!";
+          break;
+        }
+        case "tel": {
+          field.testValue = "+1234567890";
+          break;
+        }
+        case "url": {
+          field.testValue = "https://example.com";
+          break;
+        }
+        case "number": {
+          field.testValue = "42";
+          break;
+        }
+        case "date": {
+          field.testValue = new Date().toISOString().split("T")[0];
+          break;
+        }
+        case "time": {
+          const now = new Date();
+          field.testValue = `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`;
+          break;
+        }
+        default: {
+          field.testValue = `Test ${element.type || "text"}`;
+        }
+      }
+    }
+
+    fields.push(field);
+  }
+
+  return fields;
+};
 
 /**
  * Update a text input field with enhanced interaction support
@@ -115,18 +289,19 @@ export const updateTextField = async (element: HTMLElement, value: string): Prom
           }
           break;
 
-        case "range": {
+        case "range":
           // Ensure it's within range
-          const min = element.hasAttribute("min") ? Number(element.getAttribute("min")) : 0;
-          const max = element.hasAttribute("max") ? Number(element.getAttribute("max")) : 100;
-          const num = Number(normalizedValue);
-          if (isNaN(num)) {
-            normalizedValue = String(min + (max - min) / 2); // Default to middle of range
-          } else {
-            normalizedValue = String(Math.max(min, Math.min(max, num)));
+          {
+            const min = element.hasAttribute("min") ? Number(element.getAttribute("min")) : 0;
+            const max = element.hasAttribute("max") ? Number(element.getAttribute("max")) : 100;
+            const num = Number(normalizedValue);
+            if (isNaN(num)) {
+              normalizedValue = String(min + (max - min) / 2); // Default to middle of range
+            } else {
+              normalizedValue = String(Math.max(min, Math.min(max, num)));
+            }
           }
           break;
-        }
       }
     }
 
