@@ -845,8 +845,8 @@ export const detectFields = async (container: HTMLElement, isImplicitForm = fals
 
 // --- Form Container Detection ---
 export const detectFormLikeContainers = async (): Promise<HTMLElement[]> => {
-  // Track the most promising container per document/page
-  const bestContainerByDocument = new Map<Document, { container: HTMLElement; fieldCount: number }>();
+  // Initialize result container
+  const bestContainers: HTMLElement[] = [];
   const documents = getAllFrameDocuments();
 
   // Define known form container patterns
@@ -885,28 +885,27 @@ export const detectFormLikeContainers = async (): Promise<HTMLElement[]> => {
 
   for (const doc of documents) {
     try {
+      let bestContainer: HTMLElement | null = null;
+      let maxFieldCount = 0;
+
       // First check for native forms and obvious form containers
       const formContainers = Array.from(doc.querySelectorAll<HTMLElement>(formContainerSelectors.join(",")));
-
-      // Create a map to track containers and their field counts
-      const containerFieldCounts = new Map<HTMLElement, { fields: HTMLElement[]; isStandardForm: boolean }>();
 
       if (formContainers.length > 0) {
         // For each container found, count the form fields
         for (const container of formContainers) {
           const fields = getFormFields(container);
-          if (fields.length >= 1) {
-            containerFieldCounts.set(container, {
-              fields,
-              isStandardForm: container.tagName === "FORM" || container.getAttribute("role") === "form",
-            });
+
+          // Keep track of the container with the most fields
+          if (fields.length > maxFieldCount) {
+            maxFieldCount = fields.length;
+            bestContainer = container;
           }
         }
       }
 
-      // If no standard forms found, or they don't contain enough fields,
-      // look for other containers that might be forms based on content
-      if (containerFieldCounts.size === 0) {
+      // If no standard forms found with fields, look for other containers
+      if (!bestContainer || maxFieldCount === 0) {
         // Get all visible interactive elements
         const allFields = getFormFields(doc.body);
 
@@ -926,118 +925,30 @@ export const detectFormLikeContainers = async (): Promise<HTMLElement[]> => {
             }
           });
 
-          // Add these potential containers to our tracker
+          // Find the container with the most fields
           for (const [container, fields] of fieldParentMap.entries()) {
-            if (fields.length >= 1) {
-              containerFieldCounts.set(container, {
-                fields,
-                isStandardForm: false,
-              });
+            if (fields.length > maxFieldCount) {
+              maxFieldCount = fields.length;
+              bestContainer = container;
             }
           }
         }
       }
 
-      // Create a scoring system to rank containers
-      const containerScores = new Map<HTMLElement, number>();
-
-      // Function to calculate container score - higher is better
-      const calculateContainerScore = (
-        container: HTMLElement,
-        fields: HTMLElement[],
-        isStandardForm: boolean,
-      ): number => {
-        let score = fields.length * 10; // Base score is number of fields × 10
-
-        // Prefer actual <form> elements or elements with role="form"
-        if (isStandardForm) score += 50;
-
-        // Prefer containers with form-related classes or IDs
-        const classOrId = (container.className + " " + container.id).toLowerCase();
-        if (/\b(form|survey|questionnaire|application)\b/.test(classOrId)) score += 30;
-
-        // Prefer containers that aren't deeply nested
-        let depth = 0;
-        let parent = container.parentElement;
-        while (parent && parent !== doc.body && depth < 10) {
-          depth++;
-          parent = parent.parentElement;
-        }
-        score -= depth * 2; // Subtract points for deep nesting
-
-        // Prefer containers that take up significant screen space
-        const rect = container.getBoundingClientRect();
-        const viewportArea = window.innerWidth * window.innerHeight;
-        const containerArea = rect.width * rect.height;
-        const areaRatio = containerArea / viewportArea;
-        score += Math.min(areaRatio * 100, 30); // Add up to 30 points for large containers
-
-        return score;
-      };
-
-      // Calculate score for each container
-      for (const [container, { fields, isStandardForm }] of containerFieldCounts.entries()) {
-        const score = calculateContainerScore(container, fields, isStandardForm);
-        containerScores.set(container, score);
-      }
-
-      // Sort containers by score (descending)
-      const sortedContainers = Array.from(containerScores.entries()).sort((a, b) => b[1] - a[1]);
-
-      // Find the best container that isn't contained within another higher-scoring container
-      let bestContainer: HTMLElement | null = null;
-      let maxFieldCount = 0;
-
-      for (const [container, score] of sortedContainers) {
-        // Skip if this container is inside a higher-scoring container
-        const isContainedInBetter = sortedContainers.some(([otherContainer, otherScore]) => {
-          return otherScore > score && otherContainer.contains(container);
-        });
-
-        if (!isContainedInBetter) {
-          const fields = containerFieldCounts.get(container)?.fields || [];
-          // Pick this container if it has more fields than our current best
-          if (fields.length > maxFieldCount) {
-            bestContainer = container;
-            maxFieldCount = fields.length;
-          }
-        }
-      }
-
-      // If we found a good container, track it for this document
-      if (bestContainer && maxFieldCount >= 1) {
-        bestContainerByDocument.set(doc, {
-          container: bestContainer,
-          fieldCount: maxFieldCount,
-        });
-      }
-
-      // Check shadow DOM for forms
+      // Check shadow DOM for forms with more fields
       const shadowRootElements = findAllShadowRoots(doc.body);
       for (const host of shadowRootElements) {
         if (host.shadowRoot) {
-          // Check for form elements in shadow DOM
           for (const selector of formContainerSelectors) {
             const shadowForms = queryShadowRoot(host.shadowRoot, selector);
-            let bestShadowContainer: HTMLElement | null = null;
-            let maxShadowFieldCount = 0;
 
             // Find the shadow DOM container with the most fields
             for (const form of shadowForms) {
               const fields = getFormFields(form);
-              if (fields.length > maxShadowFieldCount) {
-                bestShadowContainer = form;
-                maxShadowFieldCount = fields.length;
+              if (fields.length > maxFieldCount) {
+                maxFieldCount = fields.length;
+                bestContainer = form;
               }
-            }
-
-            // If we found a good shadow container with more fields than our document's best,
-            // use it instead
-            if (bestShadowContainer && maxShadowFieldCount > (bestContainerByDocument.get(doc)?.fieldCount || 0)) {
-              bestContainerByDocument.set(doc, {
-                container: bestShadowContainer,
-                fieldCount: maxShadowFieldCount,
-              });
             }
           }
         }
@@ -1052,27 +963,57 @@ export const detectFormLikeContainers = async (): Promise<HTMLElement[]> => {
         const googleFormContainer = doc.querySelector(".freebirdFormviewerViewFormCard");
         if (googleFormContainer) {
           const fields = getFormFields(googleFormContainer as HTMLElement);
-          // If this Google Form container has more fields than our current best,
-          // use it instead
-          if (fields.length > (bestContainerByDocument.get(doc)?.fieldCount || 0)) {
-            bestContainerByDocument.set(doc, {
-              container: googleFormContainer as HTMLElement,
-              fieldCount: fields.length,
-            });
+          if (fields.length > maxFieldCount) {
+            maxFieldCount = fields.length;
+            bestContainer = googleFormContainer as HTMLElement;
           }
         }
+      }
+
+      // Make sure we only add a container that has fields
+      if (bestContainer && maxFieldCount > 0) {
+        // Ensure we get the outermost container with same field count
+        let outerContainer = bestContainer;
+        let current = bestContainer.parentElement;
+
+        // Look for parent containers that contain exactly the same fields
+        while (current && current !== doc.body) {
+          const parentFields = getFormFields(current);
+          if (parentFields.length === maxFieldCount) {
+            // This parent has the same number of fields, so it's likely a wrapper
+            outerContainer = current;
+            current = current.parentElement;
+          } else {
+            // Parent has different field count, stop here
+            break;
+          }
+        }
+
+        outerContainer.setAttribute("data-filliny-form-container", "true");
+        bestContainers.push(outerContainer);
       }
     } catch (e) {
       console.error("Error in form detection:", e);
     }
   }
 
-  // Return only the best container for each document
-  const containers: HTMLElement[] = [];
-  for (const { container } of bestContainerByDocument.values()) {
-    container.setAttribute("data-filliny-form-container", "true");
-    containers.push(container);
+  // If we somehow found multiple containers, only keep the one with the most fields
+  if (bestContainers.length > 1) {
+    const containerWithMostFields = bestContainers.reduce((best, current) => {
+      const bestFields = getFormFields(best).length;
+      const currentFields = getFormFields(current).length;
+      return currentFields > bestFields ? current : best;
+    }, bestContainers[0]);
+
+    // Remove the attribute from other containers
+    bestContainers.forEach(container => {
+      if (container !== containerWithMostFields) {
+        container.removeAttribute("data-filliny-form-container");
+      }
+    });
+
+    return [containerWithMostFields];
   }
 
-  return containers;
+  return bestContainers;
 };
