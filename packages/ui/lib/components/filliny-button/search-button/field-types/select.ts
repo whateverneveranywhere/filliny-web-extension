@@ -287,11 +287,29 @@ export const handleTsselect = (element: HTMLSelectElement, normalizedValues: str
 export const updateSelect = (element: HTMLSelectElement, value: string | string[]): void => {
   try {
     const normalizedValues = Array.isArray(value) ? value : [value];
-    if (!normalizedValues.length || !normalizedValues[0]) return;
+    if (!normalizedValues.length || !normalizedValues[0]) {
+      // For test mode, we should still select a valid option even without a value
+      const isTestMode = element.hasAttribute("data-filliny-test-mode");
+      if (isTestMode && element.options.length > 0) {
+        console.log("Test mode with no value provided - selecting a sensible default option");
+        selectBestOptionInTestMode(element);
+        return;
+      }
+      return;
+    }
 
     // Create a proper element identifier with type safety
     const elementName = element.name || "";
     console.log(`Updating select ${element.id || elementName || "unnamed"} with value:`, normalizedValues);
+
+    // First check if this is a custom React or framework-based select
+    const isFormDropdown = element.classList.contains("form_dropdown");
+    const isFancySelect =
+      element.getAttribute("data-filliny-framework") === "fancy" ||
+      isFormDropdown ||
+      element.id?.includes("_select") ||
+      element.classList.contains("form-select") ||
+      element.parentElement?.classList.contains("select-wrapper");
 
     // Enhanced detection for Exclaimer careers form React-Select components
     const isExclaimerReactSelect =
@@ -304,16 +322,26 @@ export const updateSelect = (element: HTMLSelectElement, value: string | string[
     // For numeric IDs on Exclaimer forms, aggressively use Tsselect handler
     const hasNumericValue = /^\d+$/.test(normalizedValues[0]);
 
+    // Try custom handler for React-like select components first
     if (
       isExclaimerReactSelect ||
       hasNumericValue ||
       element.getAttribute("role") === "combobox" ||
       element.classList.contains("react-select__input") ||
-      element.getAttribute("id")?.includes("application_form")
+      element.getAttribute("id")?.includes("application_form") ||
+      isFormDropdown ||
+      isFancySelect
     ) {
-      console.log("Prioritizing Tsselect handler for Exclaimer React component");
+      console.log("Prioritizing specialized handling for custom select component");
       if (handleTsselect(element, normalizedValues)) {
         return; // Successfully handled by Tsselect
+      }
+
+      // If that fails, try direct DOM manipulation for form_dropdown
+      if (isFormDropdown || isFancySelect) {
+        if (handleCustomFormDropdown(element, normalizedValues)) {
+          return; // Successfully handled custom dropdown
+        }
       }
     }
 
@@ -486,32 +514,16 @@ export const updateSelect = (element: HTMLSelectElement, value: string | string[
       }
       // If not a valid index, select first non-placeholder option as fallback
       else if (element.options.length > 0) {
-        // Skip first option if it seems like a placeholder
-        const isPlaceholder = (option: HTMLOptionElement): boolean => {
-          const text = option.text.toLowerCase();
-          return (
-            text.includes("select") ||
-            text.includes("choose") ||
-            text.includes("pick") ||
-            text === "" ||
-            option.value === "" ||
-            option.disabled
-          );
-        };
-
-        // Try to find the first non-placeholder option
-        const firstNonPlaceholder = Array.from(element.options).findIndex(opt => !isPlaceholder(opt));
-        if (firstNonPlaceholder > 0) {
-          element.selectedIndex = firstNonPlaceholder;
-          matched = true;
-          console.log(`Selected first non-placeholder option: ${element.options[firstNonPlaceholder].value}`);
-        } else {
-          // Fall back to first option if no alternatives
-          element.selectedIndex = 0;
-          matched = true;
-          console.log(`Selected first option as last resort: ${element.options[0].value}`);
-        }
+        selectBestOptionInTestMode(element);
+        matched = true;
       }
+    }
+
+    // If still no match but it's test mode, ensure we select something useful
+    if (!matched && element.hasAttribute("data-filliny-test-mode") && element.options.length > 0) {
+      console.log("Test mode with no match - selecting a valid option");
+      selectBestOptionInTestMode(element);
+      matched = true;
     }
 
     // Dispatch events
@@ -927,6 +939,172 @@ export const updateSelect = (element: HTMLSelectElement, value: string | string[
     }
   } catch (error) {
     console.error("Error updating select:", error);
+  }
+};
+
+/**
+ * Handle custom form dropdowns that might not be captured by other handlers
+ */
+const handleCustomFormDropdown = (element: HTMLSelectElement, normalizedValues: string[]): boolean => {
+  try {
+    console.log("Attempting to handle form_dropdown component...");
+
+    // First try to find any visible dropdown UI associated with this select
+    const selectContainer = element.parentElement;
+    if (!selectContainer) return false;
+
+    // Look for common custom dropdown patterns
+    const customDropdownTrigger = selectContainer.querySelector<HTMLElement>(
+      'div[class*="select"], ' +
+        'span[class*="select"], ' +
+        'button[class*="select"], ' +
+        'div[class*="dropdown"], ' +
+        'div[tabindex="0"], ' +
+        'div[role="button"], ' +
+        '[aria-haspopup="listbox"]',
+    );
+
+    if (!customDropdownTrigger) return false;
+
+    console.log("Found custom dropdown trigger:", customDropdownTrigger);
+
+    // Click to open the dropdown
+    customDropdownTrigger.click();
+
+    // Wait briefly for the dropdown to open
+    setTimeout(() => {
+      // Try to find dropdown options in multiple locations
+      const dropdownSelectors = [
+        // Look in parent container first
+        `${selectContainer.tagName.toLowerCase()} [role="option"]`,
+        `${selectContainer.tagName.toLowerCase()} li`,
+        `${selectContainer.tagName.toLowerCase()} [class*="option"]`,
+        // Look in document body for portal popups
+        'body > div[class*="dropdown"] [role="option"]',
+        'body > div[class*="select"] li',
+        'body > div[class*="popup"] [class*="option"]',
+        // Generic selectors
+        '[role="listbox"] [role="option"]',
+        '[class*="dropdown-menu"] [class*="dropdown-item"]',
+        '[class*="select-menu"] li',
+      ];
+
+      let dropdownOptions: Element[] = [];
+
+      // Try each selector until we find options
+      for (const selector of dropdownSelectors) {
+        const options = document.querySelectorAll(selector);
+        if (options.length > 0) {
+          dropdownOptions = Array.from(options);
+          console.log(`Found ${dropdownOptions.length} dropdown options with selector: ${selector}`);
+          break;
+        }
+      }
+
+      if (dropdownOptions.length === 0) {
+        console.log("No dropdown options found, closing dropdown");
+        document.body.click(); // Close dropdown by clicking elsewhere
+        return; // Add return statement here
+      }
+
+      // Try to find a matching option
+      const valueToMatch = normalizedValues[0].toLowerCase();
+      let matched = false;
+
+      // Try several matching strategies
+      for (const option of dropdownOptions) {
+        const optionText = option.textContent?.toLowerCase().trim() || "";
+        const optionValue = option.getAttribute("data-value")?.toLowerCase() || "";
+
+        if (
+          optionText === valueToMatch ||
+          optionValue === valueToMatch ||
+          optionText.includes(valueToMatch) ||
+          valueToMatch.includes(optionText)
+        ) {
+          console.log(`Clicking matched option: ${optionText}`);
+          (option as HTMLElement).click();
+          matched = true;
+          break;
+        }
+      }
+
+      // If no match found, select the first valid (non-placeholder) option
+      if (!matched) {
+        // Filter out placeholder options
+        const validOptions = dropdownOptions.filter(opt => {
+          const text = opt.textContent?.toLowerCase().trim() || "";
+          return !text.includes("select") && !text.includes("choose") && !text.includes("pick") && text.length > 0;
+        });
+
+        if (validOptions.length > 0) {
+          console.log("No exact match found, selecting first valid option:", validOptions[0].textContent);
+          (validOptions[0] as HTMLElement).click();
+        } else {
+          console.log("No valid options found, selecting first option");
+          (dropdownOptions[0] as HTMLElement).click();
+        }
+      }
+
+      return; // Add explicit return statement
+    }, 50);
+
+    return true;
+  } catch (error) {
+    console.error("Error in custom form dropdown handler:", error);
+    return false;
+  }
+};
+
+/**
+ * Helper function to select the best option in test mode
+ */
+const selectBestOptionInTestMode = (element: HTMLSelectElement): void => {
+  // Skip first option if it seems like a placeholder
+  const isPlaceholder = (option: HTMLOptionElement): boolean => {
+    const text = option.text.toLowerCase();
+    return (
+      text.includes("select") ||
+      text.includes("choose") ||
+      text.includes("pick") ||
+      text.includes("bitte") || // German "please"
+      text === "" ||
+      option.value === "" ||
+      option.disabled
+    );
+  };
+
+  // Filter out placeholder and disabled options
+  const validOptions = Array.from(element.options).filter(opt => !isPlaceholder(opt) && !opt.disabled);
+
+  // First try to find common social media or job sites if they exist
+  const commonSites = ["linkedin", "xing", "facebook", "instagram", "twitter", "indeed", "stepstone"];
+  const socialMediaOption = validOptions.find(opt => commonSites.some(site => opt.text.toLowerCase().includes(site)));
+
+  if (socialMediaOption) {
+    console.log(`Selected common site option in test mode: ${socialMediaOption.text}`);
+    element.value = socialMediaOption.value;
+    return;
+  }
+
+  // If no common sites, pick first non-placeholder option
+  if (validOptions.length > 0) {
+    console.log(`Selected first non-placeholder option in test mode: ${validOptions[0].text}`);
+    element.value = validOptions[0].value;
+    return;
+  }
+
+  // If all options look like placeholders, just pick the second option (skipping the first)
+  if (element.options.length > 1) {
+    console.log(`Selected second option as fallback in test mode: ${element.options[1].text}`);
+    element.selectedIndex = 1;
+    return;
+  }
+
+  // Last resort: just pick the first option
+  if (element.options.length > 0) {
+    console.log(`Selected first option as last resort in test mode: ${element.options[0].text}`);
+    element.selectedIndex = 0;
   }
 };
 

@@ -6,7 +6,7 @@ export * from "./file";
 export * from "./select";
 
 import type { Field } from "@extension/shared";
-import { detectCheckboxFields, detectRadioFields } from "./checkable";
+import { detectCheckableFields } from "./checkable";
 import { detectFileFields } from "./file";
 import { detectSelectFields } from "./select";
 import { detectTextField } from "./text";
@@ -59,14 +59,9 @@ export const detectFields = async (container: HTMLElement, testMode: boolean = f
   baseIndex += selectFields.length;
 
   // Process checkbox fields
-  const checkboxFields = await detectCheckboxFields(formElements, baseIndex, testMode);
-  fields.push(...checkboxFields);
-  baseIndex += checkboxFields.length;
-
-  // Process radio fields (groups radios with same name)
-  const radioFields = await detectRadioFields(formElements, baseIndex, testMode);
-  fields.push(...radioFields);
-  baseIndex += radioFields.length;
+  const checkableFields = await detectCheckableFields(formElements, baseIndex, testMode);
+  fields.push(...checkableFields);
+  baseIndex += checkableFields.length;
 
   // Process file inputs
   const fileFields = await detectFileFields(formElements, baseIndex, testMode);
