@@ -200,7 +200,35 @@ export const updateTextField = async (element: HTMLElement, value: string): Prom
     let inputType = "text";
     let normalizedValue = value;
 
-    if (element instanceof HTMLInputElement) {
+    // Special handling for textareas
+    if (element instanceof HTMLTextAreaElement) {
+      console.log("Handling textarea element specifically");
+      // Set value directly and dispatch events
+      element.value = normalizedValue;
+      dispatchEvent(element, "input");
+      dispatchEvent(element, "change");
+
+      // Additionally try native events - some frameworks need this
+      try {
+        const inputEvent = new InputEvent("input", { bubbles: true, cancelable: true });
+        element.dispatchEvent(inputEvent);
+
+        const changeEvent = new Event("change", { bubbles: true, cancelable: true });
+        element.dispatchEvent(changeEvent);
+      } catch (e) {
+        console.debug("Native event dispatch error:", e);
+      }
+
+      // If the value didn't set, try a secondary approach
+      if (element.value !== normalizedValue) {
+        // For stubborn textareas, try with selection approach
+        element.focus();
+        element.select();
+        document.execCommand("insertText", false, normalizedValue);
+      }
+
+      return;
+    } else if (element instanceof HTMLInputElement) {
       inputType = element.type;
 
       // Format value based on input type
@@ -346,6 +374,20 @@ export const updateTextField = async (element: HTMLElement, value: string): Prom
       }
     } catch (fallbackError) {
       console.error("Even fallback approach failed:", fallbackError);
+
+      // Final attempt for textareas
+      if (element instanceof HTMLTextAreaElement) {
+        try {
+          console.log("Final attempt for textarea");
+          element.focus();
+          element.value = value;
+          // Force blur and focus to trigger change detection
+          element.blur();
+          element.focus();
+        } catch (e) {
+          console.error("All textarea update attempts failed:", e);
+        }
+      }
     }
   }
 };

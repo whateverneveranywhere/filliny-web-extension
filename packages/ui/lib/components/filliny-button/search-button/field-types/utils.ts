@@ -92,6 +92,19 @@ export const simulateTyping = async (element: HTMLElement, value: string): Promi
     // Focus the element
     element.focus();
 
+    // Special handling for textareas to ensure they're properly focused
+    const isTextarea = element instanceof HTMLTextAreaElement;
+    if (isTextarea) {
+      // For textareas, we need to ensure we have focus and selection
+      try {
+        element.focus();
+        // Select all existing text first
+        element.select();
+      } catch (e) {
+        console.debug("Textarea focus/select error:", e);
+      }
+    }
+
     // Start composition (for IME-aware applications)
     // Use CustomEvent for composition events with data
     try {
@@ -109,6 +122,20 @@ export const simulateTyping = async (element: HTMLElement, value: string): Promi
     // Method 1: Direct property assignment
     if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
       element.value = value;
+
+      // For textareas, immediately dispatch events after setting value
+      if (isTextarea) {
+        dispatchEvent(element, "input");
+        dispatchEvent(element, "change");
+
+        // Also try with native event constructors
+        try {
+          element.dispatchEvent(new InputEvent("input", { bubbles: true, cancelable: true }));
+          element.dispatchEvent(new Event("change", { bubbles: true, cancelable: true }));
+        } catch (e) {
+          console.debug("Native event creation failed:", e);
+        }
+      }
     } else if ("value" in element) {
       (element as { value: string }).value = value;
     } else if (element.isContentEditable) {
@@ -220,8 +247,25 @@ export const simulateTyping = async (element: HTMLElement, value: string): Promi
     console.error("Error simulating typing:", error);
   } finally {
     // No delay before blurring to maximize speed
-    // Only blur non-textarea elements to avoid losing focus effects
-    if (!(element instanceof HTMLTextAreaElement)) {
+    // For textareas, we need to ensure we dispatch blur and focus events
+    // to trigger validation and change detection in frameworks
+    if (element instanceof HTMLTextAreaElement) {
+      try {
+        // Verify the value was set
+        if (element.value !== value) {
+          console.log("Textarea value not set correctly, trying final approach");
+          element.value = value;
+          dispatchEvent(element, "input");
+          dispatchEvent(element, "change");
+        }
+
+        // Some frameworks need blur+focus to detect changes
+        element.blur();
+        element.focus();
+      } catch (e) {
+        console.debug("Textarea finalization error:", e);
+      }
+    } else if (!(element instanceof HTMLTextAreaElement)) {
       element.blur();
     }
   }
