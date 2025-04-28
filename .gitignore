@@ -1,5 +1,6 @@
 # dependencies
 **/node_modules
+**/.pnpm-store
 
 # testing
 **/coverage
@@ -24,3 +25,4 @@ tsconfig.tsbuildinfo
 
 # compiled
 **/tailwind-output.css
+
