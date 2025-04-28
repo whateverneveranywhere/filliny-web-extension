@@ -79,6 +79,7 @@ export const getMatchingWebsite = (websites: DTOProfileFillingForm["fillingWebsi
 interface ConfigEntry {
   cookieName: string;
   baseURL: string;
+  webappEnv: WebappEnvs;
 }
 
 // Typed config object
@@ -86,14 +87,17 @@ const config: Record<WebappEnvs, ConfigEntry> = {
   dev: {
     cookieName: "authjs.session-token",
     baseURL: "http://localhost:3000",
+    webappEnv: WebappEnvs.DEV,
   },
   preview: {
     cookieName: "__Secure-authjs.session-token",
     baseURL: "https://dev.filliny-app.pages.dev",
+    webappEnv: WebappEnvs.PREVIEW,
   },
   prod: {
     cookieName: "__Secure-authjs.session-token",
     baseURL: "https://filliny.io",
+    webappEnv: WebappEnvs.PROD,
   },
 };
 
