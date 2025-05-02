@@ -17,10 +17,14 @@ const config = getConfig();
 const baseExampleURL = config.baseURL;
 
 // Separate component for recommended websites section
-const RecommendedWebsites = ({ onWebsiteSelect }: { onWebsiteSelect: (value: string) => void }) => {
+const RecommendedWebsites = ({
+  onWebsiteSelect,
+  hasReachedLimit,
+}: {
+  onWebsiteSelect: (value: string) => void;
+  hasReachedLimit: boolean;
+}) => {
   const { data: recommendedWebsites, isLoading } = useSuggestedWebsites();
-  const { fields } = useFieldArray({ name: "fillingWebsites" });
-  const { hasReachedLimit } = usePlanLimits();
 
   if (isLoading) {
     return <span className="filliny-text-muted-foreground">Loading recommendations...</span>;
@@ -40,7 +44,7 @@ const RecommendedWebsites = ({ onWebsiteSelect }: { onWebsiteSelect: (value: str
                 variant="outline"
                 className={cn(
                   "filliny-flex filliny-items-center filliny-gap-1",
-                  hasReachedLimit(fields.length)
+                  hasReachedLimit
                     ? "filliny-cursor-not-allowed filliny-opacity-50"
                     : "filliny-cursor-pointer hover:filliny-bg-accent",
                 )}
@@ -55,7 +59,7 @@ const RecommendedWebsites = ({ onWebsiteSelect }: { onWebsiteSelect: (value: str
                 {item.label}
               </Badge>
             </TooltipTrigger>
-            {hasReachedLimit(fields.length) && (
+            {hasReachedLimit && (
               <TooltipContent>
                 <p>Upgrade your plan to add more websites</p>
               </TooltipContent>
@@ -130,7 +134,7 @@ function StepperForm1() {
       <ScrollArea className="filliny-w-full">
         <div className="filliny-flex filliny-items-center filliny-gap-2 filliny-pb-3">
           <span className="filliny-whitespace-nowrap filliny-font-medium">Recommended websites:</span>
-          <RecommendedWebsites onWebsiteSelect={handleWebsiteSelect} />
+          <RecommendedWebsites onWebsiteSelect={handleWebsiteSelect} hasReachedLimit={websitesReachedLimit} />
         </div>
         <ScrollBar orientation="horizontal" />
       </ScrollArea>
