@@ -1,6 +1,6 @@
 import { createRoot } from "react-dom/client";
 import { FormsOverlay } from "./FormsOverlay";
-import { detectFields, detectFormLikeContainers } from "./detectionHelpers";
+import { detectFields, detectFormLikeContainers, openCrossOriginIframeInNewTabAndAlert } from "./detectionHelpers";
 import { addGlowingBorder, findOrCreateShadowContainer, getFormPosition } from "./overlayUtils";
 import type { HighlightFormsOptions } from "./types";
 
@@ -18,7 +18,7 @@ export const highlightForms = async ({
   // Use our new form detection logic
   const formLikeContainers = await detectFormLikeContainers();
   if (formLikeContainers.length === 0) {
-    alert("No form found");
+    openCrossOriginIframeInNewTabAndAlert();
     return;
   }
 
