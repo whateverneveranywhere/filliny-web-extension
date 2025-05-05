@@ -16,14 +16,14 @@ function init() {
   const root = createRoot(appContainer);
 
   root.render(
-    <PostHogProvider>
-      <QueryClientProvider client={queryClient}>
+    <QueryClientProvider client={queryClient}>
+      <PostHogProvider>
         <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
           <SidePanel />
           <Toaster />
         </ThemeProvider>
-      </QueryClientProvider>
-    </PostHogProvider>,
+      </PostHogProvider>
+    </QueryClientProvider>,
   );
 }
 
