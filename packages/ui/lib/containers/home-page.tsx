@@ -10,7 +10,7 @@ import {
 import type { DTOProfileFillingForm } from "@extension/storage";
 import { profileStrorage } from "@extension/storage";
 
-import { Alert, AlertDescription, AlertTitle, Loading, NoTokensAlert } from "../components";
+import { Loading, NoTokensAlert, LoadingPage } from "../components";
 import { QuickAddWebsiteToProfile } from "./quick-add-website";
 import { ActiveProfileWebsitePreview } from "./active-profile-website-preview";
 import { PageLayout } from "../layout";
@@ -149,13 +149,7 @@ const HomePage = () => {
               />
             )
           ) : (
-            <Alert variant="destructive">
-              <AlertTitle className="filliny-text-lg">Error</AlertTitle>
-              <AlertDescription>
-                URL is not valid <br />
-                Detected URL: {activeTabUrl}
-              </AlertDescription>
-            </Alert>
+            <LoadingPage message="Waiting for the page to fully load..." />
           )}
         </div>
       </>
