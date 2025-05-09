@@ -97,6 +97,8 @@ export const useActiveTabUrl = ({ websites, mode = "both" }: UseActiveTabUrlProp
   useEffect(() => {
     if (mode !== "currentPage") {
       const tabListeners = getTabListeners();
+
+      // Don't debounce - we want immediate URL detection
       const handleTabUpdate = () => updateUrl();
 
       tabListeners.onActivated(handleTabUpdate);

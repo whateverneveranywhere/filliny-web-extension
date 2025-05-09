@@ -12,6 +12,9 @@ export const useProfilesListQuery = () =>
   useQuery({
     queryKey: ["profilesList"],
     queryFn: getProfilesListService,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes
+    refetchOnWindowFocus: false,
   });
 
 export const useSuggestedWebsites = () => {
@@ -26,6 +29,9 @@ export const useFillingProfileById = (id: string) => {
     queryKey: ["fillingProfileById", id],
     queryFn: () => getFillingProfileByIdService(id),
     enabled: !!id,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes
+    refetchOnWindowFocus: false,
   });
 };
 

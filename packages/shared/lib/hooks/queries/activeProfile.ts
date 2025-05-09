@@ -1,4 +1,4 @@
-import { useMemo, useEffect } from "react";
+import { useMemo } from "react";
 import { useStorage } from "../../hooks/index.js";
 import { profileStrorage, type DTOFillingProfileItem } from "@extension/storage";
 import { useProfilesListQuery, useFillingProfileById } from "./profileQueries.js";
@@ -15,16 +15,11 @@ export const useActiveProfile = () => {
     [profiles, defaultStorageProfile],
   );
 
+  // Only fetch profile by ID when we have a valid ID
   const { data: activeProfile } = useFillingProfileById(activeProfileId);
 
-  // Set the default profile in storage whenever it changes
-  useEffect(() => {
-    if (!profiles?.length) {
-      profileStrorage.setDefaultProfile(undefined);
-    } else if (activeProfile) {
-      profileStrorage.setDefaultProfile(activeProfile);
-    }
-  }, [activeProfile, profiles]);
+  // We don't need to set the profile in storage here since it's already done in the home-page component
+  // This avoids duplicate storage operations and potential race conditions
 
   return {
     activeProfile,
