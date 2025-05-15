@@ -15,30 +15,45 @@ function checkPinStatus() {
       // If pin status changed, dispatch event
       if (isExtensionPinned !== newPinStatus) {
         isExtensionPinned = newPinStatus;
-        // Notify all tabs about the pin status change
-        chrome.tabs.query({}, tabs => {
-          tabs.forEach(tab => {
-            if (tab.id) {
-              chrome.scripting
-                .executeScript({
-                  target: { tabId: tab.id },
-                  func: pinned => {
-                    window.dispatchEvent(new CustomEvent("extensionPinned", { detail: { pinned } }));
-                    console.log("[Injected Script] Dispatched extensionPinned event with status:", pinned);
-                  },
-                  args: [isExtensionPinned],
-                })
-                .catch(err => console.error("[Background] Failed to execute pin status script:", err));
-            }
-          });
-        });
+        notifyTabsAboutPinStatus();
       }
     });
   }
 }
 
-// Check pin status periodically (every 2 seconds)
-setInterval(checkPinStatus, 2000);
+// Function to notify all tabs about the current pin status
+function notifyTabsAboutPinStatus() {
+  chrome.tabs.query({}, tabs => {
+    tabs.forEach(tab => {
+      if (tab.id) {
+        chrome.scripting
+          .executeScript({
+            target: { tabId: tab.id },
+            func: pinned => {
+              window.dispatchEvent(new CustomEvent("extensionPinned", { detail: { pinned } }));
+              console.log("[Injected Script] Dispatched extensionPinned event with status:", pinned);
+            },
+            args: [isExtensionPinned],
+          })
+          .catch(err => console.error("[Background] Failed to execute pin status script:", err));
+      }
+    });
+  });
+}
+
+// Check pin status initially
+checkPinStatus();
+
+// Check pin status whenever an external message checks it
+// This removes the need for periodic polling with setInterval
+
+// Also check pin status when browser window gets focus
+// This is a common time when users might have changed the extension's pin status
+chrome.windows.onFocusChanged.addListener(windowId => {
+  if (windowId !== chrome.windows.WINDOW_ID_NONE) {
+    checkPinStatus();
+  }
+});
 
 // Store the current environment in storage for consistent access across contexts
 function storeEnvironmentInStorage() {
@@ -128,11 +143,14 @@ chrome.runtime.onMessageExternal.addListener((request, sender, sendResponse) => 
 
   // Handle extension detection request
   if (request.message === "areYouThere") {
-    // If checkPinned is requested, check the pin status
-    if (request.checkPinned && chrome.action && chrome.action.getUserSettings) {
+    // Always check pin status when detected, to keep it updated
+    if (chrome.action && chrome.action.getUserSettings) {
       chrome.action.getUserSettings(settings => {
         isExtensionPinned = settings.isOnToolbar;
         sendResponse({ installed: true, pinned: isExtensionPinned });
+
+        // If pin status has changed, notify all tabs
+        checkPinStatus();
       });
       return true; // Keep message channel open for async response
     } else {
@@ -145,86 +163,102 @@ chrome.runtime.onMessageExternal.addListener((request, sender, sendResponse) => 
   return false;
 });
 
+// Open the installation URL in a new tab or focus existing one
+function handleInstallationRedirect() {
+  const configToUse = getConfig();
+  const installUrl = `${configToUse.baseURL}/install-extension`;
+  console.log("[Background] Installation URL:", installUrl);
+
+  // Promise-based version of chrome.tabs.query
+  return new Promise<void>(resolve => {
+    chrome.tabs.query({}, tabs => {
+      const existingTab = tabs.find(tab => tab.url?.includes("/install-extension"));
+
+      if (existingTab && existingTab.id) {
+        // Tab exists, focus on it
+        console.log("[Background] Found existing install tab, focusing it");
+        chrome.tabs.update(existingTab.id, { active: true });
+        chrome.windows.update(existingTab.windowId, { focused: true });
+
+        // Notify the website when the tab is ready
+        chrome.tabs.onUpdated.addListener(function listener(tabId, changeInfo) {
+          if (tabId === existingTab.id && changeInfo.status === "complete") {
+            chrome.tabs.onUpdated.removeListener(listener);
+            notifyTabAboutExtensionInstallation(existingTab.id);
+            resolve();
+          }
+        });
+      } else {
+        // No existing tab, create a new one
+        console.log("[Background] Creating new install tab");
+        chrome.tabs.create({ url: installUrl }, newTab => {
+          // Wait for the tab to load, then notify it
+          if (newTab.id) {
+            chrome.tabs.onUpdated.addListener(function listener(tabId, changeInfo) {
+              if (tabId === newTab.id && changeInfo.status === "complete") {
+                chrome.tabs.onUpdated.removeListener(listener);
+                notifyTabAboutExtensionInstallation(newTab.id);
+                resolve();
+              }
+            });
+          } else {
+            resolve(); // Resolve anyway if tab creation failed
+          }
+        });
+      }
+    });
+  });
+}
+
+// Function to notify a tab about extension installation
+function notifyTabAboutExtensionInstallation(tabId: number) {
+  chrome.tabs.sendMessage(tabId, { type: "EXTENSION_INSTALLED" });
+
+  // Execute script to dispatch the event directly in the page context
+  chrome.scripting
+    .executeScript({
+      target: { tabId },
+      func: () => {
+        window.dispatchEvent(new CustomEvent("extensionInstalled"));
+        console.log("[Injected Script] Dispatched extensionInstalled event");
+      },
+    })
+    .catch(err => console.error("[Background] Failed to execute script:", err));
+}
+
 // Handle extension installation
-chrome.runtime.onInstalled.addListener(details => {
+chrome.runtime.onInstalled.addListener(async details => {
   if (details.reason === "install") {
-    // Ensure environment is stored first
+    // Ensure environment is stored
     storeEnvironmentInStorage();
 
     // Set the uninstall URL to redirect to feedback/contact page
     const configToUse = getConfig();
     const uninstallUrl = `${configToUse.baseURL}/contact?reason=uninstall`;
-    chrome.runtime.setUninstallURL(uninstallUrl, () => {
-      if (chrome.runtime.lastError) {
-        console.error("[Background] Failed to set uninstall URL:", chrome.runtime.lastError);
-      } else {
-        console.log("[Background] Uninstall URL set successfully:", uninstallUrl);
-      }
-    });
 
-    // Use a short timeout to ensure storage has time to be set
-    setTimeout(() => {
-      // Get environment config directly - our new getConfig is smart enough to handle everything
-      const configToUse = getConfig();
-      console.log("[Background] Using environment config:", configToUse.baseURL);
-
-      const installUrl = `${configToUse.baseURL}/install-extension`;
-      console.log("[Background] Installation URL:", installUrl);
-
-      // Check if a tab with this URL already exists
-      chrome.tabs.query({}, tabs => {
-        const existingTab = tabs.find(tab => tab.url?.includes("/install-extension"));
-
-        if (existingTab && existingTab.id) {
-          // Tab exists, focus on it
-          console.log("[Background] Found existing install tab, focusing it");
-          chrome.tabs.update(existingTab.id, { active: true });
-          chrome.windows.update(existingTab.windowId, { focused: true });
-
-          // Notify the website in this tab that the extension is installed
-          setTimeout(() => {
-            if (existingTab.id) {
-              chrome.tabs.sendMessage(existingTab.id, { type: "EXTENSION_INSTALLED" });
-
-              // Execute script to dispatch the event directly in the page context
-              chrome.scripting
-                .executeScript({
-                  target: { tabId: existingTab.id },
-                  func: () => {
-                    window.dispatchEvent(new CustomEvent("extensionInstalled"));
-                    console.log("[Injected Script] Dispatched extensionInstalled event");
-                  },
-                })
-                .catch(err => console.error("[Background] Failed to execute script:", err));
-            }
-          }, 500); // Give the page time to load
-        } else {
-          // No existing tab, create a new one
-          console.log("[Background] Creating new install tab");
-          chrome.tabs.create({ url: installUrl }, newTab => {
-            // Wait for the tab to load, then notify it
-            if (newTab.id) {
-              chrome.tabs.onUpdated.addListener(function listener(tabId, changeInfo) {
-                if (tabId === newTab.id && changeInfo.status === "complete") {
-                  chrome.tabs.onUpdated.removeListener(listener);
-
-                  // Execute script to dispatch the event
-                  chrome.scripting
-                    .executeScript({
-                      target: { tabId: newTab.id },
-                      func: () => {
-                        window.dispatchEvent(new CustomEvent("extensionInstalled"));
-                        console.log("[Injected Script] Dispatched extensionInstalled event");
-                      },
-                    })
-                    .catch(err => console.error("[Background] Failed to execute script:", err));
-                }
-              });
-            }
-          });
-        }
+    try {
+      await new Promise<void>((resolve, reject) => {
+        chrome.runtime.setUninstallURL(uninstallUrl, () => {
+          if (chrome.runtime.lastError) {
+            console.error("[Background] Failed to set uninstall URL:", chrome.runtime.lastError);
+            reject(chrome.runtime.lastError);
+          } else {
+            console.log("[Background] Uninstall URL set successfully:", uninstallUrl);
+            resolve();
+          }
+        });
       });
-    }, 100); // Small delay to ensure storage has time to be set
+
+      // Handle installation redirect after environment is stored
+      chrome.storage.local.get(["webapp_env"], async () => {
+        if (chrome.runtime.lastError) {
+          console.error("[Background] Error getting environment:", chrome.runtime.lastError);
+        }
+        await handleInstallationRedirect();
+      });
+    } catch (error) {
+      console.error("[Background] Error during installation setup:", error);
+    }
   }
 });
 
