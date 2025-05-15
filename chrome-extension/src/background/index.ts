@@ -4,6 +4,42 @@ import "webextension-polyfill";
 // Add this near the top of the file, after imports
 setupAuthTokenListener();
 
+// Track extension pinning status
+let isExtensionPinned = false;
+
+// Check if extension is pinned by checking action visibility
+function checkPinStatus() {
+  if (chrome.action && chrome.action.getUserSettings) {
+    chrome.action.getUserSettings(settings => {
+      const newPinStatus = settings.isOnToolbar;
+      // If pin status changed, dispatch event
+      if (isExtensionPinned !== newPinStatus) {
+        isExtensionPinned = newPinStatus;
+        // Notify all tabs about the pin status change
+        chrome.tabs.query({}, tabs => {
+          tabs.forEach(tab => {
+            if (tab.id) {
+              chrome.scripting
+                .executeScript({
+                  target: { tabId: tab.id },
+                  func: pinned => {
+                    window.dispatchEvent(new CustomEvent("extensionPinned", { detail: { pinned } }));
+                    console.log("[Injected Script] Dispatched extensionPinned event with status:", pinned);
+                  },
+                  args: [isExtensionPinned],
+                })
+                .catch(err => console.error("[Background] Failed to execute pin status script:", err));
+            }
+          });
+        });
+      }
+    });
+  }
+}
+
+// Check pin status periodically (every 2 seconds)
+setInterval(checkPinStatus, 2000);
+
 // Store the current environment in storage for consistent access across contexts
 function storeEnvironmentInStorage() {
   try {
@@ -86,11 +122,45 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   return handleAction(request, sender, sendResponse);
 });
 
+// Listen for external messages from the website
+chrome.runtime.onMessageExternal.addListener((request, sender, sendResponse) => {
+  console.log("[Background] External message received:", request, "from:", sender);
+
+  // Handle extension detection request
+  if (request.message === "areYouThere") {
+    // If checkPinned is requested, check the pin status
+    if (request.checkPinned && chrome.action && chrome.action.getUserSettings) {
+      chrome.action.getUserSettings(settings => {
+        isExtensionPinned = settings.isOnToolbar;
+        sendResponse({ installed: true, pinned: isExtensionPinned });
+      });
+      return true; // Keep message channel open for async response
+    } else {
+      // Basic detection without pin status
+      sendResponse({ installed: true, pinned: isExtensionPinned });
+    }
+    return true;
+  }
+
+  return false;
+});
+
 // Handle extension installation
 chrome.runtime.onInstalled.addListener(details => {
   if (details.reason === "install") {
     // Ensure environment is stored first
     storeEnvironmentInStorage();
+
+    // Set the uninstall URL to redirect to feedback/contact page
+    const configToUse = getConfig();
+    const uninstallUrl = `${configToUse.baseURL}/contact?reason=uninstall`;
+    chrome.runtime.setUninstallURL(uninstallUrl, () => {
+      if (chrome.runtime.lastError) {
+        console.error("[Background] Failed to set uninstall URL:", chrome.runtime.lastError);
+      } else {
+        console.log("[Background] Uninstall URL set successfully:", uninstallUrl);
+      }
+    });
 
     // Use a short timeout to ensure storage has time to be set
     setTimeout(() => {
@@ -98,9 +168,61 @@ chrome.runtime.onInstalled.addListener(details => {
       const configToUse = getConfig();
       console.log("[Background] Using environment config:", configToUse.baseURL);
 
-      console.log("[Background] Opening install URL:", `${configToUse.baseURL}/auth/sign-in`);
-      chrome.tabs.create({
-        url: `${configToUse.baseURL}/auth/sign-in`,
+      const installUrl = `${configToUse.baseURL}/install-extension`;
+      console.log("[Background] Installation URL:", installUrl);
+
+      // Check if a tab with this URL already exists
+      chrome.tabs.query({}, tabs => {
+        const existingTab = tabs.find(tab => tab.url?.includes("/install-extension"));
+
+        if (existingTab && existingTab.id) {
+          // Tab exists, focus on it
+          console.log("[Background] Found existing install tab, focusing it");
+          chrome.tabs.update(existingTab.id, { active: true });
+          chrome.windows.update(existingTab.windowId, { focused: true });
+
+          // Notify the website in this tab that the extension is installed
+          setTimeout(() => {
+            if (existingTab.id) {
+              chrome.tabs.sendMessage(existingTab.id, { type: "EXTENSION_INSTALLED" });
+
+              // Execute script to dispatch the event directly in the page context
+              chrome.scripting
+                .executeScript({
+                  target: { tabId: existingTab.id },
+                  func: () => {
+                    window.dispatchEvent(new CustomEvent("extensionInstalled"));
+                    console.log("[Injected Script] Dispatched extensionInstalled event");
+                  },
+                })
+                .catch(err => console.error("[Background] Failed to execute script:", err));
+            }
+          }, 500); // Give the page time to load
+        } else {
+          // No existing tab, create a new one
+          console.log("[Background] Creating new install tab");
+          chrome.tabs.create({ url: installUrl }, newTab => {
+            // Wait for the tab to load, then notify it
+            if (newTab.id) {
+              chrome.tabs.onUpdated.addListener(function listener(tabId, changeInfo) {
+                if (tabId === newTab.id && changeInfo.status === "complete") {
+                  chrome.tabs.onUpdated.removeListener(listener);
+
+                  // Execute script to dispatch the event
+                  chrome.scripting
+                    .executeScript({
+                      target: { tabId: newTab.id },
+                      func: () => {
+                        window.dispatchEvent(new CustomEvent("extensionInstalled"));
+                        console.log("[Injected Script] Dispatched extensionInstalled event");
+                      },
+                    })
+                    .catch(err => console.error("[Background] Failed to execute script:", err));
+                }
+              });
+            }
+          });
+        }
       });
     }, 100); // Small delay to ensure storage has time to be set
   }

@@ -62,7 +62,7 @@ const manifest = {
   version: packageJson.version,
   description: "__MSG_extensionDescription__",
   host_permissions: ["<all_urls>"],
-  permissions: ["storage", "tabs", "sidePanel", "cookies"],
+  permissions: ["storage", "tabs", "sidePanel", "cookies", "scripting"],
   background: {
     service_worker: "background.js",
     type: "module",
@@ -78,6 +78,7 @@ const manifest = {
     {
       matches: ["http://*/*", "https://*/*", "<all_urls>"],
       js: ["content/index.iife.js"],
+      run_at: "document_start",
     },
     {
       matches: ["http://*/*", "https://*/*", "<all_urls>"],
@@ -100,6 +101,12 @@ const manifest = {
   ],
   side_panel: {
     default_path: "side-panel/index.html",
+  },
+  externally_connectable: {
+    matches: [
+      "https://*.filliny.io/*", // Production domain
+      ...(env === WebappEnvs.DEV ? ["http://localhost:*/*"] : []), // Local development only in DEV
+    ],
   },
 } satisfies chrome.runtime.ManifestV3;
 
