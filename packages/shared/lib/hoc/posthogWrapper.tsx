@@ -26,9 +26,15 @@ function PostHogProvider({
         capture_pageview: true,
         capture_performance: true,
         capture_exceptions: true,
-        capture_dead_clicks: true,
-        capture_pageleave: true,
-        capture_heatmaps: true,
+        // Disable features that load remote scripts
+        loaded: ph => {
+          // Prevent loading session recording script
+          ph.opt_out_capturing();
+        },
+        disable_session_recording: true,
+        autocapture: false,
+        capture_dead_clicks: false,
+        capture_heatmaps: false,
       });
     }
   }, [publicKey, host]);
