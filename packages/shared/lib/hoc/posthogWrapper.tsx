@@ -23,18 +23,19 @@ function PostHogProvider({
     if (config.webappEnv === WebappEnvs.PROD) {
       posthog.init(publicKey, {
         api_host: host,
-        capture_pageview: true,
+        // Disable all features that load remote scripts
+        capture_pageview: false,
         capture_performance: true,
         capture_exceptions: true,
-        // Disable features that load remote scripts
+        disable_session_recording: true,
+        autocapture: true,
+        capture_dead_clicks: true,
+        capture_heatmaps: false,
         loaded: ph => {
-          // Prevent loading session recording script
+          // Prevent loading any remote scripts
           ph.opt_out_capturing();
         },
-        disable_session_recording: true,
-        autocapture: false,
-        capture_dead_clicks: false,
-        capture_heatmaps: false,
+        persistence: "localStorage",
       });
     }
   }, [publicKey, host]);
