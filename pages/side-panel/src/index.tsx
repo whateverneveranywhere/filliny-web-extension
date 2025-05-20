@@ -4,7 +4,6 @@ import "@extension/ui/lib/global.css";
 import SidePanel from "@src/SidePanel";
 import { ThemeProvider, Toaster } from "@extension/ui";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { PostHogProvider } from "@extension/shared/lib/hoc";
 
 const queryClient = new QueryClient();
 
@@ -17,12 +16,12 @@ function init() {
 
   root.render(
     <QueryClientProvider client={queryClient}>
-      <PostHogProvider>
+      <>
         <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
           <SidePanel />
           <Toaster />
         </ThemeProvider>
-      </PostHogProvider>
+      </>
     </QueryClientProvider>,
   );
 }
