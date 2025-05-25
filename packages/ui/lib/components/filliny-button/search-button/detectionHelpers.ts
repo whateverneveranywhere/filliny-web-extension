@@ -191,17 +191,14 @@ export const detectFormLikeContainers = async (): Promise<HTMLElement[]> => {
     '[class*="login-form"]',
     '[class*="registration"]',
   ];
-  console.log("[Filliny] Documents to scan:", documents.length);
   for (const doc of documents) {
     try {
       let bestContainer: HTMLElement | null = null;
       let maxFieldCount = 0;
       const formContainers = Array.from(doc.querySelectorAll<HTMLElement>(formContainerSelectors.join(",")));
-      console.log("[Filliny] Found form-like containers:", formContainers.length, formContainers);
       if (formContainers.length > 0) {
         for (const container of formContainers) {
           const fields = getFormFields(container);
-          console.log("[Filliny] Fields in container:", fields.length, container);
           if (fields.length > maxFieldCount) {
             maxFieldCount = fields.length;
             bestContainer = container;
@@ -210,7 +207,6 @@ export const detectFormLikeContainers = async (): Promise<HTMLElement[]> => {
       }
       if (!bestContainer || maxFieldCount === 0) {
         const allFields = getFormFields(doc.body);
-        console.log("[Filliny] Fallback: fields in body:", allFields.length);
         if (allFields.length >= 1) {
           const fieldParentMap = new Map<HTMLElement, HTMLElement[]>();
           allFields.forEach((field: HTMLElement) => {
@@ -237,7 +233,6 @@ export const detectFormLikeContainers = async (): Promise<HTMLElement[]> => {
         if (host.shadowRoot) {
           for (const selector of formContainerSelectors) {
             const shadowForms = queryShadowRoot(host.shadowRoot, selector);
-            console.log("[Filliny] Shadow root", host, "selector", selector, "found", shadowForms.length);
             for (const form of shadowForms) {
               const fields = getFormFields(form);
               if (fields.length > maxFieldCount) {
@@ -292,7 +287,6 @@ export const detectFormLikeContainers = async (): Promise<HTMLElement[]> => {
     });
     return [containerWithMostFields];
   }
-  console.log("[Filliny] Final bestContainers:", bestContainers.length, bestContainers);
   return bestContainers;
 };
 

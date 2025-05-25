@@ -2,6 +2,7 @@
  * Safely get a string value from potentially complex field values
  */
 import type { Field, FieldType } from "@extension/shared";
+import { getFieldLabel as getFieldLabelFromUtils } from "../fieldUtils";
 
 // Track used field IDs to ensure uniqueness
 const usedFieldIds = new Set<string>();
@@ -359,9 +360,7 @@ export const createBaseField = async (
   return field;
 };
 
-// This is a placeholder for getFieldLabel which needs to be imported from detectionHelpers
+// Use the robust implementation from fieldUtils.ts
 export const getFieldLabel = async (element: HTMLElement): Promise<string> => {
-  // This function will be properly implemented in detectionHelpers.ts
-  // For now, return a placeholder value
-  return element.getAttribute("placeholder") || element.getAttribute("aria-label") || "Field";
+  return getFieldLabelFromUtils(element);
 };
