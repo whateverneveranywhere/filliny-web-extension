@@ -12,7 +12,7 @@ const websiteSchema = z.object({
     z.object({
       websiteUrl: z.string().url().min(1, { message: "Website URL is required" }),
       isRootLoad: z.boolean().default(false),
-      fillingContext: z.string().max(500).default(""),
+      fillingContext: z.string().default(""),
     }),
   ),
 });

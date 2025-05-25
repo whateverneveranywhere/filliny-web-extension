@@ -5,7 +5,7 @@ import { WebsitePreviewCard } from "./WebsitePreviewCard";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { ScrollArea, ScrollBar } from "../ui/scroll-area";
-import { RHFShadcnCheckbox, RHFShadcnTextField, RHFShadcnTextarea } from "../RHF";
+import { RHFShadcnCheckbox, RHFShadcnTextField, RHFShadcnFileDrop } from "../RHF";
 import { getFaviconUrl, useSuggestedWebsites, usePlanLimits, getConfig } from "@extension/shared";
 import type { ProfileFormTypes } from "@/lib/containers/profile-form";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui";
@@ -83,10 +83,11 @@ export const WebsiteFormFields = ({ index }: { index: number }) => (
       name={`fillingWebsites[${index}].isRootLoad`}
       title="Load it in the entire website instead of the exact given URL"
     />
-    <RHFShadcnTextarea
+    <RHFShadcnFileDrop
       name={`fillingWebsites[${index}].fillingContext`}
       title="Filling context"
       placeholder="Enter any specific instructions or context for filling this website's forms"
+      rows={4}
     />
   </div>
 );
