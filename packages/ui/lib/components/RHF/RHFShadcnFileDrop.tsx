@@ -3,7 +3,8 @@ import { useCallback, useState } from "react";
 import { useController } from "react-hook-form";
 import { cn } from "@/lib/utils";
 import { Textarea } from "../ui/textarea";
-import { Loader2, Upload } from "lucide-react";
+import { Button } from "../ui/button";
+import { FileText, Loader2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import mammoth from "mammoth";
 import * as XLSX from "xlsx";
@@ -55,6 +56,7 @@ interface RHFShadcnFileDropProps {
   rows?: number;
   className?: string;
   accept?: string;
+  helperText?: string;
 }
 
 const RHFShadcnFileDrop = ({
@@ -64,9 +66,11 @@ const RHFShadcnFileDrop = ({
   rows = 4,
   className,
   accept = ".docx,.pdf,.xlsx,.txt,.csv,.rtf,.md",
+  helperText,
 }: RHFShadcnFileDropProps) => {
   const [isDragging, setIsDragging] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isHovering, setIsHovering] = useState(false);
 
   const {
     field,
@@ -178,6 +182,19 @@ const RHFShadcnFileDrop = ({
     [accept],
   );
 
+  const handleFileClick = useCallback(() => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = accept;
+    input.onchange = async e => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (file) {
+        await processFile(file);
+      }
+    };
+    input.click();
+  }, [accept]);
+
   return (
     <div className="filliny-space-y-2">
       {title && (
@@ -187,52 +204,80 @@ const RHFShadcnFileDrop = ({
       )}
       <div
         className={cn(
-          "filliny-relative filliny-rounded-md filliny-border filliny-border-input filliny-transition-all filliny-duration-200",
+          "filliny-relative filliny-rounded-md filliny-border filliny-border-input filliny-transition-all filliny-duration-300",
           isDragging && "filliny-border-primary filliny-bg-accent/50 filliny-scale-[1.02] filliny-shadow-lg",
+          isHovering && !isDragging && "filliny-border-muted-foreground filliny-shadow-sm",
           className,
         )}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
-        onDrop={handleDrop}>
+        onDrop={handleDrop}
+        onMouseEnter={() => setIsHovering(true)}
+        onMouseLeave={() => setIsHovering(false)}>
         <Textarea
           {...field}
           rows={rows}
           placeholder={placeholder}
           className={cn(
-            "filliny-min-h-[80px] filliny-w-full filliny-resize-none filliny-bg-transparent filliny-p-3 filliny-transition-opacity filliny-duration-200",
+            "filliny-min-h-[80px] filliny-w-full filliny-resize-none filliny-bg-transparent filliny-p-3 filliny-transition-opacity filliny-duration-300",
             isDragging && "filliny-opacity-50",
           )}
         />
         <div
           className={cn(
-            "filliny-absolute filliny-inset-0 filliny-flex filliny-items-center filliny-justify-center filliny-bg-background/80 filliny-backdrop-blur-sm filliny-transition-all filliny-duration-200",
+            "filliny-absolute filliny-inset-0 filliny-flex filliny-items-center filliny-justify-center filliny-bg-background/80 filliny-backdrop-blur-sm filliny-transition-all filliny-duration-300",
             isDragging
               ? "filliny-opacity-100 filliny-scale-100"
               : "filliny-opacity-0 filliny-scale-95 filliny-pointer-events-none",
           )}>
-          <div className="filliny-flex filliny-flex-col filliny-items-center filliny-gap-2 filliny-transform filliny-transition-transform filliny-duration-200 filliny-ease-out">
+          <div className="filliny-flex filliny-flex-col filliny-items-center filliny-gap-3 filliny-transform filliny-transition-transform filliny-duration-300 filliny-ease-out">
             <Upload
               className={cn(
-                "filliny-h-8 filliny-w-8 filliny-text-muted-foreground filliny-transition-all filliny-duration-200",
-                isDragging && "filliny-scale-110 filliny-text-primary",
+                "filliny-h-10 filliny-w-10 filliny-text-muted-foreground filliny-transition-all filliny-duration-300",
+                isDragging && "filliny-scale-125 filliny-text-primary filliny-animate-bounce",
               )}
             />
             <span
               className={cn(
-                "filliny-text-sm filliny-text-muted-foreground filliny-transition-colors filliny-duration-200",
-                isDragging && "filliny-text-primary",
+                "filliny-text-center filliny-text-sm filliny-text-muted-foreground filliny-transition-colors filliny-duration-300",
+                isDragging && "filliny-text-primary filliny-font-medium",
               )}>
-              Drop your file here
+              Drop your file here to extract content
+            </span>
+            <span className="filliny-text-xs filliny-text-muted-foreground filliny-max-w-[80%] filliny-text-center">
+              Supports {accept.replace(/\./g, "")} files
             </span>
           </div>
         </div>
         {isProcessing && (
-          <div className="filliny-absolute filliny-inset-0 filliny-flex filliny-items-center filliny-justify-center filliny-bg-background/80 filliny-backdrop-blur-sm filliny-animate-in filliny-fade-in filliny-duration-200">
-            <Loader2 className="filliny-h-8 filliny-w-8 filliny-animate-spin filliny-text-muted-foreground" />
+          <div className="filliny-absolute filliny-inset-0 filliny-flex filliny-flex-col filliny-gap-3 filliny-items-center filliny-justify-center filliny-bg-background/90 filliny-backdrop-blur-sm filliny-animate-in filliny-fade-in filliny-duration-300">
+            <Loader2 className="filliny-h-8 filliny-w-8 filliny-animate-spin filliny-text-primary" />
+            <span className="filliny-text-sm filliny-text-muted-foreground">Extracting content...</span>
           </div>
         )}
       </div>
-      {error && <p className="filliny-text-sm filliny-text-destructive">{error.message}</p>}
+      <div className="filliny-flex filliny-w-full filliny-justify-end filliny-animate-in filliny-fade-in-25 filliny-duration-300">
+        <Button type="button" size="sm" variant="outline" className={cn("filliny-w-full")} onClick={handleFileClick}>
+          <FileText className="filliny-h-4 filliny-w-4" />
+          Upload file
+        </Button>
+      </div>
+      {!error && (helperText || accept) && (
+        <div className="filliny-flex filliny-items-center filliny-mt-1 filliny-animate-in filliny-fade-in filliny-duration-300">
+          <p className="filliny-text-xs filliny-text-muted-foreground">
+            {helperText || `Drag and drop files (${accept.replace(/\./g, "")}) to automatically extract content.`}
+          </p>
+        </div>
+      )}
+
+      {error && (
+        <p className="filliny-text-sm filliny-text-destructive filliny-flex filliny-items-center filliny-gap-1 filliny-animate-in filliny-slide-in-from-bottom-2 filliny-duration-300">
+          <span className="filliny-rounded-full filliny-bg-destructive/20 filliny-p-0.5 filliny-flex filliny-items-center filliny-justify-center">
+            <span className="filliny-h-1 filliny-w-1 filliny-rounded-full filliny-bg-destructive" />
+          </span>
+          {error.message}
+        </p>
+      )}
     </div>
   );
 };
