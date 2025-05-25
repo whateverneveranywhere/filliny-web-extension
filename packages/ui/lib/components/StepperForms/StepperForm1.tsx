@@ -87,7 +87,7 @@ export const WebsiteFormFields = ({ index }: { index: number }) => (
       name={`fillingWebsites[${index}].fillingContext`}
       title="Filling context"
       placeholder="Enter any specific instructions or context for filling this website's forms"
-      rows={4}
+      rows={10}
     />
   </div>
 );

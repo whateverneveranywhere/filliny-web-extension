@@ -11,7 +11,7 @@ function StepperForm2() {
         <RHFShadcnFileDrop
           name="defaultFillingContext"
           title="Default Filling context"
-          rows={8}
+          rows={16}
           placeholder="Enter default instructions or context for filling forms"
         />
       </div>
