@@ -1,4 +1,4 @@
-import { dispatchEvent, createBaseField } from "./utils";
+import { findSelectOptions, isCustomSelect, createBaseField } from "./utils";
 import type { Field } from "@extension/shared";
 
 /**
@@ -282,830 +282,456 @@ export const handleTsselect = (element: HTMLSelectElement, normalizedValues: str
 };
 
 /**
- * Update a select element with the provided value(s)
+ * Update a select element with the provided value
  */
-export const updateSelect = (element: HTMLSelectElement, value: string | string[]): void => {
+export const updateSelect = (element: HTMLElement, value: string | string[] | unknown): void => {
   try {
-    const normalizedValues = Array.isArray(value) ? value : [value];
-    if (!normalizedValues.length || !normalizedValues[0]) {
-      // For test mode, we should still select a valid option even without a value
-      const isTestMode = element.hasAttribute("data-filliny-test-mode");
-      if (isTestMode && element.options.length > 0) {
-        console.log("Test mode with no value provided - selecting a sensible default option");
-        selectBestOptionInTestMode(element);
-        return;
-      }
-      return;
+    // Handle standard HTML select elements
+    if (element instanceof HTMLSelectElement) {
+      updateStandardSelect(element, value);
     }
-
-    // Create a proper element identifier with type safety
-    const elementName = element.name || "";
-    console.log(`Updating select ${element.id || elementName || "unnamed"} with value:`, normalizedValues);
-
-    // First check if this is a custom React or framework-based select
-    const isFormDropdown = element.classList.contains("form_dropdown");
-    const isFancySelect =
-      element.getAttribute("data-filliny-framework") === "fancy" ||
-      isFormDropdown ||
-      element.id?.includes("_select") ||
-      element.classList.contains("form-select") ||
-      element.parentElement?.classList.contains("select-wrapper");
-
-    // Enhanced detection for Exclaimer careers form React-Select components
-    const isExclaimerReactSelect =
-      window.location.href.includes("exclaimer.com/") &&
-      window.location.href.includes("/careers") &&
-      (element.getAttribute("id")?.includes("application_form") ||
-        element.classList.contains("hide-at-sm-block") ||
-        !!document.querySelector(".react-select__value-container"));
-
-    // For numeric IDs on Exclaimer forms, aggressively use Tsselect handler
-    const hasNumericValue = /^\d+$/.test(normalizedValues[0]);
-
-    // Try custom handler for React-like select components first
-    if (
-      isExclaimerReactSelect ||
-      hasNumericValue ||
-      element.getAttribute("role") === "combobox" ||
-      element.classList.contains("react-select__input") ||
-      element.getAttribute("id")?.includes("application_form") ||
-      isFormDropdown ||
-      isFancySelect
-    ) {
-      console.log("Prioritizing specialized handling for custom select component");
-      if (handleTsselect(element, normalizedValues)) {
-        return; // Successfully handled by Tsselect
-      }
-
-      // If that fails, try direct DOM manipulation for form_dropdown
-      if (isFormDropdown || isFancySelect) {
-        if (handleCustomFormDropdown(element, normalizedValues)) {
-          return; // Successfully handled custom dropdown
-        }
-      }
+    // Handle ARIA combobox/listbox elements
+    else if (element.getAttribute("role") === "combobox" || element.getAttribute("role") === "listbox") {
+      updateAriaSelect(element, value);
     }
-
-    // Continue with existing handlers if Tsselect failed or wasn't applicable
-    if (handleReactSelect()) return;
-
-    // Log available options for debugging
-    console.log(
-      "Available options:",
-      Array.from(element.options).map(opt => ({
-        value: opt.value,
-        text: opt.text,
-        selected: opt.selected,
-      })),
-    );
-
-    // Check for directly accessible React component container
-    const reactContainer =
-      element.closest('[class*="react-select"]') ||
-      document.querySelector(`[data-filliny-id="${element.id}"][class*="react-select"]`) ||
-      document.querySelector(`[class*="react-select"][id*="${element.id}"]`);
-
-    if (reactContainer || element.offsetParent === null || getComputedStyle(element).display === "none") {
-      console.log("Detected hidden select or React-Select container, trying specialized handling...");
-
-      // First attempt with React-Select handling
-      if (handleReactSelect()) {
-        console.log("React-Select handling was applied");
-        return;
-      }
-
-      // If React-Select handling didn't work, try other libraries
-      console.log("Trying other custom select libraries...");
+    // Handle custom select components
+    else if (isCustomSelect(element)) {
+      updateCustomSelect(element, value);
     }
-
-    // Try standard handling for native selects
-    // ----------------------------------------
-
-    // Try exact match first
-    let matched = false;
-    if (element.multiple) {
-      // Reset all options first for multiple selects
-      Array.from(element.options).forEach(option => {
-        option.selected = normalizedValues.includes(option.value);
-        if (normalizedValues.includes(option.value)) {
-          console.log(`Selected multiple option with value: ${option.value}`);
-          matched = true;
-        }
-      });
-    } else {
-      // For single selects, try direct value assignment
-      const valueToUse = normalizedValues[0];
-      console.log(`Attempting to set select value to: ${valueToUse}`);
-
-      // First try direct assignment
-      element.value = valueToUse;
-
-      // Check if value was successfully set
-      matched = Array.from(element.options).some(option => option.selected && option.value === valueToUse);
-      if (matched) {
-        console.log(`Successfully set select value to: ${valueToUse}`);
-      }
-    }
-
-    // If no match was found, try more flexible matching
-    if (!matched) {
-      console.log("No exact match found, trying flexible matching");
-      const lowerValues = normalizedValues.map(v => v.toLowerCase());
-
-      // Try more matching strategies
-      const matchAttempts = (option: HTMLOptionElement): boolean => {
-        // 1. Direct value matching (case insensitive)
-        const valueLower = option.value.toLowerCase();
-        if (lowerValues.includes(valueLower)) {
-          console.log(`Matched by lowercase value: ${option.value}`);
-          return true;
-        }
-
-        // 2. Option text matching
-        const textLower = option.text.toLowerCase();
-        if (lowerValues.includes(textLower)) {
-          console.log(`Matched by option text: ${option.text}`);
-          return true;
-        }
-
-        // 3. Numeric ID matching - convert both to numbers and compare
-        if (
-          normalizedValues.some(v => {
-            const numericValue = parseInt(v, 10);
-            const optionNumeric = parseInt(option.value, 10);
-            return !isNaN(numericValue) && !isNaN(optionNumeric) && numericValue === optionNumeric;
-          })
-        ) {
-          console.log(`Matched by numeric conversion: ${option.value}`);
-          return true;
-        }
-
-        // 4. Check if value is contained within option value or text (for partial matches)
-        if (lowerValues.some(v => valueLower.includes(v) || textLower.includes(v))) {
-          console.log(`Matched by partial content: Value=${option.value}, Text=${option.text}`);
-          return true;
-        }
-
-        // 5. Data attribute matching
-        const dataValue = option.getAttribute("data-value");
-        if (dataValue && normalizedValues.includes(dataValue)) {
-          console.log(`Matched by data-value attribute: ${dataValue}`);
-          return true;
-        }
-
-        // 6. Try more aggressive matching: check if option text contains any of the values
-        // This helps with lists where values are returned as "John Smith" but options are labeled as "Smith, John"
-        if (
-          lowerValues.some(v => {
-            // Split the value into words and check if option contains all words in any order
-            const words = v.split(/\s+/).filter(word => word.length > 2); // Only use words with 3+ chars
-            return words.length > 0 && words.every(word => textLower.includes(word));
-          })
-        ) {
-          console.log(`Matched by word presence in text: ${option.text}`);
-          return true;
-        }
-
-        // 7. Try finding a substring match between the value and the option
-        if (
-          lowerValues.some(v => {
-            // Check for at least a 3-character match that's not just digits
-            if (v.length >= 3 && !/^\d+$/.test(v)) {
-              return valueLower.includes(v) || textLower.includes(v);
-            }
-            return false;
-          })
-        ) {
-          console.log(`Matched by significant substring: ${option.text}`);
-          return true;
-        }
-
-        return false;
-      };
-
-      if (element.multiple) {
-        // For multiple selects, apply the matching logic to each option
-        Array.from(element.options).forEach(option => {
-          if (matchAttempts(option)) {
-            option.selected = true;
-            matched = true;
-          }
-        });
+    // Handle other elements that might be part of a select component
+    else {
+      // Try to find the actual select element that might be associated with this element
+      const associatedSelect = findAssociatedSelectElement(element);
+      if (associatedSelect) {
+        updateSelect(associatedSelect, value);
       } else {
-        // For single selects, find the first matching option
-        const matchingOption = Array.from(element.options).find(matchAttempts);
-        if (matchingOption) {
-          matchingOption.selected = true;
-          matched = true;
-          console.log(`Selected option: value=${matchingOption.value}, text=${matchingOption.text}`);
-        }
+        console.warn("Could not determine how to update this select-like element:", element);
       }
-    }
-
-    // If still no match, try selecting based on option index as a last resort
-    if (!matched && normalizedValues.length > 0) {
-      console.log("No match found with any strategy, trying index-based selection");
-
-      // Try to interpret the value as a numeric index
-      const indexValue = parseInt(normalizedValues[0], 10);
-      if (!isNaN(indexValue) && indexValue >= 0 && indexValue < element.options.length) {
-        element.selectedIndex = indexValue;
-        matched = true;
-        console.log(`Selected by index: ${indexValue}, value=${element.options[indexValue].value}`);
-      }
-      // If not a valid index, select first non-placeholder option as fallback
-      else if (element.options.length > 0) {
-        selectBestOptionInTestMode(element);
-        matched = true;
-      }
-    }
-
-    // If still no match but it's test mode, ensure we select something useful
-    if (!matched && element.hasAttribute("data-filliny-test-mode") && element.options.length > 0) {
-      console.log("Test mode with no match - selecting a valid option");
-      selectBestOptionInTestMode(element);
-      matched = true;
-    }
-
-    // Dispatch events
-    dispatchEvent(element, "change");
-
-    // Log final selection state
-    console.log("Final select value:", element.value);
-    console.log("Selected option index:", element.selectedIndex);
-    console.log("Selected option text:", element.options[element.selectedIndex]?.text || "None");
-
-    // Handle other common select libraries
-    // ----------------------------------------
-
-    try {
-      // Try to determine if it's a hidden native select with custom UI
-      const isHidden =
-        element.offsetParent === null ||
-        getComputedStyle(element).display === "none" ||
-        element.style.visibility === "hidden";
-
-      if (isHidden) {
-        console.log("Select element is hidden, trying to handle custom UI...");
-
-        // Look for custom UI elements near the hidden select
-        const container = element.parentElement;
-        if (container) {
-          // Try clicking any visible replacement element
-          const customUi = container.querySelector<HTMLElement>(
-            '[class*="select"], [class*="dropdown"], [role="listbox"], [role="combobox"]',
-          );
-          if (customUi && customUi !== element) {
-            console.log("Found custom UI element, clicking to open dropdown");
-            customUi.click();
-
-            // Wait for dropdown to appear
-            setTimeout(() => {
-              // Find dropdown options
-              const options = document.querySelectorAll('[role="option"], [class*="dropdown-item"], [class*="option"]');
-              console.log("Found dropdown options:", options.length);
-
-              const valueToFind = normalizedValues[0].toLowerCase();
-              for (const option of Array.from(options)) {
-                const optionText = option.textContent?.toLowerCase() || "";
-                if (optionText.includes(valueToFind)) {
-                  console.log("Clicking matching option:", optionText);
-                  (option as HTMLElement).click();
-                  break;
-                }
-              }
-            }, 100);
-          }
-        }
-
-        // Special handling for career application forms
-        // Many career application forms use custom select UIs without clear identifiers
-        try {
-          // Look for form container with selects that might be part of job applications
-          const isCareerForm =
-            window.location.href.includes("career") ||
-            window.location.href.includes("job") ||
-            window.location.href.includes("application") ||
-            document.querySelector('[data-component-name*="Application"]') ||
-            document.querySelector('[id*="application-form"]') ||
-            document.querySelector('[class*="application-form"]');
-
-          if (isCareerForm) {
-            console.log("Career application form detected, applying specialized handling");
-
-            // Try to find interactive elements near our select
-            const formFieldContainer = element.closest(
-              '[class*="form-field"], [class*="form-group"], [class*="field-container"]',
-            );
-
-            if (formFieldContainer) {
-              // Try to find the dropdown trigger - common in application forms
-              const possibleTriggers = [
-                formFieldContainer.querySelector('[class*="select__control"]'),
-                formFieldContainer.querySelector('[class*="dropdown-toggle"]'),
-                formFieldContainer.querySelector('[role="combobox"]'),
-                formFieldContainer.querySelector("input[readonly]"),
-                formFieldContainer.querySelector("button"),
-                formFieldContainer.querySelector('div[tabindex="0"]'),
-                formFieldContainer.querySelector('[class*="control"]'),
-              ].filter(Boolean) as HTMLElement[];
-
-              if (possibleTriggers.length > 0) {
-                const trigger = possibleTriggers[0];
-                console.log("Found potential dropdown trigger in career form:", trigger);
-
-                // Click to open dropdown
-                trigger.click();
-
-                // Wait for dropdown to appear and try multiple selectors to find options
-                setTimeout(() => {
-                  // Common selectors for dropdown options in career forms
-                  const optionSelectors = [
-                    '[role="option"]',
-                    '[class*="option"]',
-                    '[class*="dropdown-item"]',
-                    '[class*="select-option"]',
-                    "li",
-                    'div[role="menuitem"]',
-                    // Search in portals and popups that might appear outside form
-                    'body > div[role="listbox"] [role="option"]',
-                    'body > div[class*="dropdown"] li',
-                    'body > div[class*="popup"] [role="option"]',
-                    '[id$="-list"] [role="option"]',
-                    '[id$="-popup"] li',
-                    '[id$="-dropdown"] [role="option"]',
-                  ];
-
-                  // Try each selector until we find options
-                  let allOptions: Element[] = [];
-
-                  for (const selector of optionSelectors) {
-                    const options = document.querySelectorAll(selector);
-                    if (options.length > 0) {
-                      allOptions = Array.from(options);
-                      console.log(`Found ${allOptions.length} dropdown options with selector: ${selector}`);
-                      break;
-                    }
-                  }
-
-                  if (allOptions.length > 0) {
-                    // Try to match options with our value
-                    const valueToFind = normalizedValues[0].toLowerCase();
-                    let matched = false;
-
-                    for (const option of allOptions) {
-                      const optionText = option.textContent?.toLowerCase().trim() || "";
-
-                      // Try multiple matching strategies
-                      if (
-                        optionText === valueToFind ||
-                        optionText.includes(valueToFind) ||
-                        valueToFind.includes(optionText) ||
-                        // Match by words
-                        valueToFind
-                          .split(/\s+/)
-                          .filter(w => w.length > 2)
-                          .every(word => optionText.includes(word))
-                      ) {
-                        console.log("Found matching option in career form dropdown:", optionText);
-                        (option as HTMLElement).click();
-                        matched = true;
-                        break;
-                      }
-                    }
-
-                    // If no match, select non-placeholder option
-                    if (!matched) {
-                      const nonPlaceholders = allOptions.filter(opt => {
-                        const text = opt.textContent?.toLowerCase() || "";
-                        return (
-                          !text.includes("select") &&
-                          !text.includes("choose") &&
-                          !text.includes("pick") &&
-                          text.length > 0 &&
-                          !text.includes("not") &&
-                          !(opt as HTMLElement).hasAttribute("disabled")
-                        );
-                      });
-
-                      if (nonPlaceholders.length > 0) {
-                        console.log("Selecting first valid option in career form dropdown");
-                        (nonPlaceholders[0] as HTMLElement).click();
-                      } else {
-                        // Click first option as last resort
-                        console.log("No suitable option found, clicking first option");
-                        (allOptions[0] as HTMLElement).click();
-                      }
-                    }
-                  } else {
-                    console.log("No dropdown options found in career form");
-                    // Click outside to close dropdown
-                    document.body.click();
-                  }
-                }, 150);
-              }
-            }
-          }
-        } catch (e) {
-          console.debug("Career form handling error:", e);
-        }
-      }
-
-      // Handle jQuery Select2
-      if (typeof (window as unknown as Record<string, unknown>).jQuery !== "undefined") {
-        const $ = (window as unknown as { jQuery: unknown }).jQuery;
-        // Note: We're using any here to avoid type errors with jQuery
-        // This is a necessary exception since we're integrating with external libraries
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        if ($ && typeof ($ as any).fn !== "undefined" && ($ as any).fn.select2) {
-          console.log("Detected Select2 library, applying specialized handling");
-          try {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const $select = ($ as any)(element);
-            if ($select.data && $select.data("select2")) {
-              console.log("Select2 instance found, updating value");
-              $select.val(normalizedValues[0]).trigger("change.select2");
-            }
-          } catch (e) {
-            console.debug("Select2 handling error:", e);
-          }
-        }
-      }
-
-      // Handle Exclaimer careers site specifically
-      if (window.location.href.includes("exclaimer.com") && window.location.href.includes("careers")) {
-        console.log("Detected Exclaimer careers site, applying specialized handling");
-
-        try {
-          // Find all Tsselect components on the page
-          const tsselectComponents = document.querySelectorAll('[data-component-name*="Tsselect"]');
-
-          if (tsselectComponents.length > 0) {
-            console.log(`Found ${tsselectComponents.length} Tsselect components on Exclaimer careers`);
-
-            // Try to associate our element with a Tsselect component
-            let targetComponent: Element | null = null;
-
-            // Look for a component related to our field
-            if (element.id) {
-              // Try by ID relation
-              targetComponent = document.querySelector(`[data-component-name*="Tsselect"][id*="${element.id}"]`);
-            }
-
-            // Try by label text if available
-            if (!targetComponent && element.labels && element.labels.length > 0) {
-              const labelText = element.labels[0].textContent?.trim().toLowerCase() || "";
-
-              if (labelText) {
-                // Find components that might be related to this label
-                Array.from(tsselectComponents).forEach(comp => {
-                  const compText = comp.textContent?.toLowerCase() || "";
-                  if (compText.includes(labelText) || labelText.includes(compText)) {
-                    targetComponent = comp;
-                  }
-                });
-              }
-            }
-
-            // If we found a component or use the first one as fallback
-            const componentToUse = targetComponent || tsselectComponents[0];
-
-            if (componentToUse) {
-              console.log("Using Tsselect component:", componentToUse);
-
-              // Click the component to open the dropdown
-              (componentToUse as HTMLElement).click();
-
-              // Wait for dropdown to appear
-              setTimeout(() => {
-                // Exclaimer uses a specific structure for dropdowns
-                const dropdownOptions = document.querySelectorAll('div[role="option"], [class*="ts-option"]');
-
-                if (dropdownOptions.length > 0) {
-                  console.log(`Found ${dropdownOptions.length} dropdown options`);
-
-                  // Try to find a matching option
-                  const valueToFind = normalizedValues[0].toLowerCase();
-                  let matched = false;
-
-                  for (const option of Array.from(dropdownOptions)) {
-                    const optionText = option.textContent?.toLowerCase().trim() || "";
-
-                    if (
-                      optionText === valueToFind ||
-                      optionText.includes(valueToFind) ||
-                      valueToFind.includes(optionText)
-                    ) {
-                      console.log("Clicking matching option:", optionText);
-                      (option as HTMLElement).click();
-                      matched = true;
-                      break;
-                    }
-                  }
-
-                  // If no match found, select a non-placeholder
-                  if (!matched) {
-                    const nonPlaceholders = Array.from(dropdownOptions).filter(opt => {
-                      const text = opt.textContent?.toLowerCase() || "";
-                      return (
-                        !text.includes("select") &&
-                        !text.includes("choose") &&
-                        !text.includes("prefer not") &&
-                        text.length > 0
-                      );
-                    });
-
-                    if (nonPlaceholders.length > 0) {
-                      console.log("Selecting first non-placeholder option:", nonPlaceholders[0]);
-                      (nonPlaceholders[0] as HTMLElement).click();
-                    } else {
-                      console.log("Falling back to first option");
-                      (dropdownOptions[0] as HTMLElement).click();
-                    }
-                  }
-                }
-              }, 200);
-            }
-          }
-        } catch (e) {
-          console.debug("Exclaimer careers handling error:", e);
-        }
-      }
-
-      // Handle Chosen library
-      if (
-        element.classList.contains("chosen-select") ||
-        element.nextElementSibling?.classList.contains("chosen-container")
-      ) {
-        console.log("Detected Chosen library, applying specialized handling");
-        try {
-          // Update the native select first
-          element.value = normalizedValues[0];
-
-          // Then trigger Chosen's update event
-          const event = new Event("chosen:updated", { bubbles: true });
-          element.dispatchEvent(event);
-
-          // Also try clicking if there's a visible Chosen container
-          const chosenContainer = element.nextElementSibling?.classList.contains("chosen-container")
-            ? (element.nextElementSibling as HTMLElement)
-            : null;
-          if (chosenContainer) {
-            chosenContainer.click();
-
-            // Look for dropdown items
-            setTimeout(() => {
-              const valueToFind = normalizedValues[0].toLowerCase();
-              const items = document.querySelectorAll(".chosen-results li");
-              for (const item of Array.from(items)) {
-                if (item.textContent?.toLowerCase().includes(valueToFind)) {
-                  (item as HTMLElement).click();
-                  break;
-                }
-              }
-            }, 100);
-          }
-        } catch (e) {
-          console.debug("Chosen handling error:", e);
-        }
-      }
-
-      // Handle Angular Material
-      if (
-        element.classList.contains("mat-select") ||
-        element.parentElement?.classList.contains("mat-form-field") ||
-        element.closest(".mat-form-field")
-      ) {
-        console.log("Detected Angular Material, applying specialized handling");
-        try {
-          // Find the clickable trigger
-          const trigger =
-            document.querySelector(`[aria-owns="${element.id}-panel"]`) ||
-            element.parentElement?.querySelector(".mat-select-trigger");
-          if (trigger) {
-            (trigger as HTMLElement).click();
-
-            // Wait for panel to open
-            setTimeout(() => {
-              const valueToFind = normalizedValues[0].toLowerCase();
-              const options = document.querySelectorAll(".mat-option");
-              for (const option of Array.from(options)) {
-                if (option.textContent?.toLowerCase().includes(valueToFind)) {
-                  (option as HTMLElement).click();
-                  break;
-                }
-              }
-            }, 100);
-          }
-        } catch (e) {
-          console.debug("Angular Material handling error:", e);
-        }
-      }
-
-      // Handle Semantic UI
-      if (
-        element.classList.contains("ui") ||
-        element.parentElement?.classList.contains("ui dropdown") ||
-        element.closest(".ui.dropdown")
-      ) {
-        console.log("Detected Semantic UI, applying specialized handling");
-        try {
-          const dropdown = element.closest(".ui.dropdown") as HTMLElement;
-          if (dropdown) {
-            // Click to open
-            dropdown.click();
-
-            // Find and click the matching item
-            setTimeout(() => {
-              const valueToFind = normalizedValues[0].toLowerCase();
-              const items = dropdown.querySelectorAll(".item");
-              for (const item of Array.from(items)) {
-                if (
-                  item.textContent?.toLowerCase().includes(valueToFind) ||
-                  item.getAttribute("data-value") === normalizedValues[0]
-                ) {
-                  (item as HTMLElement).click();
-                  break;
-                }
-              }
-            }, 100);
-          }
-        } catch (e) {
-          console.debug("Semantic UI handling error:", e);
-        }
-      }
-    } catch (e) {
-      // Ignore library handling errors - this is just additional support
-      console.debug("Select library handling error:", e);
     }
   } catch (error) {
-    console.error("Error updating select:", error);
+    console.error("Error updating select element:", error);
   }
 };
 
 /**
- * Handle custom form dropdowns that might not be captured by other handlers
+ * Normalize value to an array of strings
  */
-const handleCustomFormDropdown = (element: HTMLSelectElement, normalizedValues: string[]): boolean => {
-  try {
-    console.log("Attempting to handle form_dropdown component...");
+const normalizeSelectValue = (value: string | string[] | unknown): string[] => {
+  if (value === null || value === undefined) {
+    return [];
+  }
 
-    // First try to find any visible dropdown UI associated with this select
-    const selectContainer = element.parentElement;
-    if (!selectContainer) return false;
+  if (typeof value === "string") {
+    return [value];
+  }
 
-    // Look for common custom dropdown patterns
-    const customDropdownTrigger = selectContainer.querySelector<HTMLElement>(
-      'div[class*="select"], ' +
-        'span[class*="select"], ' +
-        'button[class*="select"], ' +
-        'div[class*="dropdown"], ' +
-        'div[tabindex="0"], ' +
-        'div[role="button"], ' +
-        '[aria-haspopup="listbox"]',
-    );
+  if (Array.isArray(value)) {
+    return value.map(v => String(v));
+  }
 
-    if (!customDropdownTrigger) return false;
+  // Handle boolean values explicitly
+  if (typeof value === "boolean") {
+    return [value ? "true" : "false"];
+  }
 
-    console.log("Found custom dropdown trigger:", customDropdownTrigger);
+  // Handle numeric values explicitly - keep as exact strings
+  if (typeof value === "number") {
+    return [String(value)];
+  }
 
-    // Click to open the dropdown
-    customDropdownTrigger.click();
+  return [String(value)];
+};
 
-    // Wait briefly for the dropdown to open
-    setTimeout(() => {
-      // Try to find dropdown options in multiple locations
-      const dropdownSelectors = [
-        // Look in parent container first
-        `${selectContainer.tagName.toLowerCase()} [role="option"]`,
-        `${selectContainer.tagName.toLowerCase()} li`,
-        `${selectContainer.tagName.toLowerCase()} [class*="option"]`,
-        // Look in document body for portal popups
-        'body > div[class*="dropdown"] [role="option"]',
-        'body > div[class*="select"] li',
-        'body > div[class*="popup"] [class*="option"]',
-        // Generic selectors
-        '[role="listbox"] [role="option"]',
-        '[class*="dropdown-menu"] [class*="dropdown-item"]',
-        '[class*="select-menu"] li',
-      ];
-
-      let dropdownOptions: Element[] = [];
-
-      // Try each selector until we find options
-      for (const selector of dropdownSelectors) {
-        const options = document.querySelectorAll(selector);
-        if (options.length > 0) {
-          dropdownOptions = Array.from(options);
-          console.log(`Found ${dropdownOptions.length} dropdown options with selector: ${selector}`);
-          break;
-        }
-      }
-
-      if (dropdownOptions.length === 0) {
-        console.log("No dropdown options found, closing dropdown");
-        document.body.click(); // Close dropdown by clicking elsewhere
-        return; // Add return statement here
-      }
-
-      // Try to find a matching option
-      const valueToMatch = normalizedValues[0].toLowerCase();
-      let matched = false;
-
-      // Try several matching strategies
-      for (const option of dropdownOptions) {
-        const optionText = option.textContent?.toLowerCase().trim() || "";
-        const optionValue = option.getAttribute("data-value")?.toLowerCase() || "";
-
-        if (
-          optionText === valueToMatch ||
-          optionValue === valueToMatch ||
-          optionText.includes(valueToMatch) ||
-          valueToMatch.includes(optionText)
-        ) {
-          console.log(`Clicking matched option: ${optionText}`);
-          (option as HTMLElement).click();
-          matched = true;
-          break;
-        }
-      }
-
-      // If no match found, select the first valid (non-placeholder) option
-      if (!matched) {
-        // Filter out placeholder options
-        const validOptions = dropdownOptions.filter(opt => {
-          const text = opt.textContent?.toLowerCase().trim() || "";
-          return !text.includes("select") && !text.includes("choose") && !text.includes("pick") && text.length > 0;
-        });
-
-        if (validOptions.length > 0) {
-          console.log("No exact match found, selecting first valid option:", validOptions[0].textContent);
-          (validOptions[0] as HTMLElement).click();
-        } else {
-          console.log("No valid options found, selecting first option");
-          (dropdownOptions[0] as HTMLElement).click();
-        }
-      }
-
-      return; // Add explicit return statement
-    }, 50);
-
+/**
+ * Match a value against an option, considering different formats
+ * This handles different representations of the same value (0/1, true/false, etc.)
+ */
+const isValueMatch = (optionValue: string, targetValue: string): boolean => {
+  // First try exact match (most reliable)
+  if (optionValue === targetValue) {
     return true;
-  } catch (error) {
-    console.error("Error in custom form dropdown handler:", error);
-    return false;
   }
-};
 
-/**
- * Helper function to select the best option in test mode
- */
-const selectBestOptionInTestMode = (element: HTMLSelectElement): void => {
-  // Skip first option if it seems like a placeholder
-  const isPlaceholder = (option: HTMLOptionElement): boolean => {
-    const text = option.text.toLowerCase();
-    return (
-      text.includes("select") ||
-      text.includes("choose") ||
-      text.includes("pick") ||
-      text.includes("bitte") || // German "please"
-      text === "" ||
-      option.value === "" ||
-      option.disabled
-    );
+  // Then try normalized string comparisons (case insensitive)
+  const normalizedOption = optionValue.toLowerCase();
+  const normalizedTarget = targetValue.toLowerCase();
+
+  if (normalizedOption === normalizedTarget) {
+    return true;
+  }
+
+  // Handle boolean-like values
+  const booleanEquivalents = {
+    true: ["1", "yes", "y", "on", "selected", "checked"],
+    false: ["0", "no", "n", "off", "unselected", "unchecked"],
   };
 
-  // Filter out placeholder and disabled options
-  const validOptions = Array.from(element.options).filter(opt => !isPlaceholder(opt) && !opt.disabled);
+  // Check if option is a boolean-equivalent of target
+  if (booleanEquivalents.true.includes(normalizedOption) && booleanEquivalents.true.includes(normalizedTarget)) {
+    return true;
+  }
 
-  // First try to find common social media or job sites if they exist
-  const commonSites = ["linkedin", "xing", "facebook", "instagram", "twitter", "indeed", "stepstone"];
-  const socialMediaOption = validOptions.find(opt => commonSites.some(site => opt.text.toLowerCase().includes(site)));
+  if (booleanEquivalents.false.includes(normalizedOption) && booleanEquivalents.false.includes(normalizedTarget)) {
+    return true;
+  }
 
-  if (socialMediaOption) {
-    console.log(`Selected common site option in test mode: ${socialMediaOption.text}`);
-    element.value = socialMediaOption.value;
+  // Check for substring match as a last resort
+  return normalizedOption.includes(normalizedTarget) || normalizedTarget.includes(normalizedOption);
+};
+
+/**
+ * Update a standard HTML select element
+ */
+const updateStandardSelect = (element: HTMLSelectElement, value: string | string[] | unknown): void => {
+  const valueArray = normalizeSelectValue(value);
+
+  // For empty values, select the first option
+  if (valueArray.length === 0 || valueArray[0] === "") {
+    // Only select first option if it's not a placeholder
+    const firstOption = element.options[0];
+    if (firstOption && !isPlaceholderOption(firstOption)) {
+      element.selectedIndex = 0;
+    }
+
+    // Dispatch events to notify of change
+    dispatchSelectEvents(element);
     return;
   }
 
-  // If no common sites, pick first non-placeholder option
-  if (validOptions.length > 0) {
-    console.log(`Selected first non-placeholder option in test mode: ${validOptions[0].text}`);
-    element.value = validOptions[0].value;
+  // Reset all selections
+  if (!element.multiple) {
+    for (let i = 0; i < element.options.length; i++) {
+      element.options[i].selected = false;
+    }
+  }
+
+  // Track if we've made a successful selection
+  let selectionMade = false;
+
+  // First try exact match on value
+  for (let i = 0; i < element.options.length; i++) {
+    const option = element.options[i];
+
+    // Skip disabled options and placeholders
+    if (option.disabled || isPlaceholderOption(option)) continue;
+
+    if (valueArray.some(val => isValueMatch(option.value, val))) {
+      option.selected = true;
+      selectionMade = true;
+
+      // For single selects, we're done after finding the first match
+      if (!element.multiple) break;
+    }
+  }
+
+  // If no match found, try matching on text content
+  if (!selectionMade) {
+    for (let i = 0; i < element.options.length; i++) {
+      const option = element.options[i];
+
+      // Skip disabled options and placeholders
+      if (option.disabled || isPlaceholderOption(option)) continue;
+
+      // Use text content if no exact value match
+      const optionText = option.textContent?.trim() || "";
+
+      if (valueArray.some(val => isValueMatch(optionText, val))) {
+        option.selected = true;
+        selectionMade = true;
+
+        // For single selects, we're done after finding the first match
+        if (!element.multiple) break;
+      }
+    }
+  }
+
+  // If still no match found and there's no placeholder, select the first non-placeholder option
+  if (!selectionMade && !element.multiple) {
+    for (let i = 0; i < element.options.length; i++) {
+      const option = element.options[i];
+      if (!option.disabled && !isPlaceholderOption(option)) {
+        option.selected = true;
+        break;
+      }
+    }
+  }
+
+  // Dispatch events to notify of change
+  dispatchSelectEvents(element);
+};
+
+/**
+ * Update an ARIA select element (combobox or listbox)
+ */
+const updateAriaSelect = (element: HTMLElement, value: string | string[] | unknown): void => {
+  const valueArray = normalizeSelectValue(value);
+  if (valueArray.length === 0) return;
+
+  // Get options using the helper function
+  const options = findSelectOptions(element);
+
+  // No options found
+  if (options.length === 0) {
+    console.warn("No options found for ARIA select:", element);
     return;
   }
 
-  // If all options look like placeholders, just pick the second option (skipping the first)
-  if (element.options.length > 1) {
-    console.log(`Selected second option as fallback in test mode: ${element.options[1].text}`);
-    element.selectedIndex = 1;
+  // First try to find an exact match on value
+  let matchFound = false;
+  for (const option of options) {
+    if (valueArray.some(val => isValueMatch(option.value, val))) {
+      // Select this option
+      if (option.element.getAttribute("role") === "option") {
+        option.element.setAttribute("aria-selected", "true");
+        // Update any visible representation of the selection
+        updateSelectDisplay(element, option.text);
+      }
+
+      matchFound = true;
+      break;
+    }
+  }
+
+  // If no exact match, try matching on text
+  if (!matchFound) {
+    for (const option of options) {
+      if (valueArray.some(val => isValueMatch(option.text, String(val)))) {
+        // Select this option
+        if (option.element.getAttribute("role") === "option") {
+          option.element.setAttribute("aria-selected", "true");
+          // Update any visible representation of the selection
+          updateSelectDisplay(element, option.text);
+        }
+
+        matchFound = true;
+        break;
+      }
+    }
+  }
+
+  // If we found a match, trigger a click on the element to ensure any listeners are notified
+  if (matchFound) {
+    // Find and click any "done" or "apply" buttons if this is an expanded listbox
+    const doneButton = document.querySelector('button[aria-label="Done"], button[aria-label="Apply"]');
+    if (doneButton instanceof HTMLElement) {
+      doneButton.click();
+    } else {
+      // Just click the element itself to close dropdown, etc.
+      element.click();
+    }
+  }
+};
+
+/**
+ * Update a custom select component
+ */
+const updateCustomSelect = (element: HTMLElement, value: string | string[] | unknown): void => {
+  const valueArray = normalizeSelectValue(value);
+  if (valueArray.length === 0) return;
+
+  // Try to find an associated native select element that might be hidden
+  const nativeSelect = element.querySelector("select");
+  if (nativeSelect instanceof HTMLSelectElement) {
+    updateStandardSelect(nativeSelect, value);
+    // Update the visible display element too
+    const displayEl = element.querySelector('[class*="selected"], [class*="display"], [class*="value"]');
+    if (displayEl instanceof HTMLElement) {
+      const selectedOptions = Array.from(nativeSelect.selectedOptions);
+      if (selectedOptions.length > 0) {
+        displayEl.textContent = selectedOptions.map(opt => opt.textContent).join(", ");
+      }
+    }
     return;
   }
 
-  // Last resort: just pick the first option
-  if (element.options.length > 0) {
-    console.log(`Selected first option as last resort in test mode: ${element.options[0].text}`);
-    element.selectedIndex = 0;
+  // Try to click the component to open the dropdown
+  const clickTarget = element.querySelector('button, [role="button"], [class*="select"]') || element;
+  if (clickTarget instanceof HTMLElement) {
+    clickTarget.click();
   }
+
+  // Give the dropdown time to open
+  setTimeout(() => {
+    // Look for option elements in dropdown
+    const dropdownOptions = findDropdownOptions();
+
+    // Try to find and click the matching option
+    let optionClicked = false;
+    for (const option of dropdownOptions) {
+      const optionText = option.textContent?.trim() || "";
+      const optionValue = option.getAttribute("data-value") || optionText;
+
+      // Check for a match
+      if (
+        valueArray.some(val => {
+          return (
+            typeof val === "string" &&
+            (optionValue.toLowerCase() === val.toLowerCase() || optionText.toLowerCase().includes(val.toLowerCase()))
+          );
+        })
+      ) {
+        // Found a match - click it
+        option.click();
+        optionClicked = true;
+        break;
+      }
+    }
+
+    // If no option was clicked, close the dropdown by clicking outside
+    if (!optionClicked) {
+      document.body.click();
+    }
+  }, 100);
+};
+
+/**
+ * Find options in dropdowns that might be appended to the body
+ */
+const findDropdownOptions = (): HTMLElement[] => {
+  // Common dropdown container selectors
+  const containerSelectors = [
+    ".dropdown-menu",
+    ".select-dropdown",
+    ".select-options",
+    ".options-list",
+    '[role="listbox"]',
+    '[role="menu"]',
+    ".MuiMenu-list",
+    ".ant-select-dropdown",
+    ".select__menu",
+    ".v-menu__content",
+    ".ui.dropdown.active",
+  ];
+
+  const options: HTMLElement[] = [];
+
+  // Look for dropdown containers
+  for (const selector of containerSelectors) {
+    const containers = document.querySelectorAll(selector);
+    for (const container of Array.from(containers)) {
+      // Check if the container is visible
+      if (container instanceof HTMLElement) {
+        const style = window.getComputedStyle(container);
+        if (style.display !== "none" && style.visibility !== "hidden") {
+          // Find option elements within this container
+          const containerOptions = container.querySelectorAll(
+            'li, [role="option"], .dropdown-item, .select-option, [class*="option"], .item',
+          );
+          containerOptions.forEach(option => {
+            if (option instanceof HTMLElement) {
+              options.push(option);
+            }
+          });
+        }
+      }
+    }
+  }
+
+  return options;
+};
+
+/**
+ * Update the visible display of a select component
+ */
+const updateSelectDisplay = (element: HTMLElement, text: string): void => {
+  // Find any visible text that represents the selection
+  const displayElements = [
+    element.querySelector('[class*="selected-text"]'),
+    element.querySelector('[class*="selected-option"]'),
+    element.querySelector('[class*="selected-value"]'),
+    element.querySelector('[class*="value"]'),
+    element.querySelector('[class*="display"]'),
+    element.querySelector("span, div"),
+  ].filter(Boolean);
+
+  // Update the first display element found
+  for (const display of displayElements) {
+    if (display instanceof HTMLElement) {
+      display.textContent = text;
+      break;
+    }
+  }
+};
+
+/**
+ * Find a select element associated with the given element
+ */
+const findAssociatedSelectElement = (element: HTMLElement): HTMLElement | null => {
+  // Check if element is a label that points to a select
+  if (element.tagName === "LABEL") {
+    const forAttribute = element.getAttribute("for");
+    if (forAttribute) {
+      const linkedElement = document.getElementById(forAttribute);
+      if (linkedElement instanceof HTMLSelectElement) {
+        return linkedElement;
+      }
+    }
+  }
+
+  // Check if element contains a select
+  const containedSelect = element.querySelector('select, [role="listbox"], [role="combobox"]');
+  if (containedSelect instanceof HTMLElement) {
+    return containedSelect;
+  }
+
+  // Check if element's parent contains a select
+  if (element.parentElement) {
+    const parentSelect = element.parentElement.querySelector('select, [role="listbox"], [role="combobox"]');
+    if (parentSelect instanceof HTMLElement && !parentSelect.contains(element)) {
+      return parentSelect;
+    }
+  }
+
+  // Check if element is part of a custom select component
+  let current = element.parentElement;
+  while (current) {
+    if (isCustomSelect(current)) {
+      return current;
+    }
+    current = current.parentElement;
+  }
+
+  return null;
+};
+
+/**
+ * Check if an option is a placeholder
+ */
+const isPlaceholderOption = (option: HTMLOptionElement): boolean => {
+  // Check common placeholder attributes
+  if (option.disabled && option.selected) return true;
+  if (option.value === "" || option.value === "-1") return true;
+
+  // Check common placeholder text patterns
+  const text = option.textContent?.toLowerCase() || "";
+  return (
+    text.includes("select") ||
+    text.includes("choose") ||
+    text === "please select" ||
+    text === "-- select --" ||
+    text.includes("pick an option") ||
+    text === "" ||
+    text === "-"
+  );
+};
+
+/**
+ * Dispatch appropriate events for select elements
+ */
+const dispatchSelectEvents = (element: HTMLSelectElement): void => {
+  // Create and dispatch events
+  const changeEvent = new Event("change", { bubbles: true });
+  element.dispatchEvent(changeEvent);
+
+  const inputEvent = new Event("input", { bubbles: true });
+  element.dispatchEvent(inputEvent);
+};
+
+/**
+ * Get a random item from an array
+ */
+const getRandomItem = <T>(items: T[]): T => {
+  return items[Math.floor(Math.random() * items.length)];
 };
 
 /**
@@ -1175,9 +801,9 @@ export const detectSelectFields = async (
       field.options = await detectDynamicSelectOptions(element);
 
       // Set current value based on selected options
-      const selectedOptions = field.options.filter(opt => opt.selected);
+      const selectedOptions = field.options.filter((opt: { selected: boolean }) => opt.selected);
       field.value = isMultiple
-        ? selectedOptions.map(opt => opt.value)
+        ? selectedOptions.map((opt: { value: string }) => opt.value)
         : selectedOptions.length > 0
           ? selectedOptions[0].value
           : "";
@@ -1195,7 +821,7 @@ export const detectSelectFields = async (
     if (testMode && field.options && field.options.length > 0) {
       // Skip placeholder options like "Select one", "--", etc.
       const validOptions = field.options.filter(
-        opt =>
+        (opt: { value: string; text: string }) =>
           opt.value &&
           !opt.text.toLowerCase().includes("select") &&
           !opt.text.includes("--") &&
@@ -1204,11 +830,14 @@ export const detectSelectFields = async (
 
       if (validOptions.length > 0) {
         if (isMultiple) {
-          // For multi-select, pick first two valid options
-          field.testValue = validOptions.slice(0, 2).map(opt => opt.value);
+          // For multi-select, pick 1-2 random valid options
+          const count = Math.min(1 + Math.floor(Math.random() * 2), validOptions.length);
+          const shuffled = [...validOptions].sort(() => 0.5 - Math.random());
+          field.testValue = shuffled.slice(0, count).map((opt: { value: string }) => opt.value);
         } else {
-          // For single select, pick first valid option
-          field.testValue = validOptions[0].value;
+          // For single select, pick a random valid option
+          const randomOption = getRandomItem(validOptions);
+          field.testValue = randomOption.value;
         }
       }
     }

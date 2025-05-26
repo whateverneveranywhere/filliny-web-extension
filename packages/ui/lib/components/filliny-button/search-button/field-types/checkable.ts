@@ -1,4 +1,4 @@
-import { dispatchEvent, createBaseField, getFieldLabel } from "./utils";
+import { createBaseField, getFieldLabel, findRelatedRadioButtons } from "./utils";
 import type { Field } from "@extension/shared";
 
 // Extend Field type with checkable-specific properties
@@ -8,305 +8,365 @@ interface CheckableField extends Field {
 }
 
 /**
- * Update a checkable input (radio or checkbox)
+ * Check if a value indicates a "checked" or "true" state
+ * Handles various formats like true/false, 0/1, "yes"/"no", etc.
  */
-export const updateCheckable = async (element: HTMLElement, value: boolean | string): Promise<void> => {
+export const isValueChecked = (value: unknown): boolean => {
+  if (value === undefined || value === null) {
+    return false;
+  }
+
+  // Direct boolean
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  // Numbers (0 = false, anything else = true)
+  if (typeof value === "number") {
+    return value !== 0;
+  }
+
+  // String representations
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+
+    // Standard boolean strings
+    if (
+      normalized === "true" ||
+      normalized === "yes" ||
+      normalized === "on" ||
+      normalized === "1" ||
+      normalized === "selected" ||
+      normalized === "checked"
+    ) {
+      return true;
+    }
+
+    // Standard false strings
+    if (
+      normalized === "false" ||
+      normalized === "no" ||
+      normalized === "off" ||
+      normalized === "0" ||
+      normalized === "unselected" ||
+      normalized === "unchecked"
+    ) {
+      return false;
+    }
+
+    // Any non-empty string that doesn't explicitly indicate false is treated as true
+    return normalized !== "";
+  }
+
+  // Arrays - if there are any items, consider it checked
+  if (Array.isArray(value)) {
+    return value.length > 0;
+  }
+
+  // For objects, treat as true (existence implies checked)
+  return true;
+};
+
+/**
+ * Match checkbox values considering different formats
+ * Used to determine if a checkbox should be checked when multiple values are involved
+ */
+export const matchesCheckboxValue = (optionValue: string, targetValue: unknown): boolean => {
+  // Handle direct equality
+  if (optionValue === targetValue) {
+    return true;
+  }
+
+  // If target is an array, check if this value is in the array
+  if (Array.isArray(targetValue)) {
+    return targetValue.some(v => String(v) === optionValue);
+  }
+
+  // Handle string comparison
+  if (typeof targetValue === "string") {
+    const normalizedOption = optionValue.toLowerCase();
+    const normalizedTarget = targetValue.toLowerCase();
+
+    // Exact match after normalization
+    if (normalizedOption === normalizedTarget) {
+      return true;
+    }
+
+    // Split by commas or semicolons for multiple values in a string
+    if (normalizedTarget.includes(",") || normalizedTarget.includes(";")) {
+      const parts = normalizedTarget.split(/[,;]/).map(p => p.trim());
+      return parts.includes(normalizedOption);
+    }
+  }
+
+  return false;
+};
+
+/**
+ * Update a checkbox or radio button input
+ * This is the main entry point for updating checkable fields
+ */
+export const updateCheckable = (element: HTMLElement, checked: boolean): void => {
   try {
-    // Parse string value to boolean if needed
-    let shouldCheck = typeof value === "boolean" ? value : value.toLowerCase() === "true";
-
-    // Detect if the element is part of a framework component
-    const isReactComponent = Object.keys(element).some(
-      key => key.startsWith("__react") || key.startsWith("_reactProps"),
-    );
-    const isAngularComponent =
-      element.hasAttribute("ng-model") ||
-      element.hasAttribute("[(ngModel)]") ||
-      element.hasAttribute("formControlName");
-    const isVueComponent = element.hasAttribute("v-model") || element.hasAttribute("data-v-");
-
-    // Handle native HTML input elements
-    if (element instanceof HTMLInputElement) {
-      // Special case for radio buttons, value might be the value attribute
-      if (element.type === "radio" && typeof value === "string" && value !== "true" && value !== "false") {
-        shouldCheck = element.value === value;
-      }
-
-      // Set checked state
-      element.checked = shouldCheck;
-      element.setAttribute("checked", shouldCheck ? "checked" : "");
-
-      // Trigger events in correct sequence for framework detection
-      if (isReactComponent) {
-        // React needs specific event sequence
-        // Create custom events with bubbles option
-        const inputEvent = new Event("input", { bubbles: true });
-        const changeEvent = new Event("change", { bubbles: true });
-        element.dispatchEvent(inputEvent);
-        element.dispatchEvent(changeEvent);
-        // React often uses SyntheticEvents, dispatch native events as fallback
-        element.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
-      } else if (isAngularComponent) {
-        // Angular often uses zone.js for change detection
-        const changeEvent = new Event("change", { bubbles: true });
-        element.dispatchEvent(changeEvent);
-        // Trigger blur to ensure ngModelChange fires in Angular
-        const blurEvent = new Event("blur", { bubbles: true });
-        element.dispatchEvent(blurEvent);
-      } else if (isVueComponent) {
-        // Vue relies heavily on input events
-        const inputEvent = new Event("input", { bubbles: true });
-        const changeEvent = new Event("change", { bubbles: true });
-        element.dispatchEvent(inputEvent);
-        element.dispatchEvent(changeEvent);
-      } else {
-        // Standard sequence for vanilla JS
-        dispatchEvent(element, "click");
-        dispatchEvent(element, "change");
-      }
-
-      // For radios, ensure only one in group is checked using various strategies to find related radios
-      if (element.type === "radio" && shouldCheck) {
-        // Start with the most specific way to get related radios and move to more general approaches
-        let groupRadios: NodeListOf<Element> | HTMLInputElement[] | null = null;
-        let radioGroup: Element | null = null;
-
-        // Strategy 1: Use the name attribute - most reliable if present
-        if (element.name) {
-          // Look in different contexts (form first, then document)
-          if (element.form) {
-            groupRadios = element.form.querySelectorAll(`input[type="radio"][name="${element.name}"]`);
-          } else {
-            // If no form, try document - with specific safety to avoid cross-form conflicts
-            const allRadios = Array.from(document.querySelectorAll(`input[type="radio"][name="${element.name}"]`));
-            groupRadios = allRadios.filter(radio => {
-              const radioForm = (radio as HTMLInputElement).form;
-              return !radioForm || radioForm === element.form;
-            }) as HTMLInputElement[];
-          }
-        }
-
-        // Strategy 2: If no name, look for a common container with role="radiogroup" or similar patterns
-        if (!groupRadios || groupRadios.length <= 1) {
-          radioGroup = element.closest(
-            '[role="radiogroup"], fieldset, [class*="radio-group"], [class*="radio_group"], [class*="radioGroup"]',
-          );
-          if (radioGroup) {
-            groupRadios = radioGroup.querySelectorAll('input[type="radio"]');
-          }
-        }
-
-        // Strategy 3: Find radios in the closest form or fieldset
-        if (!groupRadios || groupRadios.length <= 1) {
-          const container = element.closest("form, fieldset");
-          if (container) {
-            // Try to find radios with similar data attributes or classes
-            const inputClass = Array.from(element.classList).find(
-              c => c.includes("radio") || c.includes("option") || c.includes("input"),
-            );
-
-            if (inputClass) {
-              groupRadios = container.querySelectorAll(`input[type="radio"].${inputClass}`);
-            } else {
-              // Last resort: check if there are nearby radio buttons in the same container
-              const allRadios = Array.from(container.querySelectorAll('input[type="radio"]'));
-              const elementRect = element.getBoundingClientRect();
-
-              // Filter to those that appear to be in the same group (nearby in the DOM and visually)
-              groupRadios = allRadios.filter(radio => {
-                if (radio === element) return true;
-
-                // Check DOM proximity (less than 5 siblings away)
-                let domDistance = 0;
-                let current = radio;
-                while (current && current !== element && domDistance < 5) {
-                  current = current.nextElementSibling as HTMLElement;
-                  domDistance++;
-                }
-
-                if (domDistance < 5) return true;
-
-                // Check visual proximity
-                const radioRect = radio.getBoundingClientRect();
-                const verticallyAligned = Math.abs(elementRect.left - radioRect.left) < 50;
-                const horizontallyAligned = Math.abs(elementRect.top - radioRect.top) < 50;
-                const sameColumn = verticallyAligned && Math.abs(elementRect.top - radioRect.top) < 200;
-                const sameRow = horizontallyAligned && Math.abs(elementRect.left - radioRect.left) < 200;
-
-                return sameColumn || sameRow;
-              }) as HTMLInputElement[];
-            }
-          }
-        }
-
-        // If we found radios, uncheck all others in the group
-        if (groupRadios && groupRadios.length > 1) {
-          groupRadios.forEach(radio => {
-            if (radio instanceof HTMLInputElement && radio !== element) {
-              radio.checked = false;
-              radio.removeAttribute("checked");
-
-              // Fire change event on the unselected radios too for framework detection
-              dispatchEvent(radio as HTMLElement, "change");
-            }
-          });
-        }
-      }
-    } else if (element.getAttribute("role") === "checkbox" || element.getAttribute("role") === "switch") {
-      // Handle ARIA role checkbox/switch elements
-      element.setAttribute("aria-checked", shouldCheck ? "true" : "false");
-
-      // Toggle active/checked classes used by various frameworks
-      if (shouldCheck) {
-        element.classList.add("checked", "active", "selected");
-      } else {
-        element.classList.remove("checked", "active", "selected");
-      }
-
-      // Fire appropriate events
-      dispatchEvent(element, "click");
-      dispatchEvent(element, "change");
-
-      // Look for and update any hidden inputs
-      const hiddenInput =
-        element.querySelector('input[type="hidden"]') ||
-        document.querySelector(`input[type="hidden"][data-id="${element.id}"]`);
-      if (hiddenInput instanceof HTMLInputElement) {
-        hiddenInput.value = shouldCheck ? "true" : "false";
-        dispatchEvent(hiddenInput, "change");
-      }
-    } else if (element.getAttribute("role") === "radio") {
-      // Handle ARIA role radio elements
-      element.setAttribute("aria-checked", shouldCheck ? "true" : "false");
-
-      if (shouldCheck) {
-        element.classList.add("checked", "active", "selected");
-
-        // Find and uncheck other radio buttons in the same group using multiple strategies
-        // Strategy 1: Standard radiogroup container
-        let groupContainer = element.closest('[role="radiogroup"]');
-
-        // Strategy 2: Look for common containers if no explicit radiogroup
-        if (!groupContainer) {
-          groupContainer = element.closest(
-            'fieldset, [class*="radio-group"], [class*="radio_group"], [class*="radioGroup"], ul, ol, div[class*="options"]',
-          );
-        }
-
-        // Strategy 3: Look for parent with multiple radio children
-        if (!groupContainer) {
-          let current = element.parentElement;
-          while (current && current !== document.body) {
-            const childRadios = current.querySelectorAll('[role="radio"]');
-            if (childRadios.length > 1) {
-              groupContainer = current;
-              break;
-            }
-            current = current.parentElement;
-          }
-        }
-
-        if (groupContainer) {
-          groupContainer.querySelectorAll('[role="radio"]').forEach(radio => {
-            if (radio !== element) {
-              radio.setAttribute("aria-checked", "false");
-              radio.classList.remove("checked", "active", "selected");
-
-              // Dispatch events on unselected radio elements too
-              dispatchEvent(radio as HTMLElement, "change");
-            }
-          });
-        }
-      }
-
-      // Trigger appropriate events
-      dispatchEvent(element, "click");
-      dispatchEvent(element, "change");
+    // Handle both native inputs and ARIA-based custom controls
+    if (element instanceof HTMLInputElement && (element.type === "checkbox" || element.type === "radio")) {
+      updateNativeCheckable(element, checked);
+    } else if (
+      element.getAttribute("role") === "checkbox" ||
+      element.getAttribute("role") === "radio" ||
+      element.getAttribute("role") === "switch"
+    ) {
+      updateAriaCheckable(element, checked);
     } else {
-      // Handle standard checkable elements as fallback
-      if (shouldCheck) {
-        element.classList.add("checked", "active", "selected");
-      } else {
-        element.classList.remove("checked", "active", "selected");
-      }
-
-      // Try to find any hidden input that might store the value
-      const nearbyInputs = Array.from(
-        element.querySelectorAll('input[type="hidden"], input[type="checkbox"], input[type="radio"]'),
-      );
-      if (nearbyInputs.length > 0) {
-        nearbyInputs.forEach(input => {
-          if (input instanceof HTMLInputElement) {
-            if (input.type === "checkbox" || input.type === "radio") {
-              input.checked = shouldCheck;
-            } else {
-              input.value = shouldCheck ? "true" : "false";
-            }
-            dispatchEvent(input, "change");
-          }
-        });
-      }
-
-      // Trigger events on the main element too
-      dispatchEvent(element, "click");
-      dispatchEvent(element, "change");
+      // Attempt to handle custom components by looking for common patterns
+      updateCustomCheckable(element, checked);
     }
 
-    // Handle Material-UI checkbox/radio components
-    if (
-      element.classList.contains("MuiCheckbox-root") ||
-      element.classList.contains("MuiRadio-root") ||
-      element.closest(".MuiCheckbox-root") ||
-      element.closest(".MuiRadio-root")
-    ) {
-      const iconButton = element.querySelector(".MuiIconButton-root") || element.closest(".MuiIconButton-root");
-      if (iconButton instanceof HTMLElement) {
-        iconButton.click();
-      }
-    }
-
-    // Handle Bootstrap custom checkboxes
-    if (element.classList.contains("custom-control-input") || element.classList.contains("form-check-input")) {
-      // Bootstrap custom checkboxes need the change event
-      const changeEvent = new Event("change", { bubbles: true });
-      element.dispatchEvent(changeEvent);
-    }
-
-    // Special handling for Salesforce Lightning components
-    if (element.classList.contains("slds-checkbox") || element.classList.contains("slds-radio")) {
-      const input = element.querySelector("input");
-      if (input instanceof HTMLInputElement) {
-        input.checked = shouldCheck;
-        const changeEvent = new Event("change", { bubbles: true });
-        input.dispatchEvent(changeEvent);
-      }
-    }
-
-    // Handle popular form library components
-    // Semantic UI
-    if (
-      element.classList.contains("ui") &&
-      (element.classList.contains("checkbox") || element.classList.contains("radio"))
-    ) {
-      const input = element.querySelector("input");
-      if (input) {
-        const event = new Event("change", { bubbles: true });
-        input.dispatchEvent(event);
-      }
-    }
-
-    // Ant Design
-    if (element.classList.contains("ant-checkbox") || element.classList.contains("ant-radio")) {
-      const input = element.querySelector("input");
-      if (input) {
-        input.checked = shouldCheck;
-        const event = new Event("change", { bubbles: true });
-        input.dispatchEvent(event);
+    // If this is a radio button, ensure that related radio buttons in the same group are properly updated
+    if ((element instanceof HTMLInputElement && element.type === "radio") || element.getAttribute("role") === "radio") {
+      if (checked) {
+        // Find and uncheck all other radio buttons in this group
+        updateRelatedRadioButtons(element);
       }
     }
   } catch (error) {
-    console.error("Error updating checkable input:", error);
+    console.error("Error updating checkable element:", error);
   }
+};
+
+/**
+ * Update a native checkbox or radio input
+ */
+const updateNativeCheckable = (element: HTMLInputElement, checked: boolean): void => {
+  // First check if element is already in the desired state
+  if (element.checked === checked) return;
+
+  // Update the checked state
+  element.checked = checked;
+
+  // Dispatch appropriate events to trigger any event listeners
+  const changeEvent = new Event("change", { bubbles: true });
+  element.dispatchEvent(changeEvent);
+
+  const inputEvent = new Event("input", { bubbles: true });
+  element.dispatchEvent(inputEvent);
+
+  // Trigger click event only if state needs to change
+  if (element.checked !== checked) {
+    element.click();
+  }
+};
+
+/**
+ * Update an ARIA-based checkbox or radio element
+ */
+const updateAriaCheckable = (element: HTMLElement, checked: boolean): void => {
+  // Determine the role
+  const role = element.getAttribute("role");
+
+  // Get the current state
+  const currentChecked =
+    role === "switch"
+      ? element.getAttribute("aria-checked") === "true"
+      : element.getAttribute("aria-checked") === "true";
+
+  // If already in desired state, return
+  if (currentChecked === checked) return;
+
+  // Update the ARIA state
+  element.setAttribute("aria-checked", checked ? "true" : "false");
+
+  // Look for an actual input that might be controlled by this ARIA element
+  const controlledInput = findControlledInput(element);
+  if (controlledInput) {
+    updateNativeCheckable(controlledInput, checked);
+    return;
+  }
+
+  // If no controlled input, simulate a click to trigger any bound event handlers
+  element.click();
+
+  // Update CSS classes based on common patterns
+  if (checked) {
+    element.classList.add("checked", "selected", "active");
+    element.classList.remove("unchecked");
+  } else {
+    element.classList.remove("checked", "selected", "active");
+    element.classList.add("unchecked");
+  }
+
+  // Dispatch events
+  const changeEvent = new Event("change", { bubbles: true });
+  element.dispatchEvent(changeEvent);
+
+  const inputEvent = new Event("input", { bubbles: true });
+  element.dispatchEvent(inputEvent);
+};
+
+/**
+ * Find any native input that might be controlled by an ARIA element
+ */
+const findControlledInput = (element: HTMLElement): HTMLInputElement | null => {
+  // Check for common patterns
+
+  // 1. Input might be a child
+  const childInput = element.querySelector('input[type="checkbox"], input[type="radio"]') as HTMLInputElement;
+  if (childInput) return childInput;
+
+  // 2. Input might be a sibling
+  const siblingInput = element.parentElement?.querySelector(
+    'input[type="checkbox"], input[type="radio"]',
+  ) as HTMLInputElement;
+  if (siblingInput && siblingInput !== element) return siblingInput;
+
+  // 3. Input might be linked by ARIA attributes
+  const controlsId = element.getAttribute("aria-controls");
+  if (controlsId) {
+    const controlledElement = document.getElementById(controlsId);
+    if (controlledElement instanceof HTMLInputElement) {
+      return controlledElement;
+    }
+  }
+
+  // 4. Input might be hidden in the DOM
+  if (element.id) {
+    const relatedInput = document.querySelector(`input[aria-labelledby="${element.id}"]`) as HTMLInputElement;
+    if (relatedInput) return relatedInput;
+  }
+
+  return null;
+};
+
+/**
+ * Update visual indicators for custom checkbox/radio components
+ */
+const updateVisualIndicators = (element: HTMLElement, checked: boolean): void => {
+  // Update CSS classes based on common patterns
+  if (checked) {
+    element.classList.add("checked", "selected", "active");
+    element.classList.remove("unchecked");
+  } else {
+    element.classList.remove("checked", "selected", "active");
+    element.classList.add("unchecked");
+  }
+
+  // If this is a radio button, ensure that related radio buttons in the same group are properly updated
+  if ((element instanceof HTMLInputElement && element.type === "radio") || element.getAttribute("role") === "radio") {
+    if (checked) {
+      // Find and uncheck all other radio buttons in this group
+      updateRelatedRadioButtons(element);
+    }
+  }
+
+  // Dispatch events
+  const changeEvent = new Event("change", { bubbles: true });
+  element.dispatchEvent(changeEvent);
+
+  const inputEvent = new Event("input", { bubbles: true });
+  element.dispatchEvent(inputEvent);
+};
+
+/**
+ * Attempt to update custom checkable components
+ */
+const updateCustomCheckable = (element: HTMLElement, checked: boolean): void => {
+  // First, try to find a native input that might be associated with this element
+  let inputFound = false;
+
+  // Check if element contains an input
+  const containedInput = element.querySelector('input[type="checkbox"], input[type="radio"]') as HTMLInputElement;
+  if (containedInput) {
+    updateNativeCheckable(containedInput, checked);
+    inputFound = true;
+  }
+
+  // Check if element's parent contains an input
+  if (!inputFound && element.parentElement) {
+    const parentInput = element.parentElement.querySelector(
+      'input[type="checkbox"], input[type="radio"]',
+    ) as HTMLInputElement;
+    if (parentInput && !parentInput.contains(element)) {
+      updateNativeCheckable(parentInput, checked);
+      inputFound = true;
+    }
+  }
+
+  // Check for label that might be connected to an input
+  if (!inputFound && element.tagName === "LABEL") {
+    const labelFor = element.getAttribute("for");
+    if (labelFor) {
+      const linkedInput = document.getElementById(labelFor) as HTMLInputElement;
+      if (linkedInput && (linkedInput.type === "checkbox" || linkedInput.type === "radio")) {
+        updateNativeCheckable(linkedInput, checked);
+        inputFound = true;
+      }
+    }
+  }
+
+  // If no input found, treat as a custom component
+  if (!inputFound) {
+    // Set custom data attribute to track state
+    element.setAttribute("data-filliny-checked", checked ? "true" : "false");
+
+    // Update classes based on common patterns
+    if (checked) {
+      element.classList.add("checked", "selected", "active");
+      element.classList.remove("unchecked");
+    } else {
+      element.classList.remove("checked", "selected", "active");
+      element.classList.add("unchecked");
+    }
+
+    // Trigger click if needed
+    const currentChecked =
+      element.classList.contains("checked") ||
+      element.classList.contains("selected") ||
+      element.classList.contains("active");
+
+    if (currentChecked !== checked) {
+      element.click();
+    }
+  }
+};
+
+/**
+ * Find and update related radio buttons in the same group
+ */
+const updateRelatedRadioButtons = (element: HTMLElement): void => {
+  // Find all related radio buttons
+  const relatedRadios = findRelatedRadioButtons(element);
+
+  // Uncheck all except the current one
+  relatedRadios.forEach(radio => {
+    if (radio !== element) {
+      if (radio instanceof HTMLInputElement) {
+        if (radio.checked) {
+          radio.checked = false;
+
+          // Dispatch events
+          const changeEvent = new Event("change", { bubbles: true });
+          radio.dispatchEvent(changeEvent);
+
+          const inputEvent = new Event("input", { bubbles: true });
+          radio.dispatchEvent(inputEvent);
+        }
+      } else if (radio.getAttribute("role") === "radio") {
+        if (radio.getAttribute("aria-checked") === "true") {
+          radio.setAttribute("aria-checked", "false");
+
+          // Update visual indicators
+          updateVisualIndicators(radio, false);
+        }
+      }
+    }
+  });
+};
+
+/**
+ * Get a random item from an array
+ */
+const getRandomItem = <T>(items: T[]): T => {
+  return items[Math.floor(Math.random() * items.length)];
 };
 
 /**
@@ -351,6 +411,12 @@ export const detectCheckableFields = async (
     const field = (await createBaseField(element, baseIndex + fieldIndex, "checkbox", testMode)) as CheckableField;
 
     field.checked = (element as HTMLInputElement).checked;
+
+    // In test mode, randomly set checkbox state
+    if (testMode) {
+      field.testValue = Math.random() > 0.5 ? "true" : "false";
+    }
+
     fields.push(field);
     fieldIndex++;
   }
@@ -361,6 +427,12 @@ export const detectCheckableFields = async (
     const field = (await createBaseField(element, baseIndex + fieldIndex, "checkbox", testMode)) as CheckableField;
 
     field.checked = isChecked;
+
+    // In test mode, randomly set checkbox state
+    if (testMode) {
+      field.testValue = Math.random() > 0.5 ? "true" : "false";
+    }
+
     fields.push(field);
     fieldIndex++;
   }
@@ -413,7 +485,7 @@ export const detectCheckableFields = async (
         const values: string[] = groupRadios.map(radio => radio.value);
         field.options = values.length > 0 ? values.map(value => ({ value, text: value, selected: false })) : undefined;
 
-        // Set test value to first option value
+        // Set test value to a random option value
         if (testMode && values.length > 0) {
           // For gender fields in test mode, prefer "female" option if available
           const femaleValue = values.find(
@@ -425,7 +497,19 @@ export const detectCheckableFields = async (
               v === "1", // Often used for female in legacy systems
           );
 
-          field.testValue = femaleValue || values[0];
+          // If a gender field is detected, use female value, otherwise pick randomly
+          if (
+            femaleValue &&
+            (field.label?.toLowerCase().includes("gender") ||
+              field.label?.toLowerCase().includes("sex") ||
+              field.label?.toLowerCase().includes("geschlecht") ||
+              field.label?.toLowerCase().includes("anrede"))
+          ) {
+            field.testValue = femaleValue;
+          } else {
+            // Pick a random option
+            field.testValue = getRandomItem(values);
+          }
         }
 
         fields.push(field);
@@ -472,9 +556,9 @@ export const detectCheckableFields = async (
     );
     field.options = values.length > 0 ? values.map(value => ({ value, text: value, selected: false })) : undefined;
 
-    // Set test value to first option value
+    // Set test value to a random option value
     if (testMode && values.length > 0) {
-      field.testValue = values[0];
+      field.testValue = getRandomItem(values);
     }
 
     fields.push(field);
@@ -741,3 +825,13 @@ function isLabelLike(element: Element): boolean {
 
   return false;
 }
+
+// Export for testing
+export const __testing = {
+  updateNativeCheckable,
+  updateAriaCheckable,
+  updateCustomCheckable,
+  findControlledInput,
+  updateVisualIndicators,
+  updateRelatedRadioButtons,
+};

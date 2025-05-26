@@ -1,6 +1,6 @@
 import type { Field } from "@extension/shared";
 import { updateSelect } from "./field-types/select";
-import { updateCheckable } from "./field-types/checkable";
+import { updateCheckable, isValueChecked, matchesCheckboxValue } from "./field-types/checkable";
 import { updateFileInput } from "./field-types/file";
 import { updateTextField, updateContentEditable } from "./field-types/text";
 import { addVisualFeedback, getStringValue } from "./field-types/utils";
@@ -59,23 +59,15 @@ const updateField = async (element: HTMLElement, field: Field, isTestMode = fals
             if (typeof valueToUse === "boolean") {
               isChecked = valueToUse;
             } else if (typeof valueToUse === "string") {
-              // Check if the string value indicates this specific checkbox should be checked
-              isChecked =
-                valueToUse === checkboxValue ||
-                valueToUse.toLowerCase() === "true" ||
-                valueToUse.toLowerCase() === "yes" ||
-                valueToUse.toLowerCase() === "on" ||
-                valueToUse === "1";
+              // Use the improved matching logic for checkbox values
+              isChecked = matchesCheckboxValue(checkboxValue, valueToUse);
             } else if (Array.isArray(valueToUse)) {
               // If array of values, check if this checkbox's value is in the array
               isChecked = valueToUse.some(v => v === checkboxValue);
             }
           } else {
-            // Standard boolean conversion for simple cases
-            isChecked =
-              typeof valueToUse === "boolean"
-                ? valueToUse
-                : ["true", "yes", "on", "1"].includes(String(valueToUse).toLowerCase());
+            // Use the more robust value checking function
+            isChecked = isValueChecked(valueToUse);
           }
 
           // In test mode, check the checkbox by default unless explicitly set to false
