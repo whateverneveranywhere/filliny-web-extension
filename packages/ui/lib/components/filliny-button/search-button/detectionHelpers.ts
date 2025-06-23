@@ -858,7 +858,7 @@ export const detectFormLikeContainers = async (): Promise<HTMLElement[]> => {
     );
   });
 
-  // Enhanced container selection logic for modern web applications
+  // Enhanced container selection logic - more inclusive to handle multiple form containers
   const selectedContainers: HTMLElement[] = [];
 
   if (candidates.length > 0) {
@@ -870,48 +870,85 @@ export const detectFormLikeContainers = async (): Promise<HTMLElement[]> => {
       `✅ Selected primary container: ${bestCandidate.element.tagName}.${bestCandidate.element.className} (Score: ${bestCandidate.score}, Fields: ${bestCandidate.fieldCount})`,
     );
 
-    // For bulk mode, prioritize finding one comprehensive container instead of multiple smaller ones
-    // Only add additional containers if they have significantly different content and are not nested
+    // More inclusive selection criteria for multiple form containers
     const primaryFieldCount = bestCandidate.fieldCount;
-    const minAdditionalFields = Math.max(5, primaryFieldCount * 0.3); // At least 5 fields or 30% of primary
 
-    for (let i = 1; i < Math.min(candidates.length, 3); i++) {
-      // Reduced from 5 to 3 to minimize duplicates
+    // Lower the threshold to be more inclusive - include containers with at least 3 fields
+    // or containers with significant scores regardless of field count
+    const minAdditionalFields = Math.max(3, Math.floor(primaryFieldCount * 0.2)); // At least 3 fields or 20% of primary
+    const significantScoreThreshold = Math.max(50, bestCandidate.score * 0.4); // At least 40% of best score
+
+    // Process more candidates to find all valid form containers
+    const maxCandidates = Math.min(candidates.length, 8); // Increased from 3 to 8
+    for (let i = 1; i < maxCandidates; i++) {
       const candidate = candidates[i];
 
-      // More restrictive criteria for additional containers
       let shouldInclude = false;
       let inclusionReason = "";
 
-      // Only include if it has a substantial number of fields AND is not nested
+      // Strategy 1: Include containers with enough fields
       if (candidate.fieldCount >= minAdditionalFields) {
-        // Check if it's nested within the primary container
-        const isNestedInPrimary = bestCandidate.element.contains(candidate.element);
-        const containsPrimary = candidate.element.contains(bestCandidate.element);
+        // Check if it's nested within any already selected container
+        const isNestedInSelected = selectedContainers.some(
+          selected => selected.contains(candidate.element) || candidate.element.contains(selected),
+        );
 
-        if (!isNestedInPrimary && !containsPrimary) {
-          // Check spatial separation to ensure it's truly a different form section
-          const candidateRect = candidate.element.getBoundingClientRect();
-          const primaryRect = bestCandidate.element.getBoundingClientRect();
+        if (!isNestedInSelected) {
+          // More lenient spatial separation check
+          let isSpatiallyDistinct = true;
 
-          const verticalDistance = Math.abs(candidateRect.top - primaryRect.top);
-          const horizontalDistance = Math.abs(candidateRect.left - primaryRect.left);
+          // Check spatial separation against all selected containers
+          for (const selectedContainer of selectedContainers) {
+            const candidateRect = candidate.element.getBoundingClientRect();
+            const selectedRect = selectedContainer.getBoundingClientRect();
 
-          // Require significant spatial separation (at least 300px apart)
-          const isSpatiallyDistinct = verticalDistance > 300 || horizontalDistance > 400;
+            const verticalDistance = Math.abs(candidateRect.top - selectedRect.top);
+            const horizontalDistance = Math.abs(candidateRect.left - selectedRect.left);
+
+            // More lenient separation requirements - reduced from 300px to 150px
+            const hasMinimalSeparation = verticalDistance > 150 || horizontalDistance > 200;
+
+            if (!hasMinimalSeparation) {
+              isSpatiallyDistinct = false;
+              break;
+            }
+          }
 
           if (isSpatiallyDistinct) {
-            // Check if it represents truly different content
-            const candidateFieldTypes = getFieldTypesInContainer(candidate.element);
-            const primaryFieldTypes = getFieldTypesInContainer(bestCandidate.element);
+            shouldInclude = true;
+            inclusionReason = `spatially distinct with ${candidate.fieldCount} fields`;
+          }
+        }
+      }
 
-            const uniqueFieldTypes = Array.from(candidateFieldTypes).filter(type => !primaryFieldTypes.has(type));
-            const hasUniqueContent = uniqueFieldTypes.length > 0 || candidate.fieldCount > primaryFieldCount;
+      // Strategy 2: Include high-scoring containers even if they have fewer fields
+      if (!shouldInclude && candidate.score >= significantScoreThreshold) {
+        const isNestedInSelected = selectedContainers.some(
+          selected => selected.contains(candidate.element) || candidate.element.contains(selected),
+        );
 
-            if (hasUniqueContent) {
-              shouldInclude = true;
-              inclusionReason = `spatially distinct with ${candidate.fieldCount} fields`;
-            }
+        if (!isNestedInSelected) {
+          shouldInclude = true;
+          inclusionReason = `high score (${candidate.score}) with ${candidate.fieldCount} fields`;
+        }
+      }
+
+      // Strategy 3: Include semantic form containers (forms, fieldsets, role="form")
+      if (!shouldInclude) {
+        const isSemanticForm =
+          candidate.element.tagName === "FORM" ||
+          candidate.element.tagName === "FIELDSET" ||
+          candidate.element.getAttribute("role") === "form" ||
+          candidate.element.className.toLowerCase().includes("form");
+
+        if (isSemanticForm && candidate.fieldCount >= 2) {
+          const isNestedInSelected = selectedContainers.some(
+            selected => selected.contains(candidate.element) || candidate.element.contains(selected),
+          );
+
+          if (!isNestedInSelected) {
+            shouldInclude = true;
+            inclusionReason = `semantic form container with ${candidate.fieldCount} fields`;
           }
         }
       }
@@ -924,19 +961,19 @@ export const detectFormLikeContainers = async (): Promise<HTMLElement[]> => {
         );
       } else {
         console.log(
-          `⚠️ Skipped potential container: ${candidate.element.tagName}.${candidate.element.className} (Score: ${candidate.score}, Fields: ${candidate.fieldCount}, Reason: insufficient separation or field count)`,
+          `⚠️ Skipped container: ${candidate.element.tagName}.${candidate.element.className} (Score: ${candidate.score}, Fields: ${candidate.fieldCount}, Reason: nested or insufficient criteria)`,
         );
       }
     }
 
-    // If we only have one container but it's not comprehensive enough, look for a better parent
-    if (selectedContainers.length === 1 && bestCandidate.fieldCount < 5) {
-      console.log("Looking for a more comprehensive parent container...");
+    // Post-processing: If we only have one container and it's small, try to expand it
+    if (selectedContainers.length === 1 && bestCandidate.fieldCount < 8) {
+      console.log("Single small container detected, looking for expansion opportunities...");
 
       const expandedContainer = findExpandedContainer(bestCandidate.element);
       if (expandedContainer && expandedContainer !== bestCandidate.element) {
         const expandedFields = getFormFieldsRobust(expandedContainer);
-        if (expandedFields.length > bestCandidate.fieldCount * 1.5) {
+        if (expandedFields.length > bestCandidate.fieldCount * 1.3) {
           console.log(`🔄 Expanding to parent container with ${expandedFields.length} fields`);
 
           // Replace the original container with the expanded one
@@ -963,6 +1000,32 @@ export const detectFormLikeContainers = async (): Promise<HTMLElement[]> => {
   }
 
   console.log(`Final selection: ${selectedContainers.length} form containers`);
+
+  // Enhanced logging for multiple container detection
+  console.log(
+    `%c🎯 FORM CONTAINER SELECTION SUMMARY`,
+    "background: #4f46e5; color: white; padding: 8px; font-weight: bold;",
+  );
+  console.log(`📊 Total candidates found: ${candidates.length}`);
+  console.log(`✅ Selected containers: ${selectedContainers.length}`);
+
+  selectedContainers.forEach((container, idx) => {
+    const fieldCount = getFormFieldsRobust(container).length;
+    console.log(`   ${idx + 1}. ${container.tagName}.${container.className} (${fieldCount} fields)`);
+  });
+
+  if (candidates.length > selectedContainers.length) {
+    console.log(`⚠️ Filtered out ${candidates.length - selectedContainers.length} candidates:`);
+    const rejectedCandidates = candidates.slice(selectedContainers.length);
+    rejectedCandidates.forEach((candidate, idx) => {
+      if (!selectedContainers.includes(candidate.element)) {
+        console.log(
+          `   ${idx + 1}. ${candidate.element.tagName}.${candidate.element.className} (${candidate.fieldCount} fields, score: ${candidate.score})`,
+        );
+      }
+    });
+  }
+
   return selectedContainers;
 };
 

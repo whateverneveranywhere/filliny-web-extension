@@ -96,12 +96,20 @@ export const highlightForms = async ({
 
   console.log(`Processing ${formsArray.length} form containers for highlighting`);
 
+  // Log detailed information about each container being processed
+  formsArray.forEach((form, idx) => {
+    const fieldCount = countFormFieldsInElement(form);
+    console.log(`📋 Container ${idx}: ${form.tagName}.${form.className} with ${fieldCount} fields`);
+  });
+
   let index = 0;
   for (const form of formsArray) {
     const formId = `form-${index}`;
 
     // Set form ID without affecting the form's layout
     form.dataset.formId = formId;
+
+    console.log(`🎯 Processing form container ${index}: ${form.tagName}.${form.className} (${formId})`);
 
     try {
       if (visionOnly) {
@@ -112,13 +120,16 @@ export const highlightForms = async ({
         }, 2000);
       } else {
         createFormOverlay(form, formId, overlaysContainer, testMode, index === 0);
+        console.log(`✅ Created overlay for form ${formId}`);
       }
     } catch (error) {
-      console.error(`Error processing form ${formId}:`, error);
+      console.error(`❌ Error processing form ${formId}:`, error);
     }
 
     index++;
   }
+
+  console.log(`🎉 Completed processing ${formsArray.length} form containers`);
 };
 
 const createFormOverlay = (
@@ -271,7 +282,7 @@ const highlightFormFields = async (form: HTMLElement, isFirstForm: boolean = fal
 };
 
 const findOutermostFormContainer = (form: HTMLElement): HTMLElement => {
-  // Walk up the DOM tree to find the outermost meaningful container
+  // Be more conservative about expanding containers to avoid merging separate forms
   let bestContainer = form;
   let maxFieldCount = 0;
 
@@ -279,25 +290,62 @@ const findOutermostFormContainer = (form: HTMLElement): HTMLElement => {
   const originalFieldCount = countFormFieldsInElement(form);
   maxFieldCount = originalFieldCount;
 
-  // Walk up parent elements
+  console.log(
+    `🔍 Starting container expansion from ${form.tagName}.${form.className} with ${originalFieldCount} fields`,
+  );
+
+  // Walk up parent elements, but be more selective
   let parent = form.parentElement;
-  while (parent && parent !== document.body && parent !== document.documentElement) {
+  let expansionDepth = 0;
+  const MAX_EXPANSION_DEPTH = 3; // Limit how far we expand to avoid merging separate forms
+
+  while (
+    parent &&
+    parent !== document.body &&
+    parent !== document.documentElement &&
+    expansionDepth < MAX_EXPANSION_DEPTH
+  ) {
     const parentFieldCount = countFormFieldsInElement(parent);
 
-    // If parent has significantly more fields or similar field count with better semantic meaning
-    const hasMoreFields = parentFieldCount > maxFieldCount * 1.2;
+    // More conservative expansion criteria
+    const hasSignificantlyMoreFields = parentFieldCount > maxFieldCount * 1.5; // Increased threshold
     const hasSemanticMeaning = isSemanticFormContainer(parent);
-    const hasSimilarFields = parentFieldCount >= maxFieldCount * 0.8 && parentFieldCount <= maxFieldCount * 1.2;
+    const hasModerateIncrease = parentFieldCount > maxFieldCount && parentFieldCount <= maxFieldCount * 2; // Prevent massive expansions
 
-    if (hasMoreFields || (hasSimilarFields && hasSemanticMeaning)) {
-      bestContainer = parent;
-      maxFieldCount = parentFieldCount;
-      console.log(`🔄 Found better container: ${parent.tagName}.${parent.className} with ${parentFieldCount} fields`);
+    // Only expand if we have a good reason and it doesn't create too large a container
+    if (
+      (hasSignificantlyMoreFields && hasModerateIncrease) ||
+      (hasSemanticMeaning && parentFieldCount >= maxFieldCount)
+    ) {
+      console.log(`🔄 Considering expansion to: ${parent.tagName}.${parent.className} with ${parentFieldCount} fields`);
+
+      // Additional check: make sure this parent doesn't contain multiple distinct form-like sections
+      const formLikeSections = parent.querySelectorAll(
+        'form, fieldset, [role="form"], [class*="form-section"], [class*="form-container"]',
+      );
+
+      // If parent contains multiple form sections, it might be too broad
+      if (formLikeSections.length <= 2) {
+        // Allow some flexibility
+        bestContainer = parent;
+        maxFieldCount = parentFieldCount;
+        console.log(
+          `✅ Expanded to better container: ${parent.tagName}.${parent.className} with ${parentFieldCount} fields`,
+        );
+      } else {
+        console.log(`⚠️ Skipped expansion - parent contains ${formLikeSections.length} form sections (too broad)`);
+      }
+    } else {
+      console.log(
+        `⚠️ Skipped expansion - parent ${parent.tagName}.${parent.className} has ${parentFieldCount} fields (insufficient criteria)`,
+      );
     }
 
     parent = parent.parentElement;
+    expansionDepth++;
   }
 
+  console.log(`🎯 Final container: ${bestContainer.tagName}.${bestContainer.className} with ${maxFieldCount} fields`);
   return bestContainer;
 };
 
