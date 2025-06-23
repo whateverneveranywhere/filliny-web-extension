@@ -1,6 +1,6 @@
 {
   "name": "@extension/ui",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "chrome extension - ui components",
   "type": "module",
   "private": true,
@@ -49,7 +49,7 @@
     "@radix-ui/react-popover": "^1.1.2",
     "@radix-ui/react-progress": "^1.1.1",
     "@radix-ui/react-radio-group": "^1.2.1",
-    "@radix-ui/react-scroll-area": "^1.2.0",
+    "@radix-ui/react-scroll-area": "^1.2.1",
     "@radix-ui/react-select": "^2.1.2",
     "@radix-ui/react-separator": "^1.1.1",
     "@radix-ui/react-slot": "^1.1.1",
