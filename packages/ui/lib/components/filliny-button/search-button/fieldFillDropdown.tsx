@@ -20,7 +20,12 @@ export const FieldFillDropdown: React.FC<FieldFillDropdownProps> = ({ isOpen, on
 
   // Adjust position to ensure dropdown stays within viewport
   useEffect(() => {
-    const adjustPosition = () => {
+    // Skip if dropdown isn't open or ref isn't available
+    if (!isOpen || !dropdownRef.current) {
+      return undefined;
+    }
+
+    const adjustPosition = (): void => {
       if (!dropdownRef.current) return;
 
       const dropdown = dropdownRef.current;
@@ -59,23 +64,22 @@ export const FieldFillDropdown: React.FC<FieldFillDropdownProps> = ({ isOpen, on
       dropdown.style.left = `${left}px`;
     };
 
-    if (isOpen) {
-      // Initial adjustment
-      adjustPosition();
+    // Initial adjustment
+    adjustPosition();
 
-      // Adjust on window resize or scroll
-      const handleWindowChange = () => {
-        requestAnimationFrame(adjustPosition);
-      };
+    // Adjust on window resize or scroll
+    const handleWindowChange = (): void => {
+      requestAnimationFrame(adjustPosition);
+    };
 
-      window.addEventListener("resize", handleWindowChange);
-      window.addEventListener("scroll", handleWindowChange, { passive: true });
+    window.addEventListener("resize", handleWindowChange);
+    window.addEventListener("scroll", handleWindowChange, { passive: true });
 
-      return () => {
-        window.removeEventListener("resize", handleWindowChange);
-        window.removeEventListener("scroll", handleWindowChange);
-      };
-    }
+    // Cleanup function
+    return () => {
+      window.removeEventListener("resize", handleWindowChange);
+      window.removeEventListener("scroll", handleWindowChange);
+    };
   }, [isOpen, position]);
 
   // Close dropdown when clicking outside
