@@ -728,13 +728,6 @@ const dispatchSelectEvents = (element: HTMLSelectElement): void => {
 };
 
 /**
- * Get a random item from an array
- */
-const getRandomItem = <T>(items: T[]): T => {
-  return items[Math.floor(Math.random() * items.length)];
-};
-
-/**
  * Detect select fields from a set of elements
  * Handles both native selects and custom select components
  */
@@ -745,106 +738,194 @@ export const detectSelectFields = async (
 ): Promise<Field[]> => {
   const fields: Field[] = [];
 
-  // Get all select elements and custom select elements
-  const selectElements = elements.filter(
-    element =>
-      element instanceof HTMLSelectElement ||
-      element.getAttribute("role") === "combobox" ||
-      element.getAttribute("role") === "listbox" ||
-      element.classList.contains("select2-container") ||
-      element.classList.contains("chosen-container"),
-  );
+  console.log(`🔍 Detecting select fields from ${elements.length} elements, testMode: ${testMode}`);
+
+  // Enhanced select element detection with multiple strategies
+  const selectElements = elements.filter(element => {
+    // Strategy 1: Standard HTML select elements
+    if (element instanceof HTMLSelectElement) {
+      return true;
+    }
+
+    // Strategy 2: ARIA-based select elements
+    const role = element.getAttribute("role");
+    if (role === "combobox" || role === "listbox") {
+      return true;
+    }
+
+    // Strategy 3: Popular select libraries
+    const className = element.className.toLowerCase();
+    if (
+      className.includes("select2-container") ||
+      className.includes("chosen-container") ||
+      className.includes("selectize-control") ||
+      className.includes("react-select") ||
+      className.includes("vue-select") ||
+      className.includes("ng-select")
+    ) {
+      return true;
+    }
+
+    // Strategy 4: Custom select patterns
+    const hasSelectPattern =
+      className.includes("select") ||
+      className.includes("dropdown") ||
+      className.includes("picker") ||
+      element.getAttribute("data-select") !== null ||
+      element.getAttribute("data-dropdown") !== null;
+
+    // Must also have some interactive indicators
+    const hasInteractiveIndicators =
+      element.hasAttribute("tabindex") ||
+      element.hasAttribute("onclick") ||
+      element.hasAttribute("onchange") ||
+      element.getAttribute("aria-expanded") !== null ||
+      element.getAttribute("aria-haspopup") !== null;
+
+    return hasSelectPattern && hasInteractiveIndicators;
+  });
+
+  console.log(`📋 Found ${selectElements.length} potential select elements`);
 
   for (let i = 0; i < selectElements.length; i++) {
     const element = selectElements[i];
 
-    // Skip disabled/hidden elements
-    if (
-      element.hasAttribute("disabled") ||
-      element.hasAttribute("readonly") ||
-      element.getAttribute("aria-hidden") === "true" ||
-      window.getComputedStyle(element).display === "none" ||
-      window.getComputedStyle(element).visibility === "hidden"
-    ) {
-      continue;
-    }
+    try {
+      // Skip disabled/hidden elements
+      if (
+        element.hasAttribute("disabled") ||
+        element.hasAttribute("readonly") ||
+        element.getAttribute("aria-hidden") === "true"
+      ) {
+        console.log(`⏭️ Skipping disabled/readonly select element`);
+        continue;
+      }
 
-    // Create the field
-    const field = await createBaseField(element, baseIndex + i, "select", testMode);
+      // Enhanced visibility check
+      const style = window.getComputedStyle(element);
+      if (style.display === "none" || (style.visibility === "hidden" && style.opacity === "0")) {
+        console.log(`⏭️ Skipping hidden select element`);
+        continue;
+      }
 
-    // Detect if it's a multi-select
-    let isMultiple = false;
-    if (element instanceof HTMLSelectElement) {
-      isMultiple = element.multiple;
-    } else {
-      isMultiple = element.getAttribute("aria-multiselectable") === "true" || element.hasAttribute("multiple");
-    }
+      // Create the field
+      const field = await createBaseField(element, baseIndex + i, "select", testMode);
 
-    // Handle different select implementations
-    if (element instanceof HTMLSelectElement) {
-      // Standard HTML select - get options directly
-      field.options = Array.from(element.options).map(opt => ({
-        value: opt.value,
-        text: opt.text.trim() || opt.value,
-        selected: opt.selected,
-      }));
+      // Detect if it's a multi-select
+      let isMultiple = false;
+      if (element instanceof HTMLSelectElement) {
+        isMultiple = element.multiple;
+      } else {
+        isMultiple = element.getAttribute("aria-multiselectable") === "true" || element.hasAttribute("multiple");
+      }
 
-      field.value = isMultiple ? Array.from(element.selectedOptions).map(opt => opt.value) : element.value;
+      // Enhanced option detection based on element type
+      let options: Array<{ value: string; text: string; selected: boolean }> = [];
+      let currentValue: string | string[] = "";
 
-      field.metadata = {
-        framework: "vanilla",
-        visibility: { isVisible: true },
-        isMultiple,
-      };
-    } else {
-      // Custom select implementation - need to find options
-      field.options = await detectDynamicSelectOptions(element);
+      if (element instanceof HTMLSelectElement) {
+        // Standard HTML select - get options directly
+        options = Array.from(element.options).map(opt => ({
+          value: opt.value,
+          text: opt.text.trim() || opt.value,
+          selected: opt.selected,
+        }));
 
-      // Set current value based on selected options
-      const selectedOptions = field.options.filter((opt: { selected: boolean }) => opt.selected);
-      field.value = isMultiple
-        ? selectedOptions.map((opt: { value: string }) => opt.value)
-        : selectedOptions.length > 0
-          ? selectedOptions[0].value
-          : "";
+        currentValue = isMultiple ? Array.from(element.selectedOptions).map(opt => opt.value) : element.value;
 
-      // Try to detect the framework
-      const framework = detectSelectFramework(element);
-      field.metadata = {
-        framework: framework,
-        visibility: { isVisible: true },
-        isMultiple,
-      };
-    }
+        field.metadata = {
+          framework: "vanilla",
+          visibility: { isVisible: true },
+          isMultiple,
+        };
+      } else {
+        // Custom select implementation - use enhanced option detection
+        options = await detectDynamicSelectOptions(element);
 
-    // Set test value for test mode
-    if (testMode && field.options && field.options.length > 0) {
-      // Skip placeholder options like "Select one", "--", etc.
-      const validOptions = field.options.filter(
-        (opt: { value: string; text: string }) =>
-          opt.value &&
-          !opt.text.toLowerCase().includes("select") &&
-          !opt.text.includes("--") &&
-          !opt.text.toLowerCase().includes("please select"),
-      );
+        // Set current value based on selected options
+        const selectedOptions = options.filter(opt => opt.selected);
+        currentValue = isMultiple
+          ? selectedOptions.map(opt => opt.value)
+          : selectedOptions.length > 0
+            ? selectedOptions[0].value
+            : "";
 
-      if (validOptions.length > 0) {
-        if (isMultiple) {
-          // For multi-select, pick 1-2 random valid options
-          const count = Math.min(1 + Math.floor(Math.random() * 2), validOptions.length);
-          const shuffled = [...validOptions].sort(() => 0.5 - Math.random());
-          field.testValue = shuffled.slice(0, count).map((opt: { value: string }) => opt.value);
+        // Try to detect the framework
+        const framework = detectSelectFramework(element);
+        field.metadata = {
+          framework: framework,
+          visibility: { isVisible: true },
+          isMultiple,
+        };
+      }
+
+      // Set the field options and value
+      field.options = options;
+      field.value = currentValue;
+
+      // Enhanced test value generation for test mode
+      if (testMode && options.length > 0) {
+        // Filter out placeholder options with better detection
+        const validOptions = options.filter(opt => {
+          const text = opt.text.toLowerCase().trim();
+          const value = opt.value.trim();
+
+          // Skip empty values
+          if (!value || value === "") return false;
+
+          // Skip common placeholder patterns
+          if (
+            text.includes("select") ||
+            text.includes("choose") ||
+            text.includes("pick") ||
+            text.includes("please") ||
+            text.includes("--") ||
+            text.includes("...") ||
+            text === "none" ||
+            text === "n/a" ||
+            value === "0" ||
+            value === "-1"
+          ) {
+            return false;
+          }
+
+          return true;
+        });
+
+        console.log(
+          `🎯 Select field ${field.id}: Found ${validOptions.length} valid options out of ${options.length} total`,
+        );
+
+        if (validOptions.length > 0) {
+          if (isMultiple) {
+            // For multi-select, pick 1-2 random valid options
+            const count = Math.min(1 + Math.floor(Math.random() * 2), validOptions.length);
+            const shuffled = [...validOptions].sort(() => 0.5 - Math.random());
+            field.testValue = shuffled.slice(0, count).map(opt => opt.value);
+            console.log(`🎯 Generated multi-select test value:`, field.testValue);
+          } else {
+            // For single select, pick a random valid option
+            const randomIndex = Math.floor(Math.random() * validOptions.length);
+            const randomOption = validOptions[randomIndex];
+            field.testValue = randomOption.value;
+            console.log(`🎯 Generated single-select test value: ${field.testValue} (${randomOption.text})`);
+          }
         } else {
-          // For single select, pick a random valid option
-          const randomOption = getRandomItem(validOptions);
-          field.testValue = randomOption.value;
+          console.log(`⚠️ No valid options found for select field ${field.id}, using first option as fallback`);
+          if (options.length > 0) {
+            field.testValue = isMultiple ? [options[0].value] : options[0].value;
+          }
         }
       }
-    }
 
-    fields.push(field);
+      fields.push(field);
+      console.log(`✅ Created select field: ${field.id} with ${options.length} options (multiple: ${isMultiple})`);
+    } catch (error) {
+      console.error(`❌ Error processing select element ${i}:`, error);
+    }
   }
 
+  console.log(`📊 Select field detection complete: ${fields.length} fields created`);
   return fields;
 };
 

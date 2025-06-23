@@ -180,6 +180,19 @@ export const detectInputField = async (
  */
 export const updateTextField = async (element: HTMLElement, value: string): Promise<void> => {
   try {
+    // Safety check: Don't apply text updates to checkbox/radio elements
+    if (element instanceof HTMLInputElement && (element.type === "checkbox" || element.type === "radio")) {
+      console.warn(`updateTextField called on ${element.type} element, ignoring to prevent design breakage`);
+      return;
+    }
+
+    // Safety check: Don't apply text updates to ARIA checkbox/radio elements
+    const role = element.getAttribute("role");
+    if (role === "checkbox" || role === "radio" || role === "switch") {
+      console.warn(`updateTextField called on element with role="${role}", ignoring to prevent design breakage`);
+      return;
+    }
+
     // First check if element is in viewport, scroll it into view if needed
     const rect = element.getBoundingClientRect();
     const isInViewport =

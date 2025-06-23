@@ -1,7 +1,7 @@
 import { highlightForms } from "./highlightForms";
-import { detectFields } from "./detectionHelpers";
-import { processChunks, updateFormFields } from "./formFieldHelpers";
+import { processChunks, updateFormFields } from "./fieldUpdaterHelpers";
 import { disableOtherButtons, resetOverlays, showLoadingIndicator } from "./overlayUtils";
+import { unifiedFieldRegistry } from "./unifiedFieldDetection";
 import type { DTOProfileFillingForm } from "@extension/storage";
 import { profileStrorage } from "@extension/storage";
 import type { Field, FieldType } from "@extension/shared";
@@ -10,7 +10,7 @@ import { aiFillService, getMatchingWebsite } from "@extension/shared";
 /**
  * Generate mock values for field testing
  */
-const getMockValueForFieldType = (type: FieldType, field: Field): string => {
+const getMockValueForFieldType = (type: FieldType, field: Field): string | string[] => {
   const now = new Date();
 
   switch (type) {
@@ -59,25 +59,32 @@ const getMockValueForFieldType = (type: FieldType, field: Field): string => {
     case "file":
       return "https://example.com/sample.pdf";
     case "checkbox": {
-      const element = document.querySelector<HTMLElement>(`[data-filliny-id="${field.id}"]`);
-      if (element) {
-        // Determine current state
-        const isCurrentlyChecked =
-          element instanceof HTMLInputElement
-            ? element.checked
-            : element.hasAttribute("checked") || element.getAttribute("aria-checked") === "true";
-
-        // Return the opposite state
-        return (!isCurrentlyChecked).toString();
+      // If this is a checkbox group, return array of values
+      if (field.options && field.options.length > 1) {
+        // Select 1-2 random options for checkbox groups
+        const numToSelect = Math.min(Math.ceil(Math.random() * 2), field.options.length);
+        const shuffled = [...field.options].sort(() => 0.5 - Math.random());
+        return shuffled.slice(0, numToSelect).map(opt => opt.value);
       }
-      return "true"; // Default to checking the box if element not found
+
+      // For single checkbox, return random for test mode
+      return Math.random() > 0.5 ? "true" : "false";
     }
     case "radio": {
       if (field.options?.length) {
-        // Prefer boolean values if available
-        const booleanOption = field.options.find(opt => ["true", "false"].includes(opt.value));
-        if (booleanOption) return booleanOption.value;
-        // Otherwise return first option
+        // For radio groups, prefer non-placeholder options
+        const nonPlaceholders = field.options.filter(opt => {
+          const text = opt.text.toLowerCase();
+          return !text.includes("select") && !text.includes("choose") && !text.includes("pick") && text !== "";
+        });
+
+        if (nonPlaceholders.length > 0) {
+          // Pick a random valid option for better testing variety
+          const randomIndex = Math.floor(Math.random() * nonPlaceholders.length);
+          return nonPlaceholders[randomIndex].value;
+        }
+
+        // Fallback to first option
         return field.options[0].value;
       }
       return "true";
@@ -85,118 +92,60 @@ const getMockValueForFieldType = (type: FieldType, field: Field): string => {
     case "select": {
       if (!field.options?.length) return "";
 
-      // Check for a select element to examine options
+      // Check for a select element to examine options and determine if multi-select
       const element = document.querySelector<HTMLElement>(`[data-filliny-id="${field.id}"]`);
+      const isMultiple = element instanceof HTMLSelectElement ? element.multiple : false;
+
+      // Log available options for debugging
       if (element instanceof HTMLSelectElement) {
-        // Log available options for debugging
         console.log(
-          `Test mode: Select options for ${field.id}:`,
+          `Test mode: Select options for ${field.id} (multiple: ${isMultiple}):`,
           Array.from(element.options).map(opt => ({
             value: opt.value,
             text: opt.text,
             disabled: opt.disabled,
           })),
         );
-
-        // If there's a current value, keep it if available
-        if (field.value) {
-          // Try several strategies to match field.value to an option
-          let matchingOption: HTMLOptionElement | undefined;
-
-          // 1. Match by exact value
-          matchingOption = element.querySelector(`option[value="${field.value}"]`) as HTMLOptionElement;
-
-          // 2. Match by option text
-          if (!matchingOption) {
-            matchingOption = Array.from(element.options).find(
-              opt => opt.text === field.value || opt.text.toLowerCase() === String(field.value).toLowerCase(),
-            );
-          }
-
-          // 3. Match by numeric ID if possible
-          if (!matchingOption) {
-            const numValue = parseInt(String(field.value), 10);
-            if (!isNaN(numValue)) {
-              matchingOption = Array.from(element.options).find(opt => parseInt(opt.value, 10) === numValue);
-            }
-          }
-
-          if (matchingOption) {
-            console.log(
-              `Test mode: Using existing value ${field.value} for select ${field.id}, matched to option: ${matchingOption.text}`,
-            );
-            return matchingOption.value;
-          } else {
-            console.log(`Test mode: Couldn't match existing value ${field.value} to any option for select ${field.id}`);
-          }
-        }
-
-        // Skip placeholder options
-        const isPlaceholder = (option: HTMLOptionElement): boolean => {
-          const text = option.text.toLowerCase();
-          return (
-            text.includes("select") ||
-            text.includes("choose") ||
-            text.includes("pick") ||
-            text === "" ||
-            option.value === "" ||
-            option.disabled
-          );
-        };
-
-        // Find valid options (non-placeholder, not disabled)
-        const validOptions = Array.from(element.options).filter(opt => !isPlaceholder(opt));
-
-        if (validOptions.length > 0) {
-          // Pick a random valid option
-          const selectedOption = validOptions[Math.floor(Math.random() * validOptions.length)];
-          const selectedValue = selectedOption.value;
-          console.log(
-            `Test mode: Selected valid option with value ${selectedValue}, text: "${selectedOption.text}" for ${field.id}`,
-          );
-          return selectedValue;
-        }
-
-        // Fall back to first option if no valid options found
-        console.log(`Test mode: No valid options found, using first option for ${field.id}`);
-        return element.options[0]?.value || "";
       }
 
-      // Fallback to using field options if direct element access fails
-      if (field.options?.length) {
-        // If there's a current value that matches an option, keep it
-        if (field.value) {
-          const matchingOption = field.options.find(
-            opt =>
-              opt.value === field.value ||
-              opt.text === field.value ||
-              opt.text.toLowerCase() === String(field.value).toLowerCase(),
-          );
-          if (matchingOption) {
-            console.log(`Test mode: Using existing value ${field.value} for select ${field.id} from field options`);
-            return matchingOption.value;
-          }
-        }
+      // Skip placeholder options
+      const nonPlaceholders = field.options.filter(opt => {
+        const text = opt.text.toLowerCase();
+        return (
+          !text.includes("select") &&
+          !text.includes("choose") &&
+          !text.includes("pick") &&
+          text !== "" &&
+          opt.value !== ""
+        );
+      });
 
-        // Skip placeholder options
-        const nonPlaceholders = field.options.filter(opt => {
-          const text = opt.text.toLowerCase();
-          return !text.includes("select") && !text.includes("choose") && !text.includes("pick") && text !== "";
-        });
-
-        if (nonPlaceholders.length > 0) {
+      if (nonPlaceholders.length > 0) {
+        if (isMultiple) {
+          // For multi-select, return array of 1-2 values
+          const numToSelect = Math.min(1 + Math.floor(Math.random() * 2), nonPlaceholders.length);
+          const shuffled = [...nonPlaceholders].sort(() => 0.5 - Math.random());
+          const selectedValues = shuffled.slice(0, numToSelect).map(opt => opt.value);
+          console.log(`Test mode: Selected multi-select values for ${field.id}:`, selectedValues);
+          return selectedValues;
+        } else {
+          // For single select, pick a random valid option
           const selectedIndex = Math.floor(Math.random() * nonPlaceholders.length);
-          console.log(`Test mode: Using option ${selectedIndex} from field options for ${field.id}`);
-          return nonPlaceholders[selectedIndex].value;
+          const selectedValue = nonPlaceholders[selectedIndex].value;
+          console.log(`Test mode: Selected single option for ${field.id}: ${selectedValue}`);
+          return selectedValue;
         }
+      }
 
-        // Last resort, use first option
-        console.log(`Test mode: Using first option from field options for ${field.id}`);
-        return field.options[0].value;
+      // Fallback
+      if (field.options.length > 0) {
+        const fallbackValue = isMultiple ? [field.options[0].value] : field.options[0].value;
+        console.log(`Test mode: Using fallback option for ${field.id}:`, fallbackValue);
+        return fallbackValue;
       }
 
       // Last resort fallback
-      return "option1";
+      return isMultiple ? ["option1"] : "option1";
     }
     case "textarea":
       // Provide a longer multi-line sample for textareas to ensure they visibly update
@@ -219,13 +168,23 @@ export const handleFormClick = async (
   formId: string,
   testMode = false,
 ): Promise<void> => {
-  event.preventDefault();
+  // Make sure event doesn't propagate
+  if (event) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    // For extra safety with React synthetic events
+    if (event.nativeEvent) {
+      event.nativeEvent.stopImmediatePropagation?.();
+      event.nativeEvent.stopPropagation?.();
+      event.nativeEvent.preventDefault?.();
+    }
+  }
+
   const totalStartTime = performance.now();
 
-  // Look for both native forms and form-like containers
-  const formContainer = document.querySelector<HTMLElement>(
-    `form[data-form-id="${formId}"], [data-filliny-form-container][data-form-id="${formId}"]`,
-  );
+  // Enhanced form container finding logic
+  const formContainer = findFormContainer(formId);
 
   if (!formContainer) {
     alert("Form not found. Please try again.");
@@ -234,14 +193,31 @@ export const handleFormClick = async (
     return;
   }
 
+  console.log(
+    `🎯 Processing form container: ${formContainer.tagName}${formContainer.className ? "." + formContainer.className : ""}`,
+  );
+
   disableOtherButtons(formId);
   showLoadingIndicator(formId);
 
   try {
     const startTime = performance.now();
 
-    // Detect fields using DOM-only strategy
-    const fields = await detectFields(formContainer, false);
+    // Get fields from unified registry instead of re-detecting
+    // First check if this container is already registered
+    const containerId = findContainerIdForFormContainer(formContainer);
+    let fields: Field[] = [];
+
+    if (containerId) {
+      fields = unifiedFieldRegistry.getAllFields(containerId);
+      console.log(`Form Click: Using cached fields from registry for container ${containerId}`);
+    } else {
+      // Fallback: register the container if not found
+      console.log("Form Click: Container not in registry, registering now...");
+      const newContainerId = `form-click-${Date.now()}`;
+      await unifiedFieldRegistry.registerContainer(formContainer, newContainerId);
+      fields = unifiedFieldRegistry.getAllFields(newContainerId);
+    }
 
     console.log("Form Click: Detected fields:", fields);
     console.log(
@@ -348,6 +324,204 @@ export const handleFormClick = async (
     );
     resetOverlays();
   }
+};
+
+/**
+ * Find container ID for a form container from the unified registry
+ */
+const findContainerIdForFormContainer = (formContainer: HTMLElement): string | null => {
+  // Check if this container has a form ID that we can map to a container ID
+  const formId = formContainer.dataset.formId;
+  if (formId) {
+    // Try to map form ID to container ID based on naming patterns
+    const match = formId.match(/form-(\d+)/);
+    if (match) {
+      // Try different container ID patterns
+      const patterns = [`highlight-container-${match[1]}`, `container-${match[1]}`, `form-click-container-${match[1]}`];
+
+      for (const containerId of patterns) {
+        const fields = unifiedFieldRegistry.getAllFields(containerId);
+        if (fields.length > 0) {
+          return containerId;
+        }
+      }
+    }
+  }
+
+  // Fallback: check if this container matches any registered container
+  // This is more expensive but ensures we find the right one
+  return null; // Will trigger re-registration
+};
+
+/**
+ * Enhanced form container finder that prioritizes the outermost wrapper
+ */
+const findFormContainer = (formId: string): HTMLElement | null => {
+  console.log(`🔍 Looking for form container with ID: ${formId}`);
+
+  // Strategy 1: Look for exact matches first
+  const exactMatches = [
+    `form[data-form-id="${formId}"]`,
+    `[data-filliny-form-container][data-form-id="${formId}"]`,
+    `[data-form-id="${formId}"]`,
+  ];
+
+  for (const selector of exactMatches) {
+    const element = document.querySelector<HTMLElement>(selector);
+    if (element) {
+      console.log(`✅ Found exact match: ${selector}`);
+      return validateAndExpandFormContainer(element);
+    }
+  }
+
+  // Strategy 2: Look for any element with the form ID and expand to find true outermost container
+  const anyFormElement = document.querySelector<HTMLElement>(`[data-form-id="${formId}"]`);
+  if (anyFormElement) {
+    console.log(`🔍 Found element with form ID, expanding to find outermost container...`);
+    return validateAndExpandFormContainer(anyFormElement);
+  }
+
+  // Strategy 3: Fallback to any form-like container
+  const fallbackSelectors = [
+    "form",
+    "[data-filliny-form-container]",
+    "[role='form']",
+    "[data-form]",
+    ".form",
+    ".form-container",
+    ".form-wrapper",
+  ];
+
+  for (const selector of fallbackSelectors) {
+    const elements = document.querySelectorAll<HTMLElement>(selector);
+    if (elements.length > 0) {
+      console.log(`⚠️ Using fallback selector: ${selector}`);
+      // Return the largest form container (most likely to be outermost)
+      return Array.from(elements).reduce((largest, current) => {
+        const largestRect = largest.getBoundingClientRect();
+        const currentRect = current.getBoundingClientRect();
+        return currentRect.width * currentRect.height > largestRect.width * largestRect.height ? current : largest;
+      });
+    }
+  }
+
+  console.error(`❌ No form container found for ID: ${formId}`);
+  return null;
+};
+
+/**
+ * Validate and potentially expand a form container to ensure we have the outermost wrapper
+ */
+const validateAndExpandFormContainer = (element: HTMLElement): HTMLElement => {
+  console.log(`🔍 Validating form container: ${element.tagName}${element.className ? "." + element.className : ""}`);
+
+  // First, detect all form fields within this element
+  const fieldsInElement = detectFormFieldsInElement(element);
+  console.log(`📋 Found ${fieldsInElement.length} form fields in current container`);
+
+  if (fieldsInElement.length === 0) {
+    console.warn(`⚠️ No form fields found in container, returning as-is`);
+    return element;
+  }
+
+  // Strategy: Walk up the DOM tree to find a container that has significantly more fields
+  // This helps us find the true outermost form container
+  let bestContainer = element;
+  let maxFieldCount = fieldsInElement.length;
+
+  // Walk up the DOM tree
+  let parent = element.parentElement;
+  while (parent && parent !== document.body) {
+    // Don't go beyond certain boundary elements
+    if (parent.tagName === "BODY" || parent.tagName === "HTML") {
+      break;
+    }
+
+    // Check if this parent has significantly more fields
+    const fieldsInParent = detectFormFieldsInElement(parent);
+
+    // If parent has more fields, it might be a better container
+    if (fieldsInParent.length > maxFieldCount) {
+      console.log(
+        `🔍 Parent ${parent.tagName}${parent.className ? "." + parent.className : ""} has ${fieldsInParent.length} fields (more than ${maxFieldCount})`,
+      );
+
+      // Additional validation: make sure this isn't too broad
+      const ratio = fieldsInParent.length / maxFieldCount;
+
+      // If the parent has 50% more fields or more, and isn't the entire page, use it
+      if (ratio >= 1.5 && ratio <= 10) {
+        bestContainer = parent;
+        maxFieldCount = fieldsInParent.length;
+        console.log(`✅ Using parent as better container: ${parent.tagName}`);
+      } else if (ratio > 10) {
+        console.log(`⚠️ Parent has too many fields (${fieldsInParent.length}), probably too broad`);
+        break;
+      }
+    }
+
+    parent = parent.parentElement;
+  }
+
+  // Special case: if we found a semantic form element, prefer it
+  let semanticParent = bestContainer.parentElement;
+  while (semanticParent && semanticParent !== document.body) {
+    if (
+      semanticParent.tagName === "FORM" ||
+      semanticParent.getAttribute("role") === "form" ||
+      semanticParent.hasAttribute("data-form") ||
+      semanticParent.className.toLowerCase().includes("form")
+    ) {
+      const semanticFields = detectFormFieldsInElement(semanticParent);
+      if (semanticFields.length >= maxFieldCount * 0.8) {
+        // At least 80% of the fields
+        console.log(`✅ Found semantic form parent: ${semanticParent.tagName}`);
+        bestContainer = semanticParent;
+        break;
+      }
+    }
+    semanticParent = semanticParent.parentElement;
+  }
+
+  console.log(
+    `🎯 Final container choice: ${bestContainer.tagName}${bestContainer.className ? "." + bestContainer.className : ""} with ${maxFieldCount} fields`,
+  );
+  return bestContainer;
+};
+
+/**
+ * Count form fields in an element (lightweight version)
+ */
+const detectFormFieldsInElement = (element: HTMLElement): HTMLElement[] => {
+  const fieldSelectors = [
+    'input:not([type="hidden"]):not([type="submit"]):not([type="button"]):not([type="reset"])',
+    "select",
+    "textarea",
+    '[role="textbox"]',
+    '[role="combobox"]',
+    '[role="checkbox"]',
+    '[role="radio"]',
+    '[contenteditable="true"]',
+  ];
+
+  const fields: HTMLElement[] = [];
+
+  fieldSelectors.forEach(selector => {
+    try {
+      const elements = element.querySelectorAll<HTMLElement>(selector);
+      elements.forEach(el => {
+        // Basic visibility check
+        const style = window.getComputedStyle(el);
+        if (style.display !== "none" && style.visibility !== "hidden") {
+          fields.push(el);
+        }
+      });
+    } catch {
+      // Ignore selector errors
+    }
+  });
+
+  return fields;
 };
 
 /**

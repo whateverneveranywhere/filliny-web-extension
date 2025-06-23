@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import type { CSSProperties } from "react";
 import type { DragEndEvent } from "@dnd-kit/core";
 import { DndContext, useDraggable } from "@dnd-kit/core";
@@ -10,8 +10,10 @@ import { FillinyVisionButton } from "./filliny-vision-button";
 import { SupportRequestButton } from "./support-request-button";
 import { ButtonWrapper, type ButtonComponentProps } from "./button-wrapper";
 import { FillinyTestModeFillerButton } from "./test-mode-button";
-import { positionStorage } from "@extension/storage";
+import { positionStorage, fieldButtonsStorage } from "@extension/storage";
 import { DragButton } from "./drag-button";
+import { FieldFillManager } from "./search-button/fieldFillManager";
+import { FieldButtonToggle } from "./field-button";
 
 interface ButtonConfig {
   Component: React.FC<ButtonComponentProps>;
@@ -40,6 +42,11 @@ const buttonComponents: ButtonConfig[] = [
     Component: FillinyVisionButton,
     position: { top: "-10px", left: "-25px" },
     tooltipContent: "Highlight fillable form fields",
+  },
+  {
+    Component: FieldButtonToggle,
+    position: { top: "49px", left: "-8px" },
+    tooltipContent: "Toggle field fill buttons",
   },
 ];
 
@@ -107,7 +114,15 @@ const DraggableButton = ({ position }: { position: Position }) => {
 
 const FillinyButton: React.FC = () => {
   const savedPosition = useStorage(positionStorage);
+  const fieldButtonSettings = useStorage(fieldButtonsStorage);
   const [position, setPosition] = useState<Position>(savedPosition);
+
+  // Store preference in DOM for easy access by field buttons
+  useEffect(() => {
+    if (fieldButtonSettings) {
+      document.body.setAttribute("data-filliny-prefer-test-mode", String(fieldButtonSettings.preferTestMode));
+    }
+  }, [fieldButtonSettings]);
 
   const handleDragEnd = async (event: DragEndEvent) => {
     const { delta } = event;
@@ -125,9 +140,12 @@ const FillinyButton: React.FC = () => {
   };
 
   return (
-    <DndContext modifiers={[restrictToVerticalAxis]} onDragEnd={handleDragEnd}>
-      <DraggableButton position={position} />
-    </DndContext>
+    <>
+      <DndContext modifiers={[restrictToVerticalAxis]} onDragEnd={handleDragEnd}>
+        <DraggableButton position={position} />
+      </DndContext>
+      {fieldButtonSettings?.enabled && <FieldFillManager />}
+    </>
   );
 };
 

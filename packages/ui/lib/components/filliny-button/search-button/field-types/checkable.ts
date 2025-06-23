@@ -5,6 +5,7 @@ import type { Field } from "@extension/shared";
 interface CheckableField extends Field {
   checked?: boolean;
   groupName?: string;
+  groupType?: "radio" | "checkbox";
 }
 
 /**
@@ -122,12 +123,12 @@ export const updateCheckable = (element: HTMLElement, checked: boolean): void =>
       updateCustomCheckable(element, checked);
     }
 
-    // If this is a radio button, ensure that related radio buttons in the same group are properly updated
-    if ((element instanceof HTMLInputElement && element.type === "radio") || element.getAttribute("role") === "radio") {
-      if (checked) {
-        // Find and uncheck all other radio buttons in this group
-        updateRelatedRadioButtons(element);
-      }
+    // If this is a radio button and we're checking it, ensure that other radio buttons in the same group are unchecked
+    if (
+      checked &&
+      ((element instanceof HTMLInputElement && element.type === "radio") || element.getAttribute("role") === "radio")
+    ) {
+      updateRelatedRadioButtons(element);
     }
   } catch (error) {
     console.error("Error updating checkable element:", error);
@@ -250,14 +251,6 @@ const updateVisualIndicators = (element: HTMLElement, checked: boolean): void =>
     element.classList.add("unchecked");
   }
 
-  // If this is a radio button, ensure that related radio buttons in the same group are properly updated
-  if ((element instanceof HTMLInputElement && element.type === "radio") || element.getAttribute("role") === "radio") {
-    if (checked) {
-      // Find and uncheck all other radio buttons in this group
-      updateRelatedRadioButtons(element);
-    }
-  }
-
   // Dispatch events
   const changeEvent = new Event("change", { bubbles: true });
   element.dispatchEvent(changeEvent);
@@ -363,14 +356,40 @@ const updateRelatedRadioButtons = (element: HTMLElement): void => {
 };
 
 /**
- * Get a random item from an array
+ * Find a common container for elements
  */
-const getRandomItem = <T>(items: T[]): T => {
-  return items[Math.floor(Math.random() * items.length)];
+const findCommonContainer = (elements: HTMLElement[]): HTMLElement | null => {
+  if (elements.length === 0) return null;
+  if (elements.length === 1) return elements[0].parentElement;
+
+  // Start with the first element's ancestors
+  let commonAncestor = elements[0].parentElement;
+
+  while (commonAncestor) {
+    // Check if this ancestor contains all elements
+    const containsAll = elements.every(el => commonAncestor?.contains(el));
+    if (containsAll) {
+      // Prefer semantic containers
+      if (
+        commonAncestor.tagName.toLowerCase() === "fieldset" ||
+        commonAncestor.getAttribute("role") === "radiogroup" ||
+        commonAncestor.getAttribute("role") === "group" ||
+        commonAncestor.classList.contains("radio-group") ||
+        commonAncestor.classList.contains("checkbox-group") ||
+        commonAncestor.querySelector("legend")
+      ) {
+        return commonAncestor;
+      }
+    }
+    commonAncestor = commonAncestor.parentElement;
+  }
+
+  return null;
 };
 
 /**
- * Detect checkable fields (radio buttons and checkboxes)
+ * Detect checkable fields with proper grouping
+ * This is the main entry point for detecting radio and checkbox fields
  */
 export const detectCheckableFields = async (
   elements: HTMLElement[],
@@ -380,451 +399,615 @@ export const detectCheckableFields = async (
   const fields: Field[] = [];
   let fieldIndex = 0;
 
-  // Special handling for radio buttons - group them by name
-  const radioGroups = new Map<string, HTMLInputElement[]>();
-  const processedRadios = new Set<HTMLElement>();
-
-  // First, collect radio groups
-  elements.forEach(element => {
-    if (element instanceof HTMLInputElement && element.type === "radio") {
-      const groupName = element.name || "";
-      if (!radioGroups.has(groupName)) {
-        radioGroups.set(groupName, []);
-      }
-      radioGroups.get(groupName)?.push(element);
-    }
-  });
-
-  // Handle aria-based checkboxes and switches separately
-  const ariaCheckables = elements.filter(
-    el =>
-      (el.getAttribute("role") === "checkbox" || el.getAttribute("role") === "switch") &&
-      !(el instanceof HTMLInputElement),
+  console.log(
+    `Detecting checkable fields from ${elements.length} elements, baseIndex: ${baseIndex}, testMode: ${testMode}`,
   );
 
-  // Process regular input checkboxes
+  // Separate elements by type
+  const radioElements = elements.filter(
+    el => (el instanceof HTMLInputElement && el.type === "radio") || el.getAttribute("role") === "radio",
+  );
   const checkboxElements = elements.filter(
-    el => el instanceof HTMLInputElement && el.type === "checkbox" && !processedRadios.has(el),
+    el => (el instanceof HTMLInputElement && el.type === "checkbox") || el.getAttribute("role") === "checkbox",
+  );
+  const switchElements = elements.filter(el => el.getAttribute("role") === "switch");
+
+  console.log(
+    `Found ${radioElements.length} radio elements, ${checkboxElements.length} checkbox elements, ${switchElements.length} switch elements`,
   );
 
-  for (const element of checkboxElements) {
-    const field = (await createBaseField(element, baseIndex + fieldIndex, "checkbox", testMode)) as CheckableField;
+  // Process radio buttons as groups
+  if (radioElements.length > 0) {
+    const radioGroups = await groupRadioElements(radioElements);
+    console.log(`Created ${radioGroups.size} radio groups`);
 
-    field.checked = (element as HTMLInputElement).checked;
-
-    // In test mode, randomly set checkbox state
-    if (testMode) {
-      field.testValue = Math.random() > 0.5 ? "true" : "false";
-    }
-
-    fields.push(field);
-    fieldIndex++;
-  }
-
-  // Process aria-based checkboxes
-  for (const element of ariaCheckables) {
-    const isChecked = element.getAttribute("aria-checked") === "true";
-    const field = (await createBaseField(element, baseIndex + fieldIndex, "checkbox", testMode)) as CheckableField;
-
-    field.checked = isChecked;
-
-    // In test mode, randomly set checkbox state
-    if (testMode) {
-      field.testValue = Math.random() > 0.5 ? "true" : "false";
-    }
-
-    fields.push(field);
-    fieldIndex++;
-  }
-
-  // Process radio groups
-  for (const [groupName, groupElements] of radioGroups.entries()) {
-    // Skip empty groups
-    if (groupElements.length === 0) continue;
-
-    // Pick the first radio from the group
-    const inputElement = groupElements[0];
-
-    // Skip if already processed
-    if (processedRadios.has(inputElement)) continue;
-
-    if (inputElement.type === "radio") {
-      // For radio buttons, we handle the entire group at once
-      const _React = inputElement.name || null;
-
-      if (_React) {
-        // Get all radios in this group
-        const groupRadios = radioGroups.get(groupName) || [inputElement];
-
-        // Create one field for the entire radio group
-        const field = (await createBaseField(
-          inputElement,
-          baseIndex + fieldIndex,
-          "radio",
-          testMode,
-        )) as CheckableField;
-
-        field.name = groupName;
-        field.groupName = groupName;
-        field.label = groupName; // Default label to group name
-
-        // Find which option is currently selected
-        const checkedRadio = groupRadios.find(radio => radio.checked);
-        field.checked = !!checkedRadio;
-
-        // Determine label from surrounding context
-        const fieldset = inputElement.closest("fieldset");
-        if (fieldset) {
-          const legend = fieldset.querySelector("legend");
-          if (legend && legend.textContent) {
-            field.label = legend.textContent.trim();
-          }
-        }
-
-        // Get possible values from all options
-        const values: string[] = groupRadios.map(radio => radio.value);
-        field.options = values.length > 0 ? values.map(value => ({ value, text: value, selected: false })) : undefined;
-
-        // Set test value to a random option value
-        if (testMode && values.length > 0) {
-          // For gender fields in test mode, prefer "female" option if available
-          const femaleValue = values.find(
-            v =>
-              v.toLowerCase() === "female" ||
-              v.toLowerCase() === "f" ||
-              v.toLowerCase() === "frau" ||
-              v.toLowerCase() === "w" ||
-              v === "1", // Often used for female in legacy systems
-          );
-
-          // If a gender field is detected, use female value, otherwise pick randomly
-          if (
-            femaleValue &&
-            (field.label?.toLowerCase().includes("gender") ||
-              field.label?.toLowerCase().includes("sex") ||
-              field.label?.toLowerCase().includes("geschlecht") ||
-              field.label?.toLowerCase().includes("anrede"))
-          ) {
-            field.testValue = femaleValue;
-          } else {
-            // Pick a random option
-            field.testValue = getRandomItem(values);
-          }
-        }
-
+    for (const [groupId, groupElements] of radioGroups.entries()) {
+      try {
+        const field = await createRadioGroupField(groupElements, baseIndex + fieldIndex, groupId, testMode);
         fields.push(field);
         fieldIndex++;
-
-        // Mark all radios in this group as processed
-        groupRadios.forEach(radio => processedRadios.add(radio));
+        console.log(`Created radio group field: ${field.id} with ${groupElements.length} options`);
+      } catch (error) {
+        console.error(`Error creating radio group field for ${groupId}:`, error);
       }
     }
   }
 
-  // Process ARIA role=radio elements - similar to radio inputs
-  const ariaRadioGroups = new Map<string, HTMLElement[]>();
-  const ariaRadios = elements.filter(el => el.getAttribute("role") === "radio" && !processedRadios.has(el));
+  // Process checkboxes - can be individual or grouped
+  if (checkboxElements.length > 0) {
+    const checkboxGroups = await groupCheckboxElements(checkboxElements);
+    console.log(`Created ${checkboxGroups.size} checkbox groups`);
 
-  // Group by radiogroup container
-  ariaRadios.forEach(element => {
-    const radioGroup = element.closest('[role="radiogroup"]');
-    const groupId = radioGroup ? radioGroup.id || "radiogroup-" + Date.now() : "standalone-" + Date.now();
-    if (!ariaRadioGroups.has(groupId)) {
-      ariaRadioGroups.set(groupId, []);
+    for (const [groupId, groupElements] of checkboxGroups.entries()) {
+      try {
+        if (groupElements.length === 1) {
+          // Single checkbox
+          const field = await createCheckboxField(groupElements[0], baseIndex + fieldIndex, testMode);
+          fields.push(field);
+          console.log(`Created single checkbox field: ${field.id}`);
+        } else {
+          // Checkbox group
+          const field = await createCheckboxGroupField(groupElements, baseIndex + fieldIndex, groupId, testMode);
+          fields.push(field);
+          console.log(`Created checkbox group field: ${field.id} with ${groupElements.length} options`);
+        }
+        fieldIndex++;
+      } catch (error) {
+        console.error(`Error creating checkbox field for ${groupId}:`, error);
+      }
     }
-    ariaRadioGroups.get(groupId)?.push(element);
+  }
+
+  // Process switch elements individually
+  for (const switchElement of switchElements) {
+    try {
+      const field = await createSwitchField(switchElement, baseIndex + fieldIndex, testMode);
+      fields.push(field);
+      fieldIndex++;
+      console.log(`Created switch field: ${field.id}`);
+    } catch (error) {
+      console.error(`Error creating switch field:`, error);
+    }
+  }
+
+  console.log(`Detected ${fields.length} checkable fields total`);
+  return fields;
+};
+
+/**
+ * Enhanced grouping algorithm for radio elements with comprehensive fallback strategies
+ */
+const groupRadioElements = async (elements: HTMLElement[]): Promise<Map<string, HTMLElement[]>> => {
+  const groups = new Map<string, HTMLElement[]>();
+  const processed = new Set<HTMLElement>();
+
+  console.log(`Grouping ${elements.length} radio elements using enhanced algorithm`);
+
+  // Strategy 1: Group by name attribute (most reliable for radio buttons)
+  const namedGroups = new Map<string, HTMLElement[]>();
+  for (const element of elements) {
+    if (element instanceof HTMLInputElement && element.name) {
+      const name = element.name;
+      if (!namedGroups.has(name)) {
+        namedGroups.set(name, []);
+      }
+      namedGroups.get(name)!.push(element);
+      processed.add(element);
+    }
+  }
+
+  // Add named groups (radio buttons with same name should always be grouped)
+  for (const [name, groupElements] of namedGroups.entries()) {
+    if (groupElements.length >= 1) {
+      // Even single radios are part of a group conceptually
+      groups.set(`radio-name-${name}`, groupElements);
+      console.log(`Created radio group from name "${name}" with ${groupElements.length} elements`);
+    }
+  }
+
+  // Strategy 2: Group remaining elements by semantic containers and proximity
+  const unprocessedElements = elements.filter(el => !processed.has(el));
+  if (unprocessedElements.length > 0) {
+    console.log(`Processing ${unprocessedElements.length} unnamed radio elements`);
+
+    // First try semantic containers
+    const containerGroups = await groupBySemanticContainers(unprocessedElements, "radio");
+    for (const [groupId, groupElements] of containerGroups.entries()) {
+      groups.set(groupId, groupElements);
+      groupElements.forEach(el => processed.add(el));
+      console.log(`Created radio group from container "${groupId}" with ${groupElements.length} elements`);
+    }
+
+    // Then handle any remaining elements with proximity-based grouping
+    const stillUnprocessed = elements.filter(el => !processed.has(el));
+    if (stillUnprocessed.length > 0) {
+      console.log(`Creating individual groups for ${stillUnprocessed.length} remaining radio elements`);
+
+      // For radio buttons, even individual ones should be treated as groups
+      // This is because radio buttons are conceptually always part of a group
+      stillUnprocessed.forEach((element, index) => {
+        const elementId = element.id || element.getAttribute("data-filliny-id") || `radio-${Date.now()}-${index}`;
+        const groupId = `radio-individual-${elementId}`;
+        groups.set(groupId, [element]);
+        console.log(`Created individual radio group: ${groupId}`);
+      });
+    }
+  }
+
+  return groups;
+};
+
+/**
+ * Enhanced grouping algorithm for checkbox elements with improved logic
+ */
+const groupCheckboxElements = async (elements: HTMLElement[]): Promise<Map<string, HTMLElement[]>> => {
+  const groups = new Map<string, HTMLElement[]>();
+  const processed = new Set<HTMLElement>();
+
+  console.log(`Grouping ${elements.length} checkbox elements using enhanced algorithm`);
+
+  // Strategy 1: Group by name attribute (only if multiple checkboxes share the same name)
+  const namedGroups = new Map<string, HTMLElement[]>();
+  for (const element of elements) {
+    if (element instanceof HTMLInputElement && element.name) {
+      const name = element.name;
+      if (!namedGroups.has(name)) {
+        namedGroups.set(name, []);
+      }
+      namedGroups.get(name)!.push(element);
+    }
+  }
+
+  // Add named groups only if they have multiple elements
+  for (const [name, groupElements] of namedGroups.entries()) {
+    if (groupElements.length > 1) {
+      groups.set(`checkbox-name-${name}`, groupElements);
+      groupElements.forEach(el => processed.add(el));
+      console.log(`Created checkbox group from name "${name}" with ${groupElements.length} elements`);
+    }
+  }
+
+  // Strategy 2: Group remaining elements by semantic containers
+  const unprocessedElements = elements.filter(el => !processed.has(el));
+  if (unprocessedElements.length > 0) {
+    console.log(`Processing ${unprocessedElements.length} ungrouped checkbox elements`);
+
+    const containerGroups = await groupBySemanticContainers(unprocessedElements, "checkbox");
+    for (const [groupId, groupElements] of containerGroups.entries()) {
+      if (groupElements.length > 1) {
+        // Only group checkboxes if there are multiple in the same semantic container
+        groups.set(groupId, groupElements);
+        groupElements.forEach(el => processed.add(el));
+        console.log(`Created checkbox group from container "${groupId}" with ${groupElements.length} elements`);
+      }
+    }
+  }
+
+  // Strategy 3: Individual checkboxes (those not grouped by above strategies)
+  const stillUnprocessed = elements.filter(el => !processed.has(el));
+  for (const element of stillUnprocessed) {
+    // Create individual checkbox groups
+    const groupId = `checkbox-individual-${element.id || element.getAttribute("data-filliny-id") || Date.now()}-${Math.random()}`;
+    groups.set(groupId, [element]);
+    console.log(`Created individual checkbox: ${groupId}`);
+  }
+
+  return groups;
+};
+
+/**
+ * Group elements by semantic containers using multiple detection strategies
+ */
+const groupBySemanticContainers = async (
+  elements: HTMLElement[],
+  type: "radio" | "checkbox",
+): Promise<Map<string, HTMLElement[]>> => {
+  const groups = new Map<string, HTMLElement[]>();
+  const processed = new Set<HTMLElement>();
+
+  // Define semantic container selectors in priority order
+  const semanticSelectors = [
+    '[role="radiogroup"]', // ARIA radiogroup (highest priority)
+    '[role="group"]', // ARIA group
+    "fieldset", // HTML fieldset
+    '[class*="radio-group" i]', // CSS class patterns (case insensitive)
+    '[class*="radiogroup" i]',
+    '[class*="checkbox-group" i]',
+    '[class*="checkboxgroup" i]',
+    '[class*="option-group" i]',
+    '[class*="optiongroup" i]',
+    '[class*="form-group" i]',
+    '[class*="field-group" i]',
+    "[data-group]", // Data attributes
+    "[data-radio-group]",
+    "[data-checkbox-group]",
+  ];
+
+  for (const element of elements) {
+    if (processed.has(element)) continue;
+
+    let bestContainer: HTMLElement | null = null;
+    let bestScore = 0;
+
+    // Find the best semantic container for this element
+    for (const selector of semanticSelectors) {
+      const container = element.closest(selector) as HTMLElement;
+      if (container) {
+        // Score this container based on how appropriate it is
+        const score = scoreSemanticContainer(container, elements, type);
+        if (score > bestScore) {
+          bestScore = score;
+          bestContainer = container;
+        }
+      }
+    }
+
+    if (bestContainer && bestScore > 0) {
+      // Find all elements in this container
+      const containerElements = elements.filter(el => bestContainer!.contains(el) && !processed.has(el));
+
+      if (containerElements.length >= (type === "radio" ? 1 : 2)) {
+        // Create group identifier
+        const containerId =
+          bestContainer.id ||
+          bestContainer.getAttribute("data-group") ||
+          bestContainer.className.split(" ")[0] ||
+          "container";
+
+        const groupId = `${type}-semantic-${containerId}-${Date.now()}`;
+        groups.set(groupId, containerElements);
+
+        containerElements.forEach(el => processed.add(el));
+
+        console.log(
+          `Grouped ${containerElements.length} ${type} elements by semantic container: ${bestContainer.tagName}.${bestContainer.className}`,
+        );
+      }
+    }
+  }
+
+  // Handle remaining elements with proximity-based grouping
+  const remainingElements = elements.filter(el => !processed.has(el));
+  if (remainingElements.length > 1) {
+    const proximityGroups = groupByProximity(remainingElements, type);
+    for (const [groupId, groupElements] of proximityGroups.entries()) {
+      groups.set(groupId, groupElements);
+      console.log(`Created proximity-based ${type} group: ${groupId} with ${groupElements.length} elements`);
+    }
+  }
+
+  return groups;
+};
+
+/**
+ * Score a semantic container based on how well it groups the given elements
+ */
+const scoreSemanticContainer = (
+  container: HTMLElement,
+  allElements: HTMLElement[],
+  type: "radio" | "checkbox",
+): number => {
+  let score = 0;
+
+  // Count how many of our elements this container contains
+  const containedElements = allElements.filter(el => container.contains(el));
+  if (containedElements.length === 0) return 0;
+
+  // Base score from element count
+  score += containedElements.length * 10;
+
+  // Bonus for semantic HTML and ARIA
+  const tagName = container.tagName.toLowerCase();
+  const role = container.getAttribute("role");
+
+  if (role === "radiogroup" && type === "radio") score += 50;
+  if (role === "group") score += 30;
+  if (tagName === "fieldset") score += 40;
+
+  // Bonus for appropriate class names
+  const className = container.className.toLowerCase();
+  if (className.includes(`${type}-group`)) score += 30;
+  if (className.includes("form-group")) score += 20;
+  if (className.includes("field-group")) score += 20;
+
+  // Bonus for having a label (legend, aria-label, etc.)
+  const hasLabel =
+    container.querySelector("legend") ||
+    container.getAttribute("aria-label") ||
+    container.getAttribute("aria-labelledby");
+  if (hasLabel) score += 15;
+
+  // Penalty for containing too many other form elements (indicates it's too broad)
+  const otherFormElements = container.querySelectorAll("input, select, textarea").length - containedElements.length;
+  if (otherFormElements > containedElements.length * 2) {
+    score -= 20;
+  }
+
+  // Penalty for being too deeply nested
+  const depth = getContainerDepth(container);
+  if (depth > 15) score -= (depth - 15) * 2;
+
+  return Math.max(0, score);
+};
+
+/**
+ * Group elements by proximity when no semantic containers are found
+ */
+const groupByProximity = (elements: HTMLElement[], type: "radio" | "checkbox"): Map<string, HTMLElement[]> => {
+  const groups = new Map<string, HTMLElement[]>();
+
+  if (elements.length <= 1) {
+    // Single elements or empty array
+    elements.forEach((el, idx) => {
+      groups.set(`${type}-proximity-${idx}-${Date.now()}`, [el]);
+    });
+    return groups;
+  }
+
+  // Calculate distances between elements
+  const elementPositions = elements.map(el => ({
+    element: el,
+    rect: el.getBoundingClientRect(),
+  }));
+
+  // Simple clustering based on vertical proximity
+  const clusters: HTMLElement[][] = [];
+  const processed = new Set<HTMLElement>();
+
+  for (const { element, rect } of elementPositions) {
+    if (processed.has(element)) continue;
+
+    const cluster = [element];
+    processed.add(element);
+
+    // Find nearby elements
+    for (const { element: otherElement, rect: otherRect } of elementPositions) {
+      if (processed.has(otherElement)) continue;
+
+      // Consider elements close if they're within 100px vertically
+      const distance = Math.abs(rect.top - otherRect.top);
+      if (distance <= 100) {
+        cluster.push(otherElement);
+        processed.add(otherElement);
+      }
+    }
+
+    if (cluster.length >= (type === "radio" ? 1 : 2)) {
+      clusters.push(cluster);
+    }
+  }
+
+  // Convert clusters to groups
+  clusters.forEach((cluster, idx) => {
+    groups.set(`${type}-proximity-${idx}-${Date.now()}`, cluster);
   });
 
-  // Process each ARIA radio group
-  for (const [groupId, groupElements] of ariaRadioGroups.entries()) {
-    if (groupElements.length === 0) continue;
-
-    // Create one field for the entire radio group
-    const inputElement = groupElements[0];
-    const field = (await createBaseField(inputElement, baseIndex + fieldIndex, "radio", testMode)) as CheckableField;
-
-    field.groupName = groupId;
-    field.label = groupId; // Default label to group name
-
-    // Find which option is currently selected
-    const checkedRadio = groupElements.find(radio => radio.getAttribute("aria-checked") === "true");
-    field.checked = !!checkedRadio;
-
-    // Get possible values from all options
-    const values: string[] = groupElements.map(
-      radio => radio.getAttribute("data-value") || radio.textContent?.trim() || "",
-    );
-    field.options = values.length > 0 ? values.map(value => ({ value, text: value, selected: false })) : undefined;
-
-    // Set test value to a random option value
-    if (testMode && values.length > 0) {
-      field.testValue = getRandomItem(values);
-    }
-
-    fields.push(field);
-    fieldIndex++;
-
-    // Mark all radios in this group as processed
-    groupElements.forEach(radio => processedRadios.add(radio));
-  }
-
-  return fields;
+  return groups;
 };
 
 /**
- * Detect radio button fields from a set of elements
- * Groups radio buttons with the same name into a single field
+ * Get the depth of a container in the DOM tree
  */
-export const detectRadioFields = async (
-  elements: HTMLElement[],
-  baseIndex: number,
-  testMode: boolean = false,
-): Promise<Field[]> => {
-  const fields: Field[] = [];
-  const processedGroups = new Set<string>();
-  const radioGroups = new Map<string, HTMLElement[]>();
+const getContainerDepth = (container: HTMLElement): number => {
+  let depth = 0;
+  let current = container.parentElement;
+  while (current && current !== document.body) {
+    depth++;
+    current = current.parentElement;
+  }
+  return depth;
+};
 
-  // First, group radio elements by name or common container
-  const radioElements = elements.filter(
-    element =>
-      (element instanceof HTMLInputElement && element.type === "radio") || element.getAttribute("role") === "radio",
+/**
+ * Create a field for a radio group
+ */
+const createRadioGroupField = async (
+  elements: HTMLElement[],
+  index: number,
+  groupId: string,
+  testMode: boolean,
+): Promise<CheckableField> => {
+  const firstElement = elements[0];
+  const field = (await createBaseField(firstElement, index, "radio", testMode)) as CheckableField;
+
+  // Set group metadata
+  field.groupName = groupId;
+  field.groupType = "radio";
+
+  // Get group label from container or fieldset
+  const container = findCommonContainer(elements);
+  if (container) {
+    const legend = container.querySelector("legend");
+    const groupLabel =
+      legend?.textContent?.trim() || container.getAttribute("aria-label") || container.getAttribute("data-label");
+    if (groupLabel) {
+      field.label = groupLabel;
+    }
+  }
+
+  // Create options from all radio buttons in the group
+  field.options = await Promise.all(
+    elements.map(async (el, idx) => {
+      const label = await getFieldLabel(el);
+      let value = "";
+      let selected = false;
+
+      if (el instanceof HTMLInputElement) {
+        value = el.value || `option-${idx}`;
+        selected = el.checked;
+      } else {
+        value = el.getAttribute("value") || el.getAttribute("data-value") || `option-${idx}`;
+        selected = el.getAttribute("aria-checked") === "true";
+      }
+
+      // Add filliny-id to each radio button for later reference
+      el.setAttribute("data-filliny-id", `${field.id}-option-${idx}`);
+
+      return {
+        value,
+        text: label || value,
+        selected,
+      };
+    }),
   );
 
-  for (const element of radioElements) {
-    // Skip disabled elements
-    if (
-      element.hasAttribute("disabled") ||
-      element.hasAttribute("readonly") ||
-      element.getAttribute("aria-hidden") === "true"
-    ) {
-      continue;
-    }
+  // Set current value based on selected option
+  const selectedOption = field.options.find(opt => opt.selected);
+  if (selectedOption) {
+    field.value = selectedOption.value;
+  }
 
-    // Get group name - either from name attribute or container
-    let groupName = "";
-    if (element instanceof HTMLInputElement) {
-      groupName = element.name;
+  // Set test value for test mode
+  if (testMode && field.options.length > 0) {
+    // For gender fields, prefer female option
+    const isGenderField =
+      field.label?.toLowerCase().includes("gender") ||
+      field.label?.toLowerCase().includes("sex") ||
+      field.options.some(opt => opt.text.toLowerCase().includes("male") || opt.text.toLowerCase().includes("female"));
+
+    if (isGenderField) {
+      const femaleOption = field.options.find(
+        opt =>
+          opt.text.toLowerCase().includes("female") ||
+          opt.text.toLowerCase().includes("frau") ||
+          opt.value.toLowerCase() === "f",
+      );
+      field.testValue = femaleOption ? femaleOption.value : field.options[0].value;
     } else {
-      const radioGroup = element.closest('[role="radiogroup"]');
-      groupName = radioGroup?.id || radioGroup?.getAttribute("aria-labelledby") || "";
-    }
+      // Pick a random non-placeholder option for better test variety
+      const validOptions = field.options.filter(
+        opt =>
+          !opt.text.toLowerCase().includes("select") &&
+          !opt.text.toLowerCase().includes("choose") &&
+          !opt.text.toLowerCase().includes("pick") &&
+          opt.text !== "" &&
+          opt.value !== "",
+      );
 
-    // If no explicit group name, try to find common container
-    if (!groupName) {
-      const container = element.closest('fieldset, [class*="radio-group"], [class*="radio_group"]');
-      groupName = container?.id || `radio-group-${baseIndex}`;
-    }
-
-    // Add to group mapping
-    if (!radioGroups.has(groupName)) {
-      radioGroups.set(groupName, []);
-    }
-    radioGroups.get(groupName)?.push(element);
-  }
-
-  // Now process each radio group
-  let index = 0;
-  for (const [groupName, groupElements] of radioGroups.entries()) {
-    if (processedGroups.has(groupName)) continue;
-
-    // Skip empty groups
-    if (groupElements.length === 0) continue;
-
-    // Create a field for this radio group
-    const firstElement = groupElements[0];
-    const field = await createBaseField(firstElement, baseIndex + index, "radio", testMode);
-
-    // Try to get a label from the common container
-    const commonContainer = findCommonContainer(groupElements);
-    if (commonContainer) {
-      const containerLabel = await getFieldLabel(commonContainer);
-      if (containerLabel && containerLabel !== "Field " + (baseIndex + index)) {
-        field.label = containerLabel;
-      }
-    }
-
-    // Set options for the radio group
-    field.options = await Promise.all(
-      groupElements.map(async el => {
-        const labelContainer = findRadioLabelContainer(el as HTMLElement);
-        let labelText = "";
-        if (labelContainer) {
-          labelText = await getFieldLabel(labelContainer);
-        }
-
-        let value = "";
-        let selected = false;
-
-        if (el instanceof HTMLInputElement) {
-          value = el.value;
-          selected = el.checked;
-        } else {
-          value = el.getAttribute("value") || el.getAttribute("data-value") || "";
-          selected = el.getAttribute("aria-checked") === "true";
-        }
-
-        return {
-          value,
-          text: labelText || value,
-          selected,
-        };
-      }),
-    );
-
-    // Set the current value
-    const selectedRadio = groupElements.find(el =>
-      el instanceof HTMLInputElement ? el.checked : el.getAttribute("aria-checked") === "true",
-    );
-
-    if (selectedRadio) {
-      if (selectedRadio instanceof HTMLInputElement) {
-        field.value = selectedRadio.value;
+      if (validOptions.length > 0) {
+        // Pick a random valid option
+        const randomIndex = Math.floor(Math.random() * validOptions.length);
+        field.testValue = validOptions[randomIndex].value;
+        console.log(`🎯 Generated random test value for radio group ${field.id}: ${field.testValue}`);
       } else {
-        field.value = selectedRadio.getAttribute("value") || "";
+        // Fallback to first option
+        field.testValue = field.options[0].value;
+        console.log(`🎯 Using first option as test value for radio group ${field.id}: ${field.testValue}`);
       }
     }
-
-    // For test mode, set an appropriate test value
-    if (testMode && field.options && field.options.length > 0) {
-      // Look for options that might indicate gender selection
-      let bestTestOption = field.options[0].value;
-
-      // For gender fields, try to select "female" by default
-      const isGenderField =
-        field.label?.toLowerCase().includes("gender") ||
-        field.label?.toLowerCase().includes("geschlecht") ||
-        field.label?.toLowerCase().includes("anrede") ||
-        field.options.some(
-          opt =>
-            opt.text.toLowerCase().includes("female") ||
-            opt.text.toLowerCase().includes("male") ||
-            opt.text.toLowerCase().includes("frau") ||
-            opt.text.toLowerCase().includes("herr"),
-        );
-
-      if (isGenderField) {
-        // Try to find female option
-        const femaleOption = field.options.find(
-          opt =>
-            opt.text.toLowerCase().includes("female") ||
-            opt.text.toLowerCase().includes("frau") ||
-            opt.text.toLowerCase() === "f" ||
-            opt.text.toLowerCase() === "w",
-        );
-
-        if (femaleOption) {
-          bestTestOption = femaleOption.value;
-        }
-      }
-
-      field.testValue = bestTestOption;
-    }
-
-    fields.push(field);
-    index++;
-    processedGroups.add(groupName);
   }
 
-  return fields;
+  return field;
 };
 
 /**
- * Find a common container for radio buttons in a group
+ * Create a field for a single checkbox
  */
-const findCommonContainer = (elements: HTMLElement[]): HTMLElement | undefined => {
-  if (elements.length === 0) return undefined;
-  if (elements.length === 1) return elements[0].parentElement || undefined;
+const createCheckboxField = async (element: HTMLElement, index: number, testMode: boolean): Promise<CheckableField> => {
+  const field = (await createBaseField(element, index, "checkbox", testMode)) as CheckableField;
 
-  // Start with the first element's parent
-  let commonAncestor = elements[0].parentElement;
+  // Set current state
+  if (element instanceof HTMLInputElement) {
+    field.checked = element.checked;
+    field.value = element.checked ? "true" : "false";
+  } else {
+    field.checked = element.getAttribute("aria-checked") === "true";
+    field.value = field.checked ? "true" : "false";
+  }
 
-  while (commonAncestor) {
-    // Check if this container contains all elements in the group
-    if (elements.every(el => commonAncestor?.contains(el))) {
-      // Prefer containers with radiogroup semantic meaning
-      if (
-        commonAncestor.tagName.toLowerCase() === "fieldset" ||
-        commonAncestor.getAttribute("role") === "radiogroup" ||
-        commonAncestor.classList.contains("radio-group") ||
-        commonAncestor.querySelector("legend")
-      ) {
-        return commonAncestor;
+  // Set test value
+  if (testMode) {
+    field.testValue = Math.random() > 0.5 ? "true" : "false";
+  }
+
+  return field;
+};
+
+/**
+ * Create a field for a checkbox group
+ */
+const createCheckboxGroupField = async (
+  elements: HTMLElement[],
+  index: number,
+  groupId: string,
+  testMode: boolean,
+): Promise<CheckableField> => {
+  const firstElement = elements[0];
+  const field = (await createBaseField(firstElement, index, "checkbox", testMode)) as CheckableField;
+
+  // Set group metadata
+  field.groupName = groupId;
+  field.groupType = "checkbox";
+
+  // Get group label from container
+  const container = findCommonContainer(elements);
+  if (container) {
+    const legend = container.querySelector("legend");
+    const groupLabel =
+      legend?.textContent?.trim() || container.getAttribute("aria-label") || container.getAttribute("data-label");
+    if (groupLabel) {
+      field.label = groupLabel;
+    }
+  }
+
+  // Create options from all checkboxes in the group
+  field.options = await Promise.all(
+    elements.map(async (el, idx) => {
+      const label = await getFieldLabel(el);
+      let value = "";
+      let selected = false;
+
+      if (el instanceof HTMLInputElement) {
+        value = el.value || `option-${idx}`;
+        selected = el.checked;
+      } else {
+        value = el.getAttribute("value") || el.getAttribute("data-value") || `option-${idx}`;
+        selected = el.getAttribute("aria-checked") === "true";
       }
-    }
-    commonAncestor = commonAncestor.parentElement;
+
+      // Add filliny-id to each checkbox for later reference
+      el.setAttribute("data-filliny-id", `${field.id}-option-${idx}`);
+
+      return {
+        value,
+        text: label || value,
+        selected,
+      };
+    }),
+  );
+
+  // Set current value as array of selected values
+  const selectedValues = field.options.filter(opt => opt.selected).map(opt => opt.value);
+  field.value = selectedValues;
+
+  // Set test value for test mode
+  if (testMode && field.options.length > 0) {
+    // Select 1-2 random options
+    const numToSelect = Math.min(Math.ceil(Math.random() * 2), field.options.length);
+    const shuffled = [...field.options].sort(() => 0.5 - Math.random());
+    field.testValue = shuffled.slice(0, numToSelect).map(opt => opt.value);
   }
 
-  return undefined;
+  return field;
 };
 
 /**
- * Find the label container for a radio button
+ * Create a field for a switch element
  */
-const findRadioLabelContainer = (radio: HTMLElement): HTMLElement | null => {
-  // Check for explicit label with 'for' attribute
-  if (radio.id) {
-    const explicitLabel = radio.ownerDocument.querySelector<HTMLElement>(`label[for="${radio.id}"]`);
-    if (explicitLabel) return explicitLabel;
+const createSwitchField = async (element: HTMLElement, index: number, testMode: boolean): Promise<CheckableField> => {
+  const field = (await createBaseField(element, index, "checkbox", testMode)) as CheckableField;
+
+  // Set current state
+  field.checked = element.getAttribute("aria-checked") === "true";
+  field.value = field.checked ? "true" : "false";
+
+  // Set test value
+  if (testMode) {
+    field.testValue = Math.random() > 0.5 ? "true" : "false";
   }
 
-  // Check if radio is wrapped in a label
-  const wrapperLabel = radio.closest("label");
-  if (wrapperLabel) return wrapperLabel as HTMLElement;
-
-  // Look at siblings
-  const parent = radio.parentElement;
-  if (!parent) return null;
-
-  const siblings = Array.from(parent.children);
-  const radioIndex = siblings.indexOf(radio);
-
-  // Check next sibling (common pattern)
-  if (radioIndex < siblings.length - 1) {
-    const next = siblings[radioIndex + 1];
-    if (isLabelLike(next)) return next as HTMLElement;
-  }
-
-  // Check previous sibling
-  if (radioIndex > 0) {
-    const prev = siblings[radioIndex - 1];
-    if (isLabelLike(prev)) return prev as HTMLElement;
-  }
-
-  return parent;
+  return field;
 };
-
-/**
- * Helper function to detect if an element is label-like
- */
-function isLabelLike(element: Element): boolean {
-  if (!element || !(element instanceof HTMLElement)) return false;
-
-  // Check for actual labels
-  if (element.tagName.toLowerCase() === "label") return true;
-
-  // Check common label-like patterns
-  if (element.tagName.toLowerCase() === "span" || element.tagName.toLowerCase() === "div") {
-    // Check classes
-    const classStr = element.className.toLowerCase();
-    if (
-      classStr.includes("label") ||
-      classStr.includes("text") ||
-      classStr.includes("caption") ||
-      classStr.includes("title")
-    ) {
-      return true;
-    }
-
-    // Check if it has mostly text content and minimal HTML
-    const htmlContent = element.innerHTML;
-    const textContent = element.textContent || "";
-    if (textContent.length > 0 && htmlContent.length - textContent.length < 20) {
-      return true;
-    }
-  }
-
-  return false;
-}
 
 // Export for testing
 export const __testing = {
@@ -834,4 +1017,8 @@ export const __testing = {
   findControlledInput,
   updateVisualIndicators,
   updateRelatedRadioButtons,
+  groupRadioElements,
+  groupCheckboxElements,
+  createRadioGroupField,
+  createCheckboxField,
 };

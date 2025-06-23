@@ -1,4 +1,5 @@
 import { detectFields } from "./field-types";
+import { unifiedFieldRegistry } from "./unifiedFieldDetection";
 
 // --- Frame Document Utilities ---
 interface DocumentWithObserver extends Document {
@@ -16,36 +17,106 @@ export const getAllFrameDocuments = (onNewFrameLoaded?: FormDetectionCallback): 
 
   const tryGetIframeDoc = async (iframe: HTMLIFrameElement, retryCount = 0): Promise<Document | null> => {
     try {
+      // Enhanced iframe document access with better retry logic
+
       // Direct access attempts
       if (iframe.contentDocument) return iframe.contentDocument;
       if (iframe.contentWindow?.document) return iframe.contentWindow.document;
 
-      // Handle loading frames
+      // Handle loading frames with improved retry mechanism
       if (retryCount < maxRetries && iframe.src) {
-        if (!iframe.contentDocument) {
-          console.debug("Frame still loading, will retry:", iframe.src);
-          await new Promise(resolve => setTimeout(resolve, retryDelay));
+        // Check if iframe is still loading
+        if (iframe.contentDocument === null) {
+          console.debug(`Frame still loading, will retry (${retryCount + 1}/${maxRetries}):`, iframe.src);
+
+          // Wait for iframe to finish loading
+          await new Promise(resolve => {
+            const loadHandler = () => {
+              iframe.removeEventListener("load", loadHandler);
+              resolve(undefined);
+            };
+
+            // Set up load event listener
+            iframe.addEventListener("load", loadHandler);
+
+            // Also set up a timeout as fallback
+            setTimeout(() => {
+              iframe.removeEventListener("load", loadHandler);
+              resolve(undefined);
+            }, retryDelay);
+          });
+
           return tryGetIframeDoc(iframe, retryCount + 1);
         }
       }
 
-      // Special handling for same-origin frames
+      // Enhanced same-origin detection and handling
       if (iframe.src) {
-        const isSameOrigin =
-          iframe.src.startsWith(window.location.origin) || iframe.src.startsWith("/") || iframe.src === "about:blank";
+        const currentOrigin = window.location.origin;
+        const iframeUrl = new URL(iframe.src, window.location.href);
 
-        if (isSameOrigin && iframe.contentDocument) {
+        // More comprehensive same-origin check
+        const isSameOrigin =
+          iframeUrl.origin === currentOrigin ||
+          iframe.src.startsWith("/") ||
+          iframe.src === "about:blank" ||
+          iframe.src.startsWith("data:") ||
+          iframe.src.startsWith("blob:");
+
+        if (isSameOrigin) {
           console.debug("Accessing same-origin frame:", iframe.src);
-          return iframe.contentDocument;
+
+          // Try multiple access methods for same-origin frames
+          if (iframe.contentDocument) {
+            return iframe.contentDocument;
+          }
+
+          if (iframe.contentWindow?.document) {
+            return iframe.contentWindow.document;
+          }
+
+          // For data/blob URLs, the document might be available after a short delay
+          if (iframe.src.startsWith("data:") || iframe.src.startsWith("blob:")) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+            return iframe.contentDocument || iframe.contentWindow?.document || null;
+          }
+        } else {
+          // For cross-origin frames, we can't access the document directly
+          // But we can still detect their presence and handle them appropriately
+          console.debug("Cross-origin frame detected, cannot access content:", iframe.src);
+
+          // Store reference to cross-origin iframe for potential future handling
+          iframe.setAttribute("data-filliny-cross-origin", "true");
+
+          return null;
         }
+      }
+
+      // Handle frameless iframes (srcdoc, etc.)
+      if (iframe.srcdoc && iframe.contentDocument) {
+        console.debug("Accessing srcdoc frame");
+        return iframe.contentDocument;
       }
     } catch (e) {
       const error = e as Error;
-      console.debug("Frame access restricted:", {
+      console.debug("Frame access error:", {
         src: iframe.src,
         error: error.message,
-        isSameOrigin: iframe.src.startsWith(window.location.origin),
+        retryCount,
+        maxRetries,
       });
+
+      // For security errors, mark as cross-origin and don't retry
+      if (error.message.includes("cross-origin") || error.message.includes("Permission denied")) {
+        iframe.setAttribute("data-filliny-cross-origin", "true");
+        return null;
+      }
+
+      // For other errors, retry if we haven't exceeded max retries
+      if (retryCount < maxRetries) {
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+        return tryGetIframeDoc(iframe, retryCount + 1);
+      }
     }
     return null;
   };
@@ -142,11 +213,100 @@ export const getAllFrameDocuments = (onNewFrameLoaded?: FormDetectionCallback): 
     doc.__fillinyFrameObserver = observer;
   };
 
+  // Enhanced iframe monitoring system for better form detection
+  const setupIframeMonitoring = () => {
+    // Monitor all existing and future iframes for form content
+    const monitorIframe = (iframe: HTMLIFrameElement) => {
+      const checkIframeForForms = async () => {
+        try {
+          const iframeDoc = await tryGetIframeDoc(iframe);
+          if (iframeDoc) {
+            // Check if iframe contains forms
+            const hasFormElements = getFormFieldsRobust(iframeDoc.body).length > 0;
+
+            if (hasFormElements) {
+              console.log(`📋 Detected forms in iframe: ${iframe.src || "about:blank"}`);
+
+              // Mark iframe as containing forms
+              iframe.setAttribute("data-filliny-has-forms", "true");
+
+              // Trigger form detection callback if provided
+              if (onNewFrameLoaded) {
+                onNewFrameLoaded(iframeDoc);
+              }
+
+              // Set up mutation observer for dynamic content in iframe
+              const iframeObserver = new MutationObserver(() => {
+                // Re-check for new forms when iframe content changes
+                setTimeout(checkIframeForForms, 100);
+              });
+
+              iframeObserver.observe(iframeDoc.body, {
+                childList: true,
+                subtree: true,
+              });
+
+              // Store observer for cleanup
+              (iframe as HTMLIFrameElement & { __fillinyIframeObserver?: MutationObserver }).__fillinyIframeObserver =
+                iframeObserver;
+            }
+          } else if (iframe.src && !iframe.hasAttribute("data-filliny-cross-origin")) {
+            // If we can't access the iframe and it's not marked as cross-origin,
+            // it might still be loading - set up a delayed retry
+            setTimeout(checkIframeForForms, 1000);
+          }
+        } catch (error) {
+          console.debug("Error checking iframe for forms:", error);
+        }
+      };
+
+      // Initial check
+      checkIframeForForms();
+
+      // Also check when iframe loads
+      iframe.addEventListener("load", checkIframeForForms);
+
+      // For cross-origin iframes, we can at least detect their presence
+      if (iframe.hasAttribute("data-filliny-cross-origin")) {
+        console.log(`🔒 Cross-origin iframe detected: ${iframe.src} - forms cannot be accessed directly`);
+      }
+    };
+
+    // Monitor existing iframes
+    const existingIframes = Array.from(document.querySelectorAll("iframe"));
+    existingIframes.forEach(monitorIframe);
+
+    // Monitor for new iframes
+    const iframeObserver = new MutationObserver(mutations => {
+      mutations.forEach(mutation => {
+        mutation.addedNodes.forEach(node => {
+          if (node instanceof HTMLIFrameElement) {
+            monitorIframe(node);
+          } else if (node instanceof HTMLElement) {
+            // Check if added node contains iframes
+            const nestedIframes = node.querySelectorAll("iframe");
+            nestedIframes.forEach(monitorIframe);
+          }
+        });
+      });
+    });
+
+    iframeObserver.observe(document.body, {
+      childList: true,
+      subtree: true,
+    });
+
+    return iframeObserver;
+  };
+
   // Initialize processing
   const init = async () => {
     try {
       await processIframes(document);
       observeNewFrames(document as DocumentWithObserver);
+
+      // Set up enhanced iframe monitoring
+      setupIframeMonitoring();
 
       // Special handling for Google Forms
       if (window.location.hostname.includes("docs.google.com") && window.location.pathname.includes("/forms/")) {
@@ -164,223 +324,1041 @@ export const getAllFrameDocuments = (onNewFrameLoaded?: FormDetectionCallback): 
   return docs;
 };
 
-// --- Form Container Detection ---
-export const detectFormLikeContainers = async (): Promise<HTMLElement[]> => {
-  const bestContainers: HTMLElement[] = [];
-  const documents = getAllFrameDocuments();
-  const formContainerSelectors = [
-    "form",
-    "fieldset",
-    '[role="form"]',
-    '[class*="form"]',
-    '[class*="survey"]',
-    '[class*="questionnaire"]',
-    '[id*="form"]',
-    '[id*="survey"]',
-    ".freebirdFormviewerViewFormCard",
-    ".freebirdFormviewerViewFormContent",
-    ".freebirdFormviewerViewItemsItemItem",
-    ".form-container",
-    ".input-container",
-    ".field-container",
-    ".form-section",
-    ".form-group",
-    '[class*="application-form"]',
-    '[class*="contact-form"]',
-    '[class*="signup-form"]',
-    '[class*="login-form"]',
-    '[class*="registration"]',
+// --- Enhanced Form Container Detection ---
+
+interface FormCandidate {
+  element: HTMLElement;
+  score: number;
+  fieldCount: number;
+  reasons: string[];
+}
+
+/**
+ * Get the depth of an element in the DOM tree
+ */
+const getElementDepth = (element: HTMLElement): number => {
+  let depth = 0;
+  let current = element.parentElement;
+  while (current && current !== document.body) {
+    depth++;
+    current = current.parentElement;
+  }
+  return depth;
+};
+
+/**
+ * Enhanced form field detection with multiple strategies and robust error handling
+ */
+const getFormFieldsRobust = (container: HTMLElement | ShadowRoot): HTMLElement[] => {
+  const fieldSelectors = [
+    // Standard form fields (highest priority)
+    'input:not([type="hidden"]):not([type="submit"]):not([type="button"]):not([type="reset"]):not([type="image"])',
+    "select",
+    "textarea",
+
+    // ARIA form fields
+    '[role="textbox"]',
+    '[role="combobox"]',
+    '[role="spinbutton"]',
+    '[role="checkbox"]',
+    '[role="switch"]',
+    '[role="radio"]',
+    '[role="searchbox"]',
+    '[role="listbox"]',
+    '[role="slider"]',
+
+    // Content editable
+    '[contenteditable="true"]',
+
+    // Custom data attributes (common patterns)
+    "[data-field]",
+    "[data-input]",
+    "[data-form-field]",
+    "[data-form-control]",
+    '[data-testid*="input"]',
+    '[data-testid*="field"]',
+    '[data-testid*="select"]',
+    '[data-qa*="input"]',
+    '[data-qa*="field"]',
+    '[data-qa*="select"]',
+    '[data-cy*="input"]',
+    '[data-cy*="field"]',
+    '[data-cy*="select"]',
+
+    // Common CSS class patterns
+    ".form-control",
+    ".form-input",
+    ".form-field",
+    ".input-field",
+    ".text-field",
+    ".select-field",
+    ".checkbox-field",
+    ".radio-field",
+    ".field-input",
+    ".field-select",
+    ".custom-field",
+    ".custom-input",
+    ".custom-select",
+
+    // Framework-specific patterns
+    ".MuiTextField-root input",
+    ".MuiTextField-root textarea",
+    ".MuiSelect-root",
+    ".MuiCheckbox-root input",
+    ".MuiRadio-root input",
+    ".MuiSlider-root",
+    ".ant-input",
+    ".ant-select",
+    ".ant-checkbox-input",
+    ".ant-radio-input",
+    ".ant-textarea",
+    ".ant-slider",
+    ".chakra-input",
+    ".chakra-select",
+    ".chakra-checkbox__input",
+    ".chakra-radio__input",
+    ".chakra-slider",
+
+    // Bootstrap and common UI frameworks
+    ".form-control",
+    ".form-select",
+    ".form-check-input",
+    ".form-range",
+
+    // Modern SPA patterns (React, Vue, Angular)
+    '[class*="input-"]',
+    '[class*="field-"]',
+    '[class*="form-"]',
+    '[class*="Input"]',
+    '[class*="Field"]',
+    '[class*="FormControl"]',
+    '[class*="TextInput"]',
+    '[class*="Select"]',
+    '[class*="Checkbox"]',
+    '[class*="Radio"]',
+
+    // Insurance/business form specific patterns
+    '[class*="profile"]',
+    '[class*="insurance"]',
+    '[class*="policy"]',
+    '[class*="coverage"]',
+    '[class*="quote"]',
+    '[class*="application"]',
   ];
-  for (const doc of documents) {
+
+  let fields: HTMLElement[] = [];
+
+  // Strategy 1: Direct selector matching with enhanced error handling
+  for (const selector of fieldSelectors) {
     try {
-      let bestContainer: HTMLElement | null = null;
-      let maxFieldCount = 0;
-      const formContainers = Array.from(doc.querySelectorAll<HTMLElement>(formContainerSelectors.join(",")));
-      if (formContainers.length > 0) {
-        for (const container of formContainers) {
-          const fields = getFormFields(container);
-          if (fields.length > maxFieldCount) {
-            maxFieldCount = fields.length;
-            bestContainer = container;
-          }
-        }
-      }
-      if (!bestContainer || maxFieldCount === 0) {
-        const allFields = getFormFields(doc.body);
-        if (allFields.length >= 1) {
-          const fieldParentMap = new Map<HTMLElement, HTMLElement[]>();
-          allFields.forEach((field: HTMLElement) => {
-            let current = field.parentElement;
-            while (current && current !== doc.body) {
-              const existingFields = fieldParentMap.get(current) || [];
-              if (!existingFields.includes(field)) {
-                existingFields.push(field);
-                fieldParentMap.set(current, existingFields);
-              }
-              current = current.parentElement;
-            }
-          });
-          for (const [container, fields] of fieldParentMap.entries()) {
-            if (fields.length > maxFieldCount) {
-              maxFieldCount = fields.length;
-              bestContainer = container;
-            }
-          }
-        }
-      }
-      const shadowRootElements = findAllShadowRoots(doc.body);
-      for (const host of shadowRootElements) {
-        if (host.shadowRoot) {
-          for (const selector of formContainerSelectors) {
-            const shadowForms = queryShadowRoot(host.shadowRoot, selector);
-            for (const form of shadowForms) {
-              const fields = getFormFields(form);
-              if (fields.length > maxFieldCount) {
-                maxFieldCount = fields.length;
-                bestContainer = form;
-              }
-            }
-          }
-        }
-      }
-      const isGoogleForm =
-        window.location.hostname.includes("docs.google.com") && window.location.pathname.includes("/forms/");
-      if (isGoogleForm) {
-        const googleFormContainer = doc.querySelector(".freebirdFormviewerViewFormCard");
-        if (googleFormContainer) {
-          const fields = getFormFields(googleFormContainer as HTMLElement);
-          if (fields.length > maxFieldCount) {
-            maxFieldCount = fields.length;
-            bestContainer = googleFormContainer as HTMLElement;
-          }
-        }
-      }
-      if (bestContainer && maxFieldCount > 0) {
-        let outerContainer = bestContainer;
-        let current = bestContainer.parentElement;
-        while (current && current !== doc.body) {
-          const parentFields = getFormFields(current);
-          if (parentFields.length === maxFieldCount) {
-            outerContainer = current;
-            current = current.parentElement;
-          } else {
-            break;
-          }
-        }
-        outerContainer.setAttribute("data-filliny-form-container", "true");
-        bestContainers.push(outerContainer);
-      }
+      const elements = Array.from(container.querySelectorAll<HTMLElement>(selector));
+      fields.push(...elements);
     } catch (e) {
-      console.error("Error in form detection:", e);
+      console.debug(`Selector failed: ${selector}`, e);
     }
   }
-  if (bestContainers.length > 1) {
-    const containerWithMostFields = bestContainers.reduce((best, current) => {
-      const bestFields = getFormFields(best).length;
-      const currentFields = getFormFields(current).length;
-      return currentFields > bestFields ? current : best;
-    }, bestContainers[0]);
-    bestContainers.forEach(container => {
-      if (container !== containerWithMostFields) {
-        container.removeAttribute("data-filliny-form-container");
+
+  // Remove duplicates
+  fields = Array.from(new Set(fields));
+
+  // Strategy 2: Enhanced pattern-based detection for modern SPAs
+  if (fields.length < 3) {
+    console.log("Enhanced detection: Few elements found with direct selectors, trying advanced pattern detection...");
+
+    const allElements = Array.from(container.querySelectorAll<HTMLElement>("*"));
+    const patternElements = allElements.filter(el => {
+      // Skip if already found
+      if (fields.includes(el)) return false;
+
+      // Skip non-interactive elements
+      if (["SCRIPT", "STYLE", "META", "LINK", "TITLE", "HEAD", "NOSCRIPT"].includes(el.tagName)) {
+        return false;
       }
+
+      // Enhanced interactive attribute detection
+      const hasInteractiveAttrs =
+        el.hasAttribute("tabindex") ||
+        el.hasAttribute("onclick") ||
+        el.hasAttribute("onchange") ||
+        el.hasAttribute("oninput") ||
+        el.hasAttribute("onfocus") ||
+        el.hasAttribute("onblur") ||
+        el.hasAttribute("onkeydown") ||
+        el.hasAttribute("onkeyup");
+
+      // Enhanced form-like pattern detection
+      const className = el.className.toLowerCase();
+      const id = el.id.toLowerCase();
+      const dataAttrs = Array.from(el.attributes)
+        .filter(attr => attr.name.startsWith("data-"))
+        .map(attr => `${attr.name}=${attr.value}`)
+        .join(" ")
+        .toLowerCase();
+
+      // More comprehensive pattern matching
+      const formPatterns = [
+        /\b(input|field|select|checkbox|radio|textarea|control|form|widget|picker|slider|range)\b/,
+        /\b(text|email|phone|number|date|time|password|search|url)\b/,
+        /\b(name|address|city|state|zip|postal|country)\b/,
+        /\b(first|last|full|middle|title|prefix|suffix)\b/,
+        /\b(company|organization|business|employer)\b/,
+        /\b(profile|account|user|member|customer)\b/,
+        /\b(insurance|policy|coverage|premium|deductible|claim)\b/,
+        /\b(application|quote|form|survey|questionnaire)\b/,
+      ];
+
+      const hasFormLikeNames = formPatterns.some(pattern => pattern.test(className + " " + id + " " + dataAttrs));
+
+      // Enhanced ARIA detection
+      const hasAriaAttrs =
+        el.hasAttribute("aria-label") ||
+        el.hasAttribute("aria-labelledby") ||
+        el.hasAttribute("aria-describedby") ||
+        el.hasAttribute("aria-required") ||
+        el.hasAttribute("aria-invalid") ||
+        el.hasAttribute("aria-expanded") ||
+        el.hasAttribute("aria-controls");
+
+      // Enhanced focusability check
+      const isFocusable =
+        el.tabIndex >= 0 ||
+        ["INPUT", "SELECT", "TEXTAREA", "BUTTON"].includes(el.tagName) ||
+        el.hasAttribute("contenteditable") ||
+        el.getAttribute("role") === "button" ||
+        el.getAttribute("role") === "textbox" ||
+        el.getAttribute("role") === "combobox";
+
+      // Check for modern framework patterns (React, Vue, Angular)
+      const hasFrameworkAttrs =
+        el.hasAttribute("data-testid") ||
+        el.hasAttribute("data-cy") ||
+        el.hasAttribute("data-qa") ||
+        Object.keys(el).some(key => key.startsWith("__react") || key.startsWith("_vue") || key.startsWith("ng-"));
+
+      // Check for custom input-like behavior
+      const hasInputBehavior =
+        el.addEventListener !== undefined &&
+        (className.includes("editable") ||
+          className.includes("input") ||
+          className.includes("field") ||
+          el.getAttribute("contenteditable") === "true");
+
+      // Enhanced scoring system - need at least 2 strong indicators
+      const indicators = [
+        hasInteractiveAttrs,
+        hasFormLikeNames,
+        hasAriaAttrs,
+        isFocusable,
+        hasFrameworkAttrs,
+        hasInputBehavior,
+      ];
+      const strongIndicators = indicators.filter(Boolean).length;
+
+      return strongIndicators >= 2;
     });
-    return [containerWithMostFields];
+
+    console.log(
+      `Enhanced detection: Found ${patternElements.length} additional elements through advanced pattern detection`,
+    );
+    fields.push(...patternElements);
+    fields = Array.from(new Set(fields));
   }
-  return bestContainers;
+
+  // Strategy 3: Enhanced Shadow DOM exploration
+  const shadowHosts = Array.from(container.querySelectorAll("*")).filter(
+    el => (el as HTMLElement & { shadowRoot?: ShadowRoot }).shadowRoot,
+  );
+
+  for (const host of shadowHosts) {
+    try {
+      const shadowRoot = (host as HTMLElement & { shadowRoot?: ShadowRoot }).shadowRoot;
+      if (shadowRoot) {
+        const shadowFields = getFormFieldsRobust(shadowRoot);
+        fields.push(...shadowFields);
+      }
+    } catch (e) {
+      console.debug("Shadow DOM access failed:", e);
+    }
+  }
+
+  // Strategy 4: Dynamic content detection (for SPAs that load content dynamically)
+  const dynamicContainers = Array.from(
+    container.querySelectorAll<HTMLElement>(
+      '[data-reactroot], [data-vue-app], [ng-app], [class*="app"], [id*="app"], [class*="root"], [id*="root"]',
+    ),
+  );
+
+  for (const dynamicContainer of dynamicContainers) {
+    try {
+      // Look for fields that might be loaded dynamically
+      const dynamicFields = Array.from(
+        dynamicContainer.querySelectorAll<HTMLElement>(
+          'div[role="textbox"], div[contenteditable], span[role="textbox"], div[tabindex], span[tabindex]',
+        ),
+      );
+
+      fields.push(...dynamicFields.filter(el => !fields.includes(el)));
+    } catch (e) {
+      console.debug("Dynamic content detection failed:", e);
+    }
+  }
+
+  // Enhanced filtering with better visibility detection
+  return fields.filter(el => {
+    try {
+      const style = window.getComputedStyle(el);
+
+      // Skip clearly disabled or readonly fields
+      if (el.hasAttribute("disabled") || el.hasAttribute("readonly")) {
+        return false;
+      }
+
+      // Enhanced visibility check - allow for modern CSS patterns
+      const isCompletelyHidden = style.display === "none" && style.visibility === "hidden" && style.opacity === "0";
+
+      if (isCompletelyHidden) {
+        return false;
+      }
+
+      // Enhanced dimension check for modern UI patterns
+      const rect = el.getBoundingClientRect();
+      const isCheckableField = el instanceof HTMLInputElement && (el.type === "checkbox" || el.type === "radio");
+      const hasAriaRole = ["checkbox", "radio", "switch", "textbox", "combobox"].includes(
+        el.getAttribute("role") || "",
+      );
+      const isCustomInput = el.hasAttribute("contenteditable") || el.getAttribute("role") === "textbox";
+
+      // Allow zero-dimension elements if they're functional inputs or have proper ARIA roles
+      if (!isCheckableField && !hasAriaRole && !isCustomInput && rect.width === 0 && rect.height === 0) {
+        return false;
+      }
+
+      // Skip decorative elements
+      const isDecorative =
+        el.getAttribute("aria-hidden") === "true" ||
+        el.getAttribute("role") === "presentation" ||
+        el.getAttribute("role") === "none";
+
+      if (isDecorative) {
+        return false;
+      }
+
+      // Enhanced check for actual form fields vs decorative elements
+      const isLikelyFormField =
+        el.tagName === "INPUT" ||
+        el.tagName === "SELECT" ||
+        el.tagName === "TEXTAREA" ||
+        el.hasAttribute("contenteditable") ||
+        ["textbox", "combobox", "checkbox", "radio", "switch"].includes(el.getAttribute("role") || "") ||
+        /\b(input|field|control)\b/i.test(el.className);
+
+      return isLikelyFormField;
+    } catch (e) {
+      console.debug("Error filtering element:", e);
+      return false;
+    }
+  });
+};
+
+/**
+ * Find an expanded container that might be more comprehensive
+ */
+const findExpandedContainer = (element: HTMLElement): HTMLElement | null => {
+  let current = element.parentElement;
+  let bestContainer = element;
+  let maxFields = getFormFieldsRobust(element).length;
+
+  while (current && current !== document.body && current !== document.documentElement) {
+    const currentFields = getFormFieldsRobust(current);
+
+    // If parent has significantly more fields, it might be better
+    if (currentFields.length > maxFields * 1.2) {
+      bestContainer = current;
+      maxFields = currentFields.length;
+    }
+
+    // Don't go too high up the DOM tree
+    const depth = getElementDepth(current);
+    if (depth > 20) break;
+
+    current = current.parentElement;
+  }
+
+  return bestContainer !== element ? bestContainer : null;
+};
+
+/**
+ * Enhanced form container detection with improved scoring for group detection
+ */
+export const detectFormLikeContainers = async (): Promise<HTMLElement[]> => {
+  console.log("Starting enhanced form container detection with group-focused scoring...");
+
+  const candidates: FormCandidate[] = [];
+  const documents = getAllFrameDocuments();
+
+  for (const doc of documents) {
+    try {
+      console.log(`Processing document: ${doc.location?.href || "unknown"}`);
+
+      // Strategy 1: Look for explicit form-related elements (highest priority)
+      const explicitFormSelectors = [
+        "form",
+        "fieldset",
+        '[role="form"]',
+        "[data-form]",
+        '[data-testid*="form"]',
+        '[class*="form"]',
+        '[class*="survey"]',
+        '[class*="questionnaire"]',
+        '[id*="form"]',
+        '[id*="survey"]',
+        ".freebirdFormviewerViewFormCard",
+        ".freebirdFormviewerViewFormContent",
+        ".freebirdFormviewerViewItemsItemItem",
+      ];
+
+      const explicitContainers = Array.from(doc.querySelectorAll<HTMLElement>(explicitFormSelectors.join(",")));
+      console.log(`Found ${explicitContainers.length} explicit form containers`);
+
+      for (const container of explicitContainers) {
+        const fields = getFormFieldsRobust(container);
+        if (fields.length > 0) {
+          const { score, reasons } = scoreFormContainerEnhanced(container, fields);
+          candidates.push({
+            element: container,
+            score,
+            fieldCount: fields.length,
+            reasons,
+          });
+          console.log(
+            `Explicit container: ${container.tagName}.${container.className} - Score: ${score}, Fields: ${fields.length}`,
+          );
+        }
+      }
+
+      // Strategy 2: Find containers that group multiple field types together
+      const allFields = getFormFieldsRobust(doc.body);
+      console.log(`Found ${allFields.length} total form fields in document`);
+
+      if (allFields.length > 0) {
+        // Group fields by their containers with enhanced grouping logic
+        const containerFieldMap = new Map<HTMLElement, HTMLElement[]>();
+        const processedContainers = new Set<HTMLElement>();
+
+        for (const field of allFields) {
+          // Find the most appropriate container for this field
+          const optimalContainer = findOptimalFieldContainer(field, allFields, doc);
+
+          if (optimalContainer && !processedContainers.has(optimalContainer)) {
+            // Get all fields that belong to this container
+            const containerFields = allFields.filter(f => optimalContainer.contains(f));
+
+            if (containerFields.length >= 2) {
+              containerFieldMap.set(optimalContainer, containerFields);
+              processedContainers.add(optimalContainer);
+
+              // Mark fields as processed to avoid duplicate processing
+              containerFields.forEach(f => f.setAttribute("data-container-processed", "true"));
+            }
+          }
+        }
+
+        // Evaluate each container with enhanced scoring
+        for (const [container, fields] of containerFieldMap.entries()) {
+          const { score, reasons } = scoreFormContainerEnhanced(container, fields);
+
+          // Check if this container is already in candidates (avoid duplicates)
+          const existingCandidate = candidates.find(c => c.element === container);
+          if (!existingCandidate) {
+            candidates.push({
+              element: container,
+              score,
+              fieldCount: fields.length,
+              reasons,
+            });
+            console.log(
+              `Container candidate: ${container.tagName}.${container.className} - Score: ${score}, Fields: ${fields.length}`,
+            );
+          } else if (existingCandidate.score < score) {
+            // Update with better score
+            existingCandidate.score = score;
+            existingCandidate.fieldCount = fields.length;
+            existingCandidate.reasons = reasons;
+          }
+        }
+      }
+
+      // Strategy 3: Special handling for specific sites (framework-specific optimizations)
+
+      // Google Forms
+      if (doc.location?.hostname.includes("docs.google.com") && doc.location?.pathname.includes("/forms/")) {
+        const googleFormContainer = doc.querySelector(".freebirdFormviewerViewFormCard") as HTMLElement;
+        if (googleFormContainer) {
+          const fields = getFormFieldsRobust(googleFormContainer);
+          if (fields.length > 0) {
+            const { score, reasons } = scoreFormContainerEnhanced(googleFormContainer, fields);
+            candidates.push({
+              element: googleFormContainer,
+              score: score + 100, // Boost for known good pattern
+              fieldCount: fields.length,
+              reasons: [...reasons, "Google Forms special handling"],
+            });
+          }
+        }
+      }
+
+      // Typeform
+      if (doc.location?.hostname.includes("typeform.com")) {
+        const typeformContainer = doc.querySelector('[data-qa="form"]') as HTMLElement;
+        if (typeformContainer) {
+          const fields = getFormFieldsRobust(typeformContainer);
+          if (fields.length > 0) {
+            const { score, reasons } = scoreFormContainerEnhanced(typeformContainer, fields);
+            candidates.push({
+              element: typeformContainer,
+              score: score + 100,
+              fieldCount: fields.length,
+              reasons: [...reasons, "Typeform special handling"],
+            });
+          }
+        }
+      }
+
+      // JotForm
+      if (doc.location?.hostname.includes("jotform.com")) {
+        const jotformContainer = doc.querySelector(".form-all") as HTMLElement;
+        if (jotformContainer) {
+          const fields = getFormFieldsRobust(jotformContainer);
+          if (fields.length > 0) {
+            const { score, reasons } = scoreFormContainerEnhanced(jotformContainer, fields);
+            candidates.push({
+              element: jotformContainer,
+              score: score + 100,
+              fieldCount: fields.length,
+              reasons: [...reasons, "JotForm special handling"],
+            });
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Error in form detection for document:", e);
+    }
+  }
+
+  console.log(`Found ${candidates.length} total candidates`);
+
+  // Sort candidates by score (highest first)
+  candidates.sort((a, b) => b.score - a.score);
+
+  // Log top candidates
+  console.log("Top form container candidates:");
+  candidates.slice(0, 5).forEach((candidate, index) => {
+    console.log(
+      `${index + 1}. Score: ${candidate.score}, Fields: ${candidate.fieldCount}, Element: ${candidate.element.tagName}.${candidate.element.className}, Reasons: ${candidate.reasons.join(", ")}`,
+    );
+  });
+
+  // Enhanced container selection logic for modern web applications
+  const selectedContainers: HTMLElement[] = [];
+
+  if (candidates.length > 0) {
+    // Always take the highest scoring candidate
+    const bestCandidate = candidates[0];
+    bestCandidate.element.setAttribute("data-filliny-form-container", "true");
+    selectedContainers.push(bestCandidate.element);
+    console.log(
+      `✅ Selected primary container: ${bestCandidate.element.tagName}.${bestCandidate.element.className} (Score: ${bestCandidate.score}, Fields: ${bestCandidate.fieldCount})`,
+    );
+
+    // For bulk mode, prioritize finding one comprehensive container instead of multiple smaller ones
+    // Only add additional containers if they have significantly different content and are not nested
+    const primaryFieldCount = bestCandidate.fieldCount;
+    const minAdditionalFields = Math.max(5, primaryFieldCount * 0.3); // At least 5 fields or 30% of primary
+
+    for (let i = 1; i < Math.min(candidates.length, 3); i++) {
+      // Reduced from 5 to 3 to minimize duplicates
+      const candidate = candidates[i];
+
+      // More restrictive criteria for additional containers
+      let shouldInclude = false;
+      let inclusionReason = "";
+
+      // Only include if it has a substantial number of fields AND is not nested
+      if (candidate.fieldCount >= minAdditionalFields) {
+        // Check if it's nested within the primary container
+        const isNestedInPrimary = bestCandidate.element.contains(candidate.element);
+        const containsPrimary = candidate.element.contains(bestCandidate.element);
+
+        if (!isNestedInPrimary && !containsPrimary) {
+          // Check spatial separation to ensure it's truly a different form section
+          const candidateRect = candidate.element.getBoundingClientRect();
+          const primaryRect = bestCandidate.element.getBoundingClientRect();
+
+          const verticalDistance = Math.abs(candidateRect.top - primaryRect.top);
+          const horizontalDistance = Math.abs(candidateRect.left - primaryRect.left);
+
+          // Require significant spatial separation (at least 300px apart)
+          const isSpatiallyDistinct = verticalDistance > 300 || horizontalDistance > 400;
+
+          if (isSpatiallyDistinct) {
+            // Check if it represents truly different content
+            const candidateFieldTypes = getFieldTypesInContainer(candidate.element);
+            const primaryFieldTypes = getFieldTypesInContainer(bestCandidate.element);
+
+            const uniqueFieldTypes = Array.from(candidateFieldTypes).filter(type => !primaryFieldTypes.has(type));
+            const hasUniqueContent = uniqueFieldTypes.length > 0 || candidate.fieldCount > primaryFieldCount;
+
+            if (hasUniqueContent) {
+              shouldInclude = true;
+              inclusionReason = `spatially distinct with ${candidate.fieldCount} fields`;
+            }
+          }
+        }
+      }
+
+      if (shouldInclude) {
+        candidate.element.setAttribute("data-filliny-form-container", "true");
+        selectedContainers.push(candidate.element);
+        console.log(
+          `✅ Added additional container: ${candidate.element.tagName}.${candidate.element.className} (Score: ${candidate.score}, Fields: ${candidate.fieldCount}, Reason: ${inclusionReason})`,
+        );
+      } else {
+        console.log(
+          `⚠️ Skipped potential container: ${candidate.element.tagName}.${candidate.element.className} (Score: ${candidate.score}, Fields: ${candidate.fieldCount}, Reason: insufficient separation or field count)`,
+        );
+      }
+    }
+
+    // If we only have one container but it's not comprehensive enough, look for a better parent
+    if (selectedContainers.length === 1 && bestCandidate.fieldCount < 5) {
+      console.log("Looking for a more comprehensive parent container...");
+
+      const expandedContainer = findExpandedContainer(bestCandidate.element);
+      if (expandedContainer && expandedContainer !== bestCandidate.element) {
+        const expandedFields = getFormFieldsRobust(expandedContainer);
+        if (expandedFields.length > bestCandidate.fieldCount * 1.5) {
+          console.log(`🔄 Expanding to parent container with ${expandedFields.length} fields`);
+
+          // Replace the original container with the expanded one
+          bestCandidate.element.removeAttribute("data-filliny-form-container");
+          expandedContainer.setAttribute("data-filliny-form-container", "true");
+          selectedContainers[0] = expandedContainer;
+        }
+      }
+    }
+  }
+
+  // If no good candidates found, fall back to body with fields
+  if (selectedContainers.length === 0) {
+    console.log("No good form containers found, checking document body...");
+    for (const doc of documents) {
+      const bodyFields = getFormFieldsRobust(doc.body);
+      if (bodyFields.length >= 1) {
+        console.log(`Using document body as fallback with ${bodyFields.length} fields`);
+        doc.body.setAttribute("data-filliny-form-container", "true");
+        selectedContainers.push(doc.body);
+        break;
+      }
+    }
+  }
+
+  console.log(`Final selection: ${selectedContainers.length} form containers`);
+  return selectedContainers;
+};
+
+/**
+ * Find the optimal container for a field considering grouping and hierarchy
+ * Enhanced to find truly outermost containers
+ */
+const findOptimalFieldContainer = (field: HTMLElement, allFields: HTMLElement[], doc: Document): HTMLElement | null => {
+  // Start from the field and work upwards to find the best container
+  let currentElement = field.parentElement;
+  let bestContainer: HTMLElement | null = null;
+  let maxGroupScore = 0;
+  let maxFieldCount = 0;
+
+  // Track all potential containers
+  const containerCandidates: Array<{ element: HTMLElement; score: number; fieldCount: number }> = [];
+
+  while (currentElement && currentElement !== doc.body && currentElement !== doc.documentElement) {
+    // Calculate how well this container groups related fields
+    const containerFields = allFields.filter(f => currentElement!.contains(f));
+
+    if (containerFields.length >= 1) {
+      // Score this container based on how well it groups fields
+      const groupScore = calculateContainerGroupingScore(currentElement, containerFields);
+
+      containerCandidates.push({
+        element: currentElement,
+        score: groupScore,
+        fieldCount: containerFields.length,
+      });
+
+      // Prefer containers with more fields and better grouping
+      const shouldUpdate =
+        groupScore > maxGroupScore || (groupScore >= maxGroupScore * 0.8 && containerFields.length > maxFieldCount);
+
+      if (shouldUpdate) {
+        maxGroupScore = groupScore;
+        maxFieldCount = containerFields.length;
+        bestContainer = currentElement;
+      }
+    }
+
+    currentElement = currentElement.parentElement;
+  }
+
+  // Post-processing: Ensure we have the outermost meaningful container
+  if (bestContainer && containerCandidates.length > 1) {
+    // Sort by field count (descending) and then by score
+    containerCandidates.sort((a, b) => {
+      if (a.fieldCount !== b.fieldCount) {
+        return b.fieldCount - a.fieldCount;
+      }
+      return b.score - a.score;
+    });
+
+    // If the top candidate has significantly more fields, prefer it
+    const topCandidate = containerCandidates[0];
+    if (topCandidate.fieldCount > maxFieldCount * 1.2 && topCandidate.score >= maxGroupScore * 0.5) {
+      console.log(`🔄 Switching to outermost container with ${topCandidate.fieldCount} fields (was ${maxFieldCount})`);
+      bestContainer = topCandidate.element;
+    }
+  }
+
+  return bestContainer;
+};
+
+/**
+ * Calculate how well a container groups related fields
+ */
+const calculateContainerGroupingScore = (container: HTMLElement, fields: HTMLElement[]): number => {
+  let score = 0;
+
+  // Base score from field count
+  score += fields.length * 5;
+
+  // Check field type diversity (good grouping should have logical field combinations)
+  const fieldTypes = getFieldTypesInContainer(container);
+
+  // Bonus for logical field type combinations
+  if (fieldTypes.has("text") && fieldTypes.has("email")) score += 20; // Contact forms
+  if (fieldTypes.has("radio") && fieldTypes.has("checkbox")) score += 15; // Survey forms
+  if (fieldTypes.has("select") && fieldTypes.has("text")) score += 15; // Application forms
+  if (fieldTypes.has("checkbox") && fieldTypes.has("text")) score += 10; // Terms + info forms
+
+  // Bonus for semantic containers
+  const tagName = container.tagName.toLowerCase();
+  if (tagName === "fieldset") score += 30;
+  if (tagName === "form") score += 25;
+  if (container.getAttribute("role") === "group") score += 20;
+
+  // Bonus for appropriate size (not too small or too large)
+  const rect = container.getBoundingClientRect();
+  if (rect.height > 100 && rect.height < 2000) score += 10;
+  if (rect.width > 200 && rect.width < 1200) score += 10;
+
+  // Penalty for excessive nesting depth
+  const depth = getElementDepth(container);
+  if (depth > 15) score -= Math.min(depth - 15, 30);
+
+  return score;
+};
+
+/**
+ * Get field types present in a container
+ */
+const getFieldTypesInContainer = (container: HTMLElement): Set<string> => {
+  const types = new Set<string>();
+
+  // Check for different input types
+  const inputs = container.querySelectorAll("input");
+  inputs.forEach(input => {
+    if (input.type === "text" || input.type === "email" || input.type === "tel" || input.type === "url") {
+      types.add("text");
+    } else if (input.type === "checkbox") {
+      types.add("checkbox");
+    } else if (input.type === "radio") {
+      types.add("radio");
+    } else if (input.type === "file") {
+      types.add("file");
+    }
+  });
+
+  // Check for selects
+  if (container.querySelector("select")) types.add("select");
+
+  // Check for textareas
+  if (container.querySelector("textarea")) types.add("textarea");
+
+  // Check for ARIA roles
+  if (container.querySelector('[role="combobox"]')) types.add("select");
+  if (container.querySelector('[role="checkbox"]')) types.add("checkbox");
+  if (container.querySelector('[role="radio"]')) types.add("radio");
+
+  return types;
+};
+
+/**
+ * Enhanced scoring function that considers field grouping and relationships
+ * Optimized for modern web applications and SPA patterns
+ */
+const scoreFormContainerEnhanced = (
+  element: HTMLElement,
+  fields: HTMLElement[],
+): { score: number; reasons: string[] } => {
+  let score = 0;
+  const reasons: string[] = [];
+
+  // Enhanced base score from field count with better scaling
+  const fieldCount = fields.length;
+  if (fieldCount === 0) return { score: 0, reasons: ["no fields"] };
+
+  // Progressive scoring that rewards more fields but with diminishing returns
+  if (fieldCount >= 10) {
+    score += 120; // High score for forms with many fields
+  } else if (fieldCount >= 5) {
+    score += fieldCount * 15; // Good score for medium forms
+  } else {
+    score += fieldCount * 10; // Base score for small forms
+  }
+  reasons.push(`${fieldCount} form fields`);
+
+  // Enhanced field diversity scoring
+  const fieldTypes = getFieldTypesInContainer(element);
+  const diversityBonus = Math.min(fieldTypes.size * 12, 60); // Cap diversity bonus
+  score += diversityBonus;
+  reasons.push(`${fieldTypes.size} different field types (+${diversityBonus})`);
+
+  // Bonus for modern form patterns and logical field combinations
+  const hasTextAndEmail = fieldTypes.has("text") && fieldTypes.has("email");
+  const hasSelectAndText = fieldTypes.has("select") && fieldTypes.has("text");
+  const hasCheckboxAndRadio = fieldTypes.has("checkbox") && fieldTypes.has("radio");
+  const hasFileInput = fieldTypes.has("file");
+
+  if (hasTextAndEmail) {
+    score += 25;
+    reasons.push("contact form pattern (+25)");
+  }
+  if (hasSelectAndText) {
+    score += 20;
+    reasons.push("application form pattern (+20)");
+  }
+  if (hasCheckboxAndRadio) {
+    score += 18;
+    reasons.push("survey/preference form pattern (+18)");
+  }
+  if (hasFileInput) {
+    score += 15;
+    reasons.push("document upload form (+15)");
+  }
+
+  // Semantic HTML elements get higher scores
+  const tagName = element.tagName.toLowerCase();
+  if (tagName === "form") {
+    score += 60;
+    reasons.push("semantic <form> element");
+  } else if (tagName === "fieldset") {
+    score += 40;
+    reasons.push("semantic <fieldset> element");
+  }
+
+  // ARIA roles
+  const role = element.getAttribute("role");
+  if (role === "form") {
+    score += 50;
+    reasons.push("ARIA form role");
+  } else if (role === "group") {
+    score += 30;
+    reasons.push("ARIA group role");
+  }
+
+  // Enhanced class name patterns (case insensitive) - optimized for modern web apps
+  const className = element.className.toLowerCase();
+  const classPatterns = [
+    // Core form patterns
+    { pattern: /\bform\b/, score: 40, label: "form class" },
+    { pattern: /\bsurvey\b/, score: 45, label: "survey class" },
+    { pattern: /\bquestionnaire\b/, score: 45, label: "questionnaire class" },
+    { pattern: /\bapplication\b/, score: 35, label: "application class" },
+
+    // Business/insurance specific patterns
+    { pattern: /\bprofile\b/, score: 40, label: "profile class" },
+    { pattern: /\binsurance\b/, score: 42, label: "insurance class" },
+    { pattern: /\bpolicy\b/, score: 38, label: "policy class" },
+    { pattern: /\bcoverage\b/, score: 36, label: "coverage class" },
+    { pattern: /\bquote\b/, score: 35, label: "quote class" },
+    { pattern: /\bclaim\b/, score: 35, label: "claim class" },
+    { pattern: /\baccount\b/, score: 32, label: "account class" },
+    { pattern: /\bmember\b/, score: 30, label: "member class" },
+    { pattern: /\bcustomer\b/, score: 30, label: "customer class" },
+
+    // Authentication and user flows
+    { pattern: /\bcontact\b/, score: 28, label: "contact class" },
+    { pattern: /\bsignup\b/, score: 30, label: "signup class" },
+    { pattern: /\blogin\b/, score: 25, label: "login class" },
+    { pattern: /\bregistration\b/, score: 35, label: "registration class" },
+    { pattern: /\bonboarding\b/, score: 33, label: "onboarding class" },
+
+    // E-commerce patterns
+    { pattern: /\bcheckout\b/, score: 40, label: "checkout class" },
+    { pattern: /\bpayment\b/, score: 38, label: "payment class" },
+    { pattern: /\bbilling\b/, score: 36, label: "billing class" },
+    { pattern: /\bshipping\b/, score: 34, label: "shipping class" },
+
+    // Multi-step form patterns
+    { pattern: /\bwizard\b/, score: 30, label: "wizard class" },
+    { pattern: /\bstep\b/, score: 20, label: "step class" },
+    { pattern: /\bstage\b/, score: 18, label: "stage class" },
+    { pattern: /\bflow\b/, score: 16, label: "flow class" },
+
+    // Container patterns
+    { pattern: /\bform-container\b/, score: 35, label: "form container class" },
+    { pattern: /\bform-wrapper\b/, score: 35, label: "form wrapper class" },
+    { pattern: /\bform-section\b/, score: 32, label: "form section class" },
+    { pattern: /\bform-group\b/, score: 28, label: "form group class" },
+    { pattern: /\bform-body\b/, score: 33, label: "form body class" },
+    { pattern: /\bform-content\b/, score: 33, label: "form content class" },
+
+    // Modern SPA patterns
+    { pattern: /\bpage\b/, score: 15, label: "page class" },
+    { pattern: /\bview\b/, score: 12, label: "view class" },
+    { pattern: /\bcomponent\b/, score: 10, label: "component class" },
+    { pattern: /\bcontainer\b/, score: 8, label: "container class" },
+
+    // Negative patterns (reduce score)
+    { pattern: /\bmodal\b/, score: -12, label: "modal (small penalty)" },
+    { pattern: /\bpopup\b/, score: -12, label: "popup (small penalty)" },
+    { pattern: /\btooltip\b/, score: -20, label: "tooltip (penalty)" },
+    { pattern: /\bdropdown\b/, score: -15, label: "dropdown (penalty)" },
+    { pattern: /\bmenu\b/, score: -18, label: "menu (penalty)" },
+    { pattern: /\bnavigation\b/, score: -25, label: "navigation (penalty)" },
+    { pattern: /\bheader\b/, score: -20, label: "header (penalty)" },
+    { pattern: /\bfooter\b/, score: -20, label: "footer (penalty)" },
+    { pattern: /\bsidebar\b/, score: -22, label: "sidebar (penalty)" },
+  ];
+
+  for (const { pattern, score: patternScore, label } of classPatterns) {
+    if (pattern.test(className)) {
+      score += patternScore;
+      reasons.push(label);
+    }
+  }
+
+  // ID patterns
+  const id = element.id.toLowerCase();
+  const idPatterns = [
+    { pattern: /\bform\b/, score: 25, label: "form ID" },
+    { pattern: /\bsurvey\b/, score: 30, label: "survey ID" },
+    { pattern: /\bapplication\b/, score: 20, label: "application ID" },
+    { pattern: /\bcontact\b/, score: 15, label: "contact ID" },
+    { pattern: /\bwizard\b/, score: 15, label: "wizard ID" },
+  ];
+
+  for (const { pattern, score: patternScore, label } of idPatterns) {
+    if (pattern.test(id)) {
+      score += patternScore;
+      reasons.push(label);
+    }
+  }
+
+  // Data attributes
+  const dataAttributes = [
+    { attr: "data-form", score: 25, label: "data-form attribute" },
+    { attr: "data-step", score: 15, label: "data-step attribute" },
+    { attr: "data-wizard", score: 20, label: "data-wizard attribute" },
+    { attr: "data-survey", score: 30, label: "data-survey attribute" },
+  ];
+
+  for (const { attr, score: attrScore, label } of dataAttributes) {
+    if (element.hasAttribute(attr)) {
+      score += attrScore;
+      reasons.push(label);
+    }
+  }
+
+  // Structural indicators
+  const hasLegend = element.querySelector("legend");
+  if (hasLegend) {
+    score += 20;
+    reasons.push("contains legend");
+  }
+
+  const hasSubmitButton = element.querySelector('input[type="submit"], button[type="submit"], button:not([type])');
+  if (hasSubmitButton) {
+    score += 25;
+    reasons.push("contains submit button");
+  }
+
+  // Group relationship bonuses
+  const hasRadioGroups = element.querySelectorAll('input[type="radio"]').length >= 2;
+  const hasCheckboxGroups = element.querySelectorAll('input[type="checkbox"]').length >= 2;
+
+  if (hasRadioGroups) {
+    score += 15;
+    reasons.push("contains radio button groups");
+  }
+
+  if (hasCheckboxGroups) {
+    score += 15;
+    reasons.push("contains checkbox groups");
+  }
+
+  // Framework-specific patterns
+  const frameworkPatterns = [
+    { pattern: /\bfreebirdFormviewerViewFormCard\b/, score: 50, label: "Google Forms" },
+    { pattern: /\bfreebirdFormviewerViewFormContent\b/, score: 50, label: "Google Forms content" },
+    { pattern: /\bform-container\b/, score: 35, label: "form container" },
+    { pattern: /\binput-container\b/, score: 20, label: "input container" },
+    { pattern: /\bfield-container\b/, score: 20, label: "field container" },
+    { pattern: /\bform-section\b/, score: 30, label: "form section" },
+    { pattern: /\bform-group\b/, score: 25, label: "form group" },
+    { pattern: /\bform-wrapper\b/, score: 35, label: "form wrapper" },
+    { pattern: /\bform-body\b/, score: 30, label: "form body" },
+    { pattern: /\bform-content\b/, score: 30, label: "form content" },
+  ];
+
+  for (const { pattern, score: patternScore, label } of frameworkPatterns) {
+    if (pattern.test(className)) {
+      score += patternScore;
+      reasons.push(label);
+    }
+  }
+
+  // Penalty for very deep nesting (likely not a form container)
+  const depth = getElementDepth(element);
+  if (depth > 12) {
+    const penalty = Math.min((depth - 12) * 3, 40);
+    score -= penalty;
+    reasons.push(`deep nesting penalty (${depth} levels, -${penalty})`);
+  }
+
+  // Bonus for reasonable size and visibility
+  const rect = element.getBoundingClientRect();
+  if (rect.width > 250 && rect.height > 150) {
+    score += 15;
+    reasons.push("reasonable size");
+  }
+
+  // Strong penalty for hidden elements
+  const style = window.getComputedStyle(element);
+  if (style.display === "none" || style.visibility === "hidden") {
+    score -= 80;
+    reasons.push("hidden element penalty");
+  }
+
+  // Bonus for containers that properly group related fields
+  const groupingBonus = calculateContainerGroupingScore(element, fields) * 0.3; // Scale down the grouping score
+  if (groupingBonus > 5) {
+    score += groupingBonus;
+    reasons.push(`good field grouping (+${Math.round(groupingBonus)})`);
+  }
+
+  return { score: Math.round(score), reasons };
 };
 
 // --- Re-export shared helpers for convenience ---
 export { detectFields };
-
-// --- Local Helper Definitions ---
-// --- Enhanced Recursive Field Detection ---
-/**
- * Recursively finds all form-like fields within a container, including shadow roots and custom elements.
- * @param container HTMLElement or ShadowRoot to search within
- * @returns HTMLElement[]
- */
-function getFormFieldsDeep(container: HTMLElement | ShadowRoot | null): HTMLElement[] {
-  if (!container) return [];
-  const fieldSelectors = [
-    // Standard fields
-    'input:not([type="hidden"]):not([type="submit"])',
-    "select",
-    "textarea",
-    '[role="textbox"]',
-    '[role="combobox"]',
-    '[role="spinbutton"]',
-    '[contenteditable="true"]',
-    "[data-filliny-field]",
-    '[role="checkbox"]',
-    '[role="switch"]',
-    '[role="radio"]',
-    // Common custom field selectors (expand as needed)
-    '[class*="ashby-"]',
-    '[data-qa="input"]',
-    '[data-qa="select"]',
-    '[class*="custom-field"]',
-    '[class*="form-field"]',
-    '[class*="input-field"]',
-    '[class*="select-field"]',
-    '[class*="field-input"]',
-    '[class*="field-select"]',
-  ];
-  // Find all matching elements in this container
-  let fields: HTMLElement[] = Array.from(container.querySelectorAll(fieldSelectors.join(","))).filter(
-    (el): el is HTMLElement => el instanceof HTMLElement,
-  );
-
-  // Filter out hidden, disabled, or readonly fields
-  fields = fields.filter(el => {
-    const style = window.getComputedStyle(el);
-    return (
-      style.display !== "none" &&
-      style.visibility !== "hidden" &&
-      !el.hasAttribute("disabled") &&
-      !el.hasAttribute("readonly")
-    );
-  });
-
-  // Recursively search shadow roots of children
-  const children = (
-    container instanceof ShadowRoot ? Array.from(container.children) : Array.from(container.childNodes)
-  ) as Element[];
-  for (const child of children) {
-    // If the child has a shadow root, search inside it
-    if ((child as HTMLElement).shadowRoot) {
-      fields.push(...getFormFieldsDeep((child as HTMLElement).shadowRoot!));
-    }
-    // If the child is a custom element (tag includes a dash), search inside its shadow root if present
-    if (child.tagName && child.tagName.includes("-") && (child as HTMLElement).shadowRoot) {
-      fields.push(...getFormFieldsDeep((child as HTMLElement).shadowRoot!));
-    }
-  }
-  return fields;
-}
-
-// Returns all form-like fields within a container (now using the deep version)
-function getFormFields(container: HTMLElement | null): HTMLElement[] {
-  return getFormFieldsDeep(container);
-}
-
-// Recursively finds all elements in the tree with a shadowRoot
-function findAllShadowRoots(root: HTMLElement | null): HTMLElement[] {
-  const hosts: HTMLElement[] = [];
-  if (!root) return hosts;
-  const treeWalker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
-  let currentNode = treeWalker.currentNode as HTMLElement | null;
-  while (currentNode) {
-    if (currentNode.shadowRoot) hosts.push(currentNode);
-    currentNode = treeWalker.nextNode() as HTMLElement | null;
-  }
-  return hosts;
-}
-
-// Queries a shadow root for elements matching a selector
-function queryShadowRoot(shadowRoot: ShadowRoot, selector: string): HTMLElement[] {
-  return Array.from(shadowRoot.querySelectorAll(selector)).filter((el): el is HTMLElement => el instanceof HTMLElement);
-}
 
 /**
  * Returns true if the current window is inside a cross-origin iframe.
@@ -464,3 +1442,247 @@ function openCrossOriginIframeInNewTabAndAlert() {
 }
 
 export { isInsideCrossOriginIframe, showCrossOriginIframeWarning, openCrossOriginIframeInNewTabAndAlert };
+
+// --- Diagnostic Functions for Debugging ---
+
+/**
+ * Enhanced diagnostic function to analyze form detection issues with grouping focus
+ * This helps debug why certain forms or fields aren't being detected properly
+ */
+export const diagnoseFillinySystem = (): void => {
+  console.log(`🔍 FILLINY SYSTEM DIAGNOSTIC REPORT (Enhanced Grouping)`);
+  console.log(`=======================================================`);
+
+  // 1. Document Analysis
+  console.log(`📄 Document Analysis:`);
+  console.log(`   • URL: ${window.location.href}`);
+  console.log(`   • Title: ${document.title}`);
+  console.log(`   • Body classes: ${document.body.className}`);
+  console.log(`   • Total DOM elements: ${document.querySelectorAll("*").length}`);
+
+  // 2. Frame Analysis
+  const docs = getAllFrameDocuments();
+  console.log(`🖼️ Frame Analysis:`);
+  console.log(`   • Total documents: ${docs.length}`);
+  docs.forEach((doc, index) => {
+    console.log(`   • Document ${index}: ${doc.location?.href || "unknown"}`);
+  });
+
+  // 3. Enhanced Form Element Analysis with Grouping
+  console.log(`📋 Enhanced Form Element Analysis:`);
+  const allFormElements = getFormFieldsRobust(document.body);
+  console.log(`   • Total form elements found: ${allFormElements.length}`);
+
+  // Group by type for better analysis
+  const elementTypes = allFormElements.reduce(
+    (acc, el) => {
+      const inputEl = el as HTMLInputElement;
+      const type = el.tagName.toLowerCase() + (inputEl.type ? `[${inputEl.type}]` : "");
+      acc[type] = (acc[type] || 0) + 1;
+      return acc;
+    },
+    {} as Record<string, number>,
+  );
+
+  console.log(`   • Element types:`, elementTypes);
+
+  // 4. Grouping Analysis for Radio/Checkbox
+  console.log(`🎯 Grouping Analysis:`);
+
+  // Radio buttons analysis
+  const radioElements = allFormElements.filter(
+    el => (el instanceof HTMLInputElement && el.type === "radio") || el.getAttribute("role") === "radio",
+  );
+  console.log(`   • Radio elements found: ${radioElements.length}`);
+
+  if (radioElements.length > 0) {
+    const radioByName = radioElements.reduce(
+      (acc, el) => {
+        const name = (el as HTMLInputElement).name || "unnamed";
+        acc[name] = (acc[name] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>,
+    );
+    console.log(`   • Radio groups by name:`, radioByName);
+  }
+
+  // Checkbox analysis
+  const checkboxElements = allFormElements.filter(
+    el => (el instanceof HTMLInputElement && el.type === "checkbox") || el.getAttribute("role") === "checkbox",
+  );
+  console.log(`   • Checkbox elements found: ${checkboxElements.length}`);
+
+  if (checkboxElements.length > 0) {
+    const checkboxByName = checkboxElements.reduce(
+      (acc, el) => {
+        const name = (el as HTMLInputElement).name || "unnamed";
+        acc[name] = (acc[name] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>,
+    );
+    console.log(`   • Checkbox groups by name:`, checkboxByName);
+  }
+
+  // Select elements analysis
+  const selectElements = allFormElements.filter(
+    el =>
+      el instanceof HTMLSelectElement ||
+      el.getAttribute("role") === "combobox" ||
+      el.getAttribute("role") === "listbox",
+  );
+  console.log(`   • Select elements found: ${selectElements.length}`);
+
+  // 5. Existing Form Containers
+  console.log(`🏗️ Existing Form Container Analysis:`);
+  const existingContainers = document.querySelectorAll("[data-filliny-form-container]");
+  console.log(`   • Registered containers: ${existingContainers.length}`);
+  existingContainers.forEach((container, index) => {
+    const fields = getFormFieldsRobust(container as HTMLElement);
+    console.log(`   • Container ${index}: ${container.tagName}.${container.className} (${fields.length} fields)`);
+  });
+
+  // 6. Unified Registry Analysis
+  console.log(`🎯 Unified Registry Analysis:`);
+  try {
+    // Check if we can access the registry
+    const allFields = unifiedFieldRegistry.getAllFields();
+    const individualFields = unifiedFieldRegistry.getIndividualFields();
+    const groupedFields = unifiedFieldRegistry.getGroupedFields();
+
+    console.log(`   • Total fields in registry: ${allFields.length}`);
+    console.log(`   • Individual fields: ${individualFields.length}`);
+    console.log(`   • Grouped fields: ${groupedFields.length}`);
+
+    // Field type distribution
+    const fieldTypeDistribution = allFields.reduce(
+      (acc, field) => {
+        acc[field.type] = (acc[field.type] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>,
+    );
+    console.log(`   • Field type distribution:`, fieldTypeDistribution);
+
+    // Group analysis
+    groupedFields.forEach(group => {
+      console.log(`   • Group ${group.groupId}: ${group.groupType} with ${group.fields.length} fields`);
+    });
+  } catch (error) {
+    console.log(`   • Registry not available or error:`, error);
+  }
+
+  // 7. Potential Form Containers
+  console.log(`🎯 Potential Form Container Analysis:`);
+  const potentialContainers = [
+    "form",
+    '[role="form"]',
+    ".form",
+    ".form-container",
+    ".form-wrapper",
+    '[class*="form"]',
+    '[class*="profile"]',
+    '[class*="insurance"]',
+    '[class*="application"]',
+    "fieldset",
+    '[role="group"]',
+    '[role="radiogroup"]',
+  ];
+
+  potentialContainers.forEach(selector => {
+    try {
+      const elements = document.querySelectorAll(selector);
+      if (elements.length > 0) {
+        console.log(`   • ${selector}: ${elements.length} elements`);
+        elements.forEach((el, index) => {
+          const fields = getFormFieldsRobust(el as HTMLElement);
+          if (fields.length > 0) {
+            console.log(`     - Element ${index}: ${fields.length} fields`);
+          }
+        });
+      }
+    } catch {
+      console.log(`   • ${selector}: selector failed`);
+    }
+  });
+
+  // 8. Enhanced Issue Detection
+  console.log(`⚠️ Potential Issues:`);
+  const issues: string[] = [];
+
+  if (allFormElements.length === 0) {
+    issues.push("No form elements detected - check selectors");
+  }
+
+  if (existingContainers.length === 0) {
+    issues.push("No form containers registered - detection may have failed");
+  }
+
+  // Check for hidden elements
+  const hiddenElements = allFormElements.filter(el => {
+    const style = window.getComputedStyle(el);
+    return style.display === "none" || style.visibility === "hidden";
+  });
+
+  if (hiddenElements.length > 0) {
+    issues.push(`${hiddenElements.length} form elements are hidden`);
+  }
+
+  // Check for elements without proper IDs or names
+  const elementsWithoutIds = allFormElements.filter(
+    el => !el.id && !el.getAttribute("name") && !el.hasAttribute("data-filliny-id"),
+  );
+
+  if (elementsWithoutIds.length > 0) {
+    issues.push(`${elementsWithoutIds.length} elements lack proper identification`);
+  }
+
+  // Check for ungrouped radio buttons (potential issue)
+  const ungroupedRadios = radioElements.filter(el => !(el as HTMLInputElement).name);
+  if (ungroupedRadios.length > 0) {
+    issues.push(`${ungroupedRadios.length} radio buttons lack name attribute (grouping may be affected)`);
+  }
+
+  if (issues.length === 0) {
+    console.log(`   ✅ No obvious issues detected`);
+  } else {
+    issues.forEach(issue => console.log(`   ❌ ${issue}`));
+  }
+
+  // 9. Enhanced Recommendations
+  console.log(`💡 Enhanced Recommendations:`);
+  const recommendations: string[] = [];
+
+  if (allFormElements.length > 10) {
+    recommendations.push("Large form detected - ensure proper container detection and grouping");
+  }
+
+  if (docs.length > 1) {
+    recommendations.push("Multiple frames detected - check cross-frame compatibility");
+  }
+
+  if (existingContainers.length === 0 && allFormElements.length > 0) {
+    recommendations.push("Run detectFormLikeContainers() to register form containers");
+  }
+
+  if (radioElements.length > 0 && ungroupedRadios.length > 0) {
+    recommendations.push("Some radio buttons lack name attributes - grouping may not work optimally");
+  }
+
+  if (selectElements.length > 0) {
+    recommendations.push(`${selectElements.length} select elements detected - ensure proper option detection`);
+  }
+
+  if (recommendations.length === 0) {
+    console.log(`   ✅ System appears to be working correctly with enhanced grouping`);
+  } else {
+    recommendations.forEach(rec => console.log(`   💡 ${rec}`));
+  }
+
+  console.log(`=======================================================`);
+  console.log(`🔍 ENHANCED DIAGNOSTIC COMPLETE`);
+};
+
+// Export for testing and debugging
+export { getFormFieldsRobust };
