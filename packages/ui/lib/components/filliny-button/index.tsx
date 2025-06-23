@@ -13,7 +13,7 @@ import { FillinyTestModeFillerButton } from "./test-mode-button";
 import { positionStorage, fieldButtonsStorage } from "@extension/storage";
 import { DragButton } from "./drag-button";
 import { FieldFillManager } from "./search-button/fieldFillManager";
-import { FieldButtonToggle } from "./field-button";
+// import { FieldButtonToggle } from "./field-button";
 
 interface ButtonConfig {
   Component: React.FC<ButtonComponentProps>;
@@ -43,11 +43,11 @@ const buttonComponents: ButtonConfig[] = [
     position: { top: "-10px", left: "-25px" },
     tooltipContent: "Highlight fillable form fields",
   },
-  {
-    Component: FieldButtonToggle,
-    position: { top: "49px", left: "-8px" },
-    tooltipContent: "Toggle field fill buttons",
-  },
+  // {
+  //   Component: FieldButtonToggle,
+  //   position: { top: "49px", left: "-8px" },
+  //   tooltipContent: "Toggle field fill buttons",
+  // },
 ];
 
 const DraggableButton = ({ position }: { position: Position }) => {
