@@ -18,9 +18,23 @@ export const FieldFillDropdown: React.FC<FieldFillDropdownProps> = ({ isOpen, on
   const [isLoading, setIsLoading] = useState(false);
   const [adjustedPosition, setAdjustedPosition] = useState(position);
 
+  // Add spin animation if it doesn't exist
+  useEffect(() => {
+    if (!document.getElementById("filliny-spin-animation")) {
+      const styleEl = document.createElement("style");
+      styleEl.id = "filliny-spin-animation";
+      styleEl.setAttribute("data-filliny-element", "true");
+      styleEl.textContent = `
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+      `;
+      document.head.appendChild(styleEl);
+    }
+  }, []);
+
   // Adjust position to ensure dropdown stays within viewport
   useEffect(() => {
-    // Skip if dropdown isn't open or ref isn't available
     if (!isOpen || !dropdownRef.current) {
       return undefined;
     }
@@ -47,7 +61,6 @@ export const FieldFillDropdown: React.FC<FieldFillDropdownProps> = ({ isOpen, on
 
       // Ensure dropdown doesn't go off-screen at the bottom
       if (top + rect.height > viewportHeight - 10) {
-        // Position above the button instead
         top = position.top - rect.height - 10;
       }
 
@@ -56,12 +69,7 @@ export const FieldFillDropdown: React.FC<FieldFillDropdownProps> = ({ isOpen, on
         top = 10;
       }
 
-      // Apply adjusted position with smooth transition
       setAdjustedPosition({ top, left });
-
-      // Apply the position to the dropdown element
-      dropdown.style.top = `${top}px`;
-      dropdown.style.left = `${left}px`;
     };
 
     // Initial adjustment
@@ -75,7 +83,6 @@ export const FieldFillDropdown: React.FC<FieldFillDropdownProps> = ({ isOpen, on
     window.addEventListener("resize", handleWindowChange);
     window.addEventListener("scroll", handleWindowChange, { passive: true });
 
-    // Cleanup function
     return () => {
       window.removeEventListener("resize", handleWindowChange);
       window.removeEventListener("scroll", handleWindowChange);
@@ -92,7 +99,6 @@ export const FieldFillDropdown: React.FC<FieldFillDropdownProps> = ({ isOpen, on
       }
     };
 
-    // Use capture phase to ensure we catch clicks before they bubble
     document.addEventListener("mousedown", handleClickOutside, true);
     return () => {
       document.removeEventListener("mousedown", handleClickOutside, true);
@@ -116,37 +122,14 @@ export const FieldFillDropdown: React.FC<FieldFillDropdownProps> = ({ isOpen, on
     };
   }, [isOpen, onClose]);
 
-  // Prevent clicks inside dropdown from bubbling up
-  const handleDropdownClick = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    // Prevent the event from reaching any parent elements
-    if (e.nativeEvent) {
-      e.nativeEvent.stopImmediatePropagation?.();
-    }
-  };
-
   // Handle selection
   const handleSelect = async (useTestMode: boolean, e: React.MouseEvent) => {
-    // Ensure the event doesn't propagate and trigger form overlays
     e.preventDefault();
     e.stopPropagation();
-
-    // For extra safety with React synthetic events
-    if (e.nativeEvent) {
-      e.nativeEvent.stopImmediatePropagation?.();
-      e.nativeEvent.stopPropagation?.();
-      e.nativeEvent.preventDefault?.();
-    }
 
     try {
       setIsLoading(true);
-
-      // Remember user preference for next time
       await fieldButtonsStorage.setPreferTestMode(useTestMode);
-
-      // Fill the field
       await onSelect(field, useTestMode);
     } catch (error) {
       console.error("Error filling field:", error);
@@ -158,17 +141,17 @@ export const FieldFillDropdown: React.FC<FieldFillDropdownProps> = ({ isOpen, on
 
   if (!isOpen) return null;
 
-  // Define dropdown styles aligned with Filliny UI
+  // Define styles that work outside shadow DOM
   const dropdownStyle: React.CSSProperties = {
-    position: "fixed", // Use fixed positioning to avoid layout issues
+    position: "fixed",
     top: `${adjustedPosition.top}px`,
     left: `${adjustedPosition.left}px`,
     backgroundColor: "white",
     borderRadius: "6px",
     boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
     padding: "8px 0",
-    zIndex: 10000000, // Very high z-index to ensure it's above everything
-    minWidth: "160px",
+    zIndex: 10000000,
+    minWidth: "180px",
     fontSize: "14px",
     color: "#111",
     border: "1px solid rgba(0,0,0,0.08)",
@@ -176,7 +159,6 @@ export const FieldFillDropdown: React.FC<FieldFillDropdownProps> = ({ isOpen, on
     maxHeight: "300px",
     overflowY: "auto",
     pointerEvents: "auto",
-    // Ensure the dropdown doesn't affect document flow
     isolation: "isolate",
   };
 
@@ -189,7 +171,7 @@ export const FieldFillDropdown: React.FC<FieldFillDropdownProps> = ({ isOpen, on
     color: "#4f46e5",
   };
 
-  const optionStyle: React.CSSProperties = {
+  const buttonStyle: React.CSSProperties = {
     padding: "8px 12px",
     cursor: "pointer",
     display: "flex",
@@ -203,14 +185,11 @@ export const FieldFillDropdown: React.FC<FieldFillDropdownProps> = ({ isOpen, on
     fontFamily: "inherit",
   };
 
-  const hoverStyle = {
-    backgroundColor: "#f3f4f6",
-  };
-
-  const activeStyle = {
-    backgroundColor: "#eef2ff",
+  const activeButtonStyle: React.CSSProperties = {
+    ...buttonStyle,
+    backgroundColor: "#4f46e5",
+    color: "white",
     fontWeight: "bold",
-    color: "#4f46e5",
   };
 
   const loadingStyle: React.CSSProperties = {
@@ -220,7 +199,7 @@ export const FieldFillDropdown: React.FC<FieldFillDropdownProps> = ({ isOpen, on
     borderRadius: "50%",
     border: "2px solid rgba(79, 70, 229, 0.3)",
     borderTopColor: "#4f46e5",
-    animation: "filliny-spin 1s linear infinite",
+    animation: "spin 1s linear infinite",
     marginRight: "8px",
   };
 
@@ -230,33 +209,29 @@ export const FieldFillDropdown: React.FC<FieldFillDropdownProps> = ({ isOpen, on
       style={dropdownStyle}
       data-filliny-element="true"
       data-filliny-dropdown="true"
-      onMouseDown={handleDropdownClick} // Prevent mousedown from bubbling
+      onMouseDown={e => {
+        e.preventDefault();
+        e.stopPropagation();
+      }}
       role="menu"
       tabIndex={0}>
       <div style={headerStyle}>Fill Options</div>
 
       <button
-        style={{
-          ...optionStyle,
-          ...(settings?.preferTestMode ? activeStyle : {}),
-        }}
+        style={settings?.preferTestMode ? activeButtonStyle : buttonStyle}
         onMouseEnter={e => {
           if (!settings?.preferTestMode) {
             const target = e.currentTarget;
-            Object.assign(target.style, hoverStyle);
+            target.style.backgroundColor = "#f3f4f6";
           }
         }}
         onMouseLeave={e => {
           if (!settings?.preferTestMode) {
             const target = e.currentTarget;
-            Object.assign(target.style, optionStyle);
+            target.style.backgroundColor = "transparent";
           }
         }}
         onClick={e => handleSelect(true, e)}
-        onMouseDown={e => {
-          e.preventDefault();
-          e.stopPropagation();
-        }}
         type="button"
         role="menuitem"
         disabled={isLoading}>
@@ -267,7 +242,7 @@ export const FieldFillDropdown: React.FC<FieldFillDropdownProps> = ({ isOpen, on
             height="16"
             viewBox="0 0 24 24"
             fill="none"
-            stroke={settings?.preferTestMode ? "#4f46e5" : "currentColor"}
+            stroke="currentColor"
             strokeWidth="2"
             style={{ marginRight: "8px" }}>
             <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
@@ -278,27 +253,20 @@ export const FieldFillDropdown: React.FC<FieldFillDropdownProps> = ({ isOpen, on
       </button>
 
       <button
-        style={{
-          ...optionStyle,
-          ...(!settings?.preferTestMode ? activeStyle : {}),
-        }}
+        style={!settings?.preferTestMode ? activeButtonStyle : buttonStyle}
         onMouseEnter={e => {
           if (settings?.preferTestMode) {
             const target = e.currentTarget;
-            Object.assign(target.style, hoverStyle);
+            target.style.backgroundColor = "#f3f4f6";
           }
         }}
         onMouseLeave={e => {
           if (settings?.preferTestMode) {
             const target = e.currentTarget;
-            Object.assign(target.style, optionStyle);
+            target.style.backgroundColor = "transparent";
           }
         }}
         onClick={e => handleSelect(false, e)}
-        onMouseDown={e => {
-          e.preventDefault();
-          e.stopPropagation();
-        }}
         type="button"
         role="menuitem"
         disabled={isLoading}>
@@ -309,7 +277,7 @@ export const FieldFillDropdown: React.FC<FieldFillDropdownProps> = ({ isOpen, on
             height="16"
             viewBox="0 0 24 24"
             fill="none"
-            stroke={!settings?.preferTestMode ? "#4f46e5" : "currentColor"}
+            stroke="currentColor"
             strokeWidth="2"
             style={{ marginRight: "8px" }}>
             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>

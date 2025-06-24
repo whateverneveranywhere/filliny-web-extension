@@ -3,34 +3,6 @@ import { useState, useEffect, useRef } from "react";
 import type { Field, FieldType } from "@extension/shared";
 import { FieldFillDropdown } from "./fieldFillDropdown";
 
-// Define the spinner animation
-const spinKeyframes = `
-@keyframes filliny-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-`;
-
-// Add the keyframes to the document (once)
-const addSpinnerStyle = (() => {
-  let stylesAdded = false;
-
-  return () => {
-    if (stylesAdded) return;
-
-    // Check if the style already exists
-    if (!document.getElementById("filliny-spinner-style")) {
-      const styleEl = document.createElement("style");
-      styleEl.id = "filliny-spinner-style";
-      styleEl.setAttribute("data-filliny-element", "true"); // Mark as our element
-      styleEl.textContent = spinKeyframes;
-      document.head.appendChild(styleEl);
-      stylesAdded = true;
-    }
-  };
-})();
-
 interface FieldFillButtonProps {
   fieldElement: HTMLElement;
   field: Field;
@@ -46,11 +18,6 @@ export const FieldFillButton: React.FC<FieldFillButtonProps> = ({ fieldElement, 
   const buttonRef = useRef<HTMLButtonElement>(null);
   const positionObserverRef = useRef<ResizeObserver | null>(null);
   const mutationObserverRef = useRef<MutationObserver | null>(null);
-
-  // Add spinner animation style on mount (only once)
-  useEffect(() => {
-    addSpinnerStyle();
-  }, []);
 
   // Enhanced positioning system that tracks field changes and maintains relative positioning
   useEffect(() => {
@@ -478,51 +445,37 @@ export const FieldFillButton: React.FC<FieldFillButtonProps> = ({ fieldElement, 
     }
   };
 
-  // Define button styles to match Filliny UI style with fixed positioning
-  const buttonStyle: React.CSSProperties = {
-    position: "absolute", // Will be set to absolute with calculated coordinates
-    top: `${buttonPosition.top}px`,
-    left: `${buttonPosition.left}px`,
-    width: "28px",
-    height: "28px",
-    borderRadius: "50%",
-    backgroundColor: isHovered ? "#4338ca" : "#4f46e5", // Indigo color
-    color: "white",
-    border: "none",
-    boxShadow: "0 2px 5px rgba(0,0,0,0.3)",
-    cursor: "pointer",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    transition: "all 0.2s ease",
-    transform: isHovered ? "scale(1.1)" : "scale(1)",
-    opacity: 0.95,
-    zIndex: 99999,
-    pointerEvents: "auto",
-    padding: "0",
-    margin: "0",
-    outline: "none",
-    touchAction: "manipulation",
-  };
-
-  // Define spinner styles
-  const spinnerStyle: React.CSSProperties = {
-    display: "inline-block",
-    width: "12px",
-    height: "12px",
-    borderRadius: "50%",
-    border: "2px solid rgba(255, 255, 255, 0.3)",
-    borderTopColor: "white",
-    animation: "filliny-spin 1s linear infinite",
-  };
-
   return (
     <>
       <button
         ref={buttonRef}
-        style={buttonStyle}
+        style={{
+          position: "fixed",
+          top: `${buttonPosition.top}px`,
+          left: `${buttonPosition.left}px`,
+          width: "28px",
+          height: "28px",
+          borderRadius: "50%",
+          backgroundColor: isHovered ? "#4338ca" : "#4f46e5",
+          color: "white",
+          border: "none",
+          boxShadow: "0 2px 5px rgba(0,0,0,0.3)",
+          cursor: "pointer",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          transition: "all 0.2s ease",
+          transform: isHovered ? "scale(1.1)" : "scale(1)",
+          opacity: 0.95,
+          zIndex: 99999,
+          pointerEvents: "auto",
+          padding: "0",
+          margin: "0",
+          outline: "none",
+          touchAction: "manipulation",
+        }}
         onClick={handleButtonClick}
-        onContextMenu={toggleDropdown} // Right-click to toggle dropdown
+        onContextMenu={toggleDropdown}
         disabled={isLoading}
         title="Fill this field (hover for options)"
         onMouseEnter={handleMouseEnter}
@@ -530,7 +483,17 @@ export const FieldFillButton: React.FC<FieldFillButtonProps> = ({ fieldElement, 
         data-filliny-element="true"
         type="button">
         {isLoading || fieldElement.getAttribute("data-filliny-loading") === "true" ? (
-          <span style={spinnerStyle} data-filliny-element="true" />
+          <div
+            style={{
+              display: "inline-block",
+              width: "12px",
+              height: "12px",
+              borderRadius: "50%",
+              border: "2px solid rgba(255, 255, 255, 0.3)",
+              borderTopColor: "white",
+              animation: "spin 1s linear infinite",
+            }}
+          />
         ) : (
           <svg
             width="16"
@@ -540,8 +503,7 @@ export const FieldFillButton: React.FC<FieldFillButtonProps> = ({ fieldElement, 
             stroke="currentColor"
             strokeWidth="2"
             strokeLinecap="round"
-            strokeLinejoin="round"
-            data-filliny-element="true">
+            strokeLinejoin="round">
             <polyline points="20 6 9 17 4 12"></polyline>
           </svg>
         )}
