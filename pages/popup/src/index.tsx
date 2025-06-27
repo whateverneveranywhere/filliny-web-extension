@@ -1,12 +1,12 @@
-import { createRoot } from "react-dom/client";
 import "@src/index.css";
-import "@extension/ui/lib/global.css";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { ThemeProvider, Toaster } from "@extension/ui";
 import App from "./App";
+import { ThemeProvider, Toaster } from "@extension/ui";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { createRoot } from "react-dom/client";
+
 const queryClient = new QueryClient();
 
-function init() {
+const init = () => {
   const appContainer = document.querySelector("#app-container");
   if (!appContainer) {
     throw new Error("Can not find #app-container");
@@ -21,6 +21,6 @@ function init() {
       </ThemeProvider>
     </QueryClientProvider>,
   );
-}
+};
 
 init();

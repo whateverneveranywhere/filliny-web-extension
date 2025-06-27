@@ -1,20 +1,8 @@
 "use client";
 
-import type React from "react";
-import { useState } from "react";
-import { Label } from "@radix-ui/react-label";
-import { Check, X, Info, Pencil, Trash } from "lucide-react";
-import { usePOVListQuery, useTonesListQuery, useEditFillingProfileMutation } from "@extension/shared";
-import { Badge } from "../components/ui/badge";
+import { SingleWebsiteEditModal } from "../components/SingleWebsiteEditModal";
 import { WebsitePreviewCard } from "../components/StepperForms/WebsitePreviewCard";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../components/ui";
-import { Separator } from "../components/ui/separator";
-import type { DTOFillingPrefrences, DTOFillingWebsite, DTOProfileFillingForm } from "@extension/storage";
-import { cn } from "../utils";
-import { Button } from "../components/ui/button";
-import { useToast } from "../components/ui/use-toast";
-import { SingleWebsiteEditModal } from "../components/SingleWebsiteEditModal";
-import { profileStrorage } from "@extension/storage";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,6 +13,18 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "../components/ui/alert-dialog";
+import { Badge } from "../components/ui/badge";
+import { Button } from "../components/ui/button";
+import { Separator } from "../components/ui/separator";
+import { useToast } from "../components/ui/use-toast";
+import { cn } from "../utils";
+import { usePOVListQuery, useTonesListQuery, useEditFillingProfileMutation } from "@extension/shared";
+import { profileStrorage } from "@extension/storage";
+import { Label } from "@radix-ui/react-label";
+import { Check, X, Info, Pencil, Trash } from "lucide-react";
+import { useState } from "react";
+import type { DTOFillingPrefrences, DTOFillingWebsite, DTOProfileFillingForm } from "@extension/storage";
+import type React from "react";
 
 interface Props {
   matchingWebsite: DTOFillingWebsite;

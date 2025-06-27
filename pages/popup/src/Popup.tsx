@@ -1,15 +1,15 @@
 import "@src/Popup.css";
+import { t } from "@extension/i18n";
 import { useStorage, withErrorBoundary, withSuspense } from "@extension/shared";
 import { exampleThemeStorage } from "@extension/storage";
+import { Button, ErrorDisplay, LoadingSpinner } from "@extension/ui";
 import type { ComponentPropsWithoutRef } from "react";
-import { Button } from "@extension/ui";
-import { t } from "@extension/i18n";
 
 const errorMessage = "Failed to activate the content script!";
 
 const Popup = () => {
   const theme = useStorage(exampleThemeStorage);
-  const isLight = theme === "light";
+  const isLight = theme.isLight;
   const logo = "popup/logo.svg";
   const goGithubSite = () =>
     chrome.tabs.create({ url: "https://github.com/Jonghakseo/chrome-extension-boilerplate-react-vite" });
@@ -56,7 +56,7 @@ const Popup = () => {
         </p>
         <button
           className={
-            "font-bold mt-4 py-1 px-4 rounded shadow hover:scale-105 " +
+            "mt-4 rounded px-4 py-1 font-bold shadow hover:scale-105 " +
             (isLight ? "filliny-bg-blue-200 filliny-text-black" : "filliny-bg-gray-700 filliny-text-white")
           }
           onClick={activateContentRuntime}>
@@ -68,12 +68,10 @@ const Popup = () => {
   );
 };
 
-const ToggleButton = (props: ComponentPropsWithoutRef<"button">) => {
-  return (
-    <Button variant={"default"} className="bg-slate-50" onClick={exampleThemeStorage.toggle}>
-      {props.children}
-    </Button>
-  );
-};
+const ToggleButton = (props: ComponentPropsWithoutRef<"button">) => (
+  <Button variant={"default"} className="bg-slate-50" onClick={exampleThemeStorage.toggle}>
+    {props.children}
+  </Button>
+);
 
-export default withErrorBoundary(withSuspense(Popup, <div> Loading ... </div>), <div> Error Occur </div>);
+export default withErrorBoundary(withSuspense(Popup, <LoadingSpinner />), ErrorDisplay);

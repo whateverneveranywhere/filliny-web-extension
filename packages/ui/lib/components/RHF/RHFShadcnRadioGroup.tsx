@@ -1,11 +1,9 @@
 // components/TextInput.tsx
-import React from "react";
-import { useFormContext } from "react-hook-form";
-
-import type { FormOptions, GeneralFormProps } from "@extension/shared";
-
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "../ui/form";
 import { RadioGroup, RadioGroupItem } from "../ui/radio-group";
+import React from "react";
+import { useFormContext } from "react-hook-form";
+import type { FormOptions, GeneralFormProps } from "@extension/shared";
 
 interface Props extends GeneralFormProps {
   options: FormOptions;

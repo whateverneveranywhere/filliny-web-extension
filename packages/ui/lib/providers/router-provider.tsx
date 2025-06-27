@@ -1,5 +1,5 @@
-import { HashRouter, Route, Routes } from "react-router-dom";
 import { HomePage } from "../containers";
+import { HashRouter, Route, Routes } from "react-router-dom";
 
 function RouterProvider() {
   return (

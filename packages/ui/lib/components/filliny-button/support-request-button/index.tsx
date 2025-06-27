@@ -1,8 +1,8 @@
-import type React from "react";
-import { HelpCircle } from "lucide-react";
 import { Button } from "../../ui/button";
-import type { ButtonComponentProps } from "../button-wrapper";
 import { getConfig } from "@extension/shared";
+import { HelpCircle } from "lucide-react";
+import type { ButtonComponentProps } from "../button-wrapper";
+import type React from "react";
 
 const SupportRequestButton: React.FC<ButtonComponentProps> = () => {
   const gatherBugDetails = async () => {

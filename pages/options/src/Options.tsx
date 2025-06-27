@@ -1,12 +1,12 @@
 import "@src/Options.css";
+import { t } from "@extension/i18n";
 import { useStorage, withErrorBoundary, withSuspense } from "@extension/shared";
 import { exampleThemeStorage } from "@extension/storage";
-import { ToggleButton } from "@extension/ui";
-import { t } from "@extension/i18n";
+import { ErrorDisplay, LoadingSpinner, ToggleButton } from "@extension/ui";
 
 const Options = () => {
   const theme = useStorage(exampleThemeStorage);
-  const isLight = theme === "light";
+  const isLight = theme.isLight;
   const logo = isLight ? "options/logo_horizontal.svg" : "options/logo_horizontal_dark.svg";
   const goGithubSite = () =>
     chrome.tabs.create({ url: "https://github.com/Jonghakseo/chrome-extension-boilerplate-react-vite" });
@@ -25,4 +25,4 @@ const Options = () => {
   );
 };
 
-export default withErrorBoundary(withSuspense(Options, <div> Loading ... </div>), <div> Error Occur </div>);
+export default withErrorBoundary(withSuspense(Options, <LoadingSpinner />), ErrorDisplay);

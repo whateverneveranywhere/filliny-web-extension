@@ -1,8 +1,8 @@
-import type React from "react";
-import { useEffect, useState } from "react";
-import { highlightForms } from "../search-button/highlightForms";
-import type { ButtonComponentProps } from "../button-wrapper";
 import { Button } from "../../ui";
+import { highlightForms } from "../search-button/highlightForms";
+import { useEffect, useState } from "react";
+import type { ButtonComponentProps } from "../button-wrapper";
+import type React from "react";
 
 const RecordFormButton: React.FC<ButtonComponentProps> = () => {
   const [isDOMReady, setIsDOMReady] = useState(false);

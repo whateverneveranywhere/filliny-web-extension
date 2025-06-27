@@ -1,10 +1,9 @@
-import * as React from "react";
-import { type DialogProps } from "@radix-ui/react-dialog";
+import { Dialog, DialogContent } from "../ui/dialog";
+import { cn } from "@/lib/utils";
 import { Command as CommandPrimitive } from "cmdk";
 import { Search } from "lucide-react";
-
-import { cn } from "@/lib/utils";
-import { Dialog, DialogContent } from "../ui/dialog";
+import * as React from "react";
+import type { DialogProps } from "@radix-ui/react-dialog";
 
 const Command = React.forwardRef<
   React.ElementRef<typeof CommandPrimitive>,
@@ -23,17 +22,15 @@ Command.displayName = CommandPrimitive.displayName;
 
 type CommandDialogProps = DialogProps;
 
-const CommandDialog = ({ children, ...props }: CommandDialogProps) => {
-  return (
-    <Dialog {...props}>
-      <DialogContent className="filliny-overflow-hidden filliny-p-0 filliny-shadow-lg">
-        <Command className="[&_[cmdk-group-heading]]:filliny-px-2 [&_[cmdk-group-heading]]:filliny-font-medium [&_[cmdk-group-heading]]:filliny-text-muted-foreground [&_[cmdk-group]:not([hidden])_~[cmdk-group]]:filliny-pt-0 [&_[cmdk-group]]:filliny-px-2 [&_[cmdk-input-wrapper]_svg]:filliny-size-5 [&_[cmdk-input]]:filliny-h-12 [&_[cmdk-item]]:filliny-px-2 [&_[cmdk-item]]:filliny-py-3 [&_[cmdk-item]_svg]:filliny-size-5">
-          {children}
-        </Command>
-      </DialogContent>
-    </Dialog>
-  );
-};
+const CommandDialog = ({ children, ...props }: CommandDialogProps) => (
+  <Dialog {...props}>
+    <DialogContent className="filliny-overflow-hidden filliny-p-0 filliny-shadow-lg">
+      <Command className="[&_[cmdk-group-heading]]:filliny-px-2 [&_[cmdk-group-heading]]:filliny-font-medium [&_[cmdk-group-heading]]:filliny-text-muted-foreground [&_[cmdk-group]:not([hidden])_~[cmdk-group]]:filliny-pt-0 [&_[cmdk-group]]:filliny-px-2 [&_[cmdk-input-wrapper]_svg]:filliny-size-5 [&_[cmdk-input]]:filliny-h-12 [&_[cmdk-item]]:filliny-px-2 [&_[cmdk-item]]:filliny-py-3 [&_[cmdk-item]_svg]:filliny-size-5">
+        {children}
+      </Command>
+    </DialogContent>
+  </Dialog>
+);
 
 const CommandInput = React.forwardRef<
   React.ElementRef<typeof CommandPrimitive.Input>,
@@ -120,14 +117,12 @@ const CommandItem = React.forwardRef<
 
 CommandItem.displayName = CommandPrimitive.Item.displayName;
 
-const CommandShortcut = ({ className, ...props }: React.HTMLAttributes<HTMLSpanElement>) => {
-  return (
-    <span
-      className={cn("filliny-ml-auto filliny-text-xs filliny-tracking-widest filliny-text-muted-foreground", className)}
-      {...props}
-    />
-  );
-};
+const CommandShortcut = ({ className, ...props }: React.HTMLAttributes<HTMLSpanElement>) => (
+  <span
+    className={cn("filliny-ml-auto filliny-text-xs filliny-tracking-widest filliny-text-muted-foreground", className)}
+    {...props}
+  />
+);
 CommandShortcut.displayName = "CommandShortcut";
 
 export {

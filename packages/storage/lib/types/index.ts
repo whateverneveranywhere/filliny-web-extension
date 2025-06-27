@@ -1,1 +1,1 @@
-export * from "./profile.js";
+export type * from "./profile.js";

@@ -1,6 +1,7 @@
-import type { LucideIcon } from "lucide-react";
 import { Button } from "../ui";
-import { cva, type VariantProps } from "class-variance-authority";
+import { cva } from "class-variance-authority";
+import type { VariantProps } from "class-variance-authority";
+import type { LucideIcon } from "lucide-react";
 
 const alertVariants = cva("filliny-rounded-lg filliny-border filliny-p-4", {
   variants: {

@@ -1,11 +1,9 @@
 // components/TextInput.tsx
-import React from "react";
-import { useFormContext } from "react-hook-form";
-
-import type { GeneralFormProps } from "@extension/shared";
-
 import { FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "../ui/form";
 import { Input } from "../ui/input";
+import React from "react";
+import { useFormContext } from "react-hook-form";
+import type { GeneralFormProps } from "@extension/shared";
 
 interface Props extends GeneralFormProps {
   fieldType?: "number" | "text" | "email" | "password";

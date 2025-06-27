@@ -1,7 +1,7 @@
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui";
+import { motion, AnimatePresence } from "framer-motion";
 import type { ReactNode, CSSProperties } from "react";
 import type React from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui";
 
 export interface ButtonComponentProps {
   isHovered: boolean;

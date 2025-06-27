@@ -1,9 +1,9 @@
-import { createRoot } from "react-dom/client";
 import "@src/index.css";
-import "@extension/ui/lib/global.css";
-import SidePanel from "@src/SidePanel";
+import "@extension/ui/global.css";
 import { ThemeProvider, Toaster } from "@extension/ui";
+import SidePanel from "@src/SidePanel";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { createRoot } from "react-dom/client";
 
 const queryClient = new QueryClient();
 

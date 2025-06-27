@@ -1,6 +1,6 @@
-import React from "react";
 import { RHFShadcnComboBox, RHFShadcnSwitch } from "../RHF";
 import { usePOVListQuery, useTonesListQuery } from "@extension/shared";
+import React from "react";
 
 function StepperForm3() {
   const { data: povList, isLoading: isLoadingPOVs } = usePOVListQuery();

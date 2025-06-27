@@ -1,11 +1,11 @@
+import { WebsiteFormFields } from "./StepperForms/StepperForm1";
+import { Button } from "./ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
+import { zodResolver } from "@hookform/resolvers/zod";
 import React from "react";
 import { useForm, FormProvider } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
-import { Button } from "./ui/button";
 import type { DTOFillingWebsite, DTOProfileFillingForm } from "@extension/storage";
-import { WebsiteFormFields } from "./StepperForms/StepperForm1";
 
 const websiteSchema = z.object({
   fillingWebsites: z.array(

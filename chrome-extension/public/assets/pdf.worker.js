@@ -144,7 +144,7 @@
     });
 
     // add fake Function#toString for correct work wrapped methods / constructors with methods like LoDash isNative
-    // eslint-disable-next-line no-extend-native -- required
+
     Function.prototype.toString = makeBuiltIn(function toString() {
       return (isCallable(this) && getInternalState(this).source) || inspectSource(this);
     }, "toString");
@@ -543,7 +543,7 @@
     // https://tc39.es/ecma262/#sec-tointegerorinfinity
     module.exports = function (argument) {
       var number = +argument;
-      // eslint-disable-next-line no-self-compare -- NaN check
+
       return number !== number || number === 0 ? 0 : trunc(number);
     };
 
@@ -867,7 +867,7 @@
       activeXDocument.write(scriptTag(""));
       activeXDocument.close();
       var temp = activeXDocument.parentWindow.Object;
-      // eslint-disable-next-line no-useless-assignment -- avoid memory leak
+
       activeXDocument = null;
       return temp;
     };
@@ -1228,7 +1228,6 @@
   },
 
   /***/ 2967: /***/ (module, __unused_webpack_exports, __webpack_require__) => {
-    /* eslint-disable no-proto -- safe */
     var uncurryThisAccessor = __webpack_require__(6706);
     var isObject = __webpack_require__(34);
     var requireObjectCoercible = __webpack_require__(7750);
@@ -1300,7 +1299,6 @@
     module.exports = function (O) {
       if (!NATIVE_ARRAY_BUFFER || arrayBufferByteLength(O) !== 0) return false;
       try {
-        // eslint-disable-next-line no-new -- thrower
         new DataView(O);
         return false;
       } catch (error) {
@@ -1569,7 +1567,7 @@
       anObject(obj);
       var numSize = +obj.size;
       // NOTE: If size is undefined, then numSize will be NaN
-      // eslint-disable-next-line no-self-compare -- NaN check
+
       if (numSize !== numSize) throw new $TypeError(INVALID_SIZE);
       var intSize = toIntegerOrInfinity(numSize);
       if (intSize < 0) throw new $RangeError(INVALID_SIZE);
@@ -1695,7 +1693,6 @@
     $(
       { target: "Array", proto: true, arity: 1, forced: FORCED },
       {
-        // eslint-disable-next-line no-unused-vars -- required for `.length`
         push: function push(item) {
           var O = toObject(this);
           var len = lengthOfArrayLike(O);
@@ -2007,11 +2004,9 @@
       // eslint-disable-next-line es/no-global-this -- safe
       check(typeof globalThis == "object" && globalThis) ||
       check(typeof window == "object" && window) ||
-      // eslint-disable-next-line no-restricted-globals -- safe
       check(typeof self == "object" && self) ||
       check(typeof global == "object" && global) ||
       check(typeof this == "object" && this) ||
-      // eslint-disable-next-line no-new-func -- fallback
       (function () {
         return this;
       })() ||
@@ -4079,7 +4074,6 @@
       return written + elementsLength;
     };
 
-    /* eslint-disable max-statements, max-depth -- TODO */
     module.exports = function (string, options, into, maxLength) {
       aString(string);
       anObjectOrUndefined(options);
@@ -4239,7 +4233,6 @@
           /* empty */
         }
         try {
-          // eslint-disable-next-line no-new-func -- safe
           return Function('return require("' + name + '")')();
         } catch (error) {
           /* empty */
@@ -4547,11 +4540,11 @@
         var index = toAbsoluteIndex(fromIndex, length);
         var value;
         // Array#includes uses SameValueZero equality algorithm
-        // eslint-disable-next-line no-self-compare -- NaN check
+
         if (IS_INCLUDES && el !== el)
           while (length > index) {
             value = O[index++];
-            // eslint-disable-next-line no-self-compare -- NaN check
+
             if (value !== value) return true;
             // Array#indexOf ignores holes, Array#includes - not
           }

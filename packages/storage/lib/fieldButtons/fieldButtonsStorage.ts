@@ -1,6 +1,6 @@
-import { StorageEnum } from "../base/enums.js";
 import { createStorage } from "../base/base.js";
-import type { BaseStorage } from "../base/types.js";
+import { StorageEnum } from "../base/enums.js";
+import type { BaseStorageType } from "../base/types.js";
 
 // Interface for field button settings
 export interface FieldButtonSettings {
@@ -15,7 +15,7 @@ const defaultSettings: FieldButtonSettings = {
 };
 
 // Storage type with additional helper methods
-type FieldButtonsStorage = BaseStorage<FieldButtonSettings> & {
+type FieldButtonsStorage = BaseStorageType<FieldButtonSettings> & {
   toggleEnabled: () => Promise<boolean>;
   setEnabled: (enabled: boolean) => Promise<void>;
   togglePreferTestMode: () => Promise<boolean>;

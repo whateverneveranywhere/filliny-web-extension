@@ -1,12 +1,10 @@
 // components/TextInput.tsx
-import React from "react";
-import { useFormContext } from "react-hook-form";
-
-import { cn } from "@/lib/utils";
-import type { GeneralFormProps } from "@extension/shared";
-
 import { FormControl, FormDescription, FormField, FormItem, FormLabel } from "../ui/form";
 import { Switch } from "../ui/switch";
+import { cn } from "@/lib/utils";
+import React from "react";
+import { useFormContext } from "react-hook-form";
+import type { GeneralFormProps } from "@extension/shared";
 
 interface Props extends GeneralFormProps {
   className?: string;

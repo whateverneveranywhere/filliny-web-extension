@@ -1,30 +1,29 @@
-// Enhanced unified field detection and management system
-export * from "./unifiedFieldDetection";
+// Modern React components (refactored)
+export * from "./components";
 
-// Form and field detection utilities
-export * from "./detectionHelpers";
+// Main initialization
+export { initializeSearchButton, cleanupSearchButton } from "./main";
+
+// Core functionality
+export { handleFieldFill } from "./handleFieldFill";
+export { handleFormClick } from "./handleFormClick";
+export { highlightForms } from "./highlightForms";
+
+// Field detection and management
+export { detectFormLikeContainers } from "./detectionHelpers";
+export { unifiedFieldRegistry } from "./unifiedFieldDetection";
+
+// Field types
 export * from "./field-types";
 
-// Form highlighting and overlay management
-export * from "./highlightForms";
-export * from "./FormsOverlay";
+// Types
+export type * from "./types";
 
-// Field updating and form filling
-export * from "./fieldUpdaterHelpers";
-export * from "./handleFormClick";
+// Utilities (keeping essential ones only)
+export { resetOverlays, addGlowingBorder } from "./overlayUtils";
 
-// Field management for individual field buttons
-export * from "./fieldFillManager";
-
-// Utility functions
-export * from "./overlayUtils";
-export * from "./types";
-
-// Individual field filling capability
-export * from "./fieldFillButton";
-
-// Re-export the unified registry instance as the main API
-export { unifiedFieldRegistry } from "./unifiedFieldDetection";
+// Field updating
+export { updateField, updateFormFields } from "./fieldUpdaterHelpers";
 
 /**
  * Main API for unified field detection and management
@@ -41,18 +40,6 @@ export { unifiedFieldRegistry } from "./unifiedFieldDetection";
  * 4. Form overlays use getAllFields() for bulk operations
  * 5. All strategies share the same field detection logic
  */
-
-import type { Field } from "@extension/shared";
-
-// Main field filling function for individual fields
-export const handleFieldFill = async (field: Field): Promise<void> => {
-  // Placeholder - this should be implemented based on your existing field fill logic
-  console.log(`Filling individual field: ${field.id}`);
-
-  // You can implement the individual field filling logic here
-  // This might involve calling the appropriate field type handler
-  // from fieldUpdaterHelpers or other modules
-};
 
 // Note: diagnoseFillinySystem is now imported from detectionHelpers.ts
 // to avoid duplicate exports

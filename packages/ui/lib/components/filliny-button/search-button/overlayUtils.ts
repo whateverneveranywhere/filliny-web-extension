@@ -1,7 +1,7 @@
 export const resetOverlays = (): void => {
   // Remove all form overlays
   const overlaysContainer = document
-    .querySelector("#chrome-extension-filliny")
+    .querySelector("#chrome-extension-filliny-all")
     ?.shadowRoot?.querySelector(".overlays-container");
   if (overlaysContainer) {
     overlaysContainer.innerHTML = "";

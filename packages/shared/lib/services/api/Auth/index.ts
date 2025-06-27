@@ -1,6 +1,6 @@
 import { apiEndpoints } from "../../endpoints.js";
-import type { AuthHealthCheck } from "../../types/auth.js";
 import { httpService } from "../../httpService.js";
+import type { AuthHealthCheck } from "../../types/auth.js";
 
 const {
   healthCheck,

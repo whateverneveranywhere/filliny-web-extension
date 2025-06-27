@@ -7,7 +7,7 @@ import {
   WebappEnvs,
 } from "@extension/shared";
 import { authStorage } from "@extension/storage";
-import { RouterProvider, SigninPage } from "@extension/ui";
+import { ErrorDisplay, LoadingSpinner, RouterProvider, SigninPage } from "@extension/ui";
 import { useEffect, useState } from "react";
 
 // Define the type for the config
@@ -58,12 +58,12 @@ const HomePage = () => {
   }, []);
 
   return (
-    <div className="w-[350px] min-h-[300px] p-4">
-      <h1 className="text-xl font-bold mb-4">Filliny</h1>
+    <div className="min-h-[300px] w-[350px] p-4">
+      <h1 className="mb-4 text-xl font-bold">Filliny</h1>
 
       {/* Debug info */}
-      <div className="mt-4 p-2 bg-gray-100 dark:bg-slate-800 rounded-md text-sm">
-        <h2 className="font-semibold mb-2">Environment Configuration:</h2>
+      <div className="mt-4 rounded-md bg-gray-100 p-2 text-sm dark:bg-slate-800">
+        <h2 className="mb-2 font-semibold">Environment Configuration:</h2>
         {configInfo ? (
           <ul className="space-y-1">
             <li>
@@ -95,4 +95,4 @@ const HomePage = () => {
   );
 };
 
-export default withErrorBoundary(withSuspense(HomePage, <div> Loading ... </div>), <div> Error Occur </div>);
+export default withErrorBoundary(withSuspense(HomePage, <LoadingSpinner />), ErrorDisplay);

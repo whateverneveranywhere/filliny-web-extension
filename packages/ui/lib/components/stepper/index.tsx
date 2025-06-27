@@ -1,5 +1,5 @@
-import React from "react";
 import { Button } from "../ui/button";
+import React from "react";
 import type { StepperProps } from "@extension/shared";
 
 function Stepper({ steps, handleNext, handlePrev, handleFinish, isLoading, currentStep }: StepperProps) {

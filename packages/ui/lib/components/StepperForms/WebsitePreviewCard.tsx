@@ -1,14 +1,14 @@
 /* eslint-disable jsx-a11y/no-static-element-interactions */
 /* eslint-disable jsx-a11y/click-events-have-key-events */
-import { ChevronDown, ChevronUp, Loader2, Globe, ExternalLink, Trash } from "lucide-react";
-import type React from "react";
-import { useState } from "react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui";
 import { Button } from "../ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
+import { Skeleton } from "../ui/skeleton";
 import { cn } from "@/lib/utils";
 import { getFaviconUrl } from "@extension/shared";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui";
-import { Skeleton } from "../ui/skeleton";
+import { ChevronDown, ChevronUp, Loader2, Globe, ExternalLink, Trash } from "lucide-react";
+import { useState } from "react";
+import type React from "react";
 
 interface Props {
   websiteURL: string;

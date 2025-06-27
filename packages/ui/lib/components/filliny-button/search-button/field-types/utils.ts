@@ -1,8 +1,8 @@
 /**
  * Safely get a string value from potentially complex field values
  */
-import type { Field, FieldType } from "@extension/shared";
 import { getFieldLabel as getFieldLabelFromUtils } from "../fieldUtils";
+import type { Field, FieldType } from "@extension/shared";
 
 // Track used field IDs to ensure uniqueness
 const usedFieldIds = new Set<string>();
@@ -661,6 +661,51 @@ export const createBaseField = async (
 };
 
 // Use the robust implementation from fieldUtils.ts
-export const getFieldLabel = async (element: HTMLElement): Promise<string> => {
-  return getFieldLabelFromUtils(element);
+export const getFieldLabel = async (element: HTMLElement): Promise<string> => getFieldLabelFromUtils(element);
+
+/**
+ * Safely get a string value with fallback
+ */
+export const safeGetString = (value: unknown, fallback = ""): string => {
+  try {
+    if (value === null || value === undefined) return fallback;
+    if (typeof value === "string") return value;
+    return String(value);
+  } catch {
+    return fallback;
+  }
+};
+
+/**
+ * Safely get lowercase string value
+ */
+export const safeGetLowerString = (value: unknown, fallback = ""): string => {
+  try {
+    const str = safeGetString(value, fallback);
+    return str.toLowerCase();
+  } catch {
+    return fallback;
+  }
+};
+
+/**
+ * Safely get element attributes
+ */
+export const safeGetAttributes = (element: HTMLElement): Attr[] => {
+  try {
+    return Array.from(element.attributes || []);
+  } catch {
+    return [];
+  }
+};
+
+/**
+ * Safely check if element has a specific property
+ */
+export const safeHasProperty = (element: HTMLElement, property: string): boolean => {
+  try {
+    return Object.prototype.hasOwnProperty.call(element, property);
+  } catch {
+    return false;
+  }
 };

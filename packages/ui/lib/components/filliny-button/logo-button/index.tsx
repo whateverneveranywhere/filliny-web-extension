@@ -1,10 +1,10 @@
-import type React from "react";
-import { useEffect, useState } from "react";
-import { highlightForms } from "../search-button/highlightForms";
-import type { ButtonComponentProps } from "../button-wrapper";
-import { Button } from "../../ui";
 import { Logo } from "../../Logo";
+import { Button } from "../../ui";
+import { highlightForms } from "../search-button/highlightForms";
 import { Wand2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import type { ButtonComponentProps } from "../button-wrapper";
+import type React from "react";
 
 const LogoButton: React.FC<ButtonComponentProps> = ({ isHovered }) => {
   const [isDOMReady, setIsDOMReady] = useState(false);

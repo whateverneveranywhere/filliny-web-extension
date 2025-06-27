@@ -1,4 +1,8 @@
-import { useEffect } from "react";
+import { ActiveProfileWebsitePreview } from "./active-profile-website-preview";
+import { QuickAddWebsiteToProfile } from "./quick-add-website";
+import { Loading, NoTokensAlert, LoadingPage } from "../components";
+import { useToast } from "../hooks/use-toast";
+import { PageLayout } from "../layout";
 import {
   useDashboardOverview,
   useCreateFillingProfileMutation,
@@ -7,14 +11,9 @@ import {
   useActiveProfile,
   usePlanLimits,
 } from "@extension/shared";
-import type { DTOProfileFillingForm } from "@extension/storage";
 import { profileStrorage } from "@extension/storage";
-
-import { Loading, NoTokensAlert, LoadingPage } from "../components";
-import { QuickAddWebsiteToProfile } from "./quick-add-website";
-import { ActiveProfileWebsitePreview } from "./active-profile-website-preview";
-import { PageLayout } from "../layout";
-import { useToast } from "../hooks/use-toast";
+import { useEffect } from "react";
+import type { DTOProfileFillingForm } from "@extension/storage";
 
 const useProfileManagement = (url: string) => {
   const { toast } = useToast();

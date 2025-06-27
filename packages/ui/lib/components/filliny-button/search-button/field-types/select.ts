@@ -4,10 +4,9 @@ import type { Field } from "@extension/shared";
 /**
  * React Select handler for specialized React Select components
  */
-export const handleReactSelect = (): boolean => {
+export const handleReactSelect = (): boolean =>
   // This is a placeholder for now, can be expanded with proper implementation
-  return false;
-};
+  false;
 
 /**
  * Handle Tsselect components commonly found on career sites
@@ -563,12 +562,11 @@ const updateCustomSelect = (element: HTMLElement, value: string | string[] | unk
 
       // Check for a match
       if (
-        valueArray.some(val => {
-          return (
+        valueArray.some(
+          val =>
             typeof val === "string" &&
-            (optionValue.toLowerCase() === val.toLowerCase() || optionText.toLowerCase().includes(val.toLowerCase()))
-          );
-        })
+            (optionValue.toLowerCase() === val.toLowerCase() || optionText.toLowerCase().includes(val.toLowerCase())),
+        )
       ) {
         // Found a match - click it
         option.click();

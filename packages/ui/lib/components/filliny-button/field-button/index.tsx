@@ -1,8 +1,8 @@
-import type React from "react";
+import { useStorage } from "@extension/shared";
+import { fieldButtonsStorage } from "@extension/storage";
 import { useState, useEffect, useRef } from "react";
 import type { ButtonComponentProps } from "../button-wrapper";
-import { fieldButtonsStorage } from "@extension/storage";
-import { useStorage } from "@extension/shared";
+import type React from "react";
 
 interface ModeDropdownProps {
   isOpen: boolean;

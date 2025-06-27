@@ -1,11 +1,11 @@
-import { highlightForms } from "./highlightForms";
 import { processChunks, updateFormFields } from "./fieldUpdaterHelpers";
+import { highlightForms } from "./highlightForms";
 import { disableOtherButtons, resetOverlays, showLoadingIndicator } from "./overlayUtils";
 import { unifiedFieldRegistry } from "./unifiedFieldDetection";
-import type { DTOProfileFillingForm } from "@extension/storage";
+import { aiFillService, getMatchingWebsite } from "@extension/shared";
 import { profileStrorage } from "@extension/storage";
 import type { Field, FieldType } from "@extension/shared";
-import { aiFillService, getMatchingWebsite } from "@extension/shared";
+import type { DTOProfileFillingForm } from "@extension/storage";
 
 /**
  * Generate mock values for field testing
@@ -170,53 +170,145 @@ export const handleFormClick = async (
 ): Promise<void> => {
   // Make sure event doesn't propagate
   if (event) {
-    event.preventDefault();
-    event.stopPropagation();
+    try {
+      event.preventDefault();
+      event.stopPropagation();
 
-    // For extra safety with React synthetic events
-    if (event.nativeEvent) {
-      event.nativeEvent.stopImmediatePropagation?.();
-      event.nativeEvent.stopPropagation?.();
-      event.nativeEvent.preventDefault?.();
+      // For extra safety with React synthetic events
+      if (event.nativeEvent) {
+        event.nativeEvent.stopImmediatePropagation?.();
+        event.nativeEvent.stopPropagation?.();
+        event.nativeEvent.preventDefault?.();
+      }
+    } catch (eventError) {
+      console.debug("Error handling event propagation:", eventError);
     }
   }
 
   const totalStartTime = performance.now();
 
-  // Enhanced form container finding logic
-  const formContainer = findFormContainer(formId);
+  // For unified overlay approach, we need to find ALL form containers
+  let formContainers: HTMLElement[] = [];
 
-  if (!formContainer) {
-    alert("Form not found. Please try again.");
-    resetOverlays();
-    highlightForms({ visionOnly: false });
+  try {
+    // If we have a unified form, find all registered containers
+    if (formId === "unified-form") {
+      formContainers = findAllFormContainers();
+    } else {
+      // Fallback to single form container for backward compatibility
+      const singleContainer = findFormContainer(formId);
+      if (singleContainer) {
+        formContainers = [singleContainer];
+      }
+    }
+  } catch (findError) {
+    console.warn("Error finding form containers:", findError);
+  }
+
+  // Fallback: try to find any form-like containers
+  if (formContainers.length === 0) {
+    try {
+      const fallbackSelectors = ["form", "[data-filliny-form-container]", '[role="form"]', "[data-form-id]"];
+      for (const selector of fallbackSelectors) {
+        const fallbackContainers = Array.from(document.querySelectorAll<HTMLElement>(selector));
+        if (fallbackContainers.length > 0) {
+          console.log(`Using fallback containers: ${selector} (${fallbackContainers.length} found)`);
+          formContainers = fallbackContainers;
+          break;
+        }
+      }
+    } catch (fallbackError) {
+      console.error("Fallback container search also failed:", fallbackError);
+    }
+  }
+
+  if (formContainers.length === 0) {
+    alert("No forms found. Please try again.");
+    try {
+      resetOverlays();
+      highlightForms({ visionOnly: false });
+    } catch (resetError) {
+      console.error("Error resetting overlays:", resetError);
+    }
     return;
   }
 
   console.log(
-    `🎯 Processing form container: ${formContainer.tagName}${formContainer.className ? "." + formContainer.className : ""}`,
+    `🎯 Processing ${formContainers.length} form containers:`,
+    formContainers.map(c => `${c.tagName}${c.className ? "." + c.className : ""}`),
   );
 
-  disableOtherButtons(formId);
-  showLoadingIndicator(formId);
+  try {
+    disableOtherButtons(formId);
+    showLoadingIndicator(formId);
+  } catch (uiError) {
+    console.debug("Error updating UI indicators:", uiError);
+  }
 
   try {
     const startTime = performance.now();
 
-    // Get fields from unified registry instead of re-detecting
-    // First check if this container is already registered
-    const containerId = findContainerIdForFormContainer(formContainer);
-    let fields: Field[] = [];
+    // Get fields from all form containers
+    const allFields: Field[] = [];
 
-    if (containerId) {
-      fields = unifiedFieldRegistry.getAllFields(containerId);
-      console.log(`Form Click: Using cached fields from registry for container ${containerId}`);
-    } else {
-      // Fallback: register the container if not found
-      console.log("Form Click: Container not in registry, registering now...");
-      const newContainerId = `form-click-${Date.now()}`;
-      await unifiedFieldRegistry.registerContainer(formContainer, newContainerId);
-      fields = unifiedFieldRegistry.getAllFields(newContainerId);
+    // Process each container to collect all fields
+    for (let containerIndex = 0; containerIndex < formContainers.length; containerIndex++) {
+      const formContainer = formContainers[containerIndex];
+      console.log(`Processing container ${containerIndex + 1}/${formContainers.length}: ${formContainer.tagName}`);
+
+      // Get fields from unified registry instead of re-detecting
+      // First check if this container is already registered
+      const containerId = findContainerIdForFormContainer(formContainer);
+      let containerFields: Field[] = [];
+
+      if (containerId) {
+        try {
+          containerFields = unifiedFieldRegistry.getAllFields(containerId);
+          console.log(`Form Click: Using cached fields from registry for container ${containerId}`);
+        } catch (registryError) {
+          console.warn("Error getting fields from registry:", registryError);
+        }
+      }
+
+      if (containerFields.length === 0) {
+        // Fallback: register the container if not found or if registry failed
+        console.log("Form Click: Container not in registry or empty, registering now...");
+        try {
+          const newContainerId = `form-click-${Date.now()}-${containerIndex}`;
+          await unifiedFieldRegistry.registerContainer(formContainer, newContainerId);
+          containerFields = unifiedFieldRegistry.getAllFields(newContainerId);
+        } catch (registrationError) {
+          console.error("Error registering container:", registrationError);
+
+          // Last resort: use basic field detection
+          try {
+            console.log("Using basic fallback field detection...");
+            const basicFields = detectFormFieldsInElement(formContainer);
+            // Convert to Field objects (simplified)
+            containerFields = basicFields.map((element, index) => ({
+              id: element.id || `fallback-field-${containerIndex}-${index}`,
+              type: element.tagName.toLowerCase() as FieldType,
+              label: element.getAttribute("aria-label") || element.getAttribute("placeholder") || "",
+              value: "",
+              element: element,
+            }));
+          } catch (basicDetectionError) {
+            console.error("Even basic field detection failed:", basicDetectionError);
+            continue; // Skip this container and try the next one
+          }
+        }
+      }
+
+      // Add container fields to the total collection
+      allFields.push(...containerFields);
+    }
+
+    // Use all collected fields
+    const fields = allFields;
+
+    if (fields.length === 0) {
+      alert("Unable to detect form fields in any container. Please refresh the page and try again.");
+      return;
     }
 
     console.log("Form Click: Detected fields:", fields);
@@ -226,87 +318,120 @@ export const handleFormClick = async (
     );
 
     if (testMode) {
-      console.log("Running in test mode with example values");
+      try {
+        console.log("Running in test mode with example values");
 
-      // Create a visual indicator for test mode
-      const testModeIndicator = document.createElement("div");
-      testModeIndicator.textContent = "Test Mode Active";
-      testModeIndicator.style.cssText =
-        "position: fixed; top: 20px; right: 20px; background: #4f46e5; color: white; padding: 8px 16px; border-radius: 4px; z-index: 10000; font-weight: bold;";
-      document.body.appendChild(testModeIndicator);
+        // Create a visual indicator for test mode
+        const testModeIndicator = document.createElement("div");
+        testModeIndicator.textContent = "Test Mode Active";
+        testModeIndicator.style.cssText =
+          "position: fixed; top: 20px; right: 20px; background: #4f46e5; color: white; padding: 8px 16px; border-radius: 4px; z-index: 10000; font-weight: bold;";
+        document.body.appendChild(testModeIndicator);
 
-      setTimeout(() => testModeIndicator.remove(), 5000);
+        setTimeout(() => {
+          try {
+            testModeIndicator.remove();
+          } catch (removeError) {
+            console.debug("Error removing test mode indicator:", removeError);
+          }
+        }, 5000);
 
-      // Use mock data for test mode - now with testValue properly set
-      const mockResponse = fields.map(field => {
-        const mockValue = getMockValueForFieldType(field.type, field);
-        return {
-          ...field,
-          // Set both value and testValue to ensure consistent behavior
-          value: mockValue,
-          testValue: mockValue,
-        };
-      });
+        // Use mock data for test mode - now with testValue properly set
+        const mockResponse = fields.map(field => {
+          try {
+            const mockValue = getMockValueForFieldType(field.type, field);
+            return {
+              ...field,
+              // Set both value and testValue to ensure consistent behavior
+              value: mockValue,
+              testValue: mockValue,
+            };
+          } catch (mockError) {
+            console.warn("Error generating mock value for field:", field.id, mockError);
+            return {
+              ...field,
+              value: "test",
+              testValue: "test",
+            };
+          }
+        });
 
-      // Log the mock values for debugging
-      console.log(
-        "Test mode: Mock values generated:",
-        mockResponse.map(f => ({
-          id: f.id,
-          type: f.type,
-          value: f.value,
-        })),
-      );
+        // Log the mock values for debugging
+        console.log(
+          "Test mode: Mock values generated:",
+          mockResponse.map(f => ({
+            id: f.id,
+            type: f.type,
+            value: f.value,
+          })),
+        );
 
-      // Apply visual changes sequentially to simulate streaming updates
-      await simulateStreamingForTestMode(mockResponse);
-      return;
+        // Apply visual changes sequentially to simulate streaming updates
+        await simulateStreamingForTestMode(mockResponse);
+        return;
+      } catch (testModeError) {
+        console.error("Error in test mode:", testModeError);
+        alert("Test mode failed. Please try again.");
+        return;
+      }
     }
 
     // Only execute API call logic if not in test mode
-    const [defaultProfile] = await Promise.all([profileStrorage.get()]);
-    const visitingUrl = window.location.href;
-    const matchingWebsite = getMatchingWebsite((defaultProfile as DTOProfileFillingForm).fillingWebsites, visitingUrl);
+    try {
+      const [defaultProfile] = await Promise.all([profileStrorage.get()]);
+      const visitingUrl = window.location.href;
+      const matchingWebsite = getMatchingWebsite(
+        (defaultProfile as DTOProfileFillingForm).fillingWebsites,
+        visitingUrl,
+      );
 
-    // Set up message listener for streaming response
-    const streamPromise = new Promise<void>((resolve, reject) => {
-      const messageHandler = (message: { type: string; data?: string; error?: string }) => {
-        if (message.type === "STREAM_CHUNK" && message.data) {
+      // Set up message listener for streaming response
+      const streamPromise = new Promise<void>((resolve, reject) => {
+        const messageHandler = (message: { type: string; data?: string; error?: string }) => {
           try {
-            processChunks(message.data, fields);
-          } catch (error) {
-            console.error("Form Click: Error processing chunk:", error);
-            // Don't reject here, continue processing other chunks
+            if (message.type === "STREAM_CHUNK" && message.data) {
+              try {
+                processChunks(message.data, fields);
+              } catch (error) {
+                console.error("Form Click: Error processing chunk:", error);
+                // Don't reject here, continue processing other chunks
+              }
+            } else if (message.type === "STREAM_DONE") {
+              chrome.runtime.onMessage.removeListener(messageHandler);
+              resolve();
+            } else if (message.type === "STREAM_ERROR") {
+              console.error("Form Click: Stream error:", message.error);
+              chrome.runtime.onMessage.removeListener(messageHandler);
+              reject(new Error(message.error || "Stream error"));
+            }
+          } catch (messageError) {
+            console.error("Error handling stream message:", messageError);
           }
-        } else if (message.type === "STREAM_DONE") {
-          chrome.runtime.onMessage.removeListener(messageHandler);
-          resolve();
-        } else if (message.type === "STREAM_ERROR") {
-          console.error("Form Click: Stream error:", message.error);
-          chrome.runtime.onMessage.removeListener(messageHandler);
-          reject(new Error(message.error || "Stream error"));
-        }
-      };
+        };
 
-      chrome.runtime.onMessage.addListener(messageHandler);
-    });
+        chrome.runtime.onMessage.addListener(messageHandler);
+      });
 
-    // Make the API call
-    const response = await aiFillService({
-      contextText: matchingWebsite?.fillingContext || defaultProfile?.defaultFillingContext || "",
-      formData: fields,
-      websiteUrl: visitingUrl,
-      preferences: defaultProfile?.preferences,
-    });
+      // Make the API call
+      const response = await aiFillService({
+        contextText: matchingWebsite?.fillingContext || defaultProfile?.defaultFillingContext || "",
+        formData: fields,
+        websiteUrl: visitingUrl,
+        preferences: defaultProfile?.preferences,
+      });
 
-    if (response instanceof ReadableStream) {
-      // Wait for all streaming chunks to be processed
-      await streamPromise;
-    } else if (response.data) {
-      await updateFormFields(response.data, false);
-    } else {
-      console.error("Form Click: Invalid response format:", response);
-      throw new Error("Invalid response format from API");
+      if (response instanceof ReadableStream) {
+        // Wait for all streaming chunks to be processed
+        await streamPromise;
+      } else if (response.data) {
+        await updateFormFields(response.data, false);
+      } else {
+        console.error("Form Click: Invalid response format:", response);
+        throw new Error("Invalid response format from API");
+      }
+    } catch (apiError) {
+      console.error("Form Click: Error in API call:", apiError);
+      throw apiError; // Re-throw to be handled by outer catch
     }
   } catch (error) {
     console.error("Form Click: Error processing AI fill service:", error);
@@ -318,12 +443,57 @@ export const handleFormClick = async (
           : "Unknown error occurred";
     alert(`Failed to fill form: ${errorMessage}`);
   } finally {
-    console.log(
-      `%c⏱ Total process took: ${((performance.now() - totalStartTime) / 1000).toFixed(2)}s`,
-      "background: #059669; color: white; padding: 4px 8px; border-radius: 4px; font-size: 14px; font-weight: bold;",
-    );
-    resetOverlays();
+    try {
+      console.log(
+        `%c⏱ Total process took: ${((performance.now() - totalStartTime) / 1000).toFixed(2)}s`,
+        "background: #059669; color: white; padding: 4px 8px; border-radius: 4px; font-size: 14px; font-weight: bold;",
+      );
+      resetOverlays();
+    } catch (finallyError) {
+      console.error("Error in finally block:", finallyError);
+    }
   }
+};
+
+/**
+ * Find all form containers on the page
+ */
+const findAllFormContainers = (): HTMLElement[] => {
+  console.log("🔍 Looking for all form containers on page");
+
+  const containers: HTMLElement[] = [];
+
+  // Strategy 1: Find all containers with form IDs
+  const formIdContainers = Array.from(document.querySelectorAll<HTMLElement>("[data-form-id]"));
+  containers.push(...formIdContainers);
+
+  // Strategy 2: Find semantic form containers
+  const semanticSelectors = ["form", '[role="form"]', "[data-filliny-form-container]", "[data-form]", "fieldset"];
+
+  for (const selector of semanticSelectors) {
+    try {
+      const elements = Array.from(document.querySelectorAll<HTMLElement>(selector));
+      elements.forEach(element => {
+        if (!containers.includes(element)) {
+          containers.push(element);
+        }
+      });
+    } catch (e) {
+      console.debug(`Selector failed: ${selector}`, e);
+    }
+  }
+
+  // Strategy 3: Find containers with significant form fields
+  const potentialContainers = Array.from(document.querySelectorAll<HTMLElement>("div, section, main, article"));
+  for (const container of potentialContainers) {
+    const fieldCount = detectFormFieldsInElement(container).length;
+    if (fieldCount >= 2 && !containers.includes(container)) {
+      containers.push(container);
+    }
+  }
+
+  console.log(`✅ Found ${containers.length} form containers`);
+  return containers;
 };
 
 /**

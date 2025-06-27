@@ -1,14 +1,14 @@
 // components/TextInput.tsx
-import { Check, ChevronsUpDown, Edit, Loader2, Trash } from "lucide-react";
-import React, { useState } from "react";
-import { useFormContext } from "react-hook-form";
 
 import { Button } from "../ui/button";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "../ui/command";
 import { FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "../ui/form";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
-import type { FormOptions, GeneralFormProps } from "@extension/shared";
 import { cn } from "@/lib/utils";
+import { Check, ChevronsUpDown, Edit, Loader2, Trash } from "lucide-react";
+import React, { useState } from "react";
+import { useFormContext } from "react-hook-form";
+import type { FormOptions, GeneralFormProps } from "@extension/shared";
 
 interface Props extends GeneralFormProps {
   options: FormOptions;

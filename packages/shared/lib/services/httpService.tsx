@@ -1,6 +1,6 @@
-import { authStorage } from "@extension/storage";
 import { apiEndpoints } from "./endpoints.js";
 import { getConfig } from "../utils/index.js";
+import { authStorage } from "@extension/storage";
 
 export interface ApiDefaultError {
   message: string;

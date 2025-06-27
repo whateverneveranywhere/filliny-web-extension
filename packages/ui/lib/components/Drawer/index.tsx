@@ -1,4 +1,3 @@
-import type React from "react";
 import {
   Button,
   DrawerClose,
@@ -9,6 +8,7 @@ import {
   DrawerTitle,
   Drawer as ShadcnDrawer,
 } from "../ui";
+import type React from "react";
 
 interface Props {
   hideFooter?: boolean;

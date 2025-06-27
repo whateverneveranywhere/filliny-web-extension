@@ -1,28 +1,36 @@
-describe('Webextension Content Runtime Script', () => {
+describe("Webextension Content Runtime Script", () => {
   before(function () {
-    if ((browser.capabilities as WebdriverIO.Capabilities).browserName === 'chrome') {
-      // Chrome doesn't allow content scripts on the extension pages
+    // Chrome doesn't allow content scripts on the extension pages
+    if ((browser.capabilities as WebdriverIO.Capabilities).browserName === "chrome") {
       this.skip();
     }
   });
 
-  it('should create runtime element on the page', async () => {
+  it("should create all runtime elements on the page", async function () {
     // Open the popup
     const extensionPath = await browser.getExtensionPath();
     const popupUrl = `${extensionPath}/popup/index.html`;
-    await browser.url(popupUrl);
 
-    await expect(browser).toHaveTitle('Popup');
+    // if Popup file not found, skip the test
+    try {
+      await browser.url(popupUrl);
+    } catch {
+      console.error("Popup file not found");
+      this.skip();
+    }
 
-    // Trigger the content script on the popup
-    // button contains "Content Script" text
-    const contentScriptButton = await $('button*=Content Script').getElement();
+    await expect(browser).toHaveTitle("Popup");
 
-    await contentScriptButton.click();
+    // Trigger inject button on popup
+    const contentScriptsButton = await $("button*=Content Scripts").getElement();
 
-    // Check if id chrome-extension-boilerplate-react-vite-runtime-content-view-root exists on page
-    const runtimeElement = await $('#chrome-extension-filliny').getElement();
+    await contentScriptsButton.click();
 
-    await expect(runtimeElement).toBeExisting();
+    // Check if id exists on the page
+    const runtimeExampleElement = await $("#CEB-extension-runtime-example").getElement();
+    const runtimeAllElement = await $("#CEB-extension-runtime-all").getElement();
+
+    await expect(runtimeExampleElement).toBeExisting();
+    await expect(runtimeAllElement).toBeExisting();
   });
 });

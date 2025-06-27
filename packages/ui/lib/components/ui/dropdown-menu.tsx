@@ -1,8 +1,7 @@
-import * as React from "react";
+import { cn } from "@/lib/utils";
 import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu";
 import { Check, ChevronRight, Circle } from "lucide-react";
-
-import { cn } from "@/lib/utils";
+import * as React from "react";
 
 const DropdownMenu = DropdownMenuPrimitive.Root;
 
@@ -160,14 +159,12 @@ const DropdownMenuSeparator = React.forwardRef<
 ));
 DropdownMenuSeparator.displayName = DropdownMenuPrimitive.Separator.displayName;
 
-const DropdownMenuShortcut = ({ className, ...props }: React.HTMLAttributes<HTMLSpanElement>) => {
-  return (
-    <span
-      className={cn("filliny-ml-auto filliny-text-xs filliny-tracking-widest filliny-opacity-60", className)}
-      {...props}
-    />
-  );
-};
+const DropdownMenuShortcut = ({ className, ...props }: React.HTMLAttributes<HTMLSpanElement>) => (
+  <span
+    className={cn("filliny-ml-auto filliny-text-xs filliny-tracking-widest filliny-opacity-60", className)}
+    {...props}
+  />
+);
 DropdownMenuShortcut.displayName = "DropdownMenuShortcut";
 
 export {

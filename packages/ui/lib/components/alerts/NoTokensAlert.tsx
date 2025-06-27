@@ -1,6 +1,6 @@
-import { ExternalLink } from "lucide-react";
-import { getConfig } from "@extension/shared";
 import { Alert } from "./Alert";
+import { getConfig } from "@extension/shared";
+import { ExternalLink } from "lucide-react";
 
 export default function NoTokensAlert() {
   const config = getConfig();

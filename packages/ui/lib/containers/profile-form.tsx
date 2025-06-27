@@ -1,21 +1,21 @@
-import type { Step } from "@extension/shared";
+import FormProvider from "../components/RHF/FormProvider";
+import { Stepper } from "../components/stepper";
+import { StepperForm1, StepperForm2, StepperForm3 } from "../components/StepperForms";
+import { toast } from "../hooks/use-toast";
+import { cn } from "../utils";
 import {
   useCreateFillingProfileMutation,
   useEditFillingProfileMutation,
   useFillingProfileById,
 } from "@extension/shared";
-import type { DTOProfileFillingForm } from "@extension/storage";
+import { profileStrorage } from "@extension/storage";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2 } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { toast } from "../hooks/use-toast";
-import { StepperForm1, StepperForm2, StepperForm3 } from "../components/StepperForms";
-import { cn } from "../utils";
-import FormProvider from "../components/RHF/FormProvider";
-import { Stepper } from "../components/stepper";
-import { profileStrorage } from "@extension/storage";
+import type { Step } from "@extension/shared";
+import type { DTOProfileFillingForm } from "@extension/storage";
 
 const profileSchema = z.object({
   profileName: z.string().min(1, { message: "Profile name is required" }),

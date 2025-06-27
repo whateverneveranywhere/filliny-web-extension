@@ -1,10 +1,10 @@
-import type React from "react";
-import { useState, useEffect, useRef } from "react";
 import { handleFormClick } from "./handleFormClick";
-import { X, Wand2, Loader2 } from "lucide-react";
 import { disableOtherButtons, showLoadingIndicator } from "./overlayUtils";
 import { Button } from "../../ui";
+import { X, Wand2, Loader2 } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
 import type { OverlayPosition } from "./types";
+import type React from "react";
 
 interface OverlayProps {
   formId: string;
@@ -264,16 +264,11 @@ const FormsOverlay: React.FC<OverlayProps> = ({ formId, initialPosition, onDismi
   return (
     <div
       ref={overlayRef}
-      className={`
-        filliny-pointer-events-auto filliny-fixed
-        filliny-flex filliny-items-center filliny-justify-center
-        filliny-transition-all filliny-duration-300
-        ${
-          loading
-            ? "filliny-bg-black/40 filliny-backdrop-blur-sm"
-            : "filliny-rounded-lg filliny-bg-black/30 filliny-backdrop-blur-md hover:filliny-bg-black/40"
-        }
-      `}
+      className={`filliny-pointer-events-auto filliny-fixed filliny-flex filliny-items-center filliny-justify-center filliny-transition-all filliny-duration-300 ${
+        loading
+          ? "filliny-bg-black/40 filliny-backdrop-blur-sm"
+          : "filliny-rounded-lg filliny-bg-black/30 filliny-backdrop-blur-md hover:filliny-bg-black/40"
+      } `}
       style={overlayStyle}
       data-highlight-overlay="true"
       data-form-id={formId}>

@@ -1,15 +1,16 @@
 // Export all field type handlers
+import { detectCheckableFields } from "./checkable";
+import { detectFileFields } from "./file";
+import { detectSelectFields } from "./select";
+import { detectTextField, detectInputField, updateTextField, updateContentEditable } from "./text";
+import { safeGetString, safeGetLowerString, safeGetAttributes } from "./utils";
+import type { Field } from "@extension/shared";
+
 export * from "./utils";
 export * from "./text";
 export * from "./checkable";
 export * from "./file";
 export * from "./select";
-
-import type { Field } from "@extension/shared";
-import { detectCheckableFields } from "./checkable";
-import { detectFileFields } from "./file";
-import { detectSelectFields } from "./select";
-import { detectTextField } from "./text";
 
 /**
  * Enhanced field detection with multiple strategies and robust error handling
@@ -138,7 +139,7 @@ const getFormElementsRobust = (container: HTMLElement | ShadowRoot): HTMLElement
         el.hasAttribute("onblur");
 
       // Check for form-like classes or IDs
-      const className = el.className.toLowerCase();
+      const className = el?.className?.toLowerCase();
       const id = el.id.toLowerCase();
       const hasFormLikeNames =
         /\b(input|field|select|checkbox|radio|textarea|control|form|widget|picker|slider|range)\b/.test(
@@ -356,5 +357,369 @@ export const detectFields = async (container: HTMLElement, testMode: boolean = f
   } catch (error) {
     console.error("❌ Error in main field detection:", error);
     return fields; // Return whatever we managed to detect
+  }
+};
+
+/**
+ * Enhanced form field detection with multiple strategies and robust error handling
+ * Moved from detectionHelpers.ts to follow proper module organization
+ */
+export const getFormFieldsRobust = (container: HTMLElement | ShadowRoot): HTMLElement[] => {
+  // Defensive programming: ensure container is valid
+  if (!container) {
+    console.warn("getFormFieldsRobust: Invalid container provided");
+    return [];
+  }
+
+  let fields: HTMLElement[] = [];
+
+  try {
+    const fieldSelectors = [
+      // Standard form fields (highest priority)
+      'input:not([type="hidden"]):not([type="submit"]):not([type="button"]):not([type="reset"]):not([type="image"])',
+      "select",
+      "textarea",
+
+      // ARIA form fields
+      '[role="textbox"]',
+      '[role="combobox"]',
+      '[role="spinbutton"]',
+      '[role="checkbox"]',
+      '[role="switch"]',
+      '[role="radio"]',
+      '[role="searchbox"]',
+      '[role="listbox"]',
+      '[role="slider"]',
+
+      // Content editable
+      '[contenteditable="true"]',
+
+      // Custom data attributes (common patterns)
+      "[data-field]",
+      "[data-input]",
+      "[data-form-field]",
+      "[data-form-control]",
+      '[data-testid*="input"]',
+      '[data-testid*="field"]',
+      '[data-testid*="select"]',
+      '[data-qa*="input"]',
+      '[data-qa*="field"]',
+      '[data-qa*="select"]',
+      '[data-cy*="input"]',
+      '[data-cy*="field"]',
+      '[data-cy*="select"]',
+
+      // Common CSS class patterns
+      ".form-control",
+      ".form-input",
+      ".form-field",
+      ".input-field",
+      ".text-field",
+      ".select-field",
+      ".checkbox-field",
+      ".radio-field",
+      ".field-input",
+      ".field-select",
+      ".custom-field",
+      ".custom-input",
+      ".custom-select",
+
+      // Framework-specific patterns
+      ".MuiTextField-root input",
+      ".MuiTextField-root textarea",
+      ".MuiSelect-root",
+      ".MuiCheckbox-root input",
+      ".MuiRadio-root input",
+      ".MuiSlider-root",
+      ".ant-input",
+      ".ant-select",
+      ".ant-checkbox-input",
+      ".ant-radio-input",
+      ".ant-textarea",
+      ".ant-slider",
+      ".chakra-input",
+      ".chakra-select",
+      ".chakra-checkbox__input",
+      ".chakra-radio__input",
+      ".chakra-slider",
+
+      // Bootstrap and common UI frameworks
+      ".form-control",
+      ".form-select",
+      ".form-check-input",
+      ".form-range",
+
+      // Modern SPA patterns (React, Vue, Angular)
+      '[class*="input-"]',
+      '[class*="field-"]',
+      '[class*="form-"]',
+      '[class*="Input"]',
+      '[class*="Field"]',
+      '[class*="FormControl"]',
+      '[class*="TextInput"]',
+      '[class*="Select"]',
+      '[class*="Checkbox"]',
+      '[class*="Radio"]',
+
+      // Insurance/business form specific patterns
+      '[class*="profile"]',
+      '[class*="insurance"]',
+      '[class*="policy"]',
+      '[class*="coverage"]',
+      '[class*="quote"]',
+      '[class*="application"]',
+    ];
+
+    // Strategy 1: Direct selector matching with enhanced error handling
+    for (const selector of fieldSelectors) {
+      try {
+        const elements = Array.from(container.querySelectorAll<HTMLElement>(selector));
+        fields.push(...elements);
+      } catch (e) {
+        console.debug(`Selector failed: ${selector}`, e);
+      }
+    }
+
+    // Remove duplicates
+    fields = Array.from(new Set(fields));
+
+    // Strategy 2: Enhanced pattern-based detection for modern SPAs
+    if (fields.length < 3) {
+      console.log("Enhanced detection: Few elements found with direct selectors, trying advanced pattern detection...");
+
+      try {
+        const allElements = Array.from(container.querySelectorAll<HTMLElement>("*"));
+        const patternElements = allElements.filter(el => {
+          try {
+            // Skip if already found
+            if (fields.includes(el)) return false;
+
+            // Skip non-interactive elements
+            if (["SCRIPT", "STYLE", "META", "LINK", "TITLE", "HEAD", "NOSCRIPT"].includes(el.tagName)) {
+              return false;
+            }
+
+            // Enhanced interactive attribute detection
+            const hasInteractiveAttrs =
+              el.hasAttribute("tabindex") ||
+              el.hasAttribute("onclick") ||
+              el.hasAttribute("onchange") ||
+              el.hasAttribute("oninput") ||
+              el.hasAttribute("onfocus") ||
+              el.hasAttribute("onblur") ||
+              el.hasAttribute("onkeydown") ||
+              el.hasAttribute("onkeyup");
+
+            // Enhanced form-like pattern detection with safe utility functions
+            const className = safeGetLowerString(el?.className);
+            const id = safeGetLowerString(el?.id);
+            const dataAttrs = safeGetAttributes(el)
+              .filter(attr => attr.name.startsWith("data-"))
+              .map(attr => `${attr.name}=${safeGetString(attr.value)}`)
+              .join(" ")
+              .toLowerCase();
+
+            // More comprehensive pattern matching
+            const formPatterns = [
+              /\b(input|field|select|checkbox|radio|textarea|control|form|widget|picker|slider|range)\b/,
+              /\b(text|email|phone|number|date|time|password|search|url)\b/,
+              /\b(name|address|city|state|zip|postal|country)\b/,
+              /\b(first|last|full|middle|title|prefix|suffix)\b/,
+              /\b(company|organization|business|employer)\b/,
+              /\b(profile|account|user|member|customer)\b/,
+              /\b(insurance|policy|coverage|premium|deductible|claim)\b/,
+              /\b(application|quote|form|survey|questionnaire)\b/,
+            ];
+
+            const hasFormLikeNames = formPatterns.some(pattern => pattern.test(className + " " + id + " " + dataAttrs));
+
+            // Enhanced ARIA detection
+            const hasAriaAttrs =
+              el.hasAttribute("aria-label") ||
+              el.hasAttribute("aria-labelledby") ||
+              el.hasAttribute("aria-describedby") ||
+              el.hasAttribute("aria-required") ||
+              el.hasAttribute("aria-invalid") ||
+              el.hasAttribute("aria-expanded") ||
+              el.hasAttribute("aria-controls");
+
+            // Enhanced focusability check
+            const isFocusable =
+              el.tabIndex >= 0 ||
+              ["INPUT", "SELECT", "TEXTAREA", "BUTTON"].includes(el.tagName) ||
+              el.hasAttribute("contenteditable") ||
+              el.getAttribute("role") === "button" ||
+              el.getAttribute("role") === "textbox" ||
+              el.getAttribute("role") === "combobox";
+
+            // Check for modern framework patterns (React, Vue, Angular)
+            const hasFrameworkAttrs =
+              el.hasAttribute("data-testid") ||
+              el.hasAttribute("data-cy") ||
+              el.hasAttribute("data-qa") ||
+              Object.keys(el).some(key => key.startsWith("__react") || key.startsWith("_vue") || key.startsWith("ng-"));
+
+            // Check for custom input-like behavior
+            const hasInputBehavior =
+              el.addEventListener !== undefined &&
+              (className.includes("editable") ||
+                className.includes("input") ||
+                className.includes("field") ||
+                el.getAttribute("contenteditable") === "true");
+
+            // Enhanced scoring system - need at least 2 strong indicators
+            const indicators = [
+              hasInteractiveAttrs,
+              hasFormLikeNames,
+              hasAriaAttrs,
+              isFocusable,
+              hasFrameworkAttrs,
+              hasInputBehavior,
+            ];
+            const strongIndicators = indicators.filter(Boolean).length;
+
+            return strongIndicators >= 2;
+          } catch (elementError) {
+            console.debug("Error processing element in pattern detection:", elementError);
+            return false;
+          }
+        });
+
+        console.log(
+          `Enhanced detection: Found ${patternElements.length} additional elements through advanced pattern detection`,
+        );
+        fields.push(...patternElements);
+        fields = Array.from(new Set(fields));
+      } catch (patternError) {
+        console.warn("Enhanced pattern detection failed, continuing with basic detection:", patternError);
+      }
+    }
+
+    // Strategy 3: Enhanced Shadow DOM exploration
+    try {
+      const shadowHosts = Array.from(container.querySelectorAll("*")).filter(
+        el => (el as HTMLElement & { shadowRoot?: ShadowRoot }).shadowRoot,
+      );
+
+      for (const host of shadowHosts) {
+        try {
+          const shadowRoot = (host as HTMLElement & { shadowRoot?: ShadowRoot }).shadowRoot;
+          if (shadowRoot) {
+            const shadowFields = getFormFieldsRobust(shadowRoot);
+            fields.push(...shadowFields);
+          }
+        } catch (e) {
+          console.debug("Shadow DOM access failed:", e);
+        }
+      }
+    } catch (shadowError) {
+      console.debug("Shadow DOM exploration failed:", shadowError);
+    }
+
+    // Strategy 4: Dynamic content detection (for SPAs that load content dynamically)
+    try {
+      const dynamicContainers = Array.from(
+        container.querySelectorAll<HTMLElement>(
+          '[data-reactroot], [data-vue-app], [ng-app], [class*="app"], [id*="app"], [class*="root"], [id*="root"]',
+        ),
+      );
+
+      for (const dynamicContainer of dynamicContainers) {
+        try {
+          // Look for fields that might be loaded dynamically
+          const dynamicFields = Array.from(
+            dynamicContainer.querySelectorAll<HTMLElement>(
+              'div[role="textbox"], div[contenteditable], span[role="textbox"], div[tabindex], span[tabindex]',
+            ),
+          );
+
+          fields.push(...dynamicFields.filter(el => !fields.includes(el)));
+        } catch (e) {
+          console.debug("Dynamic content detection failed:", e);
+        }
+      }
+    } catch (dynamicError) {
+      console.debug("Dynamic content detection failed:", dynamicError);
+    }
+
+    // Enhanced filtering with better visibility detection
+    const filteredFields = fields.filter(el => {
+      try {
+        const style = window.getComputedStyle(el);
+
+        // Skip clearly disabled or readonly fields
+        if (el.hasAttribute("disabled") || el.hasAttribute("readonly")) {
+          return false;
+        }
+
+        // Enhanced visibility check - allow for modern CSS patterns
+        const isCompletelyHidden = style.display === "none" && style.visibility === "hidden" && style.opacity === "0";
+
+        if (isCompletelyHidden) {
+          return false;
+        }
+
+        // Enhanced dimension check for modern UI patterns
+        const rect = el.getBoundingClientRect();
+        const isCheckableField = el instanceof HTMLInputElement && (el.type === "checkbox" || el.type === "radio");
+        const hasAriaRole = ["checkbox", "radio", "switch", "textbox", "combobox"].includes(
+          el.getAttribute("role") || "",
+        );
+        const isCustomInput = el.hasAttribute("contenteditable") || el.getAttribute("role") === "textbox";
+
+        // Allow zero-dimension elements if they're functional inputs or have proper ARIA roles
+        if (!isCheckableField && !hasAriaRole && !isCustomInput && rect.width === 0 && rect.height === 0) {
+          return false;
+        }
+
+        // Skip decorative elements
+        const isDecorative =
+          el.getAttribute("aria-hidden") === "true" ||
+          el.getAttribute("role") === "presentation" ||
+          el.getAttribute("role") === "none";
+
+        if (isDecorative) {
+          return false;
+        }
+
+        // Enhanced check for actual form fields vs decorative elements
+        const isLikelyFormField =
+          el.tagName === "INPUT" ||
+          el.tagName === "SELECT" ||
+          el.tagName === "TEXTAREA" ||
+          el.hasAttribute("contenteditable") ||
+          ["textbox", "combobox", "checkbox", "radio", "switch"].includes(el.getAttribute("role") || "") ||
+          /\b(input|field|control)\b/i.test(el.className || "");
+
+        return isLikelyFormField;
+      } catch (e) {
+        console.debug("Error filtering element:", e);
+        return false;
+      }
+    });
+
+    return filteredFields;
+  } catch (error) {
+    console.error("Critical error in getFormFieldsRobust, falling back to basic detection:", error);
+
+    // Fallback: Basic form field detection
+    try {
+      const basicSelectors = ["input", "select", "textarea"];
+      const basicFields: HTMLElement[] = [];
+
+      for (const selector of basicSelectors) {
+        try {
+          const elements = Array.from(container.querySelectorAll<HTMLElement>(selector));
+          basicFields.push(...elements);
+        } catch (e) {
+          console.debug(`Basic selector failed: ${selector}`, e);
+        }
+      }
+
+      return Array.from(new Set(basicFields));
+    } catch (fallbackError) {
+      console.error("Even basic fallback detection failed:", fallbackError);
+      return [];
+    }
   }
 };

@@ -1,8 +1,8 @@
-import * as React from "react";
-import * as LabelPrimitive from "@radix-ui/react-label";
-import { cva, type VariantProps } from "class-variance-authority";
-
 import { cn } from "@/lib/utils";
+import * as LabelPrimitive from "@radix-ui/react-label";
+import { cva } from "class-variance-authority";
+import * as React from "react";
+import type { VariantProps } from "class-variance-authority";
 
 const labelVariants = cva(
   "filliny-text-sm filliny-font-medium filliny-leading-none peer-disabled:filliny-cursor-not-allowed peer-disabled:filliny-opacity-70",

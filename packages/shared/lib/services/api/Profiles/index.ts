@@ -1,3 +1,5 @@
+import { apiEndpoints } from "../../endpoints.js";
+import { httpService } from "../../httpService.js";
 import type {
   DTOFillingProfileItem,
   DTOpov,
@@ -5,8 +7,6 @@ import type {
   DTOSuggestedWebsite,
   DTOTone,
 } from "@extension/storage";
-import { apiEndpoints } from "../../endpoints.js";
-import { httpService } from "../../httpService.js";
 
 const {
   auth: {

@@ -1,16 +1,16 @@
+import { WebsitePreviewCard } from "./WebsitePreviewCard";
+import { UpgradeBanner } from "../alerts";
+import { RHFShadcnCheckbox, RHFShadcnTextField, RHFShadcnFileDrop } from "../RHF";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui";
+import { Badge } from "../ui/badge";
+import { Button } from "../ui/button";
+import { ScrollArea, ScrollBar } from "../ui/scroll-area";
+import { cn } from "@/lib/utils";
+import { getFaviconUrl, useSuggestedWebsites, usePlanLimits, getConfig } from "@extension/shared";
+import { Plus } from "lucide-react";
 import React, { useCallback } from "react";
 import { useFieldArray, useFormContext } from "react-hook-form";
-import { Plus } from "lucide-react";
-import { WebsitePreviewCard } from "./WebsitePreviewCard";
-import { Button } from "../ui/button";
-import { Badge } from "../ui/badge";
-import { ScrollArea, ScrollBar } from "../ui/scroll-area";
-import { RHFShadcnCheckbox, RHFShadcnTextField, RHFShadcnFileDrop } from "../RHF";
-import { getFaviconUrl, useSuggestedWebsites, usePlanLimits, getConfig } from "@extension/shared";
 import type { ProfileFormTypes } from "@/lib/containers/profile-form";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui";
-import { cn } from "@/lib/utils";
-import { UpgradeBanner } from "../alerts";
 
 // Get base URL for example placeholder
 const config = getConfig();

@@ -1,8 +1,8 @@
-import { Plus } from "lucide-react";
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, UpgradeBanner } from "../components";
 import { WebsitePreviewCard } from "../components/StepperForms/WebsitePreviewCard";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../components/ui/tooltip";
 import { useActiveTabUrl } from "@extension/shared";
+import { Plus } from "lucide-react";
 
 interface Props {
   onQuickAdd: () => void;

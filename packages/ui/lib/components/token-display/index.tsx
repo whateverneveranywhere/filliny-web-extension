@@ -1,6 +1,6 @@
-import { formatToK, getConfig } from "@extension/shared";
-import { Button } from "../ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger, Loading } from "../ui";
+import { Button } from "../ui/button";
+import { formatToK, getConfig } from "@extension/shared";
 import { RefreshCw } from "lucide-react";
 import { useState, useEffect } from "react";
 

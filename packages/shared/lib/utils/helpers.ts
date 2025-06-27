@@ -1,10 +1,9 @@
-import { authStorage, positionStorage, profileStrorage, type DTOProfileFillingForm } from "@extension/storage";
-import type { ErrorResponse, GetAuthTokenResponse, Request } from "./shared-types.js";
-import { BackgroundActions, WebappEnvs } from "./shared-types.js";
+import { BackgroundActions, WebappEnvs } from "./types.js";
+import { authStorage, positionStorage, profileStrorage } from "@extension/storage";
+import type { ErrorResponse, GetAuthTokenResponse, Request, ExcludeValuesFromBaseArrayType } from "./types.js";
+import type { DTOProfileFillingForm } from "@extension/storage";
 
-export const getFaviconUrl = (url: string) => {
-  return `https://www.google.com/s2/favicons?sz=64&domain_url=${url}`;
-};
+export const getFaviconUrl = (url: string) => `https://www.google.com/s2/favicons?sz=64&domain_url=${url}`;
 
 export const cleanUrl = (url: string) => {
   try {
@@ -282,8 +281,8 @@ export const handleAction = (
   }
 };
 
-export const getCurrentVistingUrl = (): Promise<string> => {
-  return new Promise((resolve, reject) => {
+export const getCurrentVistingUrl = (): Promise<string> =>
+  new Promise((resolve, reject) => {
     chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
       if (chrome.runtime.lastError) {
         reject(chrome.runtime.lastError);
@@ -297,7 +296,6 @@ export const getCurrentVistingUrl = (): Promise<string> => {
       }
     });
   });
-};
 
 // Add a new function to listen for cookie changes
 export const setupAuthTokenListener = () => {
@@ -325,3 +323,10 @@ export const clearUserStorage = () => {
   positionStorage.resetPosition();
   profileStrorage.resetDefaultProfile();
 };
+
+export const excludeValuesFromBaseArray = <B extends string[], E extends (string | number)[]>(
+  baseArray: B,
+  excludeArray: E,
+) => baseArray.filter(value => !excludeArray.includes(value)) as ExcludeValuesFromBaseArrayType<B, E>;
+
+export const sleep = async (time: number) => new Promise(r => setTimeout(r, time));

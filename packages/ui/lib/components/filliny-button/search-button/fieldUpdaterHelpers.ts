@@ -1,9 +1,9 @@
-import type { Field } from "@extension/shared";
-import { updateSelect } from "./field-types/select";
 import { updateCheckable, isValueChecked, matchesCheckboxValue } from "./field-types/checkable";
 import { updateFileInput } from "./field-types/file";
+import { updateSelect } from "./field-types/select";
 import { updateTextField, updateContentEditable } from "./field-types/text";
 import { addVisualFeedback, getStringValue } from "./field-types/utils";
+import type { Field } from "@extension/shared";
 
 // Core utilities for field updates
 // ----------------------------------------
@@ -101,6 +101,12 @@ const verifyFieldUpdate = async (element: HTMLElement, field: Field, isTestMode:
  * This is the main entry point for field updates
  */
 export const updateField = async (element: HTMLElement, field: Field, isTestMode = false): Promise<void> => {
+  // Defensive programming: validate inputs
+  if (!element || !field) {
+    console.warn("updateField: Invalid element or field provided");
+    return;
+  }
+
   try {
     // Skip elements that shouldn't be updated
     if (
@@ -112,8 +118,12 @@ export const updateField = async (element: HTMLElement, field: Field, isTestMode
       return;
     }
 
-    // Add visual feedback
-    addVisualFeedback(element);
+    // Add visual feedback with error handling
+    try {
+      addVisualFeedback(element);
+    } catch (visualError) {
+      console.debug("Error adding visual feedback:", visualError);
+    }
 
     // Get the value to use - ensure it's never undefined
     const valueToUse =
@@ -123,11 +133,15 @@ export const updateField = async (element: HTMLElement, field: Field, isTestMode
 
     // Special handling for test mode - mark the field visually
     if (isTestMode) {
-      // Add a test mode indicator
-      element.setAttribute("data-filliny-test-mode", "true");
+      try {
+        // Add a test mode indicator
+        element.setAttribute("data-filliny-test-mode", "true");
 
-      // Store the value used for testing in a data attribute for debugging
-      element.setAttribute("data-filliny-test-value", getStringValue(valueToUse));
+        // Store the value used for testing in a data attribute for debugging
+        element.setAttribute("data-filliny-test-value", getStringValue(valueToUse));
+      } catch (testModeError) {
+        console.debug("Error setting test mode attributes:", testModeError);
+      }
     }
 
     // Handle each element type with enhanced error handling

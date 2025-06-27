@@ -1,5 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { z } from "zod";
+import { Button } from "../components";
+import { Drawer } from "../components/Drawer";
+import { RHFShadcnComboBox } from "../components/RHF";
+import FormProvider from "../components/RHF/FormProvider";
+import { ProfileForm } from "@/lib/containers/profile-form";
+import { toast } from "@/lib/hooks/use-toast";
 import {
   useActiveProfile,
   useBoolean,
@@ -7,17 +11,13 @@ import {
   useDeleteProfileByIdMutation,
   useProfilesListQuery,
 } from "@extension/shared";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { toast } from "@/lib/hooks/use-toast";
-import { Plus } from "lucide-react";
-import type { DTOProfileFillingForm } from "@extension/storage";
 import { profileStrorage } from "@extension/storage";
-import { ProfileForm } from "@/lib/containers/profile-form";
-import FormProvider from "../components/RHF/FormProvider";
-import { RHFShadcnComboBox } from "../components/RHF";
-import { Button } from "../components";
-import { Drawer } from "../components/Drawer";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Plus } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import type { DTOProfileFillingForm } from "@extension/storage";
 
 const schema = z.object({
   defaultActiveProfileId: z.string(),

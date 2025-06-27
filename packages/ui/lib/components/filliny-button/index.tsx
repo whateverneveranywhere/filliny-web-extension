@@ -1,18 +1,19 @@
-import { useRef, useState, useEffect } from "react";
-import type { CSSProperties } from "react";
-import type { DragEndEvent } from "@dnd-kit/core";
+import { ButtonWrapper } from "./button-wrapper";
+import { DragButton } from "./drag-button";
+import { FillinyVisionButton } from "./filliny-vision-button";
+import { LogoButton } from "./logo-button";
+import { FieldFillManager } from "./search-button/components/FieldFillManager";
+import { SupportRequestButton } from "./support-request-button";
+import { FillinyTestModeFillerButton } from "./test-mode-button";
 import { DndContext, useDraggable } from "@dnd-kit/core";
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import { CSS } from "@dnd-kit/utilities";
 import { useStorage } from "@extension/shared";
-import { LogoButton } from "./logo-button";
-import { FillinyVisionButton } from "./filliny-vision-button";
-import { SupportRequestButton } from "./support-request-button";
-import { ButtonWrapper, type ButtonComponentProps } from "./button-wrapper";
-import { FillinyTestModeFillerButton } from "./test-mode-button";
 import { positionStorage, fieldButtonsStorage } from "@extension/storage";
-import { DragButton } from "./drag-button";
-import { FieldFillManager } from "./search-button/fieldFillManager";
+import { useRef, useState, useEffect } from "react";
+import type { ButtonComponentProps } from "./button-wrapper";
+import type { DragEndEvent } from "@dnd-kit/core";
+import type { CSSProperties } from "react";
 // import { FieldButtonToggle } from "./field-button";
 
 interface ButtonConfig {

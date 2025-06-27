@@ -1,4 +1,3 @@
-import { useQuery } from "@tanstack/react-query";
 import {
   getFillingProfileByIdService,
   getPOVsListService,
@@ -6,6 +5,7 @@ import {
   getSuggestedWebsitesService,
   getTonesListService,
 } from "../../services/api/Profiles/index.js";
+import { useQuery } from "@tanstack/react-query";
 import type { DTOTone, DTOpov } from "@extension/storage";
 
 export const useProfilesListQuery = () =>
@@ -17,15 +17,14 @@ export const useProfilesListQuery = () =>
     refetchOnWindowFocus: false,
   });
 
-export const useSuggestedWebsites = () => {
-  return useQuery({
+export const useSuggestedWebsites = () =>
+  useQuery({
     queryKey: ["recommendedWebsites"],
     queryFn: getSuggestedWebsitesService,
   });
-};
 
-export const useFillingProfileById = (id: string) => {
-  return useQuery({
+export const useFillingProfileById = (id: string) =>
+  useQuery({
     queryKey: ["fillingProfileById", id],
     queryFn: () => getFillingProfileByIdService(id),
     enabled: !!id,
@@ -33,20 +32,17 @@ export const useFillingProfileById = (id: string) => {
     gcTime: 10 * 60 * 1000, // 10 minutes
     refetchOnWindowFocus: false,
   });
-};
 
-export const useTonesListQuery = () => {
-  return useQuery({
+export const useTonesListQuery = () =>
+  useQuery({
     queryKey: ["tones"],
     queryFn: getTonesListService,
     select: (data: DTOTone[]) => data.map((item: DTOTone) => ({ label: item.label, value: String(item.id) })),
   });
-};
 
-export const usePOVListQuery = () => {
-  return useQuery({
+export const usePOVListQuery = () =>
+  useQuery({
     queryKey: ["povs"],
     queryFn: getPOVsListService,
     select: (data: DTOpov[]) => data.map((item: DTOpov) => ({ label: item.label, value: String(item.id) })),
   });
-};

@@ -1,7 +1,7 @@
-import type React from "react";
-import { Move } from "lucide-react";
 import { Button } from "../../ui/button";
+import { Move } from "lucide-react";
 import type { ButtonComponentProps } from "../button-wrapper";
+import type React from "react";
 
 const DragButton: React.FC<ButtonComponentProps> = () => (
   <Button

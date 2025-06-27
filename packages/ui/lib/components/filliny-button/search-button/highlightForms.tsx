@@ -1,15 +1,15 @@
-import { createRoot } from "react-dom/client";
-import { FormsOverlay } from "./FormsOverlay";
 import { detectFormLikeContainers, openCrossOriginIframeInNewTabAndAlert } from "./detectionHelpers";
+import { FormsOverlay } from "./FormsOverlay";
 import { addGlowingBorder, findOrCreateShadowContainer, getFormPosition } from "./overlayUtils";
 import { unifiedFieldRegistry } from "./unifiedFieldDetection";
+import { createRoot } from "react-dom/client";
 import type { HighlightFormsOptions } from "./types";
 
 export const highlightForms = async ({
   visionOnly = false,
   testMode = false,
 }: HighlightFormsOptions): Promise<void> => {
-  const shadowRoot = document.querySelector("#chrome-extension-filliny")?.shadowRoot;
+  const shadowRoot = document.querySelector("#chrome-extension-filliny-all")?.shadowRoot;
 
   if (!shadowRoot) {
     console.error("No shadow root found");
@@ -102,34 +102,162 @@ export const highlightForms = async ({
     console.log(`📋 Container ${idx}: ${form.tagName}.${form.className} with ${fieldCount} fields`);
   });
 
-  let index = 0;
-  for (const form of formsArray) {
+  // Set form IDs for all containers but don't create multiple overlays
+  formsArray.forEach((form, index) => {
     const formId = `form-${index}`;
-
-    // Set form ID without affecting the form's layout
     form.dataset.formId = formId;
+  });
 
-    console.log(`🎯 Processing form container ${index}: ${form.tagName}.${form.className} (${formId})`);
-
-    try {
-      if (visionOnly) {
+  if (visionOnly) {
+    // For vision-only mode, highlight all forms temporarily
+    for (let index = 0; index < formsArray.length; index++) {
+      const form = formsArray[index];
+      try {
         await removeFormHighlights(form);
         await highlightFormFields(form, index === 0);
         setTimeout(async () => {
           await removeFormHighlights(form);
         }, 2000);
-      } else {
-        createFormOverlay(form, formId, overlaysContainer, testMode, index === 0);
-        console.log(`✅ Created overlay for form ${formId}`);
+      } catch (error) {
+        console.error(`❌ Error highlighting form ${index}:`, error);
       }
-    } catch (error) {
-      console.error(`❌ Error processing form ${formId}:`, error);
     }
-
-    index++;
+  } else {
+    // Create ONE single overlay that handles ALL forms
+    if (formsArray.length > 0) {
+      try {
+        await createUnifiedFormOverlay(formsArray, overlaysContainer, testMode);
+        console.log(`✅ Created unified overlay for ${formsArray.length} form containers`);
+      } catch (error) {
+        console.error(`❌ Error creating unified overlay:`, error);
+      }
+    }
   }
 
   console.log(`🎉 Completed processing ${formsArray.length} form containers`);
+};
+
+/**
+ * Create a unified overlay that handles all forms at once
+ */
+const createUnifiedFormOverlay = async (
+  forms: HTMLElement[],
+  overlaysContainer: HTMLDivElement,
+  testMode: boolean,
+): Promise<void> => {
+  const unifiedFormId = "unified-form";
+
+  if (overlaysContainer.querySelector(`#overlay-${unifiedFormId}`)) {
+    console.warn(`An unified overlay is already active.`);
+    return;
+  }
+
+  // Find the best positioned form for overlay positioning (first visible form)
+  const primaryForm =
+    forms.find(form => {
+      const rect = form.getBoundingClientRect();
+      return rect.top >= -100 && rect.top <= window.innerHeight + 100;
+    }) || forms[0];
+
+  console.log(
+    `🎯 Using primary form for overlay positioning: ${primaryForm.tagName}${primaryForm.className ? "." + primaryForm.className : ""}`,
+  );
+
+  // Create container without affecting any form layout
+  const formOverlayContainer = document.createElement("div");
+  formOverlayContainer.id = `overlay-${unifiedFormId}`;
+  formOverlayContainer.className = "filliny-pointer-events-auto filliny-relative filliny-w-full filliny-h-full";
+
+  // Ensure the overlay container doesn't affect document flow
+  formOverlayContainer.style.position = "absolute";
+  formOverlayContainer.style.top = "0";
+  formOverlayContainer.style.left = "0";
+  formOverlayContainer.style.pointerEvents = "none";
+
+  // Get initial position based on the primary form
+  const initialPosition = getFormPosition(primaryForm);
+
+  // Create intersection observers for all forms to handle visibility
+  const observers: IntersectionObserver[] = [];
+  let isAnyFormVisible = false;
+
+  forms.forEach((form, index) => {
+    const observer = new IntersectionObserver(
+      entries => {
+        entries.forEach(entry => {
+          const overlay = overlaysContainer.querySelector(`#overlay-${unifiedFormId}`) as HTMLDivElement | null;
+          if (overlay) {
+            // Update visibility based on any form being visible
+            const wasVisible = isAnyFormVisible;
+            isAnyFormVisible = forms.some(f => {
+              const rect = f.getBoundingClientRect();
+              return rect.top < window.innerHeight && rect.bottom > 0;
+            });
+
+            if (wasVisible !== isAnyFormVisible) {
+              overlay.style.visibility = isAnyFormVisible ? "visible" : "hidden";
+              overlay.style.opacity = isAnyFormVisible ? "1" : "0";
+            }
+          }
+        });
+      },
+      {
+        threshold: [0, 0.1, 0.5],
+        rootMargin: "50px",
+      },
+    );
+
+    observer.observe(form);
+    observers.push(observer);
+  });
+
+  // Batch DOM operations to minimize reflows
+  requestAnimationFrame(() => {
+    // Add container to shadow DOM first
+    overlaysContainer.appendChild(formOverlayContainer);
+
+    const overlayRoot = createRoot(formOverlayContainer);
+
+    const cleanup = () => {
+      observers.forEach(observer => observer.disconnect());
+      overlayRoot.unmount();
+      formOverlayContainer.remove();
+
+      // Clean up all forms state without affecting layout
+      requestAnimationFrame(() => {
+        forms.forEach(form => {
+          form.classList.remove("filliny-pointer-events-none");
+          delete form.dataset.fillinyOverlayActive;
+        });
+      });
+    };
+
+    overlayRoot.render(
+      <FormsOverlay formId={unifiedFormId} initialPosition={initialPosition} onDismiss={cleanup} testMode={testMode} />,
+    );
+
+    // Apply form state changes after everything is rendered
+    requestAnimationFrame(() => {
+      // Mark all forms as having overlay
+      forms.forEach(form => {
+        form.dataset.fillinyOverlayActive = "true";
+      });
+
+      // Scroll to the first visible form
+      requestAnimationFrame(() => {
+        const primaryFormRect = primaryForm.getBoundingClientRect();
+        const isFormInView = primaryFormRect.top >= -100 && primaryFormRect.top <= window.innerHeight + 100;
+
+        if (!isFormInView) {
+          const scrollPosition = window.scrollY + primaryFormRect.top - 200;
+          window.scrollTo({
+            top: Math.max(0, scrollPosition),
+            behavior: "smooth",
+          });
+        }
+      });
+    });
+  });
 };
 
 const createFormOverlay = (

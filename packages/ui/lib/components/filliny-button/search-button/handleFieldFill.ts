@@ -1,7 +1,7 @@
-import type { Field } from "@extension/shared";
 import { updateFormFields, processChunks } from "./fieldUpdaterHelpers";
 import { aiFillService, getMatchingWebsite } from "@extension/shared";
 import { profileStrorage } from "@extension/storage";
+import type { Field } from "@extension/shared";
 import type { DTOProfileFillingForm } from "@extension/storage";
 
 /**

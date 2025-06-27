@@ -1,6 +1,6 @@
-import { ExternalLink } from "lucide-react";
-import { getConfig, useActiveProfile, usePlanLimits } from "@extension/shared";
 import { Alert } from "./Alert";
+import { getConfig, useActiveProfile, usePlanLimits } from "@extension/shared";
+import { ExternalLink } from "lucide-react";
 
 export default function UpgradeBanner() {
   const { currentPlan, maxWebsites, hasReachedLimit } = usePlanLimits();

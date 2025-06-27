@@ -1,6 +1,6 @@
-import { useQuery } from "@tanstack/react-query";
 import { authHealthCheckService } from "../../services/api/Auth/index.js";
 import { authStorage } from "@extension/storage";
+import { useQuery } from "@tanstack/react-query";
 import { useEffect } from "react";
 
 export const useAuthHealthCheckQuery = () => {

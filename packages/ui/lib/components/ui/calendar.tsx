@@ -1,10 +1,9 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import type * as React from "react";
+import { buttonVariants } from "./button";
+import { cn } from "@/lib/utils";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { DayPicker } from "react-day-picker";
-
-import { cn } from "@/lib/utils";
-import { buttonVariants } from "./button";
+import type * as React from "react";
 
 export type CalendarProps = React.ComponentProps<typeof DayPicker>;
 

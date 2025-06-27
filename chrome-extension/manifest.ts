@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import type { ManifestType } from "@extension/shared";
 
 const packageJson = JSON.parse(readFileSync("./package.json", "utf8"));
 
@@ -77,16 +78,12 @@ const manifest = {
   content_scripts: [
     {
       matches: ["http://*/*", "https://*/*", "<all_urls>"],
-      js: ["content/index.iife.js"],
-      run_at: "document_start",
+      js: ["content/all.iife.js"],
+      // run_at: "document_start",
     },
     {
       matches: ["http://*/*", "https://*/*", "<all_urls>"],
-      js: ["content-runtime/index.iife.js"],
-    },
-    {
-      matches: ["http://*/*", "https://*/*", "<all_urls>"],
-      js: ["content-ui/index.iife.js"],
+      js: ["content-ui/all.iife.js"],
     },
     {
       matches: ["http://*/*", "https://*/*", "<all_urls>"],
@@ -108,6 +105,6 @@ const manifest = {
       ...(env === WebappEnvs.DEV ? ["http://localhost:*/*"] : []), // Local development only in DEV
     ],
   },
-} satisfies chrome.runtime.ManifestV3;
+} satisfies ManifestType;
 
 export default manifest;

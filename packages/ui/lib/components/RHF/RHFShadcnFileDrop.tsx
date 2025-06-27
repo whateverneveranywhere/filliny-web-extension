@@ -1,13 +1,13 @@
-import type React from "react";
+import { Button } from "../ui/button";
+import { Textarea } from "../ui/textarea";
+import { cn } from "@/lib/utils";
+import { FileText, Loader2, Upload } from "lucide-react";
+import mammoth from "mammoth";
 import { useCallback, useState } from "react";
 import { useController } from "react-hook-form";
-import { cn } from "@/lib/utils";
-import { Textarea } from "../ui/textarea";
-import { Button } from "../ui/button";
-import { FileText, Loader2, Upload } from "lucide-react";
 import { toast } from "sonner";
-import mammoth from "mammoth";
 import * as XLSX from "xlsx";
+import type React from "react";
 
 // Function to process PDF files - only imported in browser
 const processPDF = async (file: File): Promise<string> => {

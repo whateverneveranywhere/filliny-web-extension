@@ -1,9 +1,9 @@
-import * as React from "react";
-import * as SheetPrimitive from "@radix-ui/react-dialog";
-import { cva, type VariantProps } from "class-variance-authority";
-import { X } from "lucide-react";
-
 import { cn } from "@/lib/utils";
+import * as SheetPrimitive from "@radix-ui/react-dialog";
+import { cva } from "class-variance-authority";
+import { X } from "lucide-react";
+import * as React from "react";
+import type { VariantProps } from "class-variance-authority";
 
 const Sheet = SheetPrimitive.Root;
 
@@ -19,7 +19,7 @@ const SheetOverlay = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <SheetPrimitive.Overlay
     className={cn(
-      "filliny-fixed filliny-inset-0 filliny-z-50 filliny-bg-black/80  data-[state=open]:filliny-animate-in data-[state=closed]:filliny-animate-out data-[state=closed]:filliny-fade-out-0 data-[state=open]:filliny-fade-in-0",
+      "filliny-fixed filliny-inset-0 filliny-z-50 filliny-bg-black/80 data-[state=open]:filliny-animate-in data-[state=closed]:filliny-animate-out data-[state=closed]:filliny-fade-out-0 data-[state=open]:filliny-fade-in-0",
       className,
     )}
     {...props}

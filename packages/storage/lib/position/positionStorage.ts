@@ -1,13 +1,13 @@
-import { StorageEnum } from "../base/enums.js";
 import { createStorage } from "../base/base.js";
-import type { BaseStorage } from "../base/types.js";
+import { StorageEnum } from "../base/enums.js";
+import type { BaseStorageType } from "../base/types.js";
 
 interface Position {
   x: number;
   y: number;
 }
 
-type PositionStorage = BaseStorage<Position> & {
+type PositionStorage = BaseStorageType<Position> & {
   setPosition: (position: Position) => Promise<void>;
   resetPosition: () => Promise<void>;
 };

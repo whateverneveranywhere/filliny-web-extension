@@ -1,5 +1,5 @@
-import type { Field } from "@extension/shared";
 import { detectFields } from "./field-types";
+import type { Field } from "@extension/shared";
 
 // Central field registry to ensure consistency across all strategies
 export class UnifiedFieldRegistry {
