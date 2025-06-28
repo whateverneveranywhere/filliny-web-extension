@@ -2,238 +2,6 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import type { Root } from "react-dom/client";
 
-// Comprehensive CSS styles for shadow DOM components including Tailwind
-const UNIFIED_SHADOW_STYLES = `
-  /* Import Tailwind CSS - this should be the actual built CSS */
-  @import url('chrome-extension://[EXTENSION_ID]/assets/tailwind.css');
-
-  /* Reset and base styles */
-  *, *::before, *::after {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-  }
-
-  /* CSS animations */
-  @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-  }
-
-  @keyframes fadeIn {
-    0% { opacity: 0; transform: scale(0.95); }
-    100% { opacity: 1; transform: scale(1); }
-  }
-
-  @keyframes slideDown {
-    0% { 
-      opacity: 0; 
-      transform: translateY(-10px); 
-    }
-    100% { 
-      opacity: 1; 
-      transform: translateY(0); 
-    }
-  }
-
-  @keyframes pulse {
-    0%, 100% { 
-      opacity: 1; 
-      transform: scale(1); 
-    }
-    50% { 
-      opacity: 0.8; 
-      transform: scale(1.05); 
-    }
-  }
-
-  /* Tailwind CSS classes - Filliny prefixed for shadow DOM isolation */
-  .filliny-fixed { position: fixed !important; }
-  .filliny-absolute { position: absolute !important; }
-  .filliny-relative { position: relative !important; }
-  .filliny-inline-flex { display: inline-flex !important; }
-  .filliny-flex { display: flex !important; }
-  .filliny-items-center { align-items: center !important; }
-  .filliny-justify-center { justify-content: center !important; }
-  .filliny-justify-start { justify-content: flex-start !important; }
-  .filliny-gap-2 { gap: 0.5rem !important; }
-  .filliny-w-full { width: 100% !important; }
-  .filliny-w-48 { width: 12rem !important; }
-  .filliny-w-7 { width: 1.75rem !important; }
-  .filliny-w-3 { width: 0.75rem !important; }
-  .filliny-h-7 { height: 1.75rem !important; }
-  .filliny-h-3 { height: 0.75rem !important; }
-  .filliny-h-8 { height: 2rem !important; }
-  .filliny-p-3 { padding: 0.75rem !important; }
-  .filliny-pt-0 { padding-top: 0 !important; }
-  .filliny-pb-2 { padding-bottom: 0.5rem !important; }
-  .filliny-mr-2 { margin-right: 0.5rem !important; }
-  .filliny-rounded-full { border-radius: 9999px !important; }
-  .filliny-rounded-md { border-radius: 0.375rem !important; }
-  .filliny-shadow-lg { box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1) !important; }
-  .filliny-border { border-width: 1px !important; }
-  .filliny-border-input { border-color: hsl(214.3 31.8% 91.4%) !important; }
-  .filliny-bg-primary { background-color: hsl(222.2 84% 4.9%) !important; }
-  .filliny-bg-background { background-color: hsl(0 0% 100%) !important; }
-  .filliny-bg-accent { background-color: hsl(210 40% 96%) !important; }
-  .filliny-bg-secondary { background-color: hsl(210 40% 96%) !important; }
-  .filliny-text-primary-foreground { color: hsl(210 40% 98%) !important; }
-  .filliny-text-accent-foreground { color: hsl(222.2 84% 4.9%) !important; }
-  .filliny-text-secondary-foreground { color: hsl(222.2 84% 4.9%) !important; }
-  .filliny-text-sm { font-size: 0.875rem !important; line-height: 1.25rem !important; }
-  .filliny-font-medium { font-weight: 500 !important; }
-  .filliny-transition-all { transition: all 0.2s ease !important; }
-  .filliny-duration-200 { transition-duration: 200ms !important; }
-  .filliny-opacity-95 { opacity: 0.95 !important; }
-  .filliny-opacity-100 { opacity: 1 !important; }
-  .filliny-opacity-70 { opacity: 0.7 !important; }
-  .filliny-scale-110 { transform: scale(1.1) !important; }
-  .filliny-space-y-1 > * + * { margin-top: 0.25rem !important; }
-  .filliny-pointer-events-auto { pointer-events: auto !important; }
-  .filliny-z-\\[10000000\\] { z-index: 10000000 !important; }
-  .filliny-animate-spin { animation: spin 1s linear infinite !important; }
-  
-  /* Hover states */
-  .filliny-hover\\:filliny-scale-110:hover { transform: scale(1.1) !important; }
-  .filliny-hover\\:filliny-opacity-100:hover { opacity: 1 !important; }
-  .filliny-hover\\:filliny-bg-primary\\/90:hover { background-color: hsl(222.2 84% 4.9% / 0.9) !important; }
-  .filliny-hover\\:filliny-bg-accent:hover { background-color: hsl(210 40% 96%) !important; }
-  .filliny-hover\\:filliny-text-accent-foreground:hover { color: hsl(222.2 84% 4.9%) !important; }
-
-  /* Disabled states */
-  .filliny-disabled\\:filliny-pointer-events-none:disabled { pointer-events: none !important; }
-  .filliny-disabled\\:filliny-opacity-50:disabled { opacity: 0.5 !important; }
-
-  /* Focus states */
-  .focus-visible\\:filliny-outline-none:focus-visible { outline: none !important; }
-  .focus-visible\\:filliny-ring-2:focus-visible { box-shadow: 0 0 0 2px hsl(222.2 84% 4.9%) !important; }
-
-  /* Button variants */
-  .filliny-btn-default {
-    background-color: hsl(222.2 84% 4.9%) !important;
-    color: hsl(210 40% 98%) !important;
-    border: none !important;
-    cursor: pointer !important;
-    display: inline-flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    border-radius: 0.375rem !important;
-    font-size: 0.875rem !important;
-    font-weight: 500 !important;
-    transition: all 0.2s ease !important;
-    outline: none !important;
-  }
-
-  .filliny-btn-default:hover:not(:disabled) {
-    background-color: hsl(222.2 84% 4.9% / 0.9) !important;
-  }
-
-  .filliny-btn-default:disabled {
-    pointer-events: none !important;
-    opacity: 0.5 !important;
-  }
-
-  .filliny-btn-ghost {
-    background-color: transparent !important;
-    color: hsl(222.2 84% 4.9%) !important;
-    border: none !important;
-    cursor: pointer !important;
-    display: inline-flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    border-radius: 0.375rem !important;
-    font-size: 0.875rem !important;
-    font-weight: 500 !important;
-    transition: all 0.2s ease !important;
-    outline: none !important;
-  }
-
-  .filliny-btn-ghost:hover:not(:disabled) {
-    background-color: hsl(210 40% 96%) !important;
-    color: hsl(222.2 84% 4.9%) !important;
-  }
-
-  .filliny-btn-ghost:disabled {
-    pointer-events: none !important;
-    opacity: 0.5 !important;
-  }
-
-  .filliny-btn-sm {
-    height: 2rem !important;
-    padding: 0 0.75rem !important;
-  }
-
-  .filliny-btn-icon {
-    height: 2.5rem !important;
-    width: 2.5rem !important;
-    padding: 0 !important;
-  }
-
-  /* Card components */
-  .filliny-card {
-    border-radius: 0.5rem !important;
-    border: 1px solid hsl(214.3 31.8% 91.4%) !important;
-    background-color: hsl(0 0% 100%) !important;
-    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1) !important;
-    color: hsl(222.2 84% 4.9%) !important;
-  }
-
-  .filliny-card-header {
-    display: flex !important;
-    flex-direction: column !important;
-    space-y: 0.375rem !important;
-    padding: 1.5rem !important;
-  }
-
-  .filliny-card-title {
-    font-size: 1.125rem !important;
-    font-weight: 600 !important;
-    line-height: 1 !important;
-    letter-spacing: -0.025em !important;
-  }
-
-  .filliny-card-content {
-    padding: 1.5rem !important;
-    padding-top: 0 !important;
-  }
-
-  /* Legacy compatibility styles - minimal custom styles */
-  .filliny-container {
-    position: fixed;
-    top: 0;
-    left: 0;
-    pointer-events: none;
-    z-index: 999999;
-    contain: layout style paint;
-  }
-
-  .filliny-container * {
-    pointer-events: auto;
-  }
-
-  /* Animation utilities */
-  .filliny-fadeIn {
-    animation: fadeIn 0.3s ease-in-out;
-  }
-
-  .filliny-slideDown {
-    animation: slideDown 0.3s ease-in-out;
-  }
-
-  /* Essential utilities */
-  .filliny-sr-only {
-    position: absolute !important;
-    width: 1px !important;
-    height: 1px !important;
-    padding: 0 !important;
-    margin: -1px !important;
-    overflow: hidden !important;
-    clip: rect(0, 0, 0, 0) !important;
-    white-space: nowrap !important;
-    border: 0 !important;
-  }
-`;
-
 // Error boundary component for safer rendering
 class ErrorBoundary extends React.Component<
   { children: React.ReactNode; containerId: string },
@@ -282,6 +50,11 @@ export interface ComponentInjectionConfig extends ShadowContainerConfig {
   onError?: (error: Error) => void;
 }
 
+export interface ShadowDOMInitConfig {
+  css?: string;
+  shadowHostId?: string;
+}
+
 /**
  * Unified Shadow DOM Manager - Single source of truth for all shadow DOM operations
  */
@@ -292,6 +65,7 @@ export class UnifiedShadowDOMManager {
   private containers: Map<string, HTMLElement> = new Map();
   private reactRoots: Map<string, Root> = new Map();
   private isInitialized = false;
+  private injectedCss: string | null = null;
 
   static getInstance(): UnifiedShadowDOMManager {
     if (!UnifiedShadowDOMManager.instance) {
@@ -301,20 +75,22 @@ export class UnifiedShadowDOMManager {
   }
 
   /**
-   * Initialize the shadow DOM with proper isolation
+   * Initialize the shadow DOM with proper isolation and CSS
    */
-  async initialize(): Promise<ShadowRoot | null> {
+  async initialize(config: ShadowDOMInitConfig = {}): Promise<ShadowRoot | null> {
     if (this.isInitialized && this.shadowRoot) {
       return this.shadowRoot;
     }
 
     try {
+      const { css, shadowHostId = "chrome-extension-filliny-all" } = config;
+
       // Find or create the shadow host
-      this.shadowHost = document.querySelector("#chrome-extension-filliny-all") as HTMLElement;
+      this.shadowHost = document.querySelector(`#${shadowHostId}`) as HTMLElement;
 
       if (!this.shadowHost) {
         this.shadowHost = document.createElement("div");
-        this.shadowHost.id = "chrome-extension-filliny-all";
+        this.shadowHost.id = shadowHostId;
         this.shadowHost.style.cssText = `
           position: fixed !important;
           top: 0 !important;
@@ -336,7 +112,15 @@ export class UnifiedShadowDOMManager {
         this.shadowRoot = this.shadowHost.shadowRoot;
       }
 
-      // Inject unified styles
+      // Store CSS for injection
+      if (css) {
+        this.injectedCss = css;
+      }
+
+      // Add a class to the shadow host to help with CSS targeting
+      this.shadowHost.classList.add("filliny-shadow-host");
+
+      // Inject styles
       await this.injectStyles();
 
       this.isInitialized = true;
@@ -350,19 +134,44 @@ export class UnifiedShadowDOMManager {
   }
 
   /**
-   * Inject comprehensive styles into shadow DOM
+   * Inject CSS styles into shadow DOM using the same pattern as initAppWithShadow
    */
   private async injectStyles(): Promise<void> {
-    if (!this.shadowRoot) return;
+    if (!this.shadowRoot || !this.injectedCss) return;
 
     // Remove existing styles to avoid duplicates
     const existingStyles = this.shadowRoot.querySelectorAll("style[data-filliny-styles]");
     existingStyles.forEach(style => style.remove());
 
-    const styleElement = document.createElement("style");
-    styleElement.setAttribute("data-filliny-styles", "true");
-    styleElement.textContent = UNIFIED_SHADOW_STYLES;
-    this.shadowRoot.appendChild(styleElement);
+    // Clear existing adopted stylesheets
+    if (this.shadowRoot.adoptedStyleSheets) {
+      this.shadowRoot.adoptedStyleSheets = [];
+    }
+
+    // Use the same CSS injection pattern as initAppWithShadow
+    if (navigator.userAgent.includes("Firefox")) {
+      /**
+       * In the firefox environment, adoptedStyleSheets cannot be used due to the bug
+       * @url https://bugzilla.mozilla.org/show_bug.cgi?id=1770592
+       */
+      const styleElement = document.createElement("style");
+      styleElement.setAttribute("data-filliny-styles", "true");
+      styleElement.innerHTML = this.injectedCss;
+      this.shadowRoot.appendChild(styleElement);
+    } else {
+      /** Inject styles into shadow dom */
+      const globalStyleSheet = new CSSStyleSheet();
+      globalStyleSheet.replaceSync(this.injectedCss);
+      this.shadowRoot.adoptedStyleSheets = [globalStyleSheet];
+    }
+  }
+
+  /**
+   * Update CSS styles dynamically
+   */
+  async updateStyles(css: string): Promise<void> {
+    this.injectedCss = css;
+    await this.injectStyles();
   }
 
   /**
@@ -525,7 +334,7 @@ export class UnifiedShadowDOMManager {
 export const unifiedShadowDOM = UnifiedShadowDOMManager.getInstance();
 
 // Convenience functions for common operations
-export const initializeShadowDOM = () => unifiedShadowDOM.initialize();
+export const initializeShadowDOM = (config?: ShadowDOMInitConfig) => unifiedShadowDOM.initialize(config);
 export const getShadowRoot = () => unifiedShadowDOM.getShadowRoot();
 export const getContainer = (config: ShadowContainerConfig) => unifiedShadowDOM.getContainer(config);
 export const injectComponent = (config: ComponentInjectionConfig) => unifiedShadowDOM.injectComponent(config);
@@ -533,3 +342,4 @@ export const cleanupContainer = (containerId: string) => unifiedShadowDOM.cleanu
 export const cleanupShadowDOM = () => unifiedShadowDOM.cleanup();
 export const isShadowDOMReady = () => unifiedShadowDOM.isReady();
 export const waitForShadowDOM = (timeout?: number) => unifiedShadowDOM.waitForReady(timeout);
+export const updateShadowDOMStyles = (css: string) => unifiedShadowDOM.updateStyles(css);

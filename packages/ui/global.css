@@ -2,9 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
-
 @layer base {
-  :root {
+  /* Define CSS variables for both regular DOM and shadow DOM */
+  :root,
+  :host,
+  :host(*) {
+    /* Light theme variables */
     --background: 0 0% 100%;
     --foreground: 240 10% 3.9%;
     --card: 0 0% 100%;
@@ -30,10 +33,12 @@
     --chart-3: 197 37% 24%;
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
-    --radius: 0.5rem;
   }
 
-  .dark {
+  /* Dark mode variables for both regular DOM and shadow DOM */
+  .dark,
+  :host(.dark),
+  :host(.dark) * {
     --background: 240 10% 3.9%;
     --foreground: 0 0% 98%;
     --card: 240 10% 3.9%;
@@ -58,30 +63,29 @@
     --chart-3: 30 80% 55%;
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
-    --radius: 0.5rem;
   }
-}
 
-@layer base {
+  /* Base styles for all elements */
   * {
     @apply filliny-border-border;
   }
 
-  body {
+  /* Base styles for both body and shadow host */
+  body,
+  :host,
+  :host(*) {
     @apply filliny-bg-background filliny-text-foreground;
     margin: 0;
     padding: 0;
     box-sizing: border-box;
-
     font-family:
-      -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans',
-      'Helvetica Neue', sans-serif;
-
+      -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell", "Fira Sans",
+      "Droid Sans", "Helvetica Neue", sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
 }
 
 code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
+  font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New", monospace;
 }

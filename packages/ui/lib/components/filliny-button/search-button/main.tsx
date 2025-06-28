@@ -3,10 +3,14 @@ import { unifiedShadowDOM, injectComponent } from "../../../utils/unified-shadow
 import { useEffect, useState } from "react";
 import type React from "react";
 
+export interface SearchButtonMainProps {
+  css?: string;
+}
+
 /**
  * Main Search Button Component - Entry point for all field detection and overlay functionality
  */
-export const SearchButtonMain: React.FC = () => {
+export const SearchButtonMain: React.FC<SearchButtonMainProps> = ({ css }) => {
   const [isInitialized, setIsInitialized] = useState(false);
   const [initError, setInitError] = useState<string | null>(null);
 
@@ -15,8 +19,11 @@ export const SearchButtonMain: React.FC = () => {
       try {
         console.log("🚀 Initializing Search Button with unified shadow DOM...");
 
-        // Initialize shadow DOM
-        await unifiedShadowDOM.initialize();
+        // Initialize shadow DOM with CSS
+        await unifiedShadowDOM.initialize({
+          css,
+          shadowHostId: "chrome-extension-filliny-search-button",
+        });
 
         setIsInitialized(true);
         console.log("✅ Search Button initialized successfully");
@@ -31,7 +38,7 @@ export const SearchButtonMain: React.FC = () => {
     if (!isInitialized && !initError) {
       initializeSearchButton();
     }
-  }, [isInitialized, initError]);
+  }, [isInitialized, initError, css]);
 
   // Show error state if initialization failed
   if (initError) {
@@ -47,18 +54,31 @@ export const SearchButtonMain: React.FC = () => {
   return <FieldFillManager />;
 };
 
+export interface InitializeSearchButtonConfig {
+  css?: string;
+  shadowHostId?: string;
+}
+
 /**
- * Initialize the search button system
+ * Initialize the search button system with CSS support
  * This is the main entry point for the search button functionality
  */
-export const initializeSearchButton = async (): Promise<void> => {
+export const initializeSearchButton = async (config: InitializeSearchButtonConfig = {}): Promise<void> => {
   try {
     console.log("🔧 Starting search button system initialization...");
+
+    const { css, shadowHostId = "chrome-extension-filliny-search-button" } = config;
+
+    // Initialize shadow DOM with CSS first
+    await unifiedShadowDOM.initialize({
+      css,
+      shadowHostId,
+    });
 
     // Use the unified shadow DOM injection system
     await injectComponent({
       containerId: "search-button-main",
-      component: <SearchButtonMain />,
+      component: <SearchButtonMain css={css} />,
       zIndex: 999999,
       isolate: true,
       onError: (error: Error) => {
