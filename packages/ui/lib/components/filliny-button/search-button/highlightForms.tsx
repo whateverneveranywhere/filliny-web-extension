@@ -163,6 +163,12 @@ const createUnifiedFormOverlay = async (
     `🎯 Using primary form for overlay positioning: ${primaryForm.tagName}${primaryForm.className ? "." + primaryForm.className : ""}`,
   );
 
+  // Mark this primary form with the unified form ID to ensure it can be found
+  primaryForm.dataset.formId = unifiedFormId;
+
+  // Also add a specific data attribute that FormsOverlay can look for
+  primaryForm.setAttribute("data-filliny-unified-form", "true");
+
   // Create container without affecting any form layout
   const formOverlayContainer = document.createElement("div");
   formOverlayContainer.id = `overlay-${unifiedFormId}`;
@@ -182,6 +188,15 @@ const createUnifiedFormOverlay = async (
   let isAnyFormVisible = false;
 
   forms.forEach((form, index) => {
+    // Make sure each form has the appropriate data attributes set
+    if (index === 0) {
+      // Primary form already has the unified ID set above
+      form.dataset.fillinyPrimaryForm = "true";
+    } else {
+      // Secondary forms get tagged as part of the unified form group
+      form.dataset.fillinyUnifiedFormMember = unifiedFormId;
+    }
+
     const observer = new IntersectionObserver(
       entries => {
         entries.forEach(entry => {
