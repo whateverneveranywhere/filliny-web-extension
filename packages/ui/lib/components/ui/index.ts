@@ -26,3 +26,4 @@ export * from "./toggle-group";
 export * from "./toggle";
 export * from "./skeleton";
 export * from "./tooltip";
+export { TogglePill } from "./toggle-pill";
