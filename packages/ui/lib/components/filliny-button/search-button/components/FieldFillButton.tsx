@@ -1,6 +1,18 @@
-import { FieldFillDropdown } from "./FieldFillDropdown";
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import { Button } from "../../../ui/button";
+import {
+  ShadowDropdownMenu,
+  ShadowDropdownMenuContent,
+  ShadowDropdownMenuRadioGroup,
+  ShadowDropdownMenuRadioItem,
+  ShadowDropdownMenuSeparator,
+  ShadowDropdownMenuTrigger,
+} from "../../../ui/shadow-ui";
+import { useStorage } from "@extension/shared";
+import { fieldButtonsStorage } from "@extension/storage";
+import { CheckCircle, ChevronDown, Wand2, TestTube2 } from "lucide-react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import type { Field } from "@extension/shared";
+import type * as React from "react";
 
 interface FieldFillButtonProps {
   fieldElement: HTMLElement;
@@ -8,371 +20,240 @@ interface FieldFillButtonProps {
   onFill: (field: Field, useTestMode: boolean) => Promise<void>;
 }
 
-// Temporary inline Button component using Tailwind classes
-const InlineButton = React.forwardRef<
-  HTMLButtonElement,
-  React.ButtonHTMLAttributes<HTMLButtonElement> & {
-    loading?: boolean;
-    variant?: "default" | "ghost";
-    size?: "sm" | "icon";
-  }
->(({ className, variant = "default", size = "default", loading = false, children, ...props }, ref) => {
-  const baseClasses =
-    "filliny-inline-flex filliny-items-center filliny-justify-center filliny-transition-all filliny-duration-200";
-
-  const variantClasses = {
-    default: "filliny-bg-primary filliny-text-primary-foreground hover:filliny-bg-primary/90",
-    ghost: "filliny-bg-transparent hover:filliny-bg-accent hover:filliny-text-accent-foreground",
-  };
-
-  const sizeClasses: Record<string, string> = {
-    default: "filliny-h-10 filliny-px-4 filliny-py-2 filliny-rounded-md",
-    sm: "filliny-h-8 filliny-px-3 filliny-rounded-md filliny-text-sm",
-    icon: "filliny-h-7 filliny-w-7 filliny-rounded-full",
-  };
-
-  const classes = `${baseClasses} ${variantClasses[variant]} ${sizeClasses[size] || sizeClasses.default} ${className || ""}`;
-
-  return (
-    <button ref={ref} className={classes} disabled={loading || props.disabled} {...props}>
-      {loading ? (
-        <div className="filliny-h-3 filliny-w-3 filliny-animate-spin filliny-border-2 filliny-border-transparent filliny-border-t-current filliny-rounded-full" />
-      ) : (
-        children
-      )}
-    </button>
-  );
-});
-
-// Simple Check icon component
-const CheckIcon = () => (
-  <svg
-    className="filliny-h-3 filliny-w-3"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round">
-    <polyline points="20 6 9 17 4 12" />
-  </svg>
-);
-
 export const FieldFillButton: React.FC<FieldFillButtonProps> = ({ fieldElement, field, onFill }) => {
+  const settings = useStorage(fieldButtonsStorage);
   const [isLoading, setIsLoading] = useState(false);
-  const [isHovered, setIsHovered] = useState(false);
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
+  const [isOpen, setIsOpen] = useState(false);
   const [buttonPosition, setButtonPosition] = useState({ top: 0, left: 0 });
+  const [hoverTimeout, setHoverTimeout] = useState<NodeJS.Timeout | null>(null);
 
+  const containerRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
-  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
   const mutationObserverRef = useRef<MutationObserver | null>(null);
 
-  // Find the optimal parent wrapper for positioning
-  const findFieldWrapper = useCallback((element: HTMLElement): HTMLElement => {
-    let current = element;
-    let bestWrapper = element;
+  // Get the current test mode preference
+  const preferTestMode = settings?.preferTestMode ?? false;
 
-    while (current.parentElement && current.parentElement !== document.body) {
-      const parent = current.parentElement;
-      const parentRect = parent.getBoundingClientRect();
-      const currentRect = current.getBoundingClientRect();
-
-      const widthRatio = parentRect.width / currentRect.width;
-      const heightRatio = parentRect.height / currentRect.height;
-
-      const isReasonableSize = widthRatio <= 3 && heightRatio <= 2;
-      const hasSemanticMeaning =
-        parent.tagName === "FIELDSET" ||
-        parent.tagName === "LABEL" ||
-        parent.getAttribute("role") === "group" ||
-        /field|input|form|control|wrapper|container/.test(parent.className.toLowerCase());
-
-      if (isReasonableSize && hasSemanticMeaning) {
-        bestWrapper = parent;
-      } else if (widthRatio > 5 || heightRatio > 3) {
-        break;
-      }
-
-      current = parent;
-    }
-
-    return bestWrapper;
-  }, []);
-
-  // Enhanced positioning system
+  // Enhanced positioning system - absolute positioning relative to the viewport
   const updateButtonPosition = useCallback(() => {
     if (!buttonRef.current || !fieldElement) return;
 
     try {
-      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-      const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
+      // Get field position
+      const fieldRect = fieldElement.getBoundingClientRect();
 
-      // Find the optimal parent wrapper for positioning
-      const fieldWrapper = findFieldWrapper(fieldElement);
-      const wrapperRect = fieldWrapper.getBoundingClientRect();
-
-      // Position button at the top-right corner of the field wrapper
+      // Position button at the top-right corner of the field
       const newPosition = {
-        top: wrapperRect.top + scrollTop - 10,
-        left: wrapperRect.right + scrollLeft - 10,
+        top: fieldRect.top - 10 + window.scrollY,
+        left: fieldRect.right - 10 + window.scrollX,
       };
 
       setButtonPosition(newPosition);
     } catch (error) {
       console.debug("Error updating button position:", error);
-      // Fallback to field element positioning
-      try {
-        const fieldRect = fieldElement.getBoundingClientRect();
-        const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-        const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
-
-        setButtonPosition({
-          top: fieldRect.top + scrollTop - 10,
-          left: fieldRect.right + scrollLeft - 10,
-        });
-      } catch (fallbackError) {
-        console.debug("Fallback positioning also failed:", fallbackError);
-      }
     }
-  }, [fieldElement, findFieldWrapper]);
+  }, [fieldElement]);
 
   // Set up positioning and observers
   useEffect(() => {
-    // Defensive check to ensure fieldElement still exists
-    if (!fieldElement || !fieldElement.isConnected) {
-      console.debug("FieldFillButton: fieldElement is no longer connected to DOM");
-      return;
-    }
+    if (!fieldElement?.isConnected) return;
 
-    try {
-      // Initial positioning
-      updateButtonPosition();
+    // Initial positioning
+    updateButtonPosition();
 
-      // Set up ResizeObserver with error handling
-      try {
-        resizeObserverRef.current = new ResizeObserver(() => {
-          try {
-            updateButtonPosition();
-          } catch (error) {
-            console.debug("Error in ResizeObserver callback:", error);
-          }
-        });
-        resizeObserverRef.current.observe(fieldElement);
-      } catch (resizeObserverError) {
-        console.debug("Error setting up ResizeObserver:", resizeObserverError);
-      }
+    // Set up ResizeObserver
+    resizeObserverRef.current = new ResizeObserver(() => {
+      requestAnimationFrame(updateButtonPosition);
+    });
+    resizeObserverRef.current.observe(fieldElement);
 
-      // Set up MutationObserver with error handling
-      try {
-        mutationObserverRef.current = new MutationObserver(() => {
-          try {
-            requestAnimationFrame(updateButtonPosition);
-          } catch (error) {
-            console.debug("Error in MutationObserver callback:", error);
-          }
-        });
+    // Set up MutationObserver
+    mutationObserverRef.current = new MutationObserver(() => {
+      requestAnimationFrame(updateButtonPosition);
+    });
+    mutationObserverRef.current.observe(fieldElement, {
+      attributes: true,
+      attributeFilter: ["style", "class"],
+    });
 
-        mutationObserverRef.current.observe(fieldElement, {
-          attributes: true,
-          attributeFilter: ["style", "class"],
-        });
-      } catch (mutationObserverError) {
-        console.debug("Error setting up MutationObserver:", mutationObserverError);
-      }
+    // Listen for scroll and resize events
+    const handleWindowEvents = () => requestAnimationFrame(updateButtonPosition);
+    window.addEventListener("resize", handleWindowEvents);
+    window.addEventListener("scroll", handleWindowEvents, { passive: true });
 
-      // Listen for scroll and resize events with error handling
-      const handleWindowEvents = () => {
-        try {
-          requestAnimationFrame(updateButtonPosition);
-        } catch (error) {
-          console.debug("Error in window events handler:", error);
-        }
-      };
-
-      try {
-        window.addEventListener("resize", handleWindowEvents);
-        window.addEventListener("scroll", handleWindowEvents, { passive: true });
-      } catch (eventListenerError) {
-        console.debug("Error setting up window event listeners:", eventListenerError);
-      }
-
-      return () => {
-        // Cleanup observers with error handling
-        try {
-          resizeObserverRef.current?.disconnect();
-        } catch (error) {
-          console.debug("Error disconnecting ResizeObserver:", error);
-        }
-
-        try {
-          mutationObserverRef.current?.disconnect();
-        } catch (error) {
-          console.debug("Error disconnecting MutationObserver:", error);
-        }
-
-        // Cleanup event listeners with error handling
-        try {
-          window.removeEventListener("resize", handleWindowEvents);
-          window.removeEventListener("scroll", handleWindowEvents);
-        } catch (error) {
-          console.debug("Error removing window event listeners:", error);
-        }
-
-        // Cleanup timeout with error handling
-        try {
-          if (hoverTimeoutRef.current) {
-            clearTimeout(hoverTimeoutRef.current);
-          }
-        } catch (error) {
-          console.debug("Error clearing hover timeout:", error);
-        }
-      };
-    } catch (error) {
-      console.error("Error in FieldFillButton useEffect setup:", error);
-      return () => {
-        // Minimal cleanup on error
-        try {
-          resizeObserverRef.current?.disconnect();
-          mutationObserverRef.current?.disconnect();
-        } catch (cleanupError) {
-          console.debug("Error in cleanup:", cleanupError);
-        }
-      };
-    }
+    return () => {
+      resizeObserverRef.current?.disconnect();
+      mutationObserverRef.current?.disconnect();
+      window.removeEventListener("resize", handleWindowEvents);
+      window.removeEventListener("scroll", handleWindowEvents);
+    };
   }, [fieldElement, updateButtonPosition]);
 
-  // Handle button click
-  const handleButtonClick = useCallback(
-    async (e: React.MouseEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
+  // Toggle test mode preference
+  const toggleTestMode = useCallback((value: string) => {
+    // Convert string value to boolean
+    const newPreferTestMode = value === "test";
+    fieldButtonsStorage.setPreferTestMode(newPreferTestMode);
+    // Auto-close dropdown after selection
+    setIsOpen(false);
+  }, []);
 
-      if (isDropdownOpen) {
-        setIsDropdownOpen(false);
-        return;
-      }
+  // Handle field fill based on current preference
+  const handleFieldFill = useCallback(() => {
+    if (isLoading) return;
 
-      // Quick fill with default mode (AI mode)
-      await handleFieldFill(false);
-    },
-    [isDropdownOpen],
-  );
+    setIsLoading(true);
 
-  // Handle context menu for dropdown
-  const handleContextMenu = useCallback(
-    (e: React.MouseEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-
-      if (isDropdownOpen) {
-        setIsDropdownOpen(false);
-      } else {
-        showDropdown();
-      }
-    },
-    [isDropdownOpen],
-  );
-
-  // Show dropdown
-  const showDropdown = useCallback(() => {
-    const buttonRect = buttonRef.current?.getBoundingClientRect();
-    if (buttonRect) {
-      setDropdownPosition({
-        top: buttonRect.bottom + 5,
-        left: Math.max(5, buttonRect.left - 100),
+    onFill(field, preferTestMode)
+      .catch(error => console.error("Error filling field:", error))
+      .finally(() => {
+        setIsLoading(false);
       });
-      setIsDropdownOpen(true);
-    }
-  }, []);
+  }, [isLoading, onFill, field, preferTestMode]);
 
-  // Handle mouse enter with proper cleanup
-  const handleMouseEnter = useCallback(() => {
-    setIsHovered(true);
-
-    // Clear any existing timeout
-    if (hoverTimeoutRef.current) {
-      clearTimeout(hoverTimeoutRef.current);
-    }
-
-    hoverTimeoutRef.current = setTimeout(() => {
-      if (!isDropdownOpen) {
-        showDropdown();
-      }
-    }, 300);
-  }, [isDropdownOpen, showDropdown]);
-
-  // Handle mouse leave with proper cleanup
-  const handleMouseLeave = useCallback(() => {
-    setIsHovered(false);
-
-    // Clear hover timeout
-    if (hoverTimeoutRef.current) {
-      clearTimeout(hoverTimeoutRef.current);
-      hoverTimeoutRef.current = null;
-    }
-
-    // Delay closing dropdown to allow moving to it
-    setTimeout(() => {
-      if (!document.querySelector(':hover[data-filliny-dropdown="true"]')) {
-        setIsDropdownOpen(false);
-      }
-    }, 200);
-  }, []);
-
-  // Handle field fill with mode selection
-  const handleFieldFill = useCallback(
-    async (useTestMode: boolean) => {
+  // Handle direct mode selection and fill
+  const handleDirectFill = useCallback(
+    (useTestMode: boolean) => {
       if (isLoading) return;
+
+      // Update preference if different
+      if (preferTestMode !== useTestMode) {
+        fieldButtonsStorage.setPreferTestMode(useTestMode);
+      }
 
       setIsLoading(true);
 
-      try {
-        await onFill(field, useTestMode);
-      } catch (error) {
-        console.error("Error filling field:", error);
-      } finally {
-        setIsLoading(false);
-        setIsDropdownOpen(false);
-      }
+      onFill(field, useTestMode)
+        .catch(error => console.error("Error filling field:", error))
+        .finally(() => {
+          setIsLoading(false);
+          setIsOpen(false);
+        });
     },
-    [isLoading, onFill, field],
+    [isLoading, onFill, field, preferTestMode],
+  );
+
+  // Handle hover events
+  const handleMouseEnter = useCallback(() => {
+    if (hoverTimeout) clearTimeout(hoverTimeout);
+    const timeout = setTimeout(() => setIsOpen(true), 300);
+    setHoverTimeout(timeout);
+  }, [hoverTimeout]);
+
+  const handleMouseLeave = useCallback(() => {
+    if (hoverTimeout) clearTimeout(hoverTimeout);
+    const timeout = setTimeout(() => setIsOpen(false), 300);
+    setHoverTimeout(timeout);
+  }, [hoverTimeout]);
+
+  // Cleanup timeout on unmount
+  useEffect(
+    () => () => {
+      if (hoverTimeout) clearTimeout(hoverTimeout);
+    },
+    [hoverTimeout],
   );
 
   return (
-    <>
-      <InlineButton
-        ref={buttonRef}
-        size="icon"
-        variant="default"
-        className={`filliny-fixed filliny-shadow-lg filliny-transition-all filliny-duration-200 hover:filliny-scale-110 filliny-opacity-95 hover:filliny-opacity-100 ${isHovered ? "filliny-scale-110 filliny-opacity-100" : ""} ${isLoading ? "filliny-opacity-70" : ""} `}
-        style={{
-          top: `${buttonPosition.top}px`,
-          left: `${buttonPosition.left}px`,
-          zIndex: 99999,
-        }}
-        onClick={handleButtonClick}
-        onContextMenu={handleContextMenu}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
-        loading={isLoading}
-        disabled={isLoading}
-        title="Fill this field (hover for options)"
-        data-filliny-element="true"
-        type="button"
-        aria-label={`Fill ${field.label || field.type} field`}>
-        {!isLoading && <CheckIcon />}
-      </InlineButton>
+    <div
+      ref={containerRef}
+      className="filliny-absolute filliny-z-[99999]"
+      style={{
+        top: `${buttonPosition.top}px`,
+        left: `${buttonPosition.left}px`,
+      }}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}>
+      {/* Main button group */}
+      <div className="filliny-flex filliny-items-center filliny-rounded-full filliny-shadow-md filliny-overflow-hidden">
+        {/* Main action button - fills with current preference */}
+        <Button
+          ref={buttonRef}
+          size="sm"
+          className={`!filliny-rounded-l-full !filliny-rounded-r-none !filliny-pl-3 !filliny-pr-2 !filliny-py-1 !filliny-bg-primary !filliny-text-primary-foreground hover:!filliny-bg-primary/90 filliny-flex filliny-items-center filliny-gap-1.5`}
+          variant="default"
+          onClick={handleFieldFill}
+          disabled={isLoading}
+          type="button"
+          loading={isLoading}>
+          <Wand2 className="filliny-h-3.5 filliny-w-3.5" />
+        </Button>
 
-      <FieldFillDropdown
-        isOpen={isDropdownOpen}
-        onClose={() => setIsDropdownOpen(false)}
-        field={field}
-        position={dropdownPosition}
-        onSelect={handleFieldFill}
-      />
-    </>
+        {/* Dropdown toggle */}
+        <Button
+          size="sm"
+          className={`!filliny-rounded-l-none !filliny-rounded-r-full !filliny-px-1 !filliny-py-1 !filliny-bg-primary !filliny-text-primary-foreground hover:!filliny-bg-primary/90 filliny-border-l filliny-border-white/20`}
+          variant="default"
+          onClick={() => setIsOpen(!isOpen)}
+          disabled={isLoading}
+          type="button">
+          <ChevronDown className="filliny-h-3 filliny-w-3" />
+        </Button>
+      </div>
+
+      {/* Dropdown menu */}
+      <ShadowDropdownMenu open={isOpen} onOpenChange={setIsOpen}>
+        <ShadowDropdownMenuTrigger className="filliny-hidden" />
+        <ShadowDropdownMenuContent
+          align="center"
+          className="!filliny-bg-primary !filliny-text-white filliny-shadow-lg filliny-rounded-lg filliny-border-none filliny-p-1 filliny-w-48"
+          sideOffset={5}
+          portalContainerId={`field-dropdown-${field.id}`}>
+          <div className="filliny-grid filliny-grid-cols-2 filliny-gap-1 filliny-p-1">
+            {/* Test mode - direct fill */}
+            <Button
+              size="sm"
+              className={`filliny-flex filliny-flex-col filliny-items-center filliny-justify-center filliny-gap-1 filliny-p-2 ${
+                preferTestMode
+                  ? "!filliny-bg-white !filliny-text-primary"
+                  : "!filliny-bg-primary !filliny-text-white !filliny-border !filliny-border-white/20"
+              } hover:!filliny-opacity-90`}
+              onClick={() => handleDirectFill(true)}
+              disabled={isLoading}>
+              <TestTube2 className="filliny-h-4 filliny-w-4" />
+              <span className="filliny-text-xs filliny-font-medium">Test</span>
+            </Button>
+
+            {/* AI mode - direct fill */}
+            <Button
+              size="sm"
+              className={`filliny-flex filliny-flex-col filliny-items-center filliny-justify-center filliny-gap-1 filliny-p-2 ${
+                !preferTestMode
+                  ? "!filliny-bg-white !filliny-text-primary"
+                  : "!filliny-bg-primary !filliny-text-white !filliny-border !filliny-border-white/20"
+              } hover:!filliny-opacity-90`}
+              onClick={() => handleDirectFill(false)}
+              disabled={isLoading}>
+              <CheckCircle className="filliny-h-4 filliny-w-4" />
+              <span className="filliny-text-xs filliny-font-medium">AI</span>
+            </Button>
+          </div>
+
+          <ShadowDropdownMenuSeparator className="!filliny-bg-white/20 filliny-my-1" />
+
+          {/* Set default preference */}
+          <ShadowDropdownMenuRadioGroup
+            value={preferTestMode ? "test" : "ai"}
+            onValueChange={toggleTestMode}
+            className="filliny-p-1">
+            <div className="filliny-text-xs filliny-opacity-80 filliny-px-2 filliny-py-1">Set default mode:</div>
+            <div className="filliny-flex filliny-gap-1">
+              <ShadowDropdownMenuRadioItem
+                value="test"
+                className={`filliny-flex-1 filliny-cursor-pointer filliny-rounded-md filliny-py-1 filliny-px-2 filliny-text-xs filliny-text-center hover:!filliny-bg-white/10 ${preferTestMode ? "!filliny-bg-white/20" : ""} `}>
+                Test Default
+              </ShadowDropdownMenuRadioItem>
+
+              <ShadowDropdownMenuRadioItem
+                value="ai"
+                className={`filliny-flex-1 filliny-cursor-pointer filliny-rounded-md filliny-py-1 filliny-px-2 filliny-text-xs filliny-text-center hover:!filliny-bg-white/10 ${!preferTestMode ? "!filliny-bg-white/20" : ""} `}>
+                AI Default
+              </ShadowDropdownMenuRadioItem>
+            </div>
+          </ShadowDropdownMenuRadioGroup>
+        </ShadowDropdownMenuContent>
+      </ShadowDropdownMenu>
+    </div>
   );
 };

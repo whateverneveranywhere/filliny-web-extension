@@ -146,10 +146,11 @@ export const FieldFillManager: React.FC = () => {
       console.log(`🎯 Filling field: ${field.id} (${field.type}) in ${useTestMode ? "test" : "AI"} mode`);
 
       if (useTestMode) {
-        // Import the field fill handling logic dynamically
-        const { handleFieldFill: handleSingleFieldFill } = await import("../handleFieldFill");
-        await handleSingleFieldFill(field);
+        // Use the dedicated test mode fill function
+        const { handleTestFieldFill } = await import("../handleTestFieldFill");
+        await handleTestFieldFill(field);
       } else {
+        // For AI mode, use the regular handleFieldFill
         await handleFieldFill(field);
       }
     } catch (error) {

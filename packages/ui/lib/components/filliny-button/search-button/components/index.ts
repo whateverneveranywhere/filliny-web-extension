@@ -1,6 +1,5 @@
 // New unified shadow DOM components
 export { FieldFillButton } from "./FieldFillButton";
-export { FieldFillDropdown } from "./FieldFillDropdown";
 export { FieldFillManager } from "./FieldFillManager";
 export {
   FormsOverlayManager,

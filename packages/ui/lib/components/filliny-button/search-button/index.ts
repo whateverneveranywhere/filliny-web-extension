@@ -6,8 +6,12 @@ export { initializeSearchButton, cleanupSearchButton } from "./main";
 
 // Core functionality
 export { handleFieldFill } from "./handleFieldFill";
+export { handleTestFieldFill } from "./handleTestFieldFill";
 export { handleFormClick } from "./handleFormClick";
 export { highlightForms } from "./highlightForms";
+
+// Test mode helpers
+export * from "./testModeHelpers";
 
 // Field detection and management
 export { detectFormLikeContainers } from "./detectionHelpers";

@@ -1,163 +1,12 @@
 import { processChunks, updateFormFields } from "./fieldUpdaterHelpers";
 import { highlightForms } from "./highlightForms";
 import { disableOtherButtons, resetOverlays, showLoadingIndicator } from "./overlayUtils";
+import { prepareFieldForTestMode, showTestModeIndicator } from "./testModeHelpers";
 import { unifiedFieldRegistry } from "./unifiedFieldDetection";
 import { aiFillService, getMatchingWebsite } from "@extension/shared";
 import { profileStrorage } from "@extension/storage";
 import type { Field, FieldType } from "@extension/shared";
 import type { DTOProfileFillingForm } from "@extension/storage";
-
-/**
- * Generate mock values for field testing
- */
-const getMockValueForFieldType = (type: FieldType, field: Field): string | string[] => {
-  const now = new Date();
-
-  switch (type) {
-    // Basic input types
-    case "text":
-      return "Sample text input";
-    case "password":
-      return "P@ssw0rd123";
-    case "email":
-      return "test@example.com";
-    case "tel":
-      return "+1-555-0123";
-    case "url":
-      return "https://example.com";
-    case "search":
-      return "search query";
-
-    // Date and time inputs
-    case "date":
-      return now.toISOString().split("T")[0];
-    case "datetime-local":
-      return now.toISOString().slice(0, 16);
-    case "month":
-      return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-    case "week": {
-      const weekNum = Math.ceil((now.getDate() + 6) / 7);
-      return `${now.getFullYear()}-W${String(weekNum).padStart(2, "0")}`;
-    }
-    case "time":
-      return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-
-    // Numeric inputs
-    case "number":
-    case "range": {
-      const min = field.validation?.min ?? 0;
-      const max = field.validation?.max ?? 100;
-      const step = field.validation?.step ?? 1;
-      return String(Math.floor((max - min) / step) * step + min);
-    }
-
-    // Color input
-    case "color":
-      return "#FF0000";
-
-    // Complex input types
-    case "file":
-      return "https://example.com/sample.pdf";
-    case "checkbox": {
-      // If this is a checkbox group, return array of values
-      if (field.options && field.options.length > 1) {
-        // Select 1-2 random options for checkbox groups
-        const numToSelect = Math.min(Math.ceil(Math.random() * 2), field.options.length);
-        const shuffled = [...field.options].sort(() => 0.5 - Math.random());
-        return shuffled.slice(0, numToSelect).map(opt => opt.value);
-      }
-
-      // For single checkbox, return random for test mode
-      return Math.random() > 0.5 ? "true" : "false";
-    }
-    case "radio": {
-      if (field.options?.length) {
-        // For radio groups, prefer non-placeholder options
-        const nonPlaceholders = field.options.filter(opt => {
-          const text = opt.text.toLowerCase();
-          return !text.includes("select") && !text.includes("choose") && !text.includes("pick") && text !== "";
-        });
-
-        if (nonPlaceholders.length > 0) {
-          // Pick a random valid option for better testing variety
-          const randomIndex = Math.floor(Math.random() * nonPlaceholders.length);
-          return nonPlaceholders[randomIndex].value;
-        }
-
-        // Fallback to first option
-        return field.options[0].value;
-      }
-      return "true";
-    }
-    case "select": {
-      if (!field.options?.length) return "";
-
-      // Check for a select element to examine options and determine if multi-select
-      const element = document.querySelector<HTMLElement>(`[data-filliny-id="${field.id}"]`);
-      const isMultiple = element instanceof HTMLSelectElement ? element.multiple : false;
-
-      // Log available options for debugging
-      if (element instanceof HTMLSelectElement) {
-        console.log(
-          `Test mode: Select options for ${field.id} (multiple: ${isMultiple}):`,
-          Array.from(element.options).map(opt => ({
-            value: opt.value,
-            text: opt.text,
-            disabled: opt.disabled,
-          })),
-        );
-      }
-
-      // Skip placeholder options
-      const nonPlaceholders = field.options.filter(opt => {
-        const text = opt.text.toLowerCase();
-        return (
-          !text.includes("select") &&
-          !text.includes("choose") &&
-          !text.includes("pick") &&
-          text !== "" &&
-          opt.value !== ""
-        );
-      });
-
-      if (nonPlaceholders.length > 0) {
-        if (isMultiple) {
-          // For multi-select, return array of 1-2 values
-          const numToSelect = Math.min(1 + Math.floor(Math.random() * 2), nonPlaceholders.length);
-          const shuffled = [...nonPlaceholders].sort(() => 0.5 - Math.random());
-          const selectedValues = shuffled.slice(0, numToSelect).map(opt => opt.value);
-          console.log(`Test mode: Selected multi-select values for ${field.id}:`, selectedValues);
-          return selectedValues;
-        } else {
-          // For single select, pick a random valid option
-          const selectedIndex = Math.floor(Math.random() * nonPlaceholders.length);
-          const selectedValue = nonPlaceholders[selectedIndex].value;
-          console.log(`Test mode: Selected single option for ${field.id}: ${selectedValue}`);
-          return selectedValue;
-        }
-      }
-
-      // Fallback
-      if (field.options.length > 0) {
-        const fallbackValue = isMultiple ? [field.options[0].value] : field.options[0].value;
-        console.log(`Test mode: Using fallback option for ${field.id}:`, fallbackValue);
-        return fallbackValue;
-      }
-
-      // Last resort fallback
-      return isMultiple ? ["option1"] : "option1";
-    }
-    case "textarea":
-      // Provide a longer multi-line sample for textareas to ensure they visibly update
-      return `This is a sample textarea content for testing purposes.\nThis form field supports multiple lines of text.\nFeel free to edit this example text.`;
-    case "button":
-      return "Click me";
-    case "fieldset":
-      return "";
-    default:
-      return "Sample test value";
-  }
-};
 
 /**
  * Handle form click event
@@ -321,45 +170,16 @@ export const handleFormClick = async (
       try {
         console.log("Running in test mode with example values");
 
-        // Create a visual indicator for test mode
-        const testModeIndicator = document.createElement("div");
-        testModeIndicator.textContent = "Test Mode Active";
-        testModeIndicator.style.cssText =
-          "position: fixed; top: 20px; right: 20px; background: #4f46e5; color: white; padding: 8px 16px; border-radius: 4px; z-index: 10000; font-weight: bold;";
-        document.body.appendChild(testModeIndicator);
+        // Show test mode indicator using shared utility
+        showTestModeIndicator();
 
-        setTimeout(() => {
-          try {
-            testModeIndicator.remove();
-          } catch (removeError) {
-            console.debug("Error removing test mode indicator:", removeError);
-          }
-        }, 5000);
+        // Use the shared utility to prepare fields with test values
+        const fieldsWithTestValues = fields.map(field => prepareFieldForTestMode(field));
 
-        // Use mock data for test mode - now with testValue properly set
-        const mockResponse = fields.map(field => {
-          try {
-            const mockValue = getMockValueForFieldType(field.type, field);
-            return {
-              ...field,
-              // Set both value and testValue to ensure consistent behavior
-              value: mockValue,
-              testValue: mockValue,
-            };
-          } catch (mockError) {
-            console.warn("Error generating mock value for field:", field.id, mockError);
-            return {
-              ...field,
-              value: "test",
-              testValue: "test",
-            };
-          }
-        });
-
-        // Log the mock values for debugging
+        // Log the test values for debugging
         console.log(
-          "Test mode: Mock values generated:",
-          mockResponse.map(f => ({
+          "Test mode: Values generated:",
+          fieldsWithTestValues.map(f => ({
             id: f.id,
             type: f.type,
             value: f.value,
@@ -367,7 +187,7 @@ export const handleFormClick = async (
         );
 
         // Apply visual changes sequentially to simulate streaming updates
-        await simulateStreamingForTestMode(mockResponse);
+        await simulateStreamingForTestMode(fieldsWithTestValues);
         return;
       } catch (testModeError) {
         console.error("Error in test mode:", testModeError);
