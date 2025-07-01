@@ -6,7 +6,6 @@ export { initializeSearchButton, cleanupSearchButton } from "./main";
 
 // Core functionality
 export { handleFieldFill } from "./handleFieldFill";
-export { handleTestFieldFill } from "./handleTestFieldFill";
 export { handleFormClick } from "./handleFormClick";
 export { highlightForms } from "./highlightForms";
 

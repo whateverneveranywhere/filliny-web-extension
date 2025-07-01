@@ -1,3 +1,4 @@
+import { updateFormFields } from "./fieldUpdaterHelpers";
 import type { Field, FieldType } from "@extension/shared";
 
 /**
@@ -231,6 +232,37 @@ export const prepareFieldForTestMode = (field: Field): Field => {
     value: testValue,
     testValue: testValue,
   };
+};
+
+/**
+ * Main function to handle test mode filling for one or more fields
+ */
+export const runTestModeFill = async (fields: Field[]): Promise<void> => {
+  if (!fields.length) {
+    console.warn("No fields provided for test mode fill.");
+    return;
+  }
+
+  console.log(`Starting test mode fill for ${fields.length} fields.`);
+  showTestModeIndicator();
+
+  // Prepare all fields with test values
+  const fieldsWithTestValues = fields.map(prepareFieldForTestMode);
+
+  // Log the generated values for debugging
+  console.log(
+    "Test mode: Values generated:",
+    fieldsWithTestValues.map(f => ({ id: f.id, type: f.type, value: f.value })),
+  );
+
+  try {
+    // Update the fields on the form
+    await updateFormFields(fieldsWithTestValues, true);
+    console.log("Test mode fill completed successfully.");
+  } catch (error) {
+    console.error("Error during test mode fill:", error);
+    alert("Test mode failed to update fields. See console for details.");
+  }
 };
 
 /**

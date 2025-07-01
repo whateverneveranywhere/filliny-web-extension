@@ -1,11 +1,12 @@
+import { getAllFormContainersFromRegistry } from "./detectionHelpers";
 import { processChunks, updateFormFields } from "./fieldUpdaterHelpers";
 import { highlightForms } from "./highlightForms";
 import { disableOtherButtons, resetOverlays, showLoadingIndicator } from "./overlayUtils";
-import { prepareFieldForTestMode, showTestModeIndicator } from "./testModeHelpers";
+import { runTestModeFill } from "./testModeHelpers";
 import { unifiedFieldRegistry } from "./unifiedFieldDetection";
 import { aiFillService, getMatchingWebsite } from "@extension/shared";
 import { profileStrorage } from "@extension/storage";
-import type { Field, FieldType } from "@extension/shared";
+import type { Field } from "@extension/shared";
 import type { DTOProfileFillingForm } from "@extension/storage";
 
 /**
@@ -36,45 +37,14 @@ export const handleFormClick = async (
 
   const totalStartTime = performance.now();
 
-  // For unified overlay approach, we need to find ALL form containers
-  let formContainers: HTMLElement[] = [];
-
-  try {
-    // If we have a unified form, find all registered containers
-    if (formId === "unified-form") {
-      formContainers = findAllFormContainers();
-    } else {
-      // Fallback to single form container for backward compatibility
-      const singleContainer = findFormContainer(formId);
-      if (singleContainer) {
-        formContainers = [singleContainer];
-      }
-    }
-  } catch (findError) {
-    console.warn("Error finding form containers:", findError);
-  }
-
-  // Fallback: try to find any form-like containers
-  if (formContainers.length === 0) {
-    try {
-      const fallbackSelectors = ["form", "[data-filliny-form-container]", '[role="form"]', "[data-form-id]"];
-      for (const selector of fallbackSelectors) {
-        const fallbackContainers = Array.from(document.querySelectorAll<HTMLElement>(selector));
-        if (fallbackContainers.length > 0) {
-          console.log(`Using fallback containers: ${selector} (${fallbackContainers.length} found)`);
-          formContainers = fallbackContainers;
-          break;
-        }
-      }
-    } catch (fallbackError) {
-      console.error("Fallback container search also failed:", fallbackError);
-    }
-  }
+  // Get all form containers directly from the unified registry
+  const formContainers = getAllFormContainersFromRegistry();
 
   if (formContainers.length === 0) {
     alert("No forms found. Please try again.");
     try {
       resetOverlays();
+      // Re-run detection if no containers were found in the registry
       highlightForms({ visionOnly: false });
     } catch (resetError) {
       console.error("Error resetting overlays:", resetError);
@@ -83,7 +53,7 @@ export const handleFormClick = async (
   }
 
   console.log(
-    `🎯 Processing ${formContainers.length} form containers:`,
+    `🎯 Processing ${formContainers.length} form containers from registry:`,
     formContainers.map(c => `${c.tagName}${c.className ? "." + c.className : ""}`),
   );
 
@@ -97,103 +67,24 @@ export const handleFormClick = async (
   try {
     const startTime = performance.now();
 
-    // Get fields from all form containers
-    const allFields: Field[] = [];
-
-    // Process each container to collect all fields
-    for (let containerIndex = 0; containerIndex < formContainers.length; containerIndex++) {
-      const formContainer = formContainers[containerIndex];
-      console.log(`Processing container ${containerIndex + 1}/${formContainers.length}: ${formContainer.tagName}`);
-
-      // Get fields from unified registry instead of re-detecting
-      // First check if this container is already registered
-      const containerId = findContainerIdForFormContainer(formContainer);
-      let containerFields: Field[] = [];
-
-      if (containerId) {
-        try {
-          containerFields = unifiedFieldRegistry.getAllFields(containerId);
-          console.log(`Form Click: Using cached fields from registry for container ${containerId}`);
-        } catch (registryError) {
-          console.warn("Error getting fields from registry:", registryError);
-        }
-      }
-
-      if (containerFields.length === 0) {
-        // Fallback: register the container if not found or if registry failed
-        console.log("Form Click: Container not in registry or empty, registering now...");
-        try {
-          const newContainerId = `form-click-${Date.now()}-${containerIndex}`;
-          await unifiedFieldRegistry.registerContainer(formContainer, newContainerId);
-          containerFields = unifiedFieldRegistry.getAllFields(newContainerId);
-        } catch (registrationError) {
-          console.error("Error registering container:", registrationError);
-
-          // Last resort: use basic field detection
-          try {
-            console.log("Using basic fallback field detection...");
-            const basicFields = detectFormFieldsInElement(formContainer);
-            // Convert to Field objects (simplified)
-            containerFields = basicFields.map((element, index) => ({
-              id: element.id || `fallback-field-${containerIndex}-${index}`,
-              type: element.tagName.toLowerCase() as FieldType,
-              label: element.getAttribute("aria-label") || element.getAttribute("placeholder") || "",
-              value: "",
-              element: element,
-            }));
-          } catch (basicDetectionError) {
-            console.error("Even basic field detection failed:", basicDetectionError);
-            continue; // Skip this container and try the next one
-          }
-        }
-      }
-
-      // Add container fields to the total collection
-      allFields.push(...containerFields);
-    }
-
-    // Use all collected fields
-    const fields = allFields;
+    // Get all fields from the unified registry at once
+    const fields = unifiedFieldRegistry.getAllFields();
 
     if (fields.length === 0) {
       alert("Unable to detect form fields in any container. Please refresh the page and try again.");
       return;
     }
 
-    console.log("Form Click: Detected fields:", fields);
+    console.log("Form Click: Detected fields from registry:", fields.length);
     console.log(
-      `%c⏱ Detection took: ${((performance.now() - startTime) / 1000).toFixed(2)}s`,
+      `%c⏱ Field retrieval from registry took: ${((performance.now() - startTime) / 1000).toFixed(2)}s`,
       "background: #059669; color: white; padding: 4px 8px; border-radius: 4px; font-size: 14px; font-weight: bold;",
     );
 
     if (testMode) {
-      try {
-        console.log("Running in test mode with example values");
-
-        // Show test mode indicator using shared utility
-        showTestModeIndicator();
-
-        // Use the shared utility to prepare fields with test values
-        const fieldsWithTestValues = fields.map(field => prepareFieldForTestMode(field));
-
-        // Log the test values for debugging
-        console.log(
-          "Test mode: Values generated:",
-          fieldsWithTestValues.map(f => ({
-            id: f.id,
-            type: f.type,
-            value: f.value,
-          })),
-        );
-
-        // Apply visual changes sequentially to simulate streaming updates
-        await simulateStreamingForTestMode(fieldsWithTestValues);
-        return;
-      } catch (testModeError) {
-        console.error("Error in test mode:", testModeError);
-        alert("Test mode failed. Please try again.");
-        return;
-      }
+      // Use the new centralized test mode handler
+      await runTestModeFill(fields);
+      return;
     }
 
     // Only execute API call logic if not in test mode
@@ -269,6 +160,8 @@ export const handleFormClick = async (
         "background: #059669; color: white; padding: 4px 8px; border-radius: 4px; font-size: 14px; font-weight: bold;",
       );
       resetOverlays();
+      // Notify the field manager to re-detect everything to prevent stale state
+      document.dispatchEvent(new CustomEvent("filliny:bulkFillComplete"));
     } catch (finallyError) {
       console.error("Error in finally block:", finallyError);
     }

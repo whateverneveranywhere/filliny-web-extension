@@ -7,6 +7,7 @@ export class UnifiedFieldRegistry {
   private detectedFields: Map<string, DetectedFieldInfo> = new Map();
   private containers: Map<string, HTMLElement> = new Map();
   private groupedFields: Map<string, GroupedFieldInfo> = new Map();
+  private processedElements: Map<HTMLElement, string> = new Map();
 
   static getInstance(): UnifiedFieldRegistry {
     if (!UnifiedFieldRegistry.instance) {
@@ -20,6 +21,7 @@ export class UnifiedFieldRegistry {
     this.detectedFields.clear();
     this.containers.clear();
     this.groupedFields.clear();
+    this.processedElements.clear();
   }
 
   // Register a container and its fields
@@ -37,16 +39,27 @@ export class UnifiedFieldRegistry {
     const groupedFields: GroupedFieldInfo[] = [];
 
     for (const field of fields) {
+      const element = this.findFieldElement(container, field);
+
+      // Skip if element not found or already processed in another container
+      if (!element || this.processedElements.has(element)) {
+        if (element) {
+          console.log(`UnifiedFieldRegistry: Skipping already processed element for field ${field.id}`);
+        }
+        continue;
+      }
+
       const fieldInfo: DetectedFieldInfo = {
         field,
         container,
         containerId,
-        element: this.findFieldElement(container, field),
+        element,
         isGrouped: this.isGroupedField(field),
         groupId: this.getGroupId(field),
       };
 
       this.detectedFields.set(field.id, fieldInfo);
+      this.processedElements.set(element, field.id);
 
       if (fieldInfo.isGrouped) {
         this.handleGroupedField(fieldInfo, groupedFields);
@@ -94,6 +107,11 @@ export class UnifiedFieldRegistry {
   getAllFields(containerId?: string): Field[] {
     const fields = Array.from(this.detectedFields.values());
     return fields.filter(info => !containerId || info.containerId === containerId).map(info => info.field);
+  }
+
+  // Get all registered container elements
+  getRegisteredContainers(): HTMLElement[] {
+    return Array.from(this.containers.values());
   }
 
   private findFieldElement(container: HTMLElement, field: Field): HTMLElement | null {

@@ -112,4 +112,3 @@ export default SearchButtonMain;
 export { highlightForms } from "./highlightForms";
 export { handleFormClick } from "./handleFormClick";
 export { handleFieldFill } from "./index";
-export { handleTestFieldFill } from "./handleTestFieldFill";

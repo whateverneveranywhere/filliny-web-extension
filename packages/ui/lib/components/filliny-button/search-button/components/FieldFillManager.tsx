@@ -1,6 +1,7 @@
 import { FieldFillButton } from "./FieldFillButton";
 import { handleFieldFill } from "../";
 import { detectFormLikeContainers } from "../detectionHelpers";
+import { runTestModeFill } from "../testModeHelpers";
 import { unifiedFieldRegistry } from "../unifiedFieldDetection";
 import { useEffect, useState, useCallback, useRef } from "react";
 import type { FieldButtonData } from "../unifiedFieldDetection";
@@ -9,8 +10,24 @@ import type React from "react";
 
 const MAX_DETECT_ATTEMPTS = 5;
 const RETRY_DELAY = 1000;
-const MUTATION_DEBOUNCE_DELAY = 500;
-const LATE_RETRY_DELAY = 2000;
+const MUTATION_DEBOUNCE_DELAY = 1000;
+const LATE_RETRY_DELAY = 5000;
+
+const isFormField = (node: Node): boolean => {
+  if (!(node instanceof HTMLElement)) return false;
+
+  return (
+    node instanceof HTMLInputElement ||
+    node instanceof HTMLSelectElement ||
+    node instanceof HTMLTextAreaElement ||
+    node.getAttribute("role") === "textbox" ||
+    node.getAttribute("role") === "combobox" ||
+    node.getAttribute("role") === "checkbox" ||
+    node.getAttribute("role") === "radio" ||
+    node.getAttribute("role") === "switch" ||
+    node.hasAttribute("contenteditable")
+  );
+};
 
 export const FieldFillManager: React.FC = () => {
   const [fieldButtons, setFieldButtons] = useState<FieldButtonData[]>([]);
@@ -118,8 +135,15 @@ export const FieldFillManager: React.FC = () => {
         }
       }
 
-      // Filter buttons to only include visible and interactive elements
-      const visibleFieldButtons = allFieldButtons.filter(
+      // Filter buttons to only include visible and interactive elements, and de-duplicate
+      const uniqueButtons = new Map<string, FieldButtonData>();
+      allFieldButtons.forEach(buttonData => {
+        if (!uniqueButtons.has(buttonData.field.id)) {
+          uniqueButtons.set(buttonData.field.id, buttonData);
+        }
+      });
+
+      const visibleFieldButtons = Array.from(uniqueButtons.values()).filter(
         buttonData => buttonData.element && isElementVisibleAndInteractive(buttonData.element),
       );
 
@@ -140,15 +164,84 @@ export const FieldFillManager: React.FC = () => {
     }
   }, [isElementVisibleAndInteractive]);
 
+  // Initialize detection on mount
+  useEffect(() => {
+    // Debounced field detection to avoid excessive re-renders
+    const debouncedDetectFields = debounce(detectAllFields, MUTATION_DEBOUNCE_DELAY);
+
+    // Initial detection run
+    if (!isInitialDetectionDone) {
+      const handleDOMReady = () => {
+        detectAllFields().then(() => {
+          setIsInitialDetectionDone(true);
+        });
+      };
+
+      if (document.readyState === "complete" || document.readyState === "interactive") {
+        handleDOMReady();
+      } else {
+        window.addEventListener("DOMContentLoaded", handleDOMReady, { once: true });
+      }
+    }
+
+    // If initial detection is done, set up observers
+    if (!isInitialDetectionDone) return;
+
+    const observer = new MutationObserver(mutations => {
+      // If filling is in progress, ignore mutations to prevent re-renders
+      if (document.body.dataset.fillinyUpdating === "true") {
+        console.log("MutationObserver: Skipping detection, update in progress.");
+        return;
+      }
+
+      // Check if mutations are relevant
+      const isRelevantMutation = mutations.some(mutation => {
+        if (mutation.type === "attributes") {
+          return mutation.attributeName !== "data-filliny-id" && mutation.attributeName !== "style";
+        }
+        if (mutation.type === "childList") {
+          return (
+            Array.from(mutation.addedNodes).some(isFormField) || Array.from(mutation.removedNodes).some(isFormField)
+          );
+        }
+        return false;
+      });
+
+      if (isRelevantMutation) {
+        debouncedDetectFields();
+      }
+    });
+
+    // Observe changes in the document body
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["style", "class", "disabled", "readonly", "type"],
+    });
+
+    // Set up an event listener to re-run detection after a bulk fill
+    const handleBulkFillComplete = () => {
+      console.log("🚀 FieldFillManager: Bulk fill complete, re-running detection...");
+      debouncedDetectFields();
+    };
+
+    document.addEventListener("filliny:bulkFillComplete", handleBulkFillComplete);
+
+    return () => {
+      observer.disconnect();
+      document.removeEventListener("filliny:bulkFillComplete", handleBulkFillComplete);
+    };
+  }, [detectAllFields, isInitialDetectionDone]);
+
   // Handle field fill
   const handleFillField = useCallback(async (field: Field, useTestMode: boolean = false) => {
     try {
       console.log(`🎯 Filling field: ${field.id} (${field.type}) in ${useTestMode ? "test" : "AI"} mode`);
 
       if (useTestMode) {
-        // Use the dedicated test mode fill function
-        const { handleTestFieldFill } = await import("../handleTestFieldFill");
-        await handleTestFieldFill(field);
+        // Use the new centralized test mode handler for a single field
+        await runTestModeFill([field]);
       } else {
         // For AI mode, use the regular handleFieldFill
         await handleFieldFill(field);
@@ -157,113 +250,6 @@ export const FieldFillManager: React.FC = () => {
       console.error(`❌ Error filling field ${field.id}:`, error);
     }
   }, []);
-
-  // Initialize detection on mount
-  useEffect(() => {
-    const handleDOMReady = () => {
-      detectAllFields().then(() => {
-        console.log("✅ Initial comprehensive field detection complete");
-      });
-    };
-
-    if (document.readyState === "complete" || document.readyState === "interactive") {
-      handleDOMReady();
-    } else {
-      window.addEventListener("DOMContentLoaded", handleDOMReady);
-      window.addEventListener("load", handleDOMReady);
-
-      return () => {
-        window.removeEventListener("DOMContentLoaded", handleDOMReady);
-        window.removeEventListener("load", handleDOMReady);
-      };
-    }
-
-    return () => {};
-  }, [detectAllFields]);
-
-  // Retry detection after delay
-  useEffect(() => {
-    const retryTimer = setTimeout(() => {
-      if (fieldButtons.length === 0) {
-        console.log("🔄 Retrying field detection after delay");
-        detectAllFields();
-      }
-    }, LATE_RETRY_DELAY);
-
-    return () => clearTimeout(retryTimer);
-  }, [detectAllFields, fieldButtons.length]);
-
-  // Set up mutation observer after initial detection
-  useEffect(() => {
-    if (!isInitialDetectionDone) return;
-
-    const debouncedDetectFields = debounce(detectAllFields, MUTATION_DEBOUNCE_DELAY);
-
-    const isFormField = (node: Node): boolean => {
-      if (!(node instanceof HTMLElement)) return false;
-
-      return (
-        node instanceof HTMLInputElement ||
-        node instanceof HTMLSelectElement ||
-        node instanceof HTMLTextAreaElement ||
-        node.getAttribute("role") === "textbox" ||
-        node.getAttribute("role") === "combobox" ||
-        node.getAttribute("role") === "checkbox" ||
-        node.getAttribute("role") === "radio" ||
-        node.getAttribute("role") === "switch" ||
-        node.hasAttribute("contenteditable")
-      );
-    };
-
-    const shouldIgnoreElement = (node: Node): boolean => {
-      if (!(node instanceof HTMLElement)) return true;
-      if (node.hasAttribute("data-filliny-element")) return true;
-      if (["SCRIPT", "STYLE", "META", "LINK", "TITLE"].includes(node.tagName)) return true;
-      return false;
-    };
-
-    const observer = new MutationObserver(mutations => {
-      let shouldRedetect = false;
-
-      mutations.forEach(mutation => {
-        mutation.addedNodes.forEach(node => {
-          if (shouldIgnoreElement(node)) return;
-
-          if (isFormField(node)) {
-            shouldRedetect = true;
-          } else if (node instanceof HTMLElement) {
-            const childFields = node.querySelectorAll(
-              "input, select, textarea, [role='textbox'], [role='combobox'], [role='checkbox'], [role='radio']",
-            );
-            if (childFields.length > 0) {
-              shouldRedetect = true;
-            }
-          }
-        });
-
-        mutation.removedNodes.forEach(node => {
-          if (shouldIgnoreElement(node)) return;
-          if (isFormField(node) || (node instanceof HTMLElement && node.querySelector("input, select, textarea"))) {
-            shouldRedetect = true;
-          }
-        });
-      });
-
-      if (shouldRedetect) {
-        console.log("🔄 DOM changes detected, re-detecting fields...");
-        debouncedDetectFields();
-      }
-    });
-
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true,
-    });
-
-    return () => {
-      observer.disconnect();
-    };
-  }, [isInitialDetectionDone, detectAllFields, debounce]);
 
   // Clean up when component unmounts
   useEffect(

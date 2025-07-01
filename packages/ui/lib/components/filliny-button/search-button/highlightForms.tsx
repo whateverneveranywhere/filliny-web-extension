@@ -60,6 +60,10 @@ export const highlightForms = async ({
     for (const form of highlightedForms) {
       await removeFormHighlights(form as HTMLElement);
     }
+
+    // Remove all per-field buttons to prevent stale references
+    const fieldButtonContainers = document.querySelectorAll(".filliny-field-button-container");
+    fieldButtonContainers.forEach(container => container.remove());
   };
 
   // Clean up existing overlays and highlights

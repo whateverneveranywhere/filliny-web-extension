@@ -3,6 +3,7 @@ import { updateFileInput } from "./field-types/file";
 import { updateSelect } from "./field-types/select";
 import { updateTextField, updateContentEditable } from "./field-types/text";
 import { addVisualFeedback, getStringValue } from "./field-types/utils";
+import { unifiedFieldRegistry } from "./unifiedFieldDetection.js";
 import type { Field } from "@extension/shared";
 
 // Core utilities for field updates
@@ -341,6 +342,7 @@ const updateAriaElement = async (element: HTMLElement, field: Field, valueToUse:
  * Update multiple form fields with their values
  */
 export const updateFormFields = async (fields: Field[], testMode = false): Promise<void> => {
+  document.body.setAttribute("data-filliny-updating", "true");
   console.log(`Updating ${fields.length} form fields (testMode: ${testMode})`);
   const startTime = performance.now();
 
@@ -375,6 +377,8 @@ export const updateFormFields = async (fields: Field[], testMode = false): Promi
   } catch (error) {
     console.error("Error in updateFormFields:", error);
     throw error;
+  } finally {
+    setTimeout(() => document.body.removeAttribute("data-filliny-updating"), 100);
   }
 };
 
@@ -383,60 +387,32 @@ export const updateFormFields = async (fields: Field[], testMode = false): Promi
  */
 const updateFieldWithGroupHandling = async (field: Field, testMode: boolean): Promise<boolean> => {
   try {
-    // Enhanced group detection - check if this is a grouped field
-    const isGroupedField =
-      field.type === "radio" || // All radio fields are grouped
-      (field.type === "checkbox" && field.options && field.options.length > 1);
+    // Get the original field info and element from the registry
+    const originalFieldInfo = unifiedFieldRegistry.getField(field.id);
 
-    if (isGroupedField) {
-      console.log(`🔍 Updating grouped field: ${field.id} (${field.type})`);
-      return await updateGroupedField(field, testMode);
-    } else {
-      // Handle individual fields normally
-      console.log(`🔍 Updating individual field: ${field.id} (${field.type})`);
-
-      // Try multiple strategies to find the element
-      let element = document.querySelector<HTMLElement>(`[data-filliny-id="${field.id}"]`);
-
-      // Enhanced element finding strategies
-      if (!element && field.uniqueSelectors?.length) {
-        for (const selector of field.uniqueSelectors) {
-          try {
-            element = document.querySelector<HTMLElement>(selector);
-            if (element) {
-              console.log(`✅ Found element using unique selector: ${selector}`);
-              break;
-            }
-          } catch (e) {
-            console.debug(`Selector failed: ${selector}`, e);
-          }
-        }
-      }
-
-      if (!element && field.name) {
-        element = document.querySelector<HTMLElement>(`[name="${field.name}"]`);
-        if (element) {
-          console.log(`✅ Found element using name attribute: ${field.name}`);
-        }
-      }
-
-      if (!element && field.id && field.id !== field.name) {
-        try {
-          element = document.getElementById(field.id) as HTMLElement;
-          if (element) {
-            console.log(`✅ Found element using ID: ${field.id}`);
-          }
-        } catch (e) {
-          console.debug(`ID lookup failed: ${field.id}`, e);
-        }
-      }
-
+    if (!originalFieldInfo?.element) {
+      console.warn(`❌ Element not found in registry for field ${field.id}. Attempting DOM query.`);
+      const element = document.querySelector(`[data-filliny-id="${field.id}"]`) as HTMLElement;
       if (element) {
         return await updateFieldWithRetry(element, field, testMode);
-      } else {
-        console.warn(`❌ Element not found for field ${field.id} after all strategies`);
-        return false;
       }
+      console.warn(`❌ Element not found in DOM for field ${field.id}. Cannot update.`);
+      return false;
+    }
+
+    // Use the definitive element from the registry
+    const element = originalFieldInfo.element;
+    // Create an updated field object that includes the new value and original metadata
+    const updatedField = { ...originalFieldInfo.field, ...field };
+
+    if (originalFieldInfo.isGrouped) {
+      console.log(`🔍 Updating grouped field: ${updatedField.id} (${updatedField.type})`);
+      // Pass the merged field data to the group handler
+      return await updateGroupedField(updatedField, testMode);
+    } else {
+      // Handle individual fields normally
+      console.log(`🔍 Updating individual field: ${updatedField.id} (${updatedField.type})`);
+      return await updateFieldWithRetry(element, updatedField, testMode);
     }
   } catch (error) {
     console.error(`❌ Error updating field ${field.id}:`, error);
@@ -456,41 +432,11 @@ const updateGroupedField = async (field: Field, testMode: boolean): Promise<bool
     } else if (field.type === "checkbox" && field.options && field.options.length > 1) {
       return await updateCheckboxGroup(field, fieldValue, testMode);
     } else {
-      // Single checkbox - handle normally with enhanced element finding
-      console.log(`🔍 Updating single checkbox: ${field.id}`);
-
-      let element = document.querySelector<HTMLElement>(`[data-filliny-id="${field.id}"]`);
-
-      // Enhanced fallback strategies for better element finding
-      if (!element) {
-        const strategies = [
-          () => (field.uniqueSelectors?.length ? document.querySelector<HTMLElement>(field.uniqueSelectors[0]) : null),
-          () => (field.name ? document.querySelector<HTMLElement>(`[name="${field.name}"]`) : null),
-          () => (field.id ? (document.getElementById(field.id) as HTMLElement) : null),
-          () => {
-            // Look for checkbox inputs with matching labels
-            const checkboxes = Array.from(document.querySelectorAll('input[type="checkbox"]'));
-            return (
-              (checkboxes.find(cb => {
-                const label = cb.closest("label") || document.querySelector(`label[for="${cb.id}"]`);
-                return label && field.label && label.textContent?.includes(field.label);
-              }) as HTMLElement) || null
-            );
-          },
-        ];
-
-        for (const strategy of strategies) {
-          try {
-            element = strategy();
-            if (element) {
-              console.log(`✅ Found single checkbox element using fallback strategy`);
-              break;
-            }
-          } catch (e) {
-            console.debug(`Fallback strategy failed:`, e);
-          }
-        }
-      }
+      // This case handles single checkboxes that might be misclassified as grouped.
+      // We now fetch the element directly from the registry.
+      console.log(`🔍 Updating single checkbox (as grouped fallback): ${field.id}`);
+      const fieldInfo = unifiedFieldRegistry.getField(field.id);
+      const element = fieldInfo?.element;
 
       if (element) {
         return await updateFieldWithRetry(element, field, testMode);

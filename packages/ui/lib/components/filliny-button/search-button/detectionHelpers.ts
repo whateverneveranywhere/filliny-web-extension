@@ -196,6 +196,12 @@ interface FormCandidate {
 }
 
 /**
+ * Gets all form containers from the unified registry.
+ * This avoids re-running detection and ensures consistency.
+ */
+export const getAllFormContainersFromRegistry = (): HTMLElement[] => unifiedFieldRegistry.getRegisteredContainers();
+
+/**
  * Enhanced form container detection with improved scoring for group detection
  */
 export const detectFormLikeContainers = async (): Promise<HTMLElement[]> => {
