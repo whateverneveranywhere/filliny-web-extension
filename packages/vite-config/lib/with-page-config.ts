@@ -26,6 +26,14 @@ export const withPageConfig = (config: UserConfig) =>
         build: {
           sourcemap: IS_DEV,
           minify: IS_PROD,
+          terserOptions: IS_PROD
+            ? {
+                compress: {
+                  drop_console: true,
+                  drop_debugger: true,
+                },
+              }
+            : undefined,
           reportCompressedSize: IS_PROD,
           emptyOutDir: IS_PROD,
           watch: watchOption,
