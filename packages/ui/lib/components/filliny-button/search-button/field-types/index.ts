@@ -36,6 +36,30 @@ const getFormElementsRobust = (container: HTMLElement | ShadowRoot): HTMLElement
     // Content editable
     '[contenteditable="true"]',
 
+    // File upload fields (enhanced detection)
+    'input[type="file"]',
+    "[accept]", // Elements with accept attribute often indicate file uploads
+    "[data-file-upload]",
+    "[data-upload]",
+    "[data-file-input]",
+    ".file-upload",
+    ".file-input",
+    ".upload-area",
+    ".dropzone",
+    ".file-drop",
+    ".upload-dropzone",
+    ".file-picker",
+    '.upload-button[type="button"]',
+    '[class*="upload"][role="button"]',
+    '[class*="file-upload"]',
+    '[class*="file-input"]',
+    '[data-testid*="upload"]',
+    '[data-testid*="file"]',
+    '[data-cy*="upload"]',
+    '[data-cy*="file"]',
+    '[data-qa*="upload"]',
+    '[data-qa*="file"]',
+
     // Custom data attributes (common patterns)
     "[data-field]",
     "[data-input]",
@@ -79,6 +103,8 @@ const getFormElementsRobust = (container: HTMLElement | ShadowRoot): HTMLElement
     ".ant-radio-input",
     ".ant-textarea",
     ".ant-slider",
+    ".ant-upload",
+    ".ant-upload-wrapper",
     ".chakra-input",
     ".chakra-select",
     ".chakra-checkbox__input",
@@ -529,6 +555,9 @@ export const getFormFieldsRobust = (container: HTMLElement | ShadowRoot): HTMLEl
               /\b(profile|account|user|member|customer)\b/,
               /\b(insurance|policy|coverage|premium|deductible|claim)\b/,
               /\b(application|quote|form|survey|questionnaire)\b/,
+              /\b(upload|file|attachment|document|photo|image|video|audio)\b/,
+              /\b(dropzone|drop-zone|file-drop|file-upload|browse)\b/,
+              /\b(choose-file|select-file|attach|browse-files)\b/,
             ];
 
             const hasFormLikeNames = formPatterns.some(pattern => pattern.test(className + " " + id + " " + dataAttrs));

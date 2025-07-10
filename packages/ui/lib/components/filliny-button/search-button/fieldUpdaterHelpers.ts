@@ -265,7 +265,11 @@ const updateInputElement = async (
       console.log(`Processing file input ${element.id || element.name || "unnamed"}`);
       // Handle file inputs specially - cast valueToUse appropriately
       const fileValue = typeof valueToUse === "string" || Array.isArray(valueToUse) ? valueToUse : String(valueToUse);
-      await updateFileInput(element, fileValue);
+      // Determine if we're in AI mode by checking if the value looks like a URL
+      const isAiMode =
+        (typeof fileValue === "string" && (fileValue.startsWith("http://") || fileValue.startsWith("https://"))) ||
+        (Array.isArray(fileValue) && fileValue.some(val => val.startsWith("http://") || val.startsWith("https://")));
+      await updateFileInput(element, fileValue, isTestMode, isAiMode, field.metadata);
       break;
     }
     // Use the new updateTextField function for all text-like inputs
