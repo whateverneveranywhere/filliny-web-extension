@@ -1,5 +1,175 @@
 import { updateFormFields } from "./fieldUpdaterHelpers";
-import type { Field, FieldType } from "@extension/shared";
+import type { AcceptType, Field, FileUploadData } from "@extension/shared";
+
+/**
+ * Generate test file based on field metadata and accept types
+ */
+const generateTestFileForField = (field: Field): string | string[] => {
+  // First, try to get accept types from field metadata
+  const fileUploadData = (field.metadata as { fileUploadData?: FileUploadData })?.fileUploadData;
+  const acceptTypes = fileUploadData?.acceptedTypes || [];
+  const isMultiple = fileUploadData?.fileInput?.multiple || false;
+
+  // If we have accept types, generate appropriate files
+  if (acceptTypes.length > 0) {
+    const testFiles = generateTestFilesForAcceptTypes(acceptTypes, isMultiple);
+    return isMultiple ? testFiles : testFiles[0];
+  }
+
+  // Try to check if there's an element in the DOM to inspect
+  const element = document.querySelector<HTMLInputElement>(`[data-filliny-id="${field.id}"]`);
+  if (element) {
+    const acceptAttr = element.getAttribute("accept");
+    if (acceptAttr) {
+      const parsedTypes = parseAcceptAttribute(acceptAttr);
+      const testFiles = generateTestFilesForAcceptTypes(parsedTypes, element.multiple);
+      return element.multiple ? testFiles : testFiles[0];
+    }
+
+    // Check if multiple attribute exists
+    if (element.multiple && !isMultiple) {
+      return ["test-document.pdf", "test-image.jpg", "test-spreadsheet.xlsx"];
+    }
+  }
+
+  // Fallback to PDF for single files
+  return "test-document.pdf";
+};
+
+/**
+ * Generate test files based on accept types
+ */
+const generateTestFilesForAcceptTypes = (acceptTypes: AcceptType[], isMultiple: boolean = false): string[] => {
+  const testFiles: string[] = [];
+
+  // Sample filenames by category
+  const categorySamples: Record<AcceptType["category"], string[]> = {
+    image: ["test-photo.jpg", "test-image.png", "test-graphic.svg"],
+    document: ["test-document.pdf", "test-report.docx", "test-spreadsheet.xlsx"],
+    video: ["test-video.mp4", "test-clip.mov", "test-recording.webm"],
+    audio: ["test-audio.mp3", "test-song.wav", "test-recording.ogg"],
+    archive: ["test-archive.zip", "test-backup.tar.gz", "test-files.rar"],
+    text: ["test-notes.txt", "test-data.csv", "test-config.json"],
+    other: ["test-file.bin", "test-data.dat"],
+  };
+
+  // Group accept types by category
+  const categories = acceptTypes.reduce(
+    (acc, type) => {
+      if (!acc[type.category]) {
+        acc[type.category] = [];
+      }
+      acc[type.category].push(type);
+      return acc;
+    },
+    {} as Record<AcceptType["category"], AcceptType[]>,
+  );
+
+  // Generate test files for each category
+  for (const [category, types] of Object.entries(categories)) {
+    const samples = categorySamples[category as AcceptType["category"]] || ["test-file.txt"];
+
+    // If specific extensions are specified, use them
+    const extensionTypes = types.filter(t => t.type === "extension");
+    if (extensionTypes.length > 0) {
+      for (const extType of extensionTypes) {
+        testFiles.push(`test-${category}.${extType.value}`);
+        if (isMultiple && testFiles.length < 3) {
+          testFiles.push(`test-${category}-2.${extType.value}`);
+        }
+      }
+    } else {
+      // Use default samples for the category
+      testFiles.push(...samples.slice(0, isMultiple ? 2 : 1));
+    }
+  }
+
+  // Add default files if nothing matched
+  if (testFiles.length === 0) {
+    testFiles.push("test-document.pdf");
+    if (isMultiple) {
+      testFiles.push("test-image.jpg", "test-data.xlsx");
+    }
+  }
+
+  // Remove duplicates and limit to reasonable number
+  const uniqueFiles = [...new Set(testFiles)];
+  return isMultiple ? uniqueFiles.slice(0, 3) : [uniqueFiles[0]];
+};
+
+/**
+ * Parse accept attribute value into structured accept types
+ */
+const parseAcceptAttribute = (acceptValue: string): AcceptType[] => {
+  if (!acceptValue || acceptValue.trim() === "") {
+    return [];
+  }
+
+  return acceptValue
+    .split(",")
+    .map(item => item.trim())
+    .filter(item => item !== "")
+    .map(item => {
+      const trimmed = item.trim();
+
+      if (trimmed.startsWith(".")) {
+        // File extension
+        const extension = trimmed.substring(1).toLowerCase();
+        return {
+          type: "extension" as const,
+          value: extension,
+          category: categorizeFileType(extension),
+        };
+      } else {
+        // MIME type
+        const mimeType = trimmed.toLowerCase();
+        return {
+          type: "mime" as const,
+          value: mimeType,
+          category: categorizeMimeType(mimeType),
+        };
+      }
+    });
+};
+
+/**
+ * Categorize file type by extension
+ */
+const categorizeFileType = (extension: string): AcceptType["category"] => {
+  const imageExts = ["jpg", "jpeg", "png", "gif", "bmp", "webp", "svg", "ico", "tiff", "tif", "heic", "heif"];
+  const documentExts = ["pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "odt", "ods", "odp", "rtf"];
+  const audioExts = ["mp3", "wav", "ogg", "flac", "aac", "wma", "m4a"];
+  const videoExts = ["mp4", "avi", "mov", "wmv", "flv", "webm", "mkv", "m4v"];
+  const archiveExts = ["zip", "rar", "tar", "gz", "7z", "bz2"];
+  const textExts = ["txt", "csv", "json", "xml", "html", "htm", "css", "js", "ts", "md", "yaml", "yml"];
+
+  if (imageExts.includes(extension)) return "image";
+  if (documentExts.includes(extension)) return "document";
+  if (audioExts.includes(extension)) return "audio";
+  if (videoExts.includes(extension)) return "video";
+  if (archiveExts.includes(extension)) return "archive";
+  if (textExts.includes(extension)) return "text";
+  return "other";
+};
+
+/**
+ * Categorize MIME type
+ */
+const categorizeMimeType = (mimeType: string): AcceptType["category"] => {
+  if (mimeType.startsWith("image/")) return "image";
+  if (mimeType.startsWith("audio/")) return "audio";
+  if (mimeType.startsWith("video/")) return "video";
+  if (mimeType.startsWith("text/")) return "text";
+  if (
+    mimeType.includes("pdf") ||
+    mimeType.includes("document") ||
+    mimeType.includes("spreadsheet") ||
+    mimeType.includes("presentation")
+  )
+    return "document";
+  if (mimeType.includes("zip") || mimeType.includes("compressed")) return "archive";
+  return "other";
+};
 
 /**
  * Generate appropriate test values for different field types
@@ -127,7 +297,7 @@ export const generateTestValue = (field: Field): string | string[] => {
 
     // Complex input types
     case "file":
-      return "https://example.com/sample.pdf";
+      return generateTestFileForField(field);
 
     case "checkbox": {
       // If this is a checkbox group, return array of values

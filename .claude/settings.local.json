@@ -1,6 +1,11 @@
 {
   "permissions": {
-    "allow": ["Bash(pnpm lint:*)", "Bash(pnpm type-check:*)"],
+    "allow": [
+      "Bash(pnpm lint:*)",
+      "Bash(pnpm type-check:*)",
+      "WebFetch(domain:eqs-group.jobs.personio.de)",
+      "WebFetch(domain:jobs.ashbyhq.com)"
+    ],
     "deny": []
   }
 }

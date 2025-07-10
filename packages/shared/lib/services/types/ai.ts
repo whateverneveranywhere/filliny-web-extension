@@ -17,6 +17,19 @@ export type InputFieldType =
   | "range";
 
 export type FieldType = InputFieldType | "select" | "checkbox" | "radio" | "textarea" | "button" | "file" | "fieldset";
+// AcceptType interface definition
+export interface AcceptType {
+  type: "mime" | "extension";
+  value: string;
+  category: "image" | "document" | "video" | "audio" | "archive" | "text" | "other";
+}
+
+export interface FileUploadData {
+  acceptedTypes?: AcceptType[];
+  fileInput?: {
+    multiple?: boolean;
+  };
+}
 
 export interface Field {
   id: string;

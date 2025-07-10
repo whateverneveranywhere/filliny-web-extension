@@ -184,95 +184,15 @@ const updateInputElement = async (
   isTestMode: boolean,
 ): Promise<void> => {
   switch (element.type) {
-    case "checkbox": {
-      console.log(`Processing checkbox ${element.id || element.name || "unnamed"} with value:`, valueToUse);
-
-      // Get checkbox value from metadata if available
-      let isChecked = false;
-
-      if (field.metadata && "checkboxValue" in field.metadata) {
-        // Check if the valueToUse matches the checkboxValue
-        const checkboxValue = field.metadata.checkboxValue as string;
-        console.log(`Checkbox has metadata value: ${checkboxValue}, comparing with:`, valueToUse);
-
-        if (typeof valueToUse === "boolean") {
-          isChecked = valueToUse;
-        } else if (typeof valueToUse === "string") {
-          // Use the improved matching logic for checkbox values
-          isChecked = matchesCheckboxValue(checkboxValue, valueToUse);
-        } else if (Array.isArray(valueToUse)) {
-          // If array of values, check if this checkbox's value is in the array
-          isChecked = valueToUse.some(v => String(v) === checkboxValue);
-        }
-      } else {
-        // Use the more robust value checking function
-        isChecked = isValueChecked(valueToUse);
-      }
-
-      // In test mode, check the checkbox by default unless explicitly set to false
-      if (isTestMode && (valueToUse === undefined || valueToUse === "")) {
-        console.log("Test mode with no explicit value, checking the checkbox by default");
-        isChecked = true;
-      }
-
-      console.log(`Setting checkbox checked state to: ${isChecked}`);
-      updateCheckable(element, isChecked);
+    case "checkbox":
+      await updateCheckboxInput(element, field, valueToUse, isTestMode);
       break;
-    }
-    case "radio": {
-      console.log(`Processing radio ${element.id || element.name || "unnamed"} with value:`, valueToUse);
-
-      // For radio buttons, we need to check if this specific radio should be selected
-      let isSelected = false;
-
-      // Check if this specific radio button's value matches the desired value
-      if (typeof valueToUse === "string") {
-        isSelected = element.value === valueToUse;
-        console.log(
-          `Radio value match check: element.value="${element.value}" === valueToUse="${valueToUse}" = ${isSelected}`,
-        );
-      } else if (typeof valueToUse === "boolean") {
-        // If boolean, select this radio if it's the value of 'true' and we want true
-        isSelected = valueToUse && (element.value === "true" || element.value === "1" || element.value === "yes");
-      }
-
-      // In test mode, if no specific match and this is the first radio in group, select it
-      if (!isSelected && isTestMode && element instanceof HTMLInputElement) {
-        const radioGroup = document.querySelectorAll<HTMLInputElement>(`input[name="${element.name}"][type="radio"]`);
-        const isFirstRadio = radioGroup.length > 0 && radioGroup[0] === element;
-        if (isFirstRadio) {
-          isSelected = true;
-          console.log(`Test mode: Selecting first radio in group ${element.name}`);
-        }
-      }
-
-      console.log(`Setting radio selected state to: ${isSelected}`);
-      updateCheckable(element, isSelected);
-
-      // If this radio is selected, uncheck others in the same group
-      if (isSelected && element instanceof HTMLInputElement) {
-        const radioGroup = document.querySelectorAll<HTMLInputElement>(`input[name="${element.name}"][type="radio"]`);
-        radioGroup.forEach(radio => {
-          if (radio !== element) {
-            updateCheckable(radio, false);
-          }
-        });
-      }
-
+    case "radio":
+      await updateRadioInput(element, field, valueToUse, isTestMode);
       break;
-    }
-    case "file": {
-      console.log(`Processing file input ${element.id || element.name || "unnamed"}`);
-      // Handle file inputs specially - cast valueToUse appropriately
-      const fileValue = typeof valueToUse === "string" || Array.isArray(valueToUse) ? valueToUse : String(valueToUse);
-      // Determine if we're in AI mode by checking if the value looks like a URL
-      const isAiMode =
-        (typeof fileValue === "string" && (fileValue.startsWith("http://") || fileValue.startsWith("https://"))) ||
-        (Array.isArray(fileValue) && fileValue.some(val => val.startsWith("http://") || val.startsWith("https://")));
-      await updateFileInput(element, fileValue, isTestMode, isAiMode, field.metadata);
+    case "file":
+      await updateFileInputElement(element, field, valueToUse, isTestMode);
       break;
-    }
-    // Use the new updateTextField function for all text-like inputs
     case "text":
     case "email":
     case "url":
@@ -286,18 +206,164 @@ const updateInputElement = async (
     case "week":
     case "time":
     case "color":
-    case "range": {
-      console.log(`Processing text-like input ${element.id || element.name || "unnamed"} (${element.type})`);
-      await updateTextField(element, getStringValue(valueToUse));
+    case "range":
+      await updateTextLikeInput(element, valueToUse);
       break;
-    }
-    default: {
-      console.log(`Handling default case for input type: ${element.type}`);
-      if (element.type !== "submit" && element.type !== "reset" && element.type !== "button") {
-        await updateTextField(element, getStringValue(valueToUse));
-      }
+    default:
+      await updateDefaultInput(element, valueToUse);
       break;
+  }
+};
+
+/**
+ * Update checkbox input element
+ */
+const updateCheckboxInput = async (
+  element: HTMLInputElement,
+  field: Field,
+  valueToUse: unknown,
+  isTestMode: boolean,
+): Promise<void> => {
+  console.log(`Processing checkbox ${element.id || element.name || "unnamed"} with value:`, valueToUse);
+
+  let isChecked = false;
+
+  if (field.metadata && "checkboxValue" in field.metadata) {
+    const checkboxValue = field.metadata.checkboxValue as string;
+    console.log(`Checkbox has metadata value: ${checkboxValue}, comparing with:`, valueToUse);
+
+    if (typeof valueToUse === "boolean") {
+      isChecked = valueToUse;
+    } else if (typeof valueToUse === "string") {
+      isChecked = matchesCheckboxValue(checkboxValue, valueToUse);
+    } else if (Array.isArray(valueToUse)) {
+      isChecked = valueToUse.some(v => String(v) === checkboxValue);
     }
+  } else {
+    isChecked = isValueChecked(valueToUse);
+  }
+
+  // In test mode, check the checkbox by default unless explicitly set to false
+  if (isTestMode && (valueToUse === undefined || valueToUse === "")) {
+    console.log("Test mode with no explicit value, checking the checkbox by default");
+    isChecked = true;
+  }
+
+  console.log(`Setting checkbox checked state to: ${isChecked}`);
+  updateCheckable(element, isChecked);
+};
+
+/**
+ * Update radio input element
+ */
+const updateRadioInput = async (
+  element: HTMLInputElement,
+  _field: Field,
+  valueToUse: unknown,
+  isTestMode: boolean,
+): Promise<void> => {
+  console.log(`Processing radio ${element.id || element.name || "unnamed"} with value:`, valueToUse);
+
+  const isSelected = determineRadioSelection(element, valueToUse, isTestMode);
+
+  console.log(`Setting radio selected state to: ${isSelected}`);
+  updateCheckable(element, isSelected);
+
+  // If this radio is selected, uncheck others in the same group
+  if (isSelected) {
+    uncheckOtherRadiosInGroup(element);
+  }
+};
+
+/**
+ * Determine if a radio button should be selected
+ */
+const determineRadioSelection = (element: HTMLInputElement, valueToUse: unknown, isTestMode: boolean): boolean => {
+  let isSelected = false;
+
+  // Check if this specific radio button's value matches the desired value
+  if (typeof valueToUse === "string") {
+    isSelected = element.value === valueToUse;
+    console.log(
+      `Radio value match check: element.value="${element.value}" === valueToUse="${valueToUse}" = ${isSelected}`,
+    );
+  } else if (typeof valueToUse === "boolean") {
+    // If boolean, select this radio if it's the value of 'true' and we want true
+    isSelected = valueToUse && (element.value === "true" || element.value === "1" || element.value === "yes");
+  }
+
+  // In test mode, if no specific match and this is the first radio in group, select it
+  if (!isSelected && isTestMode) {
+    const radioGroup = document.querySelectorAll<HTMLInputElement>(`input[name="${element.name}"][type="radio"]`);
+    const isFirstRadio = radioGroup.length > 0 && radioGroup[0] === element;
+    if (isFirstRadio) {
+      isSelected = true;
+      console.log(`Test mode: Selecting first radio in group ${element.name}`);
+    }
+  }
+
+  return isSelected;
+};
+
+/**
+ * Uncheck other radio buttons in the same group
+ */
+const uncheckOtherRadiosInGroup = (selectedElement: HTMLInputElement): void => {
+  const radioGroup = document.querySelectorAll<HTMLInputElement>(`input[name="${selectedElement.name}"][type="radio"]`);
+  radioGroup.forEach(radio => {
+    if (radio !== selectedElement) {
+      updateCheckable(radio, false);
+    }
+  });
+};
+
+/**
+ * Update file input element
+ */
+const updateFileInputElement = async (
+  element: HTMLInputElement,
+  field: Field,
+  valueToUse: unknown,
+  isTestMode: boolean,
+): Promise<void> => {
+  console.log(`Processing file input ${element.id || element.name || "unnamed"}`);
+
+  const fileValue = typeof valueToUse === "string" || Array.isArray(valueToUse) ? valueToUse : String(valueToUse);
+  const isAiMode = isFileValueFromAI(fileValue);
+
+  await updateFileInput(element, fileValue, isTestMode, isAiMode, field.metadata);
+};
+
+/**
+ * Determine if file value is from AI (URL-based)
+ */
+const isFileValueFromAI = (fileValue: string | string[]): boolean => {
+  if (typeof fileValue === "string") {
+    return fileValue.startsWith("http://") || fileValue.startsWith("https://");
+  }
+
+  if (Array.isArray(fileValue)) {
+    return fileValue.some(val => val.startsWith("http://") || val.startsWith("https://"));
+  }
+
+  return false;
+};
+
+/**
+ * Update text-like input elements
+ */
+const updateTextLikeInput = async (element: HTMLInputElement, valueToUse: unknown): Promise<void> => {
+  console.log(`Processing text-like input ${element.id || element.name || "unnamed"} (${element.type})`);
+  await updateTextField(element, getStringValue(valueToUse));
+};
+
+/**
+ * Update default/unknown input types
+ */
+const updateDefaultInput = async (element: HTMLInputElement, valueToUse: unknown): Promise<void> => {
+  console.log(`Handling default case for input type: ${element.type}`);
+  if (element.type !== "submit" && element.type !== "reset" && element.type !== "button") {
+    await updateTextField(element, getStringValue(valueToUse));
   }
 };
 
@@ -467,12 +533,28 @@ const updateRadioGroup = async (field: Field, value: unknown, testMode: boolean)
   const targetValue = String(value || "");
   console.log(`🔍 Updating radio group ${field.id} with value: ${targetValue} (testMode: ${testMode})`);
 
-  // Find the option that matches the target value
-  let selectedOption = field.options.find(opt => opt.value === targetValue);
+  const selectedOption = findMatchingRadioOption(field.options, targetValue, testMode);
 
+  if (selectedOption) {
+    return await selectRadioOption(field, selectedOption, field.options.indexOf(selectedOption));
+  } else {
+    logRadioGroupMatchFailure(field, targetValue);
+    return false;
+  }
+};
+
+/**
+ * Find the matching radio option based on value and test mode
+ */
+const findMatchingRadioOption = (options: Field["options"], targetValue: string, testMode: boolean) => {
+  if (!options) return undefined;
+
+  // Try exact value matching first
+  let selectedOption = options.find(opt => opt.value === targetValue);
+
+  // Try text matching if value matching fails
   if (!selectedOption && targetValue) {
-    // Try text matching if value matching fails
-    selectedOption = field.options.find(opt => opt.text.toLowerCase() === targetValue.toLowerCase());
+    selectedOption = options.find(opt => opt.text.toLowerCase() === targetValue.toLowerCase());
     if (selectedOption) {
       console.log(`✅ Found radio option by text matching: ${selectedOption.text}`);
     }
@@ -480,168 +562,246 @@ const updateRadioGroup = async (field: Field, value: unknown, testMode: boolean)
 
   // Enhanced fallback logic for test mode
   if (!selectedOption && testMode) {
-    // In test mode, pick a random valid option if no specific value matched
-    const validOptions = field.options.filter(
-      opt =>
-        !opt.text.toLowerCase().includes("select") &&
-        !opt.text.toLowerCase().includes("choose") &&
-        !opt.text.toLowerCase().includes("pick") &&
-        opt.text !== "" &&
-        opt.value !== "",
-    );
-
-    if (validOptions.length > 0) {
-      // Pick a random valid option for better test variety
-      const randomIndex = Math.floor(Math.random() * validOptions.length);
-      selectedOption = validOptions[randomIndex];
-      console.log(`✅ Using random test mode option: ${selectedOption.text} (${selectedOption.value})`);
-    } else {
-      // Last resort: use first option
-      selectedOption = field.options[0];
-      console.log(`✅ Using first option as fallback: ${selectedOption.text}`);
-    }
+    selectedOption = selectTestModeRadioOption(options);
   }
 
-  // For non-test mode, if no match found, try partial matching strategies
+  // For non-test mode, try partial matching strategies
   if (!selectedOption && !testMode && targetValue) {
-    // Try partial text matching
-    selectedOption = field.options.find(
-      opt =>
-        opt.text.toLowerCase().includes(targetValue.toLowerCase()) ||
-        targetValue.toLowerCase().includes(opt.text.toLowerCase()),
-    );
-
-    if (selectedOption) {
-      console.log(`✅ Found radio option by partial text matching: ${selectedOption.text}`);
-    }
+    selectedOption = findPartialMatchRadioOption(options, targetValue);
   }
+
+  return selectedOption;
+};
+
+/**
+ * Select a random valid option for test mode
+ */
+const selectTestModeRadioOption = (options: Field["options"]) => {
+  if (!options) return undefined;
+
+  const validOptions = options.filter(
+    opt =>
+      !opt.text.toLowerCase().includes("select") &&
+      !opt.text.toLowerCase().includes("choose") &&
+      !opt.text.toLowerCase().includes("pick") &&
+      opt.text !== "" &&
+      opt.value !== "",
+  );
+
+  if (validOptions.length > 0) {
+    const randomIndex = Math.floor(Math.random() * validOptions.length);
+    const selectedOption = validOptions[randomIndex];
+    console.log(`✅ Using random test mode option: ${selectedOption.text} (${selectedOption.value})`);
+    return selectedOption;
+  } else {
+    const fallbackOption = options[0];
+    console.log(`✅ Using first option as fallback: ${fallbackOption.text}`);
+    return fallbackOption;
+  }
+};
+
+/**
+ * Find option using partial text matching
+ */
+const findPartialMatchRadioOption = (options: Field["options"], targetValue: string) => {
+  if (!options) return undefined;
+
+  const selectedOption = options.find(
+    opt =>
+      opt.text.toLowerCase().includes(targetValue.toLowerCase()) ||
+      targetValue.toLowerCase().includes(opt.text.toLowerCase()),
+  );
 
   if (selectedOption) {
-    const optionIndex = field.options.indexOf(selectedOption);
+    console.log(`✅ Found radio option by partial text matching: ${selectedOption.text}`);
+  }
 
-    // Enhanced strategies to find the actual radio button element
-    const findStrategies = [
-      // Strategy 1: Use the standard filliny-id pattern
-      () => document.querySelector<HTMLElement>(`[data-filliny-id="${field.id}-option-${optionIndex}"]`),
+  return selectedOption;
+};
 
-      // Strategy 2: Find by name and value
-      () =>
-        field.name
-          ? document.querySelector<HTMLElement>(`input[name="${field.name}"][value="${selectedOption!.value}"]`)
-          : null,
+/**
+ * Select the radio option element and update its state
+ */
+const selectRadioOption = async (
+  field: Field,
+  selectedOption: NonNullable<Field["options"]>[0],
+  optionIndex: number,
+): Promise<boolean> => {
+  const optionElement = findRadioOptionElement(field, selectedOption, optionIndex);
 
-      // Strategy 3: Find all radio inputs with the same name and pick by index
-      () => {
-        if (field.name) {
-          const radios = Array.from(
-            document.querySelectorAll<HTMLInputElement>(`input[name="${field.name}"][type="radio"]`),
-          );
-          return radios[optionIndex] || null;
-        }
-        return null;
-      },
-
-      // Strategy 4: Find by value across all radio inputs
-      () => document.querySelector<HTMLElement>(`input[type="radio"][value="${selectedOption!.value}"]`),
-
-      // Strategy 5: Find by partial value matching
-      () => {
-        const radios = Array.from(document.querySelectorAll<HTMLInputElement>('input[type="radio"]'));
-        return (
-          radios.find(
-            radio =>
-              radio.value.toLowerCase().includes(selectedOption!.value.toLowerCase()) ||
-              selectedOption!.value.toLowerCase().includes(radio.value.toLowerCase()),
-          ) || null
-        );
-      },
-
-      // Strategy 6: Find by label text matching
-      () => {
-        const labels = Array.from(document.querySelectorAll("label"));
-        for (const label of labels) {
-          const labelText = label.textContent?.trim().toLowerCase();
-          const optionText = selectedOption!.text.trim().toLowerCase();
-
-          if (
-            labelText &&
-            optionText &&
-            (labelText === optionText || labelText.includes(optionText) || optionText.includes(labelText))
-          ) {
-            const forAttr = label.getAttribute("for");
-            if (forAttr) {
-              const linkedElement = document.getElementById(forAttr) as HTMLInputElement;
-              if (linkedElement && linkedElement.type === "radio") {
-                return linkedElement;
-              }
-            }
-            // Check if label contains the input
-            const input = label.querySelector('input[type="radio"]');
-            if (input) return input as HTMLElement;
-          }
-        }
-        return null;
-      },
-    ];
-
-    let optionElement: HTMLElement | null = null;
-    for (let i = 0; i < findStrategies.length; i++) {
-      try {
-        optionElement = findStrategies[i]();
-        if (optionElement) {
-          console.log(`✅ Found radio option element using strategy ${i + 1}: ${selectedOption.text}`);
-          break;
-        }
-      } catch (error) {
-        console.debug(`Radio find strategy ${i + 1} failed:`, error);
-      }
-    }
-
-    if (optionElement) {
-      // Set the filliny-id for future reference if not already set
-      if (!optionElement.hasAttribute("data-filliny-id")) {
-        optionElement.setAttribute("data-filliny-id", `${field.id}-option-${optionIndex}`);
-      }
-
-      console.log(`✅ Selecting radio option: ${selectedOption.text} (${selectedOption.value})`);
-
-      // First, uncheck all other radio buttons in this group to ensure clean state
-      if (field.name) {
-        const allRadiosInGroup = document.querySelectorAll<HTMLInputElement>(
-          `input[name="${field.name}"][type="radio"]`,
-        );
-        allRadiosInGroup.forEach(radio => {
-          if (radio !== optionElement) {
-            updateCheckable(radio, false);
-          }
-        });
-      }
-
-      // Now check the selected radio
-      updateCheckable(optionElement, true);
-
-      return true;
-    } else {
-      console.warn(`❌ Radio option element not found for ${field.id}-option-${optionIndex} (${selectedOption.text})`);
-
-      // Debug: Log all available radio inputs for this field
-      console.log("Available radio inputs:");
-      const allRadios = document.querySelectorAll('input[type="radio"]');
-      allRadios.forEach(radio => {
-        const input = radio as HTMLInputElement;
-        console.log(`  - name: "${input.name}", value: "${input.value}", id: "${input.id}"`);
-      });
-
-      return false;
-    }
+  if (optionElement) {
+    setupRadioOptionElement(field, selectedOption, optionElement, optionIndex);
+    uncheckRadioGroupMembers(field.name, optionElement);
+    updateCheckable(optionElement, true);
+    return true;
   } else {
-    console.warn(`❌ No matching radio option found for value: ${targetValue} in field ${field.id}`);
-    console.log(
-      "Available options:",
-      field.options.map(opt => `${opt.text} (${opt.value})`),
-    );
+    logRadioElementNotFound(field, selectedOption, optionIndex);
     return false;
   }
+};
+
+/**
+ * Find the actual radio button element using multiple strategies
+ */
+const findRadioOptionElement = (
+  field: Field,
+  selectedOption: NonNullable<Field["options"]>[0],
+  optionIndex: number,
+): HTMLElement | null => {
+  const findStrategies = createRadioFindStrategies(field, selectedOption, optionIndex);
+
+  for (let i = 0; i < findStrategies.length; i++) {
+    try {
+      const optionElement = findStrategies[i]();
+      if (optionElement) {
+        console.log(`✅ Found radio option element using strategy ${i + 1}: ${selectedOption.text}`);
+        return optionElement;
+      }
+    } catch (error) {
+      console.debug(`Radio find strategy ${i + 1} failed:`, error);
+    }
+  }
+
+  return null;
+};
+
+/**
+ * Create the array of strategies for finding radio option elements
+ */
+const createRadioFindStrategies = (
+  field: Field,
+  selectedOption: NonNullable<Field["options"]>[0],
+  optionIndex: number,
+) => [
+  // Strategy 1: Use the standard filliny-id pattern
+  () => document.querySelector<HTMLElement>(`[data-filliny-id="${field.id}-option-${optionIndex}"]`),
+
+  // Strategy 2: Find by name and value
+  () =>
+    field.name
+      ? document.querySelector<HTMLElement>(`input[name="${field.name}"][value="${selectedOption.value}"]`)
+      : null,
+
+  // Strategy 3: Find all radio inputs with the same name and pick by index
+  () => {
+    if (field.name) {
+      const radios = Array.from(
+        document.querySelectorAll<HTMLInputElement>(`input[name="${field.name}"][type="radio"]`),
+      );
+      return radios[optionIndex] || null;
+    }
+    return null;
+  },
+
+  // Strategy 4: Find by value across all radio inputs
+  () => document.querySelector<HTMLElement>(`input[type="radio"][value="${selectedOption.value}"]`),
+
+  // Strategy 5: Find by partial value matching
+  () => {
+    const radios = Array.from(document.querySelectorAll<HTMLInputElement>('input[type="radio"]'));
+    return (
+      radios.find(
+        radio =>
+          radio.value.toLowerCase().includes(selectedOption.value.toLowerCase()) ||
+          selectedOption.value.toLowerCase().includes(radio.value.toLowerCase()),
+      ) || null
+    );
+  },
+
+  // Strategy 6: Find by label text matching
+  () => findRadioByLabelText(selectedOption),
+];
+
+/**
+ * Find radio element by matching label text
+ */
+const findRadioByLabelText = (selectedOption: NonNullable<Field["options"]>[0]): HTMLElement | null => {
+  const labels = Array.from(document.querySelectorAll("label"));
+
+  for (const label of labels) {
+    const labelText = label.textContent?.trim().toLowerCase();
+    const optionText = selectedOption.text.trim().toLowerCase();
+
+    if (
+      labelText &&
+      optionText &&
+      (labelText === optionText || labelText.includes(optionText) || optionText.includes(labelText))
+    ) {
+      const forAttr = label.getAttribute("for");
+      if (forAttr) {
+        const linkedElement = document.getElementById(forAttr) as HTMLInputElement;
+        if (linkedElement && linkedElement.type === "radio") {
+          return linkedElement;
+        }
+      }
+      // Check if label contains the input
+      const input = label.querySelector('input[type="radio"]');
+      if (input) return input as HTMLElement;
+    }
+  }
+
+  return null;
+};
+
+/**
+ * Setup the radio option element with proper attributes
+ */
+const setupRadioOptionElement = (
+  field: Field,
+  selectedOption: NonNullable<Field["options"]>[0],
+  optionElement: HTMLElement,
+  optionIndex: number,
+): void => {
+  // Set the filliny-id for future reference if not already set
+  if (!optionElement.hasAttribute("data-filliny-id")) {
+    optionElement.setAttribute("data-filliny-id", `${field.id}-option-${optionIndex}`);
+  }
+
+  console.log(`✅ Selecting radio option: ${selectedOption.text} (${selectedOption.value})`);
+};
+
+/**
+ * Uncheck all other radio buttons in the same group
+ */
+const uncheckRadioGroupMembers = (fieldName: string | undefined, selectedElement: HTMLElement): void => {
+  if (fieldName) {
+    const allRadiosInGroup = document.querySelectorAll<HTMLInputElement>(`input[name="${fieldName}"][type="radio"]`);
+    allRadiosInGroup.forEach(radio => {
+      if (radio !== selectedElement) {
+        updateCheckable(radio, false);
+      }
+    });
+  }
+};
+
+/**
+ * Log debug information when radio element is not found
+ */
+const logRadioElementNotFound = (
+  field: Field,
+  selectedOption: NonNullable<Field["options"]>[0],
+  optionIndex: number,
+): void => {
+  console.warn(`❌ Radio option element not found for ${field.id}-option-${optionIndex} (${selectedOption.text})`);
+
+  // Debug: Log all available radio inputs for this field
+  console.log("Available radio inputs:");
+  const allRadios = document.querySelectorAll('input[type="radio"]');
+  allRadios.forEach(radio => {
+    const input = radio as HTMLInputElement;
+    console.log(`  - name: "${input.name}", value: "${input.value}", id: "${input.id}"`);
+  });
+};
+
+/**
+ * Log debug information when no matching radio option is found
+ */
+const logRadioGroupMatchFailure = (field: Field, targetValue: string): void => {
+  console.warn(`❌ No matching radio option found for value: ${targetValue} in field ${field.id}`);
+  console.log(
+    "Available options:",
+    field.options?.map(opt => `${opt.text} (${opt.value})`),
+  );
 };
 
 /**
