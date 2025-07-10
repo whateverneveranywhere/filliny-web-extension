@@ -171,7 +171,7 @@ const ActiveProfileWebsitePreview: React.FC<Props> = ({ matchingWebsite, prefere
             <Label className="filliny-text-sm filliny-font-semibold filliny-text-muted-foreground">
               Filling Context
             </Label>
-            <p className="filliny-rounded-lg filliny-bg-muted/50 filliny-p-3 filliny-text-sm">
+            <p className="filliny-rounded-lg filliny-bg-muted/50 filliny-p-3 filliny-text-sm filliny-break-words">
               {matchingWebsite.fillingContext || "No context provided"}
             </p>
           </div>
