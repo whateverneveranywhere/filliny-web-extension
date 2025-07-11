@@ -1,11 +1,32 @@
 {
   "permissions": {
     "allow": [
-      "Bash(pnpm lint:*)",
-      "Bash(pnpm type-check:*)",
+      "Bash(pnpm lint*)",
+      "Bash(pnpm type-check*)",
+      "Bash(pnpm build*)",
+      "Bash(pnpm format*)",
+      "Bash(pnpm test*)",
       "WebFetch(domain:eqs-group.jobs.personio.de)",
-      "WebFetch(domain:jobs.ashbyhq.com)"
+      "WebFetch(domain:jobs.ashbyhq.com)",
+      "WebFetch(domain:jobs.smartrecruiters.com)",
+      "WebFetch(domain:job-boards.greenhouse.io)",
+      "Bash(npx eslint*)",
+      "Bash(npx prettier*)",
+      "WebFetch(domain:docs.anthropic.com)",
+      "Bash(pnpm build:*)",
+      "Bash(pnpm base-build:*)",
+      "Bash(pnpm run:*)",
+      "Bash(pnpm -w run base-build)"
     ],
     "deny": []
+  },
+  "quality": {
+    "autoCheck": true,
+    "commands": {
+      "lint": "pnpm lint",
+      "typeCheck": "pnpm type-check",
+      "format": "pnpm format",
+      "build": "pnpm build"
+    }
   }
 }

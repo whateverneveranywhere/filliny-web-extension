@@ -151,3 +151,81 @@ Content scripts have special considerations:
 - Popup/Options: Right-click → Inspect
 
 When making changes to the extension, always test in all relevant contexts and ensure the form filling functionality works correctly across different websites.
+
+## Code Quality Requirements
+
+### Mandatory Quality Checks
+Claude Code must **ALWAYS** run these commands after making any code changes:
+
+1. **TypeScript Compilation**: `pnpm type-check`
+   - Zero TypeScript errors are required
+   - All type issues must be resolved before proceeding
+   - Use proper types instead of `any` wherever possible
+
+2. **ESLint Validation**: `pnpm lint`
+   - Critical errors must be fixed immediately
+   - Warnings should be addressed when possible
+   - Follow the existing code style and patterns
+
+3. **Code Formatting**: `pnpm format`
+   - Ensure consistent code formatting across the project
+   - Use Prettier for automatic formatting
+
+4. **Build Verification**: `pnpm build`
+   - All packages must compile successfully
+   - No build errors are acceptable
+
+### Code Quality Standards
+
+#### Function Declarations
+- Use function expressions instead of function declarations where required by ESLint
+- Prefer arrow functions for simple utility functions
+- Use async/await over Promise chains for better readability
+
+#### TypeScript Best Practices
+- Always provide explicit types for function parameters and return values
+- Use proper type guards and assertions
+- Avoid `any` types - use `unknown` or proper type definitions
+- Handle nullable/undefined values correctly
+
+#### Import/Export Standards
+- Keep imports and exports organized and clean
+- Avoid duplicate exports
+- Place export statements at the end of files when required by ESLint
+- Use proper module resolution patterns
+
+#### Error Handling
+- Always handle Promise rejections
+- Use try-catch blocks for async operations
+- Provide meaningful error messages and logging
+- Handle edge cases gracefully
+
+### Automated Quality Gates
+
+The `.claude/settings.local.json` configuration ensures:
+- Automated permission for quality commands
+- Integration with development workflow
+- Consistent quality checks across all changes
+
+### Development Workflow Integration
+
+**Before committing any changes:**
+1. Run `pnpm type-check` - Must pass with zero errors
+2. Run `pnpm lint` - Must address all critical errors
+3. Run `pnpm format` - Ensure consistent formatting
+4. Run `pnpm build` - Verify all packages compile successfully
+
+**When encountering quality issues:**
+1. Fix TypeScript errors immediately - they prevent compilation
+2. Address ESLint errors before warnings
+3. Maintain existing code patterns and conventions
+4. Test changes in relevant extension contexts
+
+### Continuous Quality Maintenance
+
+- Monitor for new ESLint rules and TypeScript configurations
+- Update quality standards as the project evolves
+- Ensure all team members follow the same quality standards
+- Use automated tools to maintain code quality consistently
+
+This quality-first approach ensures the extension remains maintainable, secure, and performant across all environments and use cases.

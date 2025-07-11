@@ -2,11 +2,622 @@ import { findSelectOptions, isCustomSelect, createBaseField } from "./utils";
 import type { Field } from "@extension/shared";
 
 /**
- * React Select handler for specialized React Select components
+ * Enhanced React Select handler for all React Select variants
  */
-export const handleReactSelect = (): boolean =>
-  // This is a placeholder for now, can be expanded with proper implementation
-  false;
+export const handleReactSelect = (element: HTMLElement, normalizedValues: string[]): boolean => {
+  try {
+    console.log("🔍 Handling React Select component...", element);
+
+    // Enhanced React Select detection patterns
+    const isReactSelect = detectReactSelectComponent(element);
+
+    if (!isReactSelect) {
+      return false;
+    }
+
+    console.log("✅ Confirmed React Select component detected");
+
+    // Find the React Select container using multiple strategies
+    const selectContainer = findReactSelectContainer(element);
+
+    if (!selectContainer) {
+      console.warn("❌ Could not find React Select container");
+      return false;
+    }
+
+    console.log("🎯 Found React Select container:", selectContainer);
+
+    // Open the dropdown
+    const opened = openReactSelectDropdown(selectContainer);
+    if (!opened) {
+      console.warn("❌ Could not open React Select dropdown");
+      return false;
+    }
+
+    // Wait briefly for the dropdown to render
+    setTimeout(() => {
+      selectReactSelectOption(normalizedValues[0], element);
+    }, 50);
+
+    return true;
+  } catch (error) {
+    console.error("❌ Error in handleReactSelect:", error);
+    return false;
+  }
+};
+
+/**
+ * Detect if element is part of a React Select component
+ */
+function detectReactSelectComponent(element: HTMLElement): boolean {
+  // Check element itself
+  if (hasReactSelectClasses(element)) return true;
+
+  // Check parent chain (up to 5 levels)
+  let current = element.parentElement;
+  let depth = 0;
+  while (current && depth < 5) {
+    if (hasReactSelectClasses(current)) return true;
+    current = current.parentElement;
+    depth++;
+  }
+
+  // Check for React Select specific attributes
+  if (element.getAttribute("role") === "combobox" && element.className.includes("select")) {
+    return true;
+  }
+
+  // Check for hidden inputs with React Select patterns
+  const form = element.closest('form, [role="form"]');
+  if (form) {
+    const hiddenInputs = form.querySelectorAll('input[type="hidden"]');
+    for (const input of Array.from(hiddenInputs)) {
+      if (input.getAttribute("name")?.includes("select") || input.getAttribute("id")?.includes("select")) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Check if element has React Select related classes
+ */
+function hasReactSelectClasses(element: HTMLElement): boolean {
+  const className = element.className.toLowerCase();
+  const reactSelectPatterns = [
+    "react-select",
+    "select__control",
+    "select__container",
+    "select__input",
+    "select__value-container",
+    "select__single-value",
+    "select__placeholder",
+    "select__dropdown-indicator",
+    "css-.*-control", // Emotion CSS classes
+    "css-.*-container",
+    "css-.*-valuecontainer",
+  ];
+
+  return reactSelectPatterns.some(pattern => {
+    if (pattern.includes("css-.*")) {
+      return new RegExp(pattern).test(className);
+    }
+    return className.includes(pattern);
+  });
+}
+
+/**
+ * Find the React Select container element
+ */
+function findReactSelectContainer(element: HTMLElement): HTMLElement | null {
+  // Strategy 1: Look for container in parent chain
+  let current: HTMLElement | null = element;
+  while (current) {
+    if (
+      current.className.includes("react-select") &&
+      (current.className.includes("container") || current.className.includes("control"))
+    ) {
+      return current;
+    }
+    current = current.parentElement;
+  }
+
+  // Strategy 2: Look for control element
+  current = element;
+  while (current) {
+    if (current.className.includes("select__control") || current.className.includes("control")) {
+      return current;
+    }
+    current = current.parentElement;
+  }
+
+  // Strategy 3: Use CSS selector to find nearby React Select
+  const nearbySelects = document.querySelectorAll(`
+    [class*="react-select"][class*="container"],
+    [class*="select__container"],
+    [class*="css-"][class*="container"]
+  `);
+
+  let closest: HTMLElement | null = null;
+  let closestDistance = Infinity;
+
+  for (const select of Array.from(nearbySelects)) {
+    const selectElement = select as HTMLElement;
+    const distance = getElementDistance(element, selectElement);
+    if (distance < closestDistance) {
+      closestDistance = distance;
+      closest = selectElement;
+    }
+  }
+
+  return closest;
+}
+
+/**
+ * Calculate distance between two elements
+ */
+function getElementDistance(el1: HTMLElement, el2: HTMLElement): number {
+  const rect1 = el1.getBoundingClientRect();
+  const rect2 = el2.getBoundingClientRect();
+
+  return Math.abs(rect1.top - rect2.top) + Math.abs(rect1.left - rect2.left);
+}
+
+/**
+ * Open React Select dropdown
+ */
+function openReactSelectDropdown(container: HTMLElement): boolean {
+  try {
+    // Try clicking the control area
+    const control = container.querySelector('[class*="control"]') || container;
+    if (control instanceof HTMLElement) {
+      control.click();
+
+      // Also try clicking the dropdown indicator
+      const indicator = container.querySelector('[class*="dropdown-indicator"], [class*="indicatorContainer"]');
+      if (indicator instanceof HTMLElement) {
+        indicator.click();
+      }
+
+      return true;
+    }
+
+    return false;
+  } catch (error) {
+    console.error("Error opening React Select dropdown:", error);
+    return false;
+  }
+}
+
+/**
+ * Select an option in React Select dropdown
+ */
+function selectReactSelectOption(value: string, originalElement: HTMLElement): void {
+  try {
+    // Find dropdown menu
+    const menuSelectors = [
+      '[class*="react-select__menu"]',
+      '[class*="select__menu"]',
+      '[class*="css-"][class*="menu"]',
+      '[role="listbox"]',
+      ".react-select__menu-list",
+      ".select__menu-list",
+    ];
+
+    let menu: HTMLElement | null = null;
+    for (const selector of menuSelectors) {
+      menu = document.querySelector(selector) as HTMLElement;
+      if (menu && window.getComputedStyle(menu).display !== "none") {
+        break;
+      }
+    }
+
+    if (!menu) {
+      console.warn("Could not find React Select dropdown menu");
+      return;
+    }
+
+    // Find options
+    const optionSelectors = [
+      '[class*="react-select__option"]',
+      '[class*="select__option"]',
+      '[class*="css-"][class*="option"]',
+      '[role="option"]',
+    ];
+
+    let options: HTMLElement[] = [];
+    for (const selector of optionSelectors) {
+      const foundOptions = menu.querySelectorAll(selector);
+      if (foundOptions.length > 0) {
+        options = Array.from(foundOptions) as HTMLElement[];
+        break;
+      }
+    }
+
+    if (options.length === 0) {
+      console.warn("No options found in React Select dropdown");
+      return;
+    }
+
+    // Find matching option
+    const matchingOption = findMatchingReactSelectOption(options, value);
+
+    if (matchingOption) {
+      console.log("🎯 Clicking matching React Select option:", matchingOption.textContent);
+      matchingOption.click();
+
+      // Dispatch additional events
+      matchingOption.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+      matchingOption.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+
+      // Update original element
+      if (originalElement instanceof HTMLInputElement) {
+        originalElement.value = value;
+        originalElement.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+    } else {
+      console.warn("No matching option found for value:", value);
+      // Close dropdown by clicking outside
+      document.body.click();
+    }
+  } catch (error) {
+    console.error("Error selecting React Select option:", error);
+  }
+}
+
+/**
+ * Find matching option in React Select dropdown
+ */
+function findMatchingReactSelectOption(options: HTMLElement[], value: string): HTMLElement | null {
+  const normalizedValue = value.toLowerCase().trim();
+
+  // Strategy 1: Exact value match
+  for (const option of options) {
+    const optionValue =
+      option.getAttribute("data-value") || option.getAttribute("value") || option.textContent?.trim() || "";
+
+    if (optionValue.toLowerCase() === normalizedValue) {
+      return option;
+    }
+  }
+
+  // Strategy 2: Text content match
+  for (const option of options) {
+    const optionText = option.textContent?.toLowerCase().trim() || "";
+    if (optionText === normalizedValue) {
+      return option;
+    }
+  }
+
+  // Strategy 3: Partial match
+  for (const option of options) {
+    const optionText = option.textContent?.toLowerCase().trim() || "";
+    if (optionText.includes(normalizedValue) || normalizedValue.includes(optionText)) {
+      return option;
+    }
+  }
+
+  // Strategy 4: First non-placeholder option
+  for (const option of options) {
+    const optionText = option.textContent?.toLowerCase().trim() || "";
+    if (
+      !optionText.includes("select") &&
+      !optionText.includes("choose") &&
+      !optionText.includes("please") &&
+      optionText.length > 0
+    ) {
+      return option;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Enhanced Material-UI Select handler
+ */
+export const handleMaterialUISelect = (element: HTMLElement, normalizedValues: string[]): boolean => {
+  try {
+    console.log("🔍 Handling Material-UI Select component...", element);
+
+    // Enhanced Material-UI detection patterns
+    const isMaterialUI = detectMaterialUIComponent(element);
+
+    if (!isMaterialUI) {
+      return false;
+    }
+
+    console.log("✅ Confirmed Material-UI Select component detected");
+
+    // Find the Material-UI select container
+    const selectContainer = findMaterialUISelectContainer(element);
+
+    if (!selectContainer) {
+      console.warn("❌ Could not find Material-UI Select container");
+      return false;
+    }
+
+    console.log("🎯 Found Material-UI Select container:", selectContainer);
+
+    // Open the dropdown
+    const opened = openMaterialUIDropdown(selectContainer);
+    if (!opened) {
+      console.warn("❌ Could not open Material-UI dropdown");
+      return false;
+    }
+
+    // Wait briefly for the dropdown to render
+    setTimeout(() => {
+      selectMaterialUIOption(normalizedValues[0], element);
+    }, 100);
+
+    return true;
+  } catch (error) {
+    console.error("❌ Error in handleMaterialUISelect:", error);
+    return false;
+  }
+};
+
+/**
+ * Detect if element is part of a Material-UI Select component
+ */
+function detectMaterialUIComponent(element: HTMLElement): boolean {
+  // Check element itself
+  if (hasMaterialUIClasses(element)) return true;
+
+  // Check parent chain (up to 5 levels)
+  let current = element.parentElement;
+  let depth = 0;
+  while (current && depth < 5) {
+    if (hasMaterialUIClasses(current)) return true;
+    current = current.parentElement;
+    depth++;
+  }
+
+  // Check for Material-UI specific attributes
+  if (element.getAttribute("role") === "combobox" && element.className.includes("Mui")) {
+    return true;
+  }
+
+  // Check for hidden native select with Material-UI patterns
+  const nativeSelect = element.querySelector("select") || element.parentElement?.querySelector("select");
+  if (nativeSelect && hasMaterialUIClasses(nativeSelect.parentElement as HTMLElement)) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Check if element has Material-UI related classes
+ */
+function hasMaterialUIClasses(element: HTMLElement): boolean {
+  if (!element) return false;
+
+  const className = element.className.toLowerCase();
+  const materialUIPatterns = [
+    "mui",
+    "muiselect",
+    "muiformcontrol",
+    "muiinputbase",
+    "muiinput",
+    "muioutlinedinput",
+    "muifilledinput",
+    "css-.*-muiselect", // Emotion CSS classes
+    "css-.*-muiinputbase",
+    "css-.*-muiinput",
+    "makeStyles", // Material-UI JSS
+    "withStyles",
+  ];
+
+  return materialUIPatterns.some(pattern => {
+    if (pattern.includes("css-.*")) {
+      return new RegExp(pattern).test(className);
+    }
+    return className.includes(pattern);
+  });
+}
+
+/**
+ * Find the Material-UI select container element
+ */
+function findMaterialUISelectContainer(element: HTMLElement): HTMLElement | null {
+  // Strategy 1: Look for FormControl in parent chain
+  let current: HTMLElement | null = element;
+  while (current) {
+    if (current.className.includes("MuiFormControl") || current.className.includes("MuiSelect")) {
+      return current;
+    }
+    current = current.parentElement;
+  }
+
+  // Strategy 2: Look for InputBase
+  current = element;
+  while (current) {
+    if (current.className.includes("MuiInputBase") || current.className.includes("MuiInput")) {
+      return current;
+    }
+    current = current.parentElement;
+  }
+
+  // Strategy 3: Use CSS selector to find nearby Material-UI select
+  const nearbySelects = document.querySelectorAll(`
+    [class*="MuiSelect"],
+    [class*="MuiFormControl"],
+    [class*="MuiInputBase"],
+    [class*="css-"][class*="MuiSelect"],
+    [class*="css-"][class*="MuiInputBase"]
+  `);
+
+  let closest: HTMLElement | null = null;
+  let closestDistance = Infinity;
+
+  for (const select of Array.from(nearbySelects)) {
+    const selectElement = select as HTMLElement;
+    const distance = getElementDistance(element, selectElement);
+    if (distance < closestDistance) {
+      closestDistance = distance;
+      closest = selectElement;
+    }
+  }
+
+  return closest;
+}
+
+/**
+ * Open Material-UI dropdown
+ */
+function openMaterialUIDropdown(container: HTMLElement): boolean {
+  try {
+    // Try clicking the select element
+    const selectElement =
+      container.querySelector('[role="combobox"], [role="button"]') || container.querySelector("input") || container;
+
+    if (selectElement instanceof HTMLElement) {
+      selectElement.click();
+
+      // Also try clicking the dropdown arrow
+      const arrow = container.querySelector('[class*="arrow"], [class*="icon"], [class*="dropdown"]');
+      if (arrow instanceof HTMLElement) {
+        arrow.click();
+      }
+
+      return true;
+    }
+
+    return false;
+  } catch (error) {
+    console.error("Error opening Material-UI dropdown:", error);
+    return false;
+  }
+}
+
+/**
+ * Select an option in Material-UI dropdown
+ */
+function selectMaterialUIOption(value: string, originalElement: HTMLElement): void {
+  try {
+    // Find dropdown menu - Material-UI often uses Popover or Menu
+    const menuSelectors = [
+      '[class*="MuiMenu-list"]',
+      '[class*="MuiPopover-paper"]',
+      '[class*="MuiSelect-menu"]',
+      '[class*="css-"][class*="MuiMenu"]',
+      '[role="listbox"]',
+      '[role="menu"]',
+    ];
+
+    let menu: HTMLElement | null = null;
+    for (const selector of menuSelectors) {
+      menu = document.querySelector(selector) as HTMLElement;
+      if (menu && window.getComputedStyle(menu).display !== "none") {
+        break;
+      }
+    }
+
+    if (!menu) {
+      console.warn("Could not find Material-UI dropdown menu");
+      return;
+    }
+
+    // Find options
+    const optionSelectors = [
+      '[class*="MuiMenuItem"]',
+      '[class*="MuiListItem"]',
+      '[class*="css-"][class*="MuiMenuItem"]',
+      '[role="option"]',
+      '[role="menuitem"]',
+    ];
+
+    let options: HTMLElement[] = [];
+    for (const selector of optionSelectors) {
+      const foundOptions = menu.querySelectorAll(selector);
+      if (foundOptions.length > 0) {
+        options = Array.from(foundOptions) as HTMLElement[];
+        break;
+      }
+    }
+
+    if (options.length === 0) {
+      console.warn("No options found in Material-UI dropdown");
+      return;
+    }
+
+    // Find matching option
+    const matchingOption = findMatchingMaterialUIOption(options, value);
+
+    if (matchingOption) {
+      console.log("🎯 Clicking matching Material-UI option:", matchingOption.textContent);
+      matchingOption.click();
+
+      // Dispatch additional events
+      matchingOption.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+      matchingOption.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+
+      // Update original element if it's an input
+      if (originalElement instanceof HTMLInputElement) {
+        originalElement.value = value;
+        originalElement.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+    } else {
+      console.warn("No matching option found for value:", value);
+      // Close dropdown by pressing Escape
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    }
+  } catch (error) {
+    console.error("Error selecting Material-UI option:", error);
+  }
+}
+
+/**
+ * Find matching option in Material-UI dropdown
+ */
+function findMatchingMaterialUIOption(options: HTMLElement[], value: string): HTMLElement | null {
+  const normalizedValue = value.toLowerCase().trim();
+
+  // Strategy 1: Exact value match
+  for (const option of options) {
+    const optionValue =
+      option.getAttribute("data-value") || option.getAttribute("value") || option.textContent?.trim() || "";
+
+    if (optionValue.toLowerCase() === normalizedValue) {
+      return option;
+    }
+  }
+
+  // Strategy 2: Text content match
+  for (const option of options) {
+    const optionText = option.textContent?.toLowerCase().trim() || "";
+    if (optionText === normalizedValue) {
+      return option;
+    }
+  }
+
+  // Strategy 3: Partial match
+  for (const option of options) {
+    const optionText = option.textContent?.toLowerCase().trim() || "";
+    if (optionText.includes(normalizedValue) || normalizedValue.includes(optionText)) {
+      return option;
+    }
+  }
+
+  // Strategy 4: First non-placeholder option
+  for (const option of options) {
+    const optionText = option.textContent?.toLowerCase().trim() || "";
+    if (
+      !optionText.includes("select") &&
+      !optionText.includes("choose") &&
+      !optionText.includes("please") &&
+      optionText.length > 0
+    ) {
+      return option;
+    }
+  }
+
+  return null;
+}
 
 /**
  * Handle Tsselect components commonly found on career sites
@@ -285,28 +896,54 @@ export const handleTsselect = (element: HTMLSelectElement, normalizedValues: str
  */
 export const updateSelect = (element: HTMLElement, value: string | string[] | unknown): void => {
   try {
-    // Handle standard HTML select elements
+    const normalizedValues = normalizeSelectValue(value);
+
+    // Enhanced framework-specific handling
+
+    // 1. Try React Select first (most common modern pattern)
+    if (handleReactSelect(element, normalizedValues)) {
+      console.log("✅ Successfully handled as React Select");
+      return;
+    }
+
+    // 2. Try Material-UI Select
+    if (handleMaterialUISelect(element, normalizedValues)) {
+      console.log("✅ Successfully handled as Material-UI Select");
+      return;
+    }
+
+    // 3. Try specialized Tsselect handler (for career sites)
+    if (element instanceof HTMLSelectElement && handleTsselect(element, normalizedValues)) {
+      console.log("✅ Successfully handled as Tsselect");
+      return;
+    }
+
+    // 4. Standard HTML select elements
     if (element instanceof HTMLSelectElement) {
       updateStandardSelect(element, value);
+      return;
     }
-    // Handle ARIA combobox/listbox elements
-    else if (element.getAttribute("role") === "combobox" || element.getAttribute("role") === "listbox") {
+
+    // 5. ARIA combobox/listbox elements
+    if (element.getAttribute("role") === "combobox" || element.getAttribute("role") === "listbox") {
       updateAriaSelect(element, value);
+      return;
     }
-    // Handle custom select components
-    else if (isCustomSelect(element)) {
+
+    // 6. Custom select components (fallback)
+    if (isCustomSelect(element)) {
       updateCustomSelect(element, value);
+      return;
     }
-    // Handle other elements that might be part of a select component
-    else {
-      // Try to find the actual select element that might be associated with this element
-      const associatedSelect = findAssociatedSelectElement(element);
-      if (associatedSelect) {
-        updateSelect(associatedSelect, value);
-      } else {
-        console.warn("Could not determine how to update this select-like element:", element);
-      }
+
+    // 7. Try to find associated select element
+    const associatedSelect = findAssociatedSelectElement(element);
+    if (associatedSelect) {
+      updateSelect(associatedSelect, value);
+      return;
     }
+
+    console.warn("Could not determine how to update this select-like element:", element);
   } catch (error) {
     console.error("Error updating select element:", error);
   }
@@ -751,7 +1388,7 @@ export const detectSelectFields = async (
       return true;
     }
 
-    // Strategy 3: Popular select libraries
+    // Strategy 3: Popular select libraries and frameworks
     const className = element.className.toLowerCase();
     if (
       className.includes("select2-container") ||
@@ -759,7 +1396,25 @@ export const detectSelectFields = async (
       className.includes("selectize-control") ||
       className.includes("react-select") ||
       className.includes("vue-select") ||
-      className.includes("ng-select")
+      className.includes("ng-select") ||
+      // Material-UI patterns
+      className.includes("muiselect") ||
+      className.includes("muiformcontrol") ||
+      className.includes("muiinputbase") ||
+      // Ant Design patterns
+      className.includes("ant-select") ||
+      className.includes("antd-select") ||
+      // Chakra UI patterns
+      className.includes("chakra-select") ||
+      // Bootstrap patterns
+      className.includes("form-select") ||
+      className.includes("form-control") ||
+      // Generic modern patterns
+      (className.includes("css-") && (className.includes("select") || className.includes("input"))) ||
+      // Job application specific patterns
+      className.includes("application-select") ||
+      className.includes("job-select") ||
+      className.includes("candidate-select")
     ) {
       return true;
     }

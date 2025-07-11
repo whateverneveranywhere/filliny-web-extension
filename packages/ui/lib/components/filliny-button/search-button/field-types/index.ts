@@ -2,328 +2,1620 @@
 import { detectCheckableFields } from "./checkable";
 import { detectFileFields } from "./file";
 import { detectSelectFields } from "./select";
-import { detectTextField, detectInputField, updateTextField, updateContentEditable } from "./text";
-import { safeGetString, safeGetLowerString, safeGetAttributes } from "./utils";
+import { detectTextField } from "./text";
 import type { Field } from "@extension/shared";
 
-export * from "./utils";
-export * from "./text";
-export * from "./checkable";
-export * from "./file";
-export * from "./select";
-
 /**
- * Enhanced field detection with multiple strategies and robust error handling
+ * Universal field detection with multiple strategies and robust error handling
+ * Now supports dynamic content, behavioral analysis, and adaptive learning
  */
 const getFormElementsRobust = (container: HTMLElement | ShadowRoot): HTMLElement[] => {
-  // Strategy 1: Direct selector matching
-  let elements = applyBasicSelectorMatching(container);
+  console.log(`🔍 Starting universal field detection in container: ${container.constructor.name}`);
 
-  // Strategy 2: Pattern-based detection for custom components
-  if (elements.length < 2) {
-    elements = enhanceWithBasicPatternDetection(container, elements);
+  // Strategy 1: Direct selector matching with universal patterns
+  let elements = applyUniversalSelectorMatching(container);
+  console.log(`📋 Direct selector matching found ${elements.length} elements`);
+
+  // Strategy 2: Behavioral pattern detection for interactive elements
+  if (elements.length < 3) {
+    elements = enhanceWithBehavioralPatternDetection(container, elements);
+    console.log(`🎯 Behavioral detection enhanced to ${elements.length} elements`);
   }
 
-  // Strategy 3: Shadow DOM exploration
-  elements = enhanceWithBasicShadowDOMDetection(container, elements);
+  // Strategy 3: Shadow DOM and custom component exploration
+  elements = enhanceWithAdvancedShadowDOMDetection(container, elements);
+  console.log(`🔍 Shadow DOM detection enhanced to ${elements.length} elements`);
 
-  // Final filtering step
-  return applyBasicFieldFiltering(elements);
+  // Strategy 4: Semantic analysis for accessibility-compliant elements
+  elements = enhanceWithSemanticAnalysis(container, elements);
+  console.log(`📊 Semantic analysis enhanced to ${elements.length} elements`);
+
+  // Strategy 5: Visual layout analysis for form-like structures
+  elements = enhanceWithVisualAnalysis(container, elements);
+  console.log(`👁️ Visual analysis enhanced to ${elements.length} elements`);
+
+  // Final filtering with confidence scoring
+  const filteredElements = applyUniversalFieldFiltering(elements);
+  console.log(`✅ Final filtered result: ${filteredElements.length} elements`);
+
+  return filteredElements;
 };
 
 /**
- * Apply basic CSS selector matching for form elements
+ * Create universal form element selectors with confidence scoring
+ * Each selector has a confidence score indicating reliability
  */
-const applyBasicSelectorMatching = (container: HTMLElement | ShadowRoot): HTMLElement[] => {
-  const fieldSelectors = createBasicFormElementSelectors();
-  const elements: HTMLElement[] = [];
+interface SelectorWithConfidence {
+  selector: string;
+  confidence: number;
+  description: string;
+}
 
-  // Strategy 1: Direct selector matching
-  for (const selector of fieldSelectors) {
+const createUniversalFormElementSelectors = (): SelectorWithConfidence[] => [
+  // Standard form fields (highest confidence)
+  {
+    selector:
+      'input:not([type="hidden"]):not([type="submit"]):not([type="button"]):not([type="reset"]):not([type="image"])',
+    confidence: 0.95,
+    description: "Standard HTML input elements",
+  },
+  {
+    selector: "select",
+    confidence: 0.95,
+    description: "Standard HTML select elements",
+  },
+  {
+    selector: "textarea",
+    confidence: 0.95,
+    description: "Standard HTML textarea elements",
+  },
+
+  // ARIA form fields (high confidence)
+  {
+    selector: '[role="textbox"]',
+    confidence: 0.9,
+    description: "ARIA textbox elements",
+  },
+  {
+    selector: '[role="combobox"]',
+    confidence: 0.9,
+    description: "ARIA combobox elements",
+  },
+  {
+    selector: '[role="spinbutton"]',
+    confidence: 0.9,
+    description: "ARIA spinbutton elements",
+  },
+  {
+    selector: '[role="checkbox"]',
+    confidence: 0.9,
+    description: "ARIA checkbox elements",
+  },
+  {
+    selector: '[role="switch"]',
+    confidence: 0.9,
+    description: "ARIA switch elements",
+  },
+  {
+    selector: '[role="radio"]',
+    confidence: 0.9,
+    description: "ARIA radio elements",
+  },
+  {
+    selector: '[role="searchbox"]',
+    confidence: 0.9,
+    description: "ARIA searchbox elements",
+  },
+  {
+    selector: '[role="listbox"]',
+    confidence: 0.85,
+    description: "ARIA listbox elements",
+  },
+  {
+    selector: '[role="slider"]',
+    confidence: 0.85,
+    description: "ARIA slider elements",
+  },
+
+  // Content editable (high confidence)
+  {
+    selector: '[contenteditable="true"]',
+    confidence: 0.85,
+    description: "Content editable elements",
+  },
+  {
+    selector: '[contenteditable=""]',
+    confidence: 0.8,
+    description: "Content editable elements (empty value)",
+  },
+
+  // File upload fields (enhanced universal detection)
+  {
+    selector: 'input[type="file"]',
+    confidence: 0.95,
+    description: "Standard file input elements",
+  },
+  {
+    selector: "[accept]",
+    confidence: 0.7,
+    description: "Elements with accept attribute",
+  },
+  {
+    selector: "[data-file-upload]",
+    confidence: 0.8,
+    description: "Elements with file upload data attribute",
+  },
+  {
+    selector: "[data-upload]",
+    confidence: 0.75,
+    description: "Elements with upload data attribute",
+  },
+  {
+    selector: '[class*="upload"][role="button"]',
+    confidence: 0.8,
+    description: "Upload buttons with ARIA role",
+  },
+  {
+    selector: '[class*="file"][role="button"]',
+    confidence: 0.75,
+    description: "File buttons with ARIA role",
+  },
+  {
+    selector: '[class*="dropzone"]',
+    confidence: 0.8,
+    description: "Dropzone elements",
+  },
+  {
+    selector: '[class*="file-drop"]',
+    confidence: 0.8,
+    description: "File drop elements",
+  },
+  {
+    selector: '[draggable="true"][class*="upload"]',
+    confidence: 0.75,
+    description: "Draggable upload elements",
+  },
+  {
+    selector: '[ondrop][class*="upload"]',
+    confidence: 0.75,
+    description: "Elements with drop handlers for uploads",
+  },
+
+  // Universal patterns for modern applications (medium confidence)
+  {
+    selector: '[class*="attach"]',
+    confidence: 0.65,
+    description: "Elements with attachment-related classes",
+  },
+  {
+    selector: '[class*="document"]',
+    confidence: 0.6,
+    description: "Elements with document-related classes",
+  },
+  {
+    selector: '[class*="resume"]',
+    confidence: 0.7,
+    description: "Elements with resume-related classes",
+  },
+  {
+    selector: '[class*="cv"]',
+    confidence: 0.7,
+    description: "Elements with CV-related classes",
+  },
+  {
+    selector: '[data-field-type="file"]',
+    confidence: 0.8,
+    description: "Elements with file field type",
+  },
+  {
+    selector: '[data-field-type="upload"]',
+    confidence: 0.8,
+    description: "Elements with upload field type",
+  },
+  {
+    selector: '[data-input-type="file"]',
+    confidence: 0.8,
+    description: "Elements with file input type",
+  },
+
+  // Interactive elements that might trigger file uploads
+  {
+    selector: 'button[class*="upload"]',
+    confidence: 0.75,
+    description: "Upload buttons",
+  },
+  {
+    selector: 'button[class*="file"]',
+    confidence: 0.7,
+    description: "File buttons",
+  },
+  {
+    selector: 'button[class*="attach"]',
+    confidence: 0.7,
+    description: "Attachment buttons",
+  },
+  {
+    selector: 'button[class*="browse"]',
+    confidence: 0.7,
+    description: "Browse buttons",
+  },
+  {
+    selector: '[role="button"][class*="upload"]',
+    confidence: 0.7,
+    description: "Upload elements with button role",
+  },
+  {
+    selector: '[role="button"][class*="file"]',
+    confidence: 0.65,
+    description: "File elements with button role",
+  },
+
+  // Hidden file input patterns (common in custom upload components)
+  {
+    selector: 'input[type="file"][style*="display: none"] + *',
+    confidence: 0.8,
+    description: "Elements following hidden file inputs",
+  },
+  {
+    selector: 'input[type="file"][class*="hidden"] + *',
+    confidence: 0.8,
+    description: "Elements following hidden file inputs (class)",
+  },
+  {
+    selector: 'input[type="file"][class*="sr-only"] + *',
+    confidence: 0.8,
+    description: "Elements following screen reader only file inputs",
+  },
+  {
+    selector: 'label[for] input[type="file"][style*="display: none"]',
+    confidence: 0.85,
+    description: "Labels for hidden file inputs",
+  },
+
+  // Custom data attributes (universal patterns)
+  {
+    selector: "[data-field]",
+    confidence: 0.8,
+    description: "Elements with data-field attribute",
+  },
+  {
+    selector: "[data-input]",
+    confidence: 0.8,
+    description: "Elements with data-input attribute",
+  },
+  {
+    selector: "[data-form-field]",
+    confidence: 0.85,
+    description: "Elements with data-form-field attribute",
+  },
+  {
+    selector: "[data-form-control]",
+    confidence: 0.85,
+    description: "Elements with data-form-control attribute",
+  },
+  {
+    selector: '[data-testid*="input"]',
+    confidence: 0.75,
+    description: "Elements with input-related test IDs",
+  },
+  {
+    selector: '[data-testid*="field"]',
+    confidence: 0.75,
+    description: "Elements with field-related test IDs",
+  },
+  {
+    selector: '[data-testid*="select"]',
+    confidence: 0.75,
+    description: "Elements with select-related test IDs",
+  },
+  {
+    selector: '[data-cy*="input"]',
+    confidence: 0.75,
+    description: "Cypress test elements for inputs",
+  },
+  {
+    selector: '[data-cy*="field"]',
+    confidence: 0.75,
+    description: "Cypress test elements for fields",
+  },
+
+  // Common CSS class patterns (medium confidence)
+  {
+    selector: ".form-control",
+    confidence: 0.8,
+    description: "Bootstrap form control elements",
+  },
+  {
+    selector: ".form-input",
+    confidence: 0.8,
+    description: "Form input elements",
+  },
+  {
+    selector: ".form-field",
+    confidence: 0.8,
+    description: "Form field elements",
+  },
+  {
+    selector: ".input-field",
+    confidence: 0.75,
+    description: "Input field elements",
+  },
+  {
+    selector: ".text-field",
+    confidence: 0.75,
+    description: "Text field elements",
+  },
+  {
+    selector: ".select-field",
+    confidence: 0.75,
+    description: "Select field elements",
+  },
+  {
+    selector: ".checkbox-field",
+    confidence: 0.75,
+    description: "Checkbox field elements",
+  },
+  {
+    selector: ".radio-field",
+    confidence: 0.75,
+    description: "Radio field elements",
+  },
+
+  // Framework-specific patterns (medium confidence)
+  {
+    selector: ".MuiTextField-root input",
+    confidence: 0.85,
+    description: "Material-UI text field inputs",
+  },
+  {
+    selector: ".MuiTextField-root textarea",
+    confidence: 0.85,
+    description: "Material-UI text field textareas",
+  },
+  {
+    selector: ".MuiSelect-root",
+    confidence: 0.85,
+    description: "Material-UI select components",
+  },
+  {
+    selector: ".MuiCheckbox-root input",
+    confidence: 0.85,
+    description: "Material-UI checkbox inputs",
+  },
+  {
+    selector: ".ant-input",
+    confidence: 0.85,
+    description: "Ant Design input components",
+  },
+  {
+    selector: ".ant-select",
+    confidence: 0.85,
+    description: "Ant Design select components",
+  },
+  {
+    selector: ".ant-checkbox-input",
+    confidence: 0.85,
+    description: "Ant Design checkbox inputs",
+  },
+  {
+    selector: ".ant-upload",
+    confidence: 0.85,
+    description: "Ant Design upload components",
+  },
+  {
+    selector: ".chakra-input",
+    confidence: 0.8,
+    description: "Chakra UI input components",
+  },
+  {
+    selector: ".chakra-select",
+    confidence: 0.8,
+    description: "Chakra UI select components",
+  },
+
+  // Bootstrap and common UI frameworks (high confidence)
+  {
+    selector: ".form-select",
+    confidence: 0.9,
+    description: "Bootstrap form select elements",
+  },
+  {
+    selector: ".form-check-input",
+    confidence: 0.9,
+    description: "Bootstrap form check inputs",
+  },
+  {
+    selector: ".form-range",
+    confidence: 0.9,
+    description: "Bootstrap form range inputs",
+  },
+
+  // Universal interactive patterns (lower confidence, broader matching)
+  {
+    selector: 'input[class*="input"]',
+    confidence: 0.6,
+    description: "Input elements with input-related classes",
+  },
+  {
+    selector: 'select[class*="select"]',
+    confidence: 0.6,
+    description: "Select elements with select-related classes",
+  },
+  {
+    selector: 'textarea[class*="textarea"]',
+    confidence: 0.6,
+    description: "Textarea elements with textarea-related classes",
+  },
+  {
+    selector: '[class*="input"][type]',
+    confidence: 0.55,
+    description: "Elements with input classes and type attribute",
+  },
+  {
+    selector: '[class*="field"][role]',
+    confidence: 0.55,
+    description: "Elements with field classes and ARIA roles",
+  },
+  {
+    selector: '[class*="control"][aria-label]',
+    confidence: 0.55,
+    description: "Elements with control classes and ARIA labels",
+  },
+
+  // Universal accessibility patterns
+  {
+    selector: '[aria-required="true"]',
+    confidence: 0.8,
+    description: "Elements marked as required via ARIA",
+  },
+  {
+    selector: "[aria-invalid]",
+    confidence: 0.75,
+    description: "Elements with ARIA invalid state",
+  },
+  {
+    selector: "[aria-describedby]",
+    confidence: 0.7,
+    description: "Elements with ARIA descriptions",
+  },
+  {
+    selector: "[aria-labelledby]",
+    confidence: 0.7,
+    description: "Elements with ARIA label references",
+  },
+
+  // Universal interaction patterns
+  {
+    selector: '[tabindex]:not([tabindex="-1"])',
+    confidence: 0.6,
+    description: "Focusable elements with tabindex",
+  },
+  {
+    selector: "[onfocus]",
+    confidence: 0.65,
+    description: "Elements with focus event handlers",
+  },
+  {
+    selector: "[onchange]",
+    confidence: 0.7,
+    description: "Elements with change event handlers",
+  },
+  {
+    selector: "[oninput]",
+    confidence: 0.7,
+    description: "Elements with input event handlers",
+  },
+
+  // Universal custom web components
+  {
+    selector: '*[is*="input"]',
+    confidence: 0.6,
+    description: "Custom elements extending input",
+  },
+  {
+    selector: '*[is*="select"]',
+    confidence: 0.6,
+    description: "Custom elements extending select",
+  },
+  {
+    selector: '*[is*="field"]',
+    confidence: 0.6,
+    description: "Custom elements extending field",
+  },
+
+  // Custom elements with hyphenated names (Web Components)
+  {
+    selector: '*[class*="-input"]',
+    confidence: 0.5,
+    description: "Elements with hyphenated input classes",
+  },
+  {
+    selector: '*[class*="-field"]',
+    confidence: 0.5,
+    description: "Elements with hyphenated field classes",
+  },
+  {
+    selector: '*[class*="-control"]',
+    confidence: 0.5,
+    description: "Elements with hyphenated control classes",
+  },
+];
+
+/**
+ * Apply universal CSS selector matching for form elements
+ * Enhanced with confidence scoring and multiple detection strategies
+ */
+const applyUniversalSelectorMatching = (container: HTMLElement | ShadowRoot): HTMLElement[] => {
+  const fieldSelectors = createUniversalFormElementSelectors();
+  const elements: HTMLElement[] = [];
+  const elementConfidence = new Map<HTMLElement, number>();
+
+  // Strategy 1: High-confidence selectors (standard form elements)
+  const highConfidenceSelectors = fieldSelectors.filter(s => s.confidence >= 0.9);
+  for (const selectorObj of highConfidenceSelectors) {
     try {
-      const found = Array.from(container.querySelectorAll<HTMLElement>(selector));
-      elements.push(...found);
+      const found = Array.from(container.querySelectorAll<HTMLElement>(selectorObj.selector));
+      found.forEach(el => {
+        elements.push(el);
+        elementConfidence.set(el, selectorObj.confidence);
+      });
     } catch (e) {
-      console.debug(`Selector failed: ${selector}`, e);
+      console.debug(`High-confidence selector failed: ${selectorObj.selector}`, e);
     }
   }
 
-  // Remove duplicates
+  // Strategy 2: Medium-confidence selectors (ARIA and semantic elements)
+  const mediumConfidenceSelectors = fieldSelectors.filter(s => s.confidence >= 0.7 && s.confidence < 0.9);
+  for (const selectorObj of mediumConfidenceSelectors) {
+    try {
+      const found = Array.from(container.querySelectorAll<HTMLElement>(selectorObj.selector));
+      found.forEach(el => {
+        if (!elements.includes(el)) {
+          elements.push(el);
+          elementConfidence.set(el, selectorObj.confidence);
+        }
+      });
+    } catch (e) {
+      console.debug(`Medium-confidence selector failed: ${selectorObj.selector}`, e);
+    }
+  }
+
+  // Strategy 3: Low-confidence selectors (pattern-based detection)
+  const lowConfidenceSelectors = fieldSelectors.filter(s => s.confidence < 0.7);
+  for (const selectorObj of lowConfidenceSelectors) {
+    try {
+      const found = Array.from(container.querySelectorAll<HTMLElement>(selectorObj.selector));
+      found.forEach(el => {
+        if (!elements.includes(el)) {
+          elements.push(el);
+          elementConfidence.set(el, selectorObj.confidence);
+        }
+      });
+    } catch (e) {
+      console.debug(`Low-confidence selector failed: ${selectorObj.selector}`, e);
+    }
+  }
+
+  // Store confidence scores for later use
+  elements.forEach(el => {
+    const confidence = elementConfidence.get(el) || 0.5;
+    el.setAttribute("data-filliny-confidence", confidence.toString());
+  });
+
   return Array.from(new Set(elements));
 };
 
 /**
- * Create basic form element selectors (includes file upload specific selectors)
+ * Enhance with behavioral pattern detection for interactive elements
+ * Uses behavioral analysis to identify form-like elements
  */
-const createBasicFormElementSelectors = (): string[] => [
-  // Standard form fields (highest priority)
-  'input:not([type="hidden"]):not([type="submit"]):not([type="button"]):not([type="reset"]):not([type="image"])',
-  "select",
-  "textarea",
-
-  // ARIA form fields
-  '[role="textbox"]',
-  '[role="combobox"]',
-  '[role="spinbutton"]',
-  '[role="checkbox"]',
-  '[role="switch"]',
-  '[role="radio"]',
-  '[role="searchbox"]',
-  '[role="listbox"]',
-  '[role="slider"]',
-
-  // Content editable
-  '[contenteditable="true"]',
-
-  // File upload fields (enhanced detection)
-  'input[type="file"]',
-  "[accept]", // Elements with accept attribute often indicate file uploads
-  "[data-file-upload]",
-  "[data-upload]",
-  "[data-file-input]",
-  ".file-upload",
-  ".file-input",
-  ".upload-area",
-  ".dropzone",
-  ".file-drop",
-  ".upload-dropzone",
-  ".file-picker",
-  '.upload-button[type="button"]',
-  '[class*="upload"][role="button"]',
-  '[class*="file-upload"]',
-  '[class*="file-input"]',
-  '[data-testid*="upload"]',
-  '[data-testid*="file"]',
-  '[data-cy*="upload"]',
-  '[data-cy*="file"]',
-  '[data-qa*="upload"]',
-  '[data-qa*="file"]',
-
-  // Enhanced patterns for modern job application sites
-  '[class*="attach"]',
-  '[class*="attachment"]',
-  '[class*="document"]',
-  '[class*="file-field"]',
-  '[class*="upload-field"]',
-  '[class*="drop-zone"]',
-  '[class*="drag-drop"]',
-  '[class*="file-browser"]',
-  '[class*="file-chooser"]',
-  '[class*="file-selector"]',
-
-  // Personio-style patterns
-  '[class*="personio"]',
-  "[data-personio]",
-  '[class*="resume"]',
-  '[class*="cv"]',
-
-  // Ashby-style patterns
-  '[class*="ashby"]',
-  "[data-ashby]",
-  '[class*="_systemfield_resume"]',
-
-  // Generic job application patterns
-  '[class*="application"]',
-  '[data-field-type="file"]',
-  '[data-field-type="upload"]',
-  '[data-input-type="file"]',
-
-  // Button elements that might trigger file uploads
-  'button[class*="upload"]',
-  'button[class*="file"]',
-  'button[class*="attach"]',
-  'button[class*="browse"]',
-  'div[class*="upload"][role="button"]',
-  'div[class*="file"][role="button"]',
-  'span[class*="upload"][role="button"]',
-
-  // Hidden file input patterns (common in custom upload components)
-  'input[type="file"][style*="display: none"] + *',
-  'input[type="file"][style*="visibility: hidden"] + *',
-  'input[type="file"][class*="hidden"] + *',
-  'input[type="file"][class*="sr-only"] + *',
-
-  // Custom data attributes (common patterns)
-  "[data-field]",
-  "[data-input]",
-  "[data-form-field]",
-  "[data-form-control]",
-  '[data-testid*="input"]',
-  '[data-testid*="field"]',
-  '[data-testid*="select"]',
-  '[data-qa*="input"]',
-  '[data-qa*="field"]',
-  '[data-qa*="select"]',
-  '[data-cy*="input"]',
-  '[data-cy*="field"]',
-  '[data-cy*="select"]',
-
-  // Common CSS class patterns
-  ".form-control",
-  ".form-input",
-  ".form-field",
-  ".input-field",
-  ".text-field",
-  ".select-field",
-  ".checkbox-field",
-  ".radio-field",
-  ".field-input",
-  ".field-select",
-  ".custom-field",
-  ".custom-input",
-  ".custom-select",
-
-  // Framework-specific patterns
-  ".MuiTextField-root input",
-  ".MuiTextField-root textarea",
-  ".MuiSelect-root",
-  ".MuiCheckbox-root input",
-  ".MuiRadio-root input",
-  ".MuiSlider-root",
-  ".ant-input",
-  ".ant-select",
-  ".ant-checkbox-input",
-  ".ant-radio-input",
-  ".ant-textarea",
-  ".ant-slider",
-  ".ant-upload",
-  ".ant-upload-wrapper",
-  ".chakra-input",
-  ".chakra-select",
-  ".chakra-checkbox__input",
-  ".chakra-radio__input",
-  ".chakra-slider",
-
-  // Bootstrap and common UI frameworks
-  ".form-control",
-  ".form-select",
-  ".form-check-input",
-  ".form-range",
-
-  // Generic component patterns (be more specific to avoid false positives)
-  'input[class*="input"]',
-  'select[class*="select"]',
-  'textarea[class*="textarea"]',
-  '[class*="input"][type]',
-  '[class*="field"][role]',
-  '[class*="control"][aria-label]',
-];
-
-/**
- * Enhance with basic pattern detection for custom components
- */
-const enhanceWithBasicPatternDetection = (
+const enhanceWithBehavioralPatternDetection = (
   container: HTMLElement | ShadowRoot,
   existingElements: HTMLElement[],
 ): HTMLElement[] => {
-  console.log("Few elements found with direct selectors, trying pattern-based detection...");
+  console.log("🎯 Enhancing with behavioral pattern detection...");
 
   const allElements = Array.from(container.querySelectorAll<HTMLElement>("*"));
-  const patternElements = allElements.filter(el => isBasicFormFieldByPatterns(el, existingElements));
+  const behavioralElements = allElements.filter(el => isInteractiveFormFieldByBehavior(el, existingElements));
 
-  console.log(`Found ${patternElements.length} additional elements through pattern detection`);
-  const combinedElements = [...existingElements, ...patternElements];
+  console.log(`🎯 Found ${behavioralElements.length} additional elements through behavioral analysis`);
+  const combinedElements = [...existingElements, ...behavioralElements];
   return Array.from(new Set(combinedElements));
 };
 
 /**
- * Check if element is a form field using basic pattern detection
+ * Check if element is a form field using behavioral analysis
+ * Analyzes interaction patterns, accessibility features, and user behavior expectations
  */
-const isBasicFormFieldByPatterns = (el: HTMLElement, existingElements: HTMLElement[]): boolean => {
+const isInteractiveFormFieldByBehavior = (el: HTMLElement, existingElements: HTMLElement[]): boolean => {
   // Skip if already found
   if (existingElements.includes(el)) return false;
 
   // Skip non-interactive elements
-  if (["SCRIPT", "STYLE", "META", "LINK", "TITLE", "HEAD"].includes(el.tagName)) {
+  if (["SCRIPT", "STYLE", "META", "LINK", "TITLE", "HEAD", "NOSCRIPT"].includes(el.tagName)) {
     return false;
   }
 
-  const indicators = gatherBasicElementIndicators(el);
-  const indicatorCount = indicators.filter(Boolean).length;
+  // Use advanced behavioral scoring
+  const behavioralScore = calculateBehavioralFormFieldScore(el);
+  const confidenceThreshold = getDynamicConfidenceThreshold(el);
 
-  // Must have at least 2 indicators to be considered a form field
-  return indicatorCount >= 2;
+  return behavioralScore >= confidenceThreshold;
 };
 
 /**
- * Gather basic indicators for form field detection
+ * Calculate behavioral score for form field likelihood using advanced analysis
+ * Enhanced with framework detection, pattern recognition, and adaptive scoring
  */
-const gatherBasicElementIndicators = (el: HTMLElement): boolean[] => {
-  // Check for interactive attributes
-  const hasInteractiveAttrs =
-    el.hasAttribute("tabindex") ||
-    el.hasAttribute("onclick") ||
-    el.hasAttribute("onchange") ||
-    el.hasAttribute("oninput") ||
-    el.hasAttribute("onfocus") ||
-    el.hasAttribute("onblur");
+const calculateBehavioralFormFieldScore = (el: HTMLElement): number => {
+  let score = 0;
 
-  // Check for form-like classes or IDs
-  const className = el?.className?.toLowerCase() || "";
-  const id = el.id.toLowerCase() || "";
-  const hasFormLikeNames =
-    /\b(input|field|select|checkbox|radio|textarea|control|form|widget|picker|slider|range)\b/.test(
-      className + " " + id,
+  // 1. Interaction capability analysis (25 points max)
+  score += analyzeInteractionCapability(el);
+
+  // 2. Accessibility implementation (20 points max)
+  score += analyzeAccessibilityImplementation(el);
+
+  // 3. Semantic meaning analysis (20 points max)
+  score += analyzeSemanticMeaning(el);
+
+  // 4. User experience patterns (15 points max)
+  score += analyzeUserExperiencePatterns(el);
+
+  // 5. Context clues analysis (10 points max)
+  score += analyzeContextClues(el);
+
+  // 6. Framework-specific patterns (10 points max)
+  score += analyzeFrameworkPatterns(el);
+
+  // 7. Advanced interaction patterns (10 points max)
+  score += analyzeAdvancedInteractionPatterns(el);
+
+  // 8. Visual characteristics analysis (5 points max)
+  score += analyzeVisualCharacteristics(el);
+
+  // Apply framework-specific boosters
+  score = applyFrameworkBoosters(el, score);
+
+  // Apply contextual multipliers
+  score = applyContextualMultipliers(el, score);
+
+  return Math.min(100, Math.round(score));
+};
+
+/**
+ * Analyze interaction capability of an element with enhanced detection
+ */
+const analyzeInteractionCapability = (el: HTMLElement): number => {
+  let score = 0;
+
+  // Standard form elements get high score
+  if (["INPUT", "SELECT", "TEXTAREA", "BUTTON"].includes(el.tagName)) {
+    score += 20;
+
+    // Additional scoring for input types
+    if (el instanceof HTMLInputElement) {
+      const inputType = el.type;
+      if (["text", "email", "password", "tel", "url", "search", "number"].includes(inputType)) {
+        score += 5;
+      }
+    }
+  }
+
+  // Focusable elements with enhanced detection
+  if (el.tabIndex >= 0 || el.hasAttribute("tabindex")) {
+    score += 8;
+
+    // Bonus for non-negative tabindex (properly focusable)
+    if (el.tabIndex >= 0) {
+      score += 2;
+    }
+  }
+
+  // Content editable with type detection
+  if (el.hasAttribute("contenteditable") && el.getAttribute("contenteditable") !== "false") {
+    score += 12;
+
+    // Bonus for rich text editor patterns
+    if (el.closest('[class*="editor"], [class*="wysiwyg"], [class*="rich-text"]')) {
+      score += 3;
+    }
+  }
+
+  // Event handlers suggest interactivity (enhanced)
+  const interactiveEvents = [
+    "onclick",
+    "onchange",
+    "oninput",
+    "onfocus",
+    "onblur",
+    "onkeydown",
+    "onkeyup",
+    "onkeypress",
+    "onsubmit",
+    "onreset",
+  ];
+  const eventHandlerCount = interactiveEvents.filter(event => el.hasAttribute(event)).length;
+  score += Math.min(8, eventHandlerCount * 1.5);
+
+  // ARIA roles that indicate interactivity (enhanced)
+  const interactiveRoles = [
+    "textbox",
+    "combobox",
+    "checkbox",
+    "radio",
+    "switch",
+    "button",
+    "slider",
+    "spinbutton",
+    "searchbox",
+    "listbox",
+    "option",
+  ];
+  const role = el.getAttribute("role");
+  if (role && interactiveRoles.includes(role)) {
+    score += 15;
+
+    // Bonus for composite roles
+    if (["combobox", "listbox"].includes(role)) {
+      score += 3;
+    }
+  }
+
+  // Check for modern input patterns
+  if (el.hasAttribute("data-testid") || el.hasAttribute("data-cy")) {
+    score += 2;
+  }
+
+  return Math.min(25, score);
+};
+
+/**
+ * Analyze accessibility implementation with enhanced ARIA detection
+ */
+const analyzeAccessibilityImplementation = (el: HTMLElement): number => {
+  let score = 0;
+
+  // ARIA labels and descriptions (enhanced)
+  if (el.hasAttribute("aria-label")) {
+    score += 6;
+    // Bonus for descriptive labels
+    const label = el.getAttribute("aria-label");
+    if (label && label.length > 3) {
+      score += 2;
+    }
+  }
+
+  if (el.hasAttribute("aria-labelledby")) {
+    score += 5;
+    // Verify the referenced element exists
+    const labelId = el.getAttribute("aria-labelledby");
+    if (labelId && document.getElementById(labelId)) {
+      score += 2;
+    }
+  }
+
+  if (el.hasAttribute("aria-describedby")) {
+    score += 4;
+    // Verify the referenced element exists
+    const descId = el.getAttribute("aria-describedby");
+    if (descId && document.getElementById(descId)) {
+      score += 1;
+    }
+  }
+
+  // Form-specific ARIA attributes (enhanced)
+  if (el.hasAttribute("aria-required")) {
+    score += 5;
+  }
+
+  if (el.hasAttribute("aria-invalid")) {
+    score += 3;
+  }
+
+  // Additional form-specific ARIA attributes
+  if (el.hasAttribute("aria-readonly")) {
+    score += 2;
+  }
+
+  if (el.hasAttribute("aria-disabled")) {
+    score += 2;
+  }
+
+  // ARIA states that indicate form fields (enhanced)
+  const formAriaStates = [
+    "aria-expanded",
+    "aria-checked",
+    "aria-selected",
+    "aria-pressed",
+    "aria-multiselectable",
+    "aria-autocomplete",
+    "aria-haspopup",
+  ];
+  const ariaStateCount = formAriaStates.filter(state => el.hasAttribute(state)).length;
+  score += Math.min(6, ariaStateCount * 1.5);
+
+  // Proper labeling via labels (enhanced)
+  const id = el.id;
+  if (id) {
+    const associatedLabel = document.querySelector(`label[for="${id}"]`);
+    if (associatedLabel) {
+      score += 8;
+      // Bonus for descriptive label text
+      const labelText = associatedLabel.textContent?.trim();
+      if (labelText && labelText.length > 3) {
+        score += 1;
+      }
+    }
+  }
+
+  // Check for parent label
+  const parentLabel = el.closest("label");
+  if (parentLabel && !el.closest("label")?.querySelector("label")) {
+    score += 6;
+  }
+
+  return Math.min(20, score);
+};
+
+/**
+ * Analyze semantic meaning through naming and context with enhanced patterns
+ */
+const analyzeSemanticMeaning = (el: HTMLElement): number => {
+  let score = 0;
+
+  const className = el.className?.toLowerCase() || "";
+  const id = el.id?.toLowerCase() || "";
+  const name = el.getAttribute("name")?.toLowerCase() || "";
+  const placeholder = el.getAttribute("placeholder")?.toLowerCase() || "";
+  const type = el.getAttribute("type")?.toLowerCase() || "";
+  const role = el.getAttribute("role")?.toLowerCase() || "";
+  const ariaLabel = el.getAttribute("aria-label")?.toLowerCase() || "";
+
+  const allText = `${className} ${id} ${name} ${placeholder} ${type} ${role} ${ariaLabel}`;
+
+  // Strong form field indicators (enhanced)
+  const strongIndicators = [
+    /\b(input|field|control|widget|editor|form-control)\b/,
+    /\b(text|email|password|number|tel|url|search|textarea)\b/,
+    /\b(select|choice|option|dropdown|combo|combobox)\b/,
+    /\b(checkbox|radio|switch|toggle|button)\b/,
+    /\b(upload|file|attach|document|browse)\b/,
+    /\b(date|time|calendar|picker|datepicker)\b/,
+    /\b(range|slider|spin|number|stepper)\b/,
+  ];
+
+  const strongMatches = strongIndicators.filter(pattern => pattern.test(allText)).length;
+  score += Math.min(12, strongMatches * 2.5);
+
+  // Form context indicators (enhanced)
+  const formContextIndicators = [
+    /\b(form|application|registration|profile|account)\b/,
+    /\b(name|email|phone|address|company|organization)\b/,
+    /\b(first|last|middle|full|given|family)\b/,
+    /\b(city|state|country|zip|postal|region)\b/,
+    /\b(birth|age|gender|title|position)\b/,
+    /\b(username|password|login|signin|signup)\b/,
+  ];
+
+  const contextMatches = formContextIndicators.filter(pattern => pattern.test(allText)).length;
+  score += Math.min(6, contextMatches * 1.5);
+
+  // Job application specific patterns
+  const jobApplicationIndicators = [
+    /\b(resume|cv|portfolio|experience|education)\b/,
+    /\b(skill|qualification|certification|degree)\b/,
+    /\b(position|role|job|career|employment)\b/,
+    /\b(salary|compensation|availability|location)\b/,
+  ];
+
+  const jobMatches = jobApplicationIndicators.filter(pattern => pattern.test(allText)).length;
+  score += Math.min(4, jobMatches * 2);
+
+  // Framework-specific class patterns
+  const frameworkIndicators = [
+    /\b(form-field|form-group|form-item|form-element)\b/,
+    /\b(input-field|input-group|input-wrapper)\b/,
+    /\b(field-wrapper|field-container|field-group)\b/,
+    /\b(control-group|control-wrapper)\b/,
+  ];
+
+  const frameworkMatches = frameworkIndicators.filter(pattern => pattern.test(allText)).length;
+  score += Math.min(3, frameworkMatches * 1.5);
+
+  return Math.min(20, score);
+};
+
+/**
+ * Analyze user experience patterns with enhanced UX detection
+ */
+const analyzeUserExperiencePatterns = (el: HTMLElement): number => {
+  let score = 0;
+
+  // Has placeholder text (common UX pattern)
+  if (el.hasAttribute("placeholder") && el.getAttribute("placeholder")?.trim()) {
+    score += 4;
+
+    // Bonus for descriptive placeholders
+    const placeholder = el.getAttribute("placeholder");
+    if (placeholder && placeholder.length > 5) {
+      score += 1;
+    }
+  }
+
+  // Has validation attributes (enhanced)
+  const validationAttrs = [
+    "required",
+    "pattern",
+    "min",
+    "max",
+    "minlength",
+    "maxlength",
+    "step",
+    "novalidate",
+    "formnovalidate",
+  ];
+  const validationCount = validationAttrs.filter(attr => el.hasAttribute(attr)).length;
+  score += Math.min(5, validationCount * 1);
+
+  // Has autocomplete attribute (modern form UX)
+  if (el.hasAttribute("autocomplete")) {
+    score += 3;
+
+    // Bonus for specific autocomplete values
+    const autocomplete = el.getAttribute("autocomplete");
+    if (autocomplete && !["off", "on"].includes(autocomplete)) {
+      score += 1;
+    }
+  }
+
+  // Modern input attributes
+  const modernAttrs = ["spellcheck", "inputmode", "enterkeyhint", "autocapitalize"];
+  const modernCount = modernAttrs.filter(attr => el.hasAttribute(attr)).length;
+  score += Math.min(2, modernCount * 0.5);
+
+  // Visual styling suggests input field (enhanced)
+  try {
+    const style = window.getComputedStyle(el);
+    const hasBorder = style.borderWidth !== "0px" && style.borderStyle !== "none";
+    const hasBackground = style.backgroundColor !== "rgba(0, 0, 0, 0)" && style.backgroundColor !== "transparent";
+    const hasRoundedCorners = style.borderRadius !== "0px";
+    const hasPadding = style.padding !== "0px";
+
+    let visualScore = 0;
+    if (hasBorder) visualScore += 1;
+    if (hasBackground) visualScore += 1;
+    if (hasRoundedCorners) visualScore += 0.5;
+    if (hasPadding) visualScore += 0.5;
+
+    score += Math.min(3, visualScore);
+  } catch {
+    // Ignore styling errors
+  }
+
+  // Check for error/success states
+  const hasStateClasses = el.className?.toLowerCase().match(/\b(error|invalid|success|valid|warning)\b/);
+  if (hasStateClasses) {
+    score += 1;
+  }
+
+  return Math.min(15, score);
+};
+
+/**
+ * Analyze context clues from surrounding elements with enhanced detection
+ */
+const analyzeContextClues = (el: HTMLElement): number => {
+  let score = 0;
+
+  // Inside form-like containers (enhanced)
+  const formLikeContainers = el.closest(
+    'form, fieldset, [role="form"], [role="group"], [class*="form"], [class*="application"]',
+  );
+  if (formLikeContainers) {
+    score += 4;
+
+    // Bonus for being in a direct form
+    if (formLikeContainers.tagName === "FORM") {
+      score += 2;
+    }
+  }
+
+  // Has associated label (enhanced)
+  const parentLabel = el.closest("label");
+  if (parentLabel) {
+    score += 3;
+  }
+
+  // Check for adjacent labels
+  const adjacentLabel = el.previousElementSibling || el.nextElementSibling;
+  if (adjacentLabel && adjacentLabel.tagName === "LABEL") {
+    score += 2;
+  }
+
+  // Surrounded by other likely form elements (enhanced)
+  const parent = el.parentElement;
+  if (parent) {
+    const siblingFormElements = parent.querySelectorAll(
+      'input, select, textarea, [role="textbox"], [role="combobox"], [role="checkbox"], [role="radio"]',
     );
+    if (siblingFormElements.length > 1) {
+      score += 2;
+    }
 
-  // Check for ARIA attributes that suggest interactivity
-  const hasAriaAttrs =
-    el.hasAttribute("aria-label") ||
-    el.hasAttribute("aria-labelledby") ||
-    el.hasAttribute("aria-describedby") ||
-    el.hasAttribute("aria-required") ||
-    el.hasAttribute("aria-invalid");
+    // Bonus for being in a form row or group
+    if (parent.matches('[class*="row"], [class*="group"], [class*="field"]')) {
+      score += 1;
+    }
+  }
 
-  // Check if it's focusable
-  const isFocusable =
-    el.tabIndex >= 0 ||
-    ["INPUT", "SELECT", "TEXTAREA", "BUTTON"].includes(el.tagName) ||
-    el.hasAttribute("contenteditable");
+  // Check for form validation context
+  const hasValidationContext = el.closest('[class*="validation"], [class*="error"], [class*="invalid"]');
+  if (hasValidationContext) {
+    score += 1;
+  }
 
-  // Check for event listeners (heuristic)
-  const hasEventListeners =
-    el.getAttribute("onclick") !== null || el.getAttribute("onchange") !== null || el.getAttribute("oninput") !== null;
-
-  return [hasInteractiveAttrs, hasFormLikeNames, hasAriaAttrs, isFocusable, hasEventListeners];
+  return Math.min(10, score);
 };
 
 /**
- * Enhance with basic Shadow DOM detection
+ * Analyze framework-specific patterns
  */
-const enhanceWithBasicShadowDOMDetection = (
+const analyzeFrameworkPatterns = (el: HTMLElement): number => {
+  let score = 0;
+
+  // React patterns
+  const reactPatterns = [
+    /\b(react-select|react-input|react-form)\b/,
+    /\b(mui-|material-ui|ant-design)\b/,
+    /\b(chakra-|mantine-)\b/,
+  ];
+
+  const className = el.className?.toLowerCase() || "";
+  const reactMatches = reactPatterns.filter(pattern => pattern.test(className)).length;
+  score += Math.min(4, reactMatches * 2);
+
+  // Vue patterns
+  const vuePatterns = [/\b(v-model|v-bind|vuetify)\b/, /\b(el-input|el-select|element-ui)\b/];
+
+  const vueMatches = vuePatterns.filter(pattern => pattern.test(className)).length;
+  score += Math.min(4, vueMatches * 2);
+
+  // Angular patterns
+  const angularPatterns = [/\b(mat-|angular-material)\b/, /\b(ng-|ngx-)\b/, /\b(p-|primeng)\b/];
+
+  const angularMatches = angularPatterns.filter(pattern => pattern.test(className)).length;
+  score += Math.min(4, angularMatches * 2);
+
+  // Bootstrap patterns
+  const bootstrapPatterns = [/\b(form-control|form-select|form-check)\b/, /\b(input-group|form-floating)\b/];
+
+  const bootstrapMatches = bootstrapPatterns.filter(pattern => pattern.test(className)).length;
+  score += Math.min(3, bootstrapMatches * 1.5);
+
+  // Tailwind patterns
+  const tailwindPatterns = [/\b(focus:ring|focus:border|border-gray)\b/, /\b(rounded-md|shadow-sm|px-3|py-2)\b/];
+
+  const tailwindMatches = tailwindPatterns.filter(pattern => pattern.test(className)).length;
+  score += Math.min(2, tailwindMatches * 1);
+
+  return Math.min(10, score);
+};
+
+/**
+ * Analyze advanced interaction patterns
+ */
+const analyzeAdvancedInteractionPatterns = (el: HTMLElement): number => {
+  let score = 0;
+
+  // Check for modern event listeners (not just inline handlers)
+  // Note: getEventListeners is a Chrome DevTools API, may not be available in all contexts
+  try {
+    const listeners = (el as unknown as { getEventListeners?: () => Record<string, unknown[]> }).getEventListeners?.();
+    if (listeners && Object.keys(listeners).length > 0) {
+      score += 3;
+    }
+  } catch {
+    // Ignore if not available
+  }
+
+  // Check for CSS pseudo-class support
+  try {
+    const style = window.getComputedStyle(el);
+    const hasFocusStyle = style.getPropertyValue("outline") !== "none" || style.getPropertyValue("border") !== "none";
+    if (hasFocusStyle) {
+      score += 2;
+    }
+  } catch {
+    // Ignore styling errors
+  }
+
+  // Check for data attributes that suggest form handling
+  const formDataAttributes = [
+    "data-validate",
+    "data-required",
+    "data-mask",
+    "data-format",
+    "data-field",
+    "data-input",
+    "data-form",
+    "data-control",
+  ];
+
+  const dataAttrCount = formDataAttributes.filter(attr => el.hasAttribute(attr)).length;
+  score += Math.min(3, dataAttrCount * 1);
+
+  // Check for custom properties or methods
+  const customProperties = ["value", "checked", "selectedOptions", "validity"];
+  const hasCustomProps = customProperties.some(prop => prop in el);
+  if (hasCustomProps) {
+    score += 2;
+  }
+
+  return Math.min(10, score);
+};
+
+/**
+ * Analyze visual characteristics that suggest form fields
+ */
+const analyzeVisualCharacteristics = (el: HTMLElement): number => {
+  let score = 0;
+
+  try {
+    const style = window.getComputedStyle(el);
+    const rect = el.getBoundingClientRect();
+
+    // Check for typical form field dimensions
+    const hasTypicalDimensions = rect.width > 50 && rect.width < 800 && rect.height > 20 && rect.height < 200;
+
+    if (hasTypicalDimensions) {
+      score += 2;
+    }
+
+    // Check for form field styling
+    const hasBorder = style.borderWidth !== "0px";
+    const hasBackground = style.backgroundColor !== "rgba(0, 0, 0, 0)" && style.backgroundColor !== "transparent";
+    const hasPadding = style.padding !== "0px";
+
+    if (hasBorder) score += 1;
+    if (hasBackground) score += 1;
+    if (hasPadding) score += 1;
+
+    // Check for focus indicators
+    const hasOutline = style.outline !== "none";
+    if (hasOutline) {
+      score += 1;
+    }
+  } catch {
+    // Ignore styling errors
+  }
+
+  return Math.min(5, score);
+};
+
+/**
+ * Apply framework-specific score boosters
+ */
+const applyFrameworkBoosters = (el: HTMLElement, score: number): number => {
+  const className = el.className?.toLowerCase() || "";
+  let booster = 1;
+
+  // Material-UI/MUI boost
+  if (className.includes("mui-") || className.includes("material-ui")) {
+    booster = 1.1;
+  }
+
+  // Ant Design boost
+  if (className.includes("ant-")) {
+    booster = 1.1;
+  }
+
+  // React Select boost
+  if (className.includes("react-select")) {
+    booster = 1.15;
+  }
+
+  // Bootstrap boost
+  if (className.includes("form-control") || className.includes("form-select")) {
+    booster = 1.1;
+  }
+
+  return score * booster;
+};
+
+/**
+ * Apply contextual multipliers based on page context
+ */
+const applyContextualMultipliers = (_el: HTMLElement, score: number): number => {
+  let multiplier = 1;
+
+  // Job application context multiplier
+  const pageContent = document.body.textContent?.toLowerCase() || "";
+  const jobKeywords = ["apply", "application", "career", "job", "position", "resume", "cv"];
+  const hasJobContext = jobKeywords.some(keyword => pageContent.includes(keyword));
+
+  if (hasJobContext) {
+    multiplier += 0.05;
+  }
+
+  // Form-dense page multiplier
+  const formElementsCount = document.querySelectorAll("input, select, textarea").length;
+  if (formElementsCount > 10) {
+    multiplier += 0.05;
+  }
+
+  // Dynamic content multiplier (for SPAs)
+  const hasDynamicContent = document.querySelector("[data-reactroot], [ng-app], [data-v-]");
+  if (hasDynamicContent) {
+    multiplier += 0.03;
+  }
+
+  return score * multiplier;
+};
+
+/**
+ * Get dynamic confidence threshold based on element characteristics with adaptive logic
+ */
+const getDynamicConfidenceThreshold = (el: HTMLElement): number => {
+  // Very low threshold for standard form elements
+  if (["INPUT", "SELECT", "TEXTAREA"].includes(el.tagName)) {
+    return 35;
+  }
+
+  // Low threshold for ARIA form elements
+  const role = el.getAttribute("role");
+  if (role && ["textbox", "combobox", "checkbox", "radio", "switch", "slider", "spinbutton"].includes(role)) {
+    return 45;
+  }
+
+  // Medium threshold for content editable
+  if (el.hasAttribute("contenteditable") && el.getAttribute("contenteditable") !== "false") {
+    return 50;
+  }
+
+  // Context-aware threshold adjustment
+  const contextBonus = analyzeContextualRelevance();
+  let threshold = 65;
+
+  // Lower threshold if element is in a form context
+  if (el.closest('form, fieldset, [role="form"], [role="group"]')) {
+    threshold -= 5;
+  }
+
+  // Lower threshold for elements with form-like attributes
+  const formAttributes = ["name", "placeholder", "required", "disabled", "readonly"];
+  const hasFormAttrs = formAttributes.some(attr => el.hasAttribute(attr));
+  if (hasFormAttrs) {
+    threshold -= 5;
+  }
+
+  // Apply context bonus
+  threshold -= contextBonus;
+
+  return Math.max(35, Math.round(threshold));
+};
+
+/**
+ * Analyze contextual relevance for threshold adjustment
+ */
+const analyzeContextualRelevance = (): number => {
+  let bonus = 0;
+
+  // Check if we're in a job application context
+  const pageContent = document.body.textContent?.toLowerCase() || "";
+  const jobKeywords = ["apply", "application", "career", "job", "position", "resume", "cv"];
+  const hasJobContext = jobKeywords.some(keyword => pageContent.includes(keyword));
+
+  if (hasJobContext) {
+    bonus += 3;
+  }
+
+  // Check for form-heavy pages
+  const formElementsCount = document.querySelectorAll("input, select, textarea").length;
+  if (formElementsCount > 5) {
+    bonus += 2;
+  }
+
+  return bonus;
+};
+
+/**
+ * Enhance with advanced Shadow DOM detection and custom component analysis
+ */
+const enhanceWithAdvancedShadowDOMDetection = (
   container: HTMLElement | ShadowRoot,
   existingElements: HTMLElement[],
 ): HTMLElement[] => {
+  console.log("🔍 Enhancing with advanced Shadow DOM detection...");
+
+  const shadowElements: HTMLElement[] = [];
+
+  // Strategy 1: Direct Shadow DOM access
   const shadowHosts = Array.from(container.querySelectorAll("*")).filter(
     el => (el as HTMLElement & { shadowRoot?: ShadowRoot }).shadowRoot,
   );
 
-  const shadowElements: HTMLElement[] = [];
   for (const host of shadowHosts) {
     try {
       const shadowRoot = (host as HTMLElement & { shadowRoot?: ShadowRoot }).shadowRoot;
       if (shadowRoot) {
         const elements = getFormElementsRobust(shadowRoot);
         shadowElements.push(...elements);
+        console.log(`🔍 Found ${elements.length} elements in shadow DOM of ${host.tagName}`);
       }
     } catch (e) {
       console.debug("Shadow DOM access failed:", e);
     }
   }
 
+  // Strategy 2: Custom element detection (Web Components)
+  const customElements = Array.from(container.querySelectorAll("*")).filter(
+    el => el.tagName.includes("-") && !el.tagName.startsWith("WEBKIT-"),
+  );
+
+  for (const customEl of customElements) {
+    try {
+      // Check if custom element has form-like behavior
+      if (isCustomElementFormLike(customEl as HTMLElement)) {
+        shadowElements.push(customEl as HTMLElement);
+        console.log(`🔍 Found form-like custom element: ${customEl.tagName}`);
+      }
+    } catch (e) {
+      console.debug("Custom element analysis failed:", e);
+    }
+  }
+
+  // Strategy 3: Slotted content detection
+  const slots = Array.from(container.querySelectorAll("slot"));
+  for (const slot of slots) {
+    try {
+      const assignedElements = slot.assignedElements ? slot.assignedElements() : [];
+      for (const assigned of assignedElements) {
+        if (assigned instanceof HTMLElement) {
+          const elements = getFormElementsRobust(assigned);
+          shadowElements.push(...elements);
+        }
+      }
+    } catch (e) {
+      console.debug("Slot content analysis failed:", e);
+    }
+  }
+
+  console.log(`🔍 Shadow DOM detection found ${shadowElements.length} additional elements`);
   return [...existingElements, ...shadowElements];
 };
 
 /**
- * Apply basic filtering to remove invalid elements
+ * Check if a custom element behaves like a form field
  */
-const applyBasicFieldFiltering = (elements: HTMLElement[]): HTMLElement[] =>
-  elements.filter(el => {
+const isCustomElementFormLike = (el: HTMLElement): boolean => {
+  // Check for form-like attributes
+  const formLikeAttrs = ["value", "name", "required", "disabled", "readonly", "placeholder"];
+  const hasFormAttrs = formLikeAttrs.some(attr => el.hasAttribute(attr));
+
+  // Check for form-like methods
+  const formLikeMethods = ["focus", "blur", "click", "select"];
+  const hasFormMethods = formLikeMethods.some(
+    method => typeof (el as unknown as Record<string, unknown>)[method] === "function",
+  );
+
+  // Check for form-like events
+  const formLikeEvents = ["onchange", "oninput", "onfocus", "onblur"];
+  const hasFormEvents = formLikeEvents.some(event => el.hasAttribute(event));
+
+  // Check for ARIA roles
+  const role = el.getAttribute("role");
+  const hasFormRole = role && ["textbox", "combobox", "checkbox", "radio", "switch", "slider"].includes(role);
+
+  return Boolean(hasFormAttrs || hasFormMethods || hasFormEvents || hasFormRole);
+};
+
+/**
+ * Enhance with semantic analysis for accessibility-compliant elements
+ */
+const enhanceWithSemanticAnalysis = (
+  container: HTMLElement | ShadowRoot,
+  existingElements: HTMLElement[],
+): HTMLElement[] => {
+  console.log("📊 Enhancing with semantic analysis...");
+
+  const semanticElements: HTMLElement[] = [];
+
+  // Strategy 1: ARIA relationship traversal
+  const ariaElements = Array.from(
+    container.querySelectorAll("[aria-labelledby], [aria-describedby], [aria-controls], [aria-owns]"),
+  );
+
+  for (const el of ariaElements) {
     try {
-      if (!isBasicElementVisible(el)) return false;
+      const htmlEl = el as HTMLElement;
+
+      // Check if this element or its ARIA-related elements are form fields
+      const relatedIds = [
+        htmlEl.getAttribute("aria-labelledby"),
+        htmlEl.getAttribute("aria-describedby"),
+        htmlEl.getAttribute("aria-controls"),
+        htmlEl.getAttribute("aria-owns"),
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .split(" ");
+
+      for (const id of relatedIds) {
+        const relatedEl = document.getElementById(id);
+        if (relatedEl && isUniversalFormFieldElement(relatedEl)) {
+          if (!existingElements.includes(relatedEl)) {
+            semanticElements.push(relatedEl);
+          }
+        }
+      }
+
+      // Check if the element itself is a form field
+      if (isUniversalFormFieldElement(htmlEl) && !existingElements.includes(htmlEl)) {
+        semanticElements.push(htmlEl);
+      }
+    } catch (e) {
+      console.debug("ARIA relationship analysis failed:", e);
+    }
+  }
+
+  // Strategy 2: Label association discovery
+  const labels = Array.from(container.querySelectorAll("label"));
+  for (const label of labels) {
+    try {
+      const forAttr = label.getAttribute("for");
+      if (forAttr) {
+        const associatedEl = document.getElementById(forAttr);
+        if (associatedEl && isUniversalFormFieldElement(associatedEl) && !existingElements.includes(associatedEl)) {
+          semanticElements.push(associatedEl);
+        }
+      }
+
+      // Check for nested form elements
+      const nestedElements = label.querySelectorAll('input, select, textarea, [role="textbox"], [role="combobox"]');
+      for (const nested of Array.from(nestedElements)) {
+        const nestedEl = nested as HTMLElement;
+        if (isUniversalFormFieldElement(nestedEl) && !existingElements.includes(nestedEl)) {
+          semanticElements.push(nestedEl);
+        }
+      }
+    } catch (e) {
+      console.debug("Label association analysis failed:", e);
+    }
+  }
+
+  console.log(`📊 Semantic analysis found ${semanticElements.length} additional elements`);
+  return [...existingElements, ...semanticElements];
+};
+
+/**
+ * Enhance with visual layout analysis for form-like structures
+ */
+const enhanceWithVisualAnalysis = (
+  container: HTMLElement | ShadowRoot,
+  existingElements: HTMLElement[],
+): HTMLElement[] => {
+  console.log("👁️ Enhancing with visual analysis...");
+
+  const visualElements: HTMLElement[] = [];
+
+  try {
+    // Strategy 1: Find elements in form-like visual arrangements
+    const potentialElements = Array.from(container.querySelectorAll("*")).filter(el => {
+      const htmlEl = el as HTMLElement;
+      return (
+        !existingElements.includes(htmlEl) &&
+        !["SCRIPT", "STYLE", "META", "LINK", "TITLE", "HEAD", "NOSCRIPT"].includes(htmlEl.tagName)
+      );
+    });
+
+    for (const el of potentialElements) {
+      const htmlEl = el as HTMLElement;
+
+      // Check if element is in a form-like visual arrangement
+      if (isInFormLikeVisualArrangement(htmlEl)) {
+        const behavioralScore = calculateBehavioralFormFieldScore(htmlEl);
+        if (behavioralScore >= 45) {
+          // Lower threshold for visually arranged elements
+          visualElements.push(htmlEl);
+        }
+      }
+    }
+  } catch (e) {
+    console.debug("Visual analysis failed:", e);
+  }
+
+  console.log(`👁️ Visual analysis found ${visualElements.length} additional elements`);
+  return [...existingElements, ...visualElements];
+};
+
+/**
+ * Check if an element is in a form-like visual arrangement
+ */
+const isInFormLikeVisualArrangement = (el: HTMLElement): boolean => {
+  try {
+    const rect = el.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return false;
+
+    // Look for nearby elements that might be form fields
+    const parent = el.parentElement;
+    if (!parent) return false;
+
+    const siblings = Array.from(parent.children).filter(child => {
+      const childRect = child.getBoundingClientRect();
+      return childRect.width > 0 && childRect.height > 0;
+    });
+
+    // Check if there are other potentially interactive elements nearby
+    const nearbyInteractiveElements = siblings.filter(sibling => {
+      const siblingEl = sibling as HTMLElement;
+      return (
+        siblingEl !== el &&
+        (["INPUT", "SELECT", "TEXTAREA", "BUTTON"].includes(siblingEl.tagName) ||
+          siblingEl.hasAttribute("contenteditable") ||
+          siblingEl.hasAttribute("tabindex") ||
+          siblingEl.hasAttribute("role") ||
+          /\b(input|field|control|button)\b/i.test(siblingEl.className))
+      );
+    });
+
+    // If there are 2+ interactive elements in the same container, it's likely a form
+    if (nearbyInteractiveElements.length >= 1) {
+      return true;
+    }
+
+    // Check for form-like vertical or horizontal alignment
+    const elementPositions = siblings.map(sibling => {
+      const siblingRect = sibling.getBoundingClientRect();
+      return {
+        element: sibling,
+        top: siblingRect.top,
+        left: siblingRect.left,
+        width: siblingRect.width,
+        height: siblingRect.height,
+      };
+    });
+
+    // Check for vertical alignment (common in forms)
+    const verticallyAligned = elementPositions.filter(pos => Math.abs(pos.left - rect.left) < 50 && pos.element !== el);
+
+    if (verticallyAligned.length >= 2) {
+      return true;
+    }
+
+    // Check for horizontal alignment (also common in forms)
+    const horizontallyAligned = elementPositions.filter(pos => Math.abs(pos.top - rect.top) < 50 && pos.element !== el);
+
+    if (horizontallyAligned.length >= 2) {
+      return true;
+    }
+
+    return false;
+  } catch (e) {
+    console.debug("Visual arrangement analysis failed:", e);
+    return false;
+  }
+};
+
+/**
+ * Apply universal filtering with confidence-based scoring
+ */
+const applyUniversalFieldFiltering = (elements: HTMLElement[]): HTMLElement[] => {
+  console.log(`🔍 Applying universal filtering to ${elements.length} elements...`);
+
+  const filteredElements = elements.filter(el => {
+    try {
+      // Basic visibility and accessibility checks
+      if (!isUniversalElementVisible(el)) return false;
       if (isElementDisabledOrReadonly(el)) return false;
       if (isElementDecorative(el)) return false;
-      if (!isBasicFormFieldElement(el)) return false;
+
+      // Advanced form field validation
+      if (!isUniversalFormFieldElement(el)) return false;
+
+      // Check minimum confidence threshold
+      const confidence = parseFloat(el.getAttribute("data-filliny-confidence") || "0.5");
+      if (confidence < 0.4) return false;
 
       return true;
     } catch (e) {
@@ -332,42 +1624,193 @@ const applyBasicFieldFiltering = (elements: HTMLElement[]): HTMLElement[] =>
     }
   });
 
-/**
- * Basic visibility check for elements
- */
-const isBasicElementVisible = (el: HTMLElement): boolean => {
-  const style = window.getComputedStyle(el);
+  // Sort by confidence score (highest first)
+  filteredElements.sort((a, b) => {
+    const confidenceA = parseFloat(a.getAttribute("data-filliny-confidence") || "0.5");
+    const confidenceB = parseFloat(b.getAttribute("data-filliny-confidence") || "0.5");
+    return confidenceB - confidenceA;
+  });
 
-  // Skip completely hidden fields (but allow temporarily hidden ones like in modals)
-  if (style.display === "none" && style.visibility === "hidden" && style.opacity === "0") {
-    return false;
-  }
-
-  // Skip elements with zero dimensions that aren't radio/checkbox (which can be hidden but still functional)
-  const rect = el.getBoundingClientRect();
-  const isCheckableField = el instanceof HTMLInputElement && (el.type === "checkbox" || el.type === "radio");
-  const hasAriaRole = ["checkbox", "radio", "switch"].includes(el.getAttribute("role") || "");
-
-  if (!isCheckableField && !hasAriaRole && rect.width === 0 && rect.height === 0) {
-    return false;
-  }
-
-  return true;
+  console.log(`✅ Universal filtering result: ${filteredElements.length} elements`);
+  return filteredElements;
 };
 
 /**
- * Basic check for form field elements
+ * Universal visibility check with advanced heuristics
  */
-const isBasicFormFieldElement = (el: HTMLElement): boolean => {
-  // Skip elements that are clearly not form fields
-  const isNotFormField =
-    el.tagName === "DIV" &&
-    !el.hasAttribute("role") &&
-    !el.hasAttribute("contenteditable") &&
-    !el.hasAttribute("tabindex") &&
-    !/\b(input|field|select|control)\b/i.test(el.className + " " + el.id);
+const isUniversalElementVisible = (el: HTMLElement): boolean => {
+  try {
+    const style = window.getComputedStyle(el);
 
-  return !isNotFormField;
+    // Skip completely hidden fields (but allow temporarily hidden ones like in modals)
+    if (style.display === "none" && style.visibility === "hidden" && style.opacity === "0") {
+      return false;
+    }
+
+    // Skip elements with zero dimensions that aren't special cases
+    const rect = el.getBoundingClientRect();
+    const isCheckableField =
+      (el instanceof HTMLInputElement && (el.type === "checkbox" || el.type === "radio")) ||
+      ["checkbox", "radio", "switch"].includes(el.getAttribute("role") || "");
+
+    // Allow zero-dimension elements if they're checkable or have special roles
+    const hasSpecialRole = ["textbox", "combobox", "listbox", "slider", "spinbutton"].includes(
+      el.getAttribute("role") || "",
+    );
+    const isCustomFormElement = el.tagName.includes("-") && isCustomElementFormLike(el);
+
+    if (!isCheckableField && !hasSpecialRole && !isCustomFormElement && rect.width === 0 && rect.height === 0) {
+      return false;
+    }
+
+    // Check for elements that are visually hidden but still functional
+    // (e.g., hidden file inputs with visible labels)
+    if (
+      style.position === "absolute" &&
+      (style.left === "-9999px" || style.top === "-9999px" || style.left === "-999em" || style.top === "-999em")
+    ) {
+      // Check if there's a visible label or button associated with this element
+      const id = el.id;
+      if (id) {
+        const associatedLabel = document.querySelector(`label[for="${id}"]`);
+        if (associatedLabel && window.getComputedStyle(associatedLabel).display !== "none") {
+          return true; // Hidden element with visible label
+        }
+      }
+      return false;
+    }
+
+    // Check if element is inside a hidden container but might become visible
+    if (style.display === "none" || style.visibility === "hidden") {
+      // Check if it's in a modal, tab, or accordion that might be shown
+      const hiddenContainer = el.closest('[style*="display: none"], [style*="visibility: hidden"], [hidden]');
+      if (hiddenContainer) {
+        const isInModal = hiddenContainer.closest('[role="dialog"], [role="alertdialog"], .modal, .popup');
+        const isInTab = hiddenContainer.closest('[role="tabpanel"], .tab-pane, .tab-content');
+        const isInAccordion = hiddenContainer.closest('[role="region"], .accordion, .collapsible');
+
+        if (isInModal || isInTab || isInAccordion) {
+          return true; // Temporarily hidden but potentially visible
+        }
+      }
+      return false;
+    }
+
+    return true;
+  } catch (e) {
+    console.debug("Visibility check error:", e);
+    return true; // Default to visible if we can't determine
+  }
+};
+
+/**
+ * Check if element is disabled or readonly
+ */
+const isElementDisabledOrReadonly = (el: HTMLElement): boolean =>
+  el.hasAttribute("disabled") || el.hasAttribute("readonly");
+
+/**
+ * Check if element is decorative (not interactive)
+ */
+const isElementDecorative = (el: HTMLElement): boolean =>
+  el.getAttribute("aria-hidden") === "true" ||
+  el.getAttribute("role") === "presentation" ||
+  el.getAttribute("role") === "none";
+
+/**
+ * Universal form field element validation with comprehensive analysis
+ */
+const isUniversalFormFieldElement = (el: HTMLElement): boolean => {
+  // Always include standard form elements
+  if (["INPUT", "SELECT", "TEXTAREA", "BUTTON"].includes(el.tagName)) {
+    return true;
+  }
+
+  // Include elements with form-related ARIA roles
+  const role = el.getAttribute("role");
+  if (
+    role &&
+    ["textbox", "combobox", "checkbox", "radio", "switch", "slider", "spinbutton", "searchbox", "listbox"].includes(
+      role,
+    )
+  ) {
+    return true;
+  }
+
+  // Include content editable elements
+  if (el.hasAttribute("contenteditable") && el.getAttribute("contenteditable") !== "false") {
+    return true;
+  }
+
+  // Include custom form elements (Web Components)
+  if (el.tagName.includes("-") && isCustomElementFormLike(el)) {
+    return true;
+  }
+
+  // Include elements with form-like behavior indicators
+  const hasFormBehavior =
+    el.hasAttribute("name") ||
+    el.hasAttribute("value") ||
+    el.hasAttribute("placeholder") ||
+    el.hasAttribute("required") ||
+    el.hasAttribute("pattern") ||
+    el.hasAttribute("autocomplete") ||
+    el.hasAttribute("aria-required") ||
+    el.hasAttribute("aria-invalid");
+
+  if (hasFormBehavior) {
+    return true;
+  }
+
+  // Include elements with form-like event handlers
+  const hasFormEvents =
+    el.hasAttribute("onchange") ||
+    el.hasAttribute("oninput") ||
+    el.hasAttribute("onfocus") ||
+    el.hasAttribute("onblur");
+
+  if (hasFormEvents) {
+    return true;
+  }
+
+  // Include elements with high confidence scores from semantic analysis
+  const confidence = parseFloat(el.getAttribute("data-filliny-confidence") || "0");
+  if (confidence >= 0.7) {
+    return true;
+  }
+
+  // Advanced pattern matching for modern web apps
+  const className = el.className?.toLowerCase() || "";
+  const id = el.id?.toLowerCase() || "";
+  const dataAttrs = Array.from(el.attributes)
+    .filter(attr => attr.name.startsWith("data-"))
+    .map(attr => attr.name + "=" + attr.value)
+    .join(" ")
+    .toLowerCase();
+
+  const allText = `${className} ${id} ${dataAttrs}`;
+
+  // Check for form-related patterns
+  const formPatterns = [
+    /\b(input|field|control|widget|editor|picker)\b/,
+    /\b(form|application|registration|profile)\b/,
+    /\b(text|email|password|number|tel|url|search)\b/,
+    /\b(select|choice|option|dropdown|combo)\b/,
+    /\b(checkbox|radio|switch|toggle)\b/,
+    /\b(upload|file|attach|document)\b/,
+    /\b(date|time|calendar)\b/,
+    /\b(range|slider|spin)\b/,
+  ];
+
+  const hasFormPattern = formPatterns.some(pattern => pattern.test(allText));
+
+  // Only include DIV and SPAN elements if they have strong form indicators
+  if (["DIV", "SPAN"].includes(el.tagName)) {
+    return hasFormPattern && (confidence >= 0.6 || hasFormBehavior || hasFormEvents);
+  }
+
+  // Include other elements with form patterns
+  return hasFormPattern;
 };
 
 /**
@@ -497,781 +1940,13 @@ export const getFormFieldsRobust = (container: HTMLElement | ShadowRoot): HTMLEl
   }
 
   try {
-    // Strategy 1: Direct selector matching
-    let fields = applyDirectSelectorMatching(container);
-
-    // Strategy 2: Pattern-based detection for modern SPAs
-    if (fields.length < 3) {
-      fields = enhanceWithPatternDetection(container, fields);
-    }
-
-    // Strategy 3: Shadow DOM exploration
-    fields = enhanceWithShadowDOMDetection(container, fields);
-
-    // Strategy 4: Dynamic content detection
-    fields = enhanceWithDynamicContentDetection(container, fields);
-
-    // Final filtering step
-    return applyAdvancedFieldFiltering(fields);
+    // Use the enhanced detection pipeline
+    return getFormElementsRobust(container);
   } catch (error) {
     console.error("Critical error in getFormFieldsRobust, falling back to basic detection:", error);
     return fallbackToBasicDetection(container);
   }
 };
-
-/**
- * Apply direct CSS selector matching to find form fields
- */
-const applyDirectSelectorMatching = (container: HTMLElement | ShadowRoot): HTMLElement[] => {
-  const fieldSelectors = createFormFieldSelectors();
-  const fields: HTMLElement[] = [];
-
-  // Strategy 1: Direct selector matching with enhanced error handling
-  for (const selector of fieldSelectors) {
-    try {
-      const elements = Array.from(container.querySelectorAll<HTMLElement>(selector));
-      fields.push(...elements);
-    } catch (e) {
-      console.debug(`Selector failed: ${selector}`, e);
-    }
-  }
-
-  // Remove duplicates
-  return Array.from(new Set(fields));
-};
-
-/**
- * Create comprehensive list of form field selectors
- */
-const createFormFieldSelectors = (): string[] => [
-  // Standard form fields (highest priority)
-  'input:not([type="hidden"]):not([type="submit"]):not([type="button"]):not([type="reset"]):not([type="image"])',
-  "select",
-  "textarea",
-
-  // ARIA form fields
-  '[role="textbox"]',
-  '[role="combobox"]',
-  '[role="spinbutton"]',
-  '[role="checkbox"]',
-  '[role="switch"]',
-  '[role="radio"]',
-  '[role="searchbox"]',
-  '[role="listbox"]',
-  '[role="slider"]',
-
-  // Content editable
-  '[contenteditable="true"]',
-
-  // Custom data attributes (common patterns)
-  "[data-field]",
-  "[data-input]",
-  "[data-form-field]",
-  "[data-form-control]",
-  '[data-testid*="input"]',
-  '[data-testid*="field"]',
-  '[data-testid*="select"]',
-  '[data-qa*="input"]',
-  '[data-qa*="field"]',
-  '[data-qa*="select"]',
-  '[data-cy*="input"]',
-  '[data-cy*="field"]',
-  '[data-cy*="select"]',
-
-  // Common CSS class patterns
-  ".form-control",
-  ".form-input",
-  ".form-field",
-  ".input-field",
-  ".text-field",
-  ".select-field",
-  ".checkbox-field",
-  ".radio-field",
-  ".field-input",
-  ".field-select",
-  ".custom-field",
-  ".custom-input",
-  ".custom-select",
-
-  // Framework-specific patterns
-  ".MuiTextField-root input",
-  ".MuiTextField-root textarea",
-  ".MuiSelect-root",
-  ".MuiCheckbox-root input",
-  ".MuiRadio-root input",
-  ".MuiSlider-root",
-  ".ant-input",
-  ".ant-select",
-  ".ant-checkbox-input",
-  ".ant-radio-input",
-  ".ant-textarea",
-  ".ant-slider",
-  ".chakra-input",
-  ".chakra-select",
-  ".chakra-checkbox__input",
-  ".chakra-radio__input",
-  ".chakra-slider",
-
-  // Bootstrap and common UI frameworks
-  ".form-control",
-  ".form-select",
-  ".form-check-input",
-  ".form-range",
-
-  // Modern SPA patterns (React, Vue, Angular) - highly targeted selectors
-  'input[class*="Input"]',
-  'textarea[class*="Input"]',
-  'input[class*="Field"]',
-  'textarea[class*="Field"]',
-  'select[class*="Field"]',
-  'input[class*="FormControl"]',
-  'select[class*="FormControl"]',
-  'textarea[class*="FormControl"]',
-  'input[class*="TextInput"]',
-  'textarea[class*="TextInput"]',
-  'select[class*="Select"]',
-  'input[class*="input-"]',
-  'input[class*="field-"]',
-  'select[class*="select-"]',
-  'textarea[class*="textarea-"]',
-
-  // Business form specific patterns (highly targeted)
-  'input[class*="profile"][type]:not([type="hidden"]):not([type="submit"])',
-  'input[class*="insurance"][type]:not([type="hidden"]):not([type="submit"])',
-  'input[class*="policy"][type]:not([type="hidden"]):not([type="submit"])',
-  'select[class*="coverage"]',
-  'input[class*="quote"][type]:not([type="hidden"]):not([type="submit"])',
-  'input[class*="application"][type]:not([type="hidden"]):not([type="submit"])',
-
-  // Custom web components with form semantics
-  "custom-input",
-  "custom-select",
-  "custom-textarea",
-  "web-input",
-  "web-select",
-  "form-input",
-  "form-select",
-  "form-field",
-  "ui-input",
-  "ui-select",
-  "ui-textarea",
-  '[is^="input-"]',
-  '[is^="select-"]',
-  '[is^="field-"]',
-  '[data-component*="input"]',
-  '[data-component*="select"]',
-  '[data-component*="field"]',
-];
-
-/**
- * Enhance field detection with pattern-based matching for modern SPAs
- */
-const enhanceWithPatternDetection = (
-  container: HTMLElement | ShadowRoot,
-  existingFields: HTMLElement[],
-): HTMLElement[] => {
-  console.log("Enhanced detection: Few elements found with direct selectors, trying advanced pattern detection...");
-
-  try {
-    const allElements = Array.from(container.querySelectorAll<HTMLElement>("*"));
-    const patternElements = allElements.filter(el => isLikelyFormFieldByPatterns(el, existingFields));
-
-    console.log(
-      `Enhanced detection: Found ${patternElements.length} additional elements through advanced pattern detection`,
-    );
-    const combinedFields = [...existingFields, ...patternElements];
-    return Array.from(new Set(combinedFields));
-  } catch (patternError) {
-    console.warn("Enhanced pattern detection failed, continuing with basic detection:", patternError);
-    return existingFields;
-  }
-};
-
-/**
- * Check if element is likely a form field based on various patterns
- */
-const isLikelyFormFieldByPatterns = (el: HTMLElement, existingFields: HTMLElement[]): boolean => {
-  try {
-    // Skip if already found
-    if (existingFields.includes(el)) return false;
-
-    // Skip non-interactive elements
-    if (["SCRIPT", "STYLE", "META", "LINK", "TITLE", "HEAD", "NOSCRIPT"].includes(el.tagName)) {
-      return false;
-    }
-
-    // Use weighted scoring system instead of simple counting
-    const score = calculateElementFormFieldScore(el);
-
-    // Dynamic threshold based on element type and context
-    const threshold = getDynamicThreshold(el);
-
-    return score >= threshold;
-  } catch (elementError) {
-    console.debug("Error processing element in pattern detection:", elementError);
-    return false;
-  }
-};
-
-/**
- * Calculate weighted score for form field likelihood
- */
-const calculateElementFormFieldScore = (el: HTMLElement): number => {
-  let score = 0;
-
-  // High-confidence indicators (worth more points)
-  if (isFocusableElement(el)) score += 30;
-  if (hasFormLikeAttributes(el)) score += 25;
-  if (hasAriaFormAttributes(el)) score += 20;
-  if (isCustomWebComponent(el)) score += 35; // Custom components get high score
-  if (isFileUploadElement(el)) score += 40; // File upload elements get very high score
-
-  // Medium-confidence indicators
-  if (hasInteractiveEventHandlers(el)) score += 15;
-  if (hasFormLikeNaming(el)) score += 15;
-  if (hasFrameworkTestingAttributes(el)) score += 10;
-  if (hasCustomElementSemantics(el)) score += 12;
-  if (hasFileUploadIndicators(el)) score += 18; // File upload specific patterns
-
-  // Low-confidence indicators (context clues)
-  if (hasInputLikeBehavior(el)) score += 8;
-  if (isInFormContext(el)) score += 5;
-  if (hasFormLikePosition(el)) score += 5;
-  if (hasWebComponentPatterns(el)) score += 7;
-  if (hasFileUploadContext(el)) score += 12; // File upload context clues
-
-  // Bonus points for multiple confirmatory signals
-  const indicators = [
-    isFocusableElement(el),
-    hasFormLikeAttributes(el),
-    hasAriaFormAttributes(el),
-    hasInteractiveEventHandlers(el),
-    hasFormLikeNaming(el),
-    hasFrameworkTestingAttributes(el),
-    isCustomWebComponent(el),
-    hasCustomElementSemantics(el),
-    isFileUploadElement(el),
-    hasFileUploadIndicators(el),
-    hasFileUploadContext(el),
-  ];
-  const indicatorCount = indicators.filter(Boolean).length;
-
-  if (indicatorCount >= 3) score += 10; // Bonus for multiple confirmatory signals
-  if (indicatorCount >= 4) score += 15; // Higher bonus for very strong signals
-
-  return score;
-};
-
-/**
- * Get dynamic threshold based on element type and context
- */
-const getDynamicThreshold = (el: HTMLElement): number => {
-  // Standard HTML form elements need lower threshold (they're likely form fields)
-  if (["INPUT", "SELECT", "TEXTAREA"].includes(el.tagName)) {
-    return 25;
-  }
-
-  // Elements with contenteditable or form roles need medium threshold
-  if (
-    el.hasAttribute("contenteditable") ||
-    ["textbox", "combobox", "checkbox", "radio", "switch"].includes(el.getAttribute("role") || "")
-  ) {
-    return 35;
-  }
-
-  // Other elements need higher threshold to avoid false positives
-  return 45;
-};
-
-/**
- * Check if element is focusable (high-confidence indicator)
- */
-const isFocusableElement = (el: HTMLElement): boolean =>
-  el.tabIndex >= 0 ||
-  ["INPUT", "SELECT", "TEXTAREA", "BUTTON"].includes(el.tagName) ||
-  el.hasAttribute("contenteditable") ||
-  ["button", "textbox", "combobox"].includes(el.getAttribute("role") || "");
-
-/**
- * Check for form-like attributes (high-confidence indicator)
- */
-const hasFormLikeAttributes = (el: HTMLElement): boolean =>
-  el.hasAttribute("name") ||
-  el.hasAttribute("value") ||
-  el.hasAttribute("placeholder") ||
-  el.hasAttribute("required") ||
-  el.hasAttribute("pattern") ||
-  el.hasAttribute("minlength") ||
-  el.hasAttribute("maxlength");
-
-/**
- * Check for ARIA form attributes (high-confidence indicator)
- */
-const hasAriaFormAttributes = (el: HTMLElement): boolean =>
-  el.hasAttribute("aria-label") ||
-  el.hasAttribute("aria-labelledby") ||
-  el.hasAttribute("aria-describedby") ||
-  el.hasAttribute("aria-required") ||
-  el.hasAttribute("aria-invalid") ||
-  el.hasAttribute("aria-expanded") ||
-  el.hasAttribute("aria-controls");
-
-/**
- * Check for interactive event handlers (medium-confidence indicator)
- */
-const hasInteractiveEventHandlers = (el: HTMLElement): boolean =>
-  el.hasAttribute("tabindex") ||
-  el.hasAttribute("onclick") ||
-  el.hasAttribute("onchange") ||
-  el.hasAttribute("oninput") ||
-  el.hasAttribute("onfocus") ||
-  el.hasAttribute("onblur") ||
-  el.hasAttribute("onkeydown") ||
-  el.hasAttribute("onkeyup");
-
-/**
- * Check for form-like naming patterns (medium-confidence indicator)
- */
-const hasFormLikeNaming = (el: HTMLElement): boolean => {
-  const className = safeGetLowerString(el?.className);
-  const id = safeGetLowerString(el?.id);
-  const dataAttrs = safeGetAttributes(el)
-    .filter(attr => attr.name.startsWith("data-"))
-    .map(attr => `${attr.name}=${safeGetString(attr.value)}`)
-    .join(" ")
-    .toLowerCase();
-
-  return createFormPatterns().some(pattern => pattern.test(className + " " + id + " " + dataAttrs));
-};
-
-/**
- * Check for framework testing attributes (medium-confidence indicator)
- */
-const hasFrameworkTestingAttributes = (el: HTMLElement): boolean =>
-  el.hasAttribute("data-testid") ||
-  el.hasAttribute("data-cy") ||
-  el.hasAttribute("data-qa") ||
-  Object.keys(el).some(key => key.startsWith("__react") || key.startsWith("_vue") || key.startsWith("ng-"));
-
-/**
- * Check for input-like behavior (low-confidence indicator)
- */
-const hasInputLikeBehavior = (el: HTMLElement): boolean => {
-  const className = safeGetLowerString(el?.className);
-  return (
-    el.addEventListener !== undefined &&
-    (className.includes("editable") ||
-      className.includes("input") ||
-      className.includes("field") ||
-      el.getAttribute("contenteditable") === "true")
-  );
-};
-
-/**
- * Check if element is within a form context (low-confidence indicator)
- */
-const isInFormContext = (el: HTMLElement): boolean =>
-  !!el.closest('form, fieldset, [role="form"], [class*="form"], [id*="form"]');
-
-/**
- * Check if element has form-like positioning (low-confidence indicator)
- */
-const hasFormLikePosition = (el: HTMLElement): boolean => {
-  // Look for associated labels or form-like containers
-  const id = el.id;
-  if (id) {
-    const label = document.querySelector(`label[for="${id}"]`);
-    if (label) return true;
-  }
-
-  // Check if element is in a container that suggests form fields
-  const container = el.closest('[class*="field"], [class*="input"], [class*="form-group"], .row, .column');
-  return !!container;
-};
-
-/**
- * Check if element is a custom web component (high-confidence indicator)
- */
-const isCustomWebComponent = (el: HTMLElement): boolean => {
-  const tagName = el.tagName.toLowerCase();
-
-  // Custom elements must contain a hyphen
-  if (!tagName.includes("-")) return false;
-
-  // Check for common form-related custom element naming patterns
-  const formComponentPatterns = [
-    /^(custom|web|ui|form|app)-(input|select|textarea|field|control)/,
-    /(input|select|textarea|field|control)-(custom|web|ui|component)/,
-    /^(input|select|textarea|field|control)-/,
-    /-(input|select|textarea|field|control)$/,
-  ];
-
-  return formComponentPatterns.some(pattern => pattern.test(tagName));
-};
-
-/**
- * Check for custom element semantics (medium-confidence indicator)
- */
-const hasCustomElementSemantics = (el: HTMLElement): boolean => {
-  // Check for Web Components standard attributes
-  const hasCustomElementAttrs =
-    el.hasAttribute("is") || el.hasAttribute("part") || el.hasAttribute("slot") || el.hasAttribute("exportparts");
-
-  // Check for form-related custom attributes
-  const hasFormCustomAttrs =
-    el.hasAttribute("form-control") ||
-    el.hasAttribute("form-field") ||
-    el.hasAttribute("input-type") ||
-    el.hasAttribute("field-type") ||
-    el.hasAttribute("validation") ||
-    el.hasAttribute("validators");
-
-  return hasCustomElementAttrs || hasFormCustomAttrs;
-};
-
-/**
- * Check for web component patterns (low-confidence indicator)
- */
-const hasWebComponentPatterns = (el: HTMLElement): boolean => {
-  const className = safeGetLowerString(el?.className);
-  const dataAttrs = safeGetAttributes(el)
-    .filter(attr => attr.name.startsWith("data-"))
-    .map(attr => attr.name)
-    .join(" ")
-    .toLowerCase();
-
-  // Check for component-related patterns in class and data attributes
-  const componentPatterns = [
-    /\b(component|widget|control|element)\b/,
-    /\b(custom|web|ui|app)-(.*)/,
-    /\b(.*)-(component|widget|control|element)\b/,
-  ];
-
-  return componentPatterns.some(pattern => pattern.test(className + " " + dataAttrs));
-};
-
-/**
- * Gather various indicators that suggest an element is a form field
- */
-const gatherElementIndicators = (el: HTMLElement): boolean[] => {
-  // Enhanced interactive attribute detection
-  const hasInteractiveAttrs =
-    el.hasAttribute("tabindex") ||
-    el.hasAttribute("onclick") ||
-    el.hasAttribute("onchange") ||
-    el.hasAttribute("oninput") ||
-    el.hasAttribute("onfocus") ||
-    el.hasAttribute("onblur") ||
-    el.hasAttribute("onkeydown") ||
-    el.hasAttribute("onkeyup");
-
-  // Enhanced form-like pattern detection with safe utility functions
-  const className = safeGetLowerString(el?.className);
-  const id = safeGetLowerString(el?.id);
-  const dataAttrs = safeGetAttributes(el)
-    .filter(attr => attr.name.startsWith("data-"))
-    .map(attr => `${attr.name}=${safeGetString(attr.value)}`)
-    .join(" ")
-    .toLowerCase();
-
-  const hasFormLikeNames = createFormPatterns().some(pattern => pattern.test(className + " " + id + " " + dataAttrs));
-
-  // Enhanced ARIA detection
-  const hasAriaAttrs =
-    el.hasAttribute("aria-label") ||
-    el.hasAttribute("aria-labelledby") ||
-    el.hasAttribute("aria-describedby") ||
-    el.hasAttribute("aria-required") ||
-    el.hasAttribute("aria-invalid") ||
-    el.hasAttribute("aria-expanded") ||
-    el.hasAttribute("aria-controls");
-
-  // Enhanced focusability check
-  const isFocusable =
-    el.tabIndex >= 0 ||
-    ["INPUT", "SELECT", "TEXTAREA", "BUTTON"].includes(el.tagName) ||
-    el.hasAttribute("contenteditable") ||
-    ["button", "textbox", "combobox"].includes(el.getAttribute("role") || "");
-
-  // Check for modern framework patterns (React, Vue, Angular)
-  const hasFrameworkAttrs =
-    el.hasAttribute("data-testid") ||
-    el.hasAttribute("data-cy") ||
-    el.hasAttribute("data-qa") ||
-    Object.keys(el).some(key => key.startsWith("__react") || key.startsWith("_vue") || key.startsWith("ng-"));
-
-  // Check for custom input-like behavior
-  const hasInputBehavior =
-    el.addEventListener !== undefined &&
-    (className.includes("editable") ||
-      className.includes("input") ||
-      className.includes("field") ||
-      el.getAttribute("contenteditable") === "true");
-
-  return [hasInteractiveAttrs, hasFormLikeNames, hasAriaAttrs, isFocusable, hasFrameworkAttrs, hasInputBehavior];
-};
-
-/**
- * Create comprehensive form-related regex patterns
- */
-const createFormPatterns = (): RegExp[] => [
-  /\b(input|field|select|checkbox|radio|textarea|control|form|widget|picker|slider|range)\b/,
-  /\b(text|email|phone|number|date|time|password|search|url)\b/,
-  /\b(name|address|city|state|zip|postal|country)\b/,
-  /\b(first|last|full|middle|title|prefix|suffix)\b/,
-  /\b(company|organization|business|employer)\b/,
-  /\b(profile|account|user|member|customer)\b/,
-  /\b(insurance|policy|coverage|premium|deductible|claim)\b/,
-  /\b(application|quote|form|survey|questionnaire)\b/,
-  /\b(upload|file|attachment|document|photo|image|video|audio)\b/,
-  /\b(dropzone|drop-zone|file-drop|file-upload|browse)\b/,
-  /\b(choose-file|select-file|attach|browse-files)\b/,
-];
-
-/**
- * Check if element is a file upload element (direct input type="file")
- */
-const isFileUploadElement = (el: HTMLElement): boolean => el instanceof HTMLInputElement && el.type === "file";
-
-/**
- * Check if element has file upload specific indicators
- */
-const hasFileUploadIndicators = (el: HTMLElement): boolean => {
-  const className = el.className?.toLowerCase() || "";
-  const id = el.id?.toLowerCase() || "";
-  const dataAttrs = Array.from(el.attributes)
-    .filter(attr => attr.name.startsWith("data-"))
-    .map(attr => attr.name + "=" + attr.value)
-    .join(" ")
-    .toLowerCase();
-
-  // File upload class patterns
-  const hasFileUploadClasses =
-    className.includes("upload") ||
-    className.includes("file") ||
-    className.includes("dropzone") ||
-    className.includes("drop-zone") ||
-    className.includes("file-drop") ||
-    className.includes("attach") ||
-    className.includes("browse") ||
-    className.includes("file-picker") ||
-    className.includes("file-input") ||
-    className.includes("file-field") ||
-    className.includes("drag-drop") ||
-    className.includes("document");
-
-  // File upload ID patterns
-  const hasFileUploadIds =
-    id.includes("upload") ||
-    id.includes("file") ||
-    id.includes("attach") ||
-    id.includes("browse") ||
-    id.includes("resume") ||
-    id.includes("cv") ||
-    id.includes("document");
-
-  // File upload data attributes
-  const hasFileUploadData =
-    dataAttrs.includes("upload") ||
-    dataAttrs.includes("file") ||
-    dataAttrs.includes("attach") ||
-    dataAttrs.includes("resume") ||
-    dataAttrs.includes("cv") ||
-    dataAttrs.includes("document") ||
-    el.hasAttribute("accept") ||
-    el.hasAttribute("data-file-upload") ||
-    el.hasAttribute("data-upload") ||
-    el.hasAttribute("data-file-input");
-
-  // ARIA patterns for file upload
-  const role = el.getAttribute("role");
-  const ariaLabel = el.getAttribute("aria-label")?.toLowerCase() || "";
-  const hasFileUploadAria =
-    (role === "button" &&
-      (ariaLabel.includes("upload") || ariaLabel.includes("file") || ariaLabel.includes("attach"))) ||
-    ariaLabel.includes("choose file") ||
-    ariaLabel.includes("select file") ||
-    ariaLabel.includes("browse");
-
-  return hasFileUploadClasses || hasFileUploadIds || hasFileUploadData || hasFileUploadAria;
-};
-
-/**
- * Check if element has file upload context clues (surrounding content or parent/child elements)
- */
-const hasFileUploadContext = (el: HTMLElement): boolean => {
-  // Check text content of element and nearby elements
-  const textContent = el.textContent?.toLowerCase() || "";
-  const parentText = el.parentElement?.textContent?.toLowerCase() || "";
-
-  // File upload text patterns
-  const hasFileUploadText =
-    textContent.includes("upload") ||
-    textContent.includes("attach") ||
-    textContent.includes("browse") ||
-    textContent.includes("choose file") ||
-    textContent.includes("select file") ||
-    textContent.includes("drag") ||
-    textContent.includes("drop") ||
-    textContent.includes("cv") ||
-    textContent.includes("resume") ||
-    textContent.includes("document") ||
-    parentText.includes("upload file") ||
-    parentText.includes("attach file") ||
-    parentText.includes("choose file");
-
-  // Check for hidden file inputs in vicinity (common pattern for custom upload components)
-  const nearbyFileInput =
-    el.querySelector('input[type="file"]') ||
-    el.parentElement?.querySelector('input[type="file"]') ||
-    document.querySelector('input[type="file"][style*="display: none"]');
-
-  // Check for drag and drop event handlers
-  const hasDragDropHandlers =
-    el.ondragover !== null ||
-    el.ondrop !== null ||
-    el.ondragenter !== null ||
-    el.ondragleave !== null ||
-    el.getAttribute("draggable") === "true";
-
-  return hasFileUploadText || !!nearbyFileInput || hasDragDropHandlers;
-};
-
-/**
- * Enhance field detection with Shadow DOM exploration
- */
-const enhanceWithShadowDOMDetection = (
-  container: HTMLElement | ShadowRoot,
-  existingFields: HTMLElement[],
-): HTMLElement[] => {
-  try {
-    const shadowHosts = Array.from(container.querySelectorAll("*")).filter(
-      el => (el as HTMLElement & { shadowRoot?: ShadowRoot }).shadowRoot,
-    );
-
-    const shadowFields: HTMLElement[] = [];
-    for (const host of shadowHosts) {
-      try {
-        const shadowRoot = (host as HTMLElement & { shadowRoot?: ShadowRoot }).shadowRoot;
-        if (shadowRoot) {
-          const fields = getFormFieldsRobust(shadowRoot);
-          shadowFields.push(...fields);
-        }
-      } catch (e) {
-        console.debug("Shadow DOM access failed:", e);
-      }
-    }
-
-    return [...existingFields, ...shadowFields];
-  } catch (shadowError) {
-    console.debug("Shadow DOM exploration failed:", shadowError);
-    return existingFields;
-  }
-};
-
-/**
- * Enhance field detection with dynamic content detection for SPAs
- */
-const enhanceWithDynamicContentDetection = (
-  container: HTMLElement | ShadowRoot,
-  existingFields: HTMLElement[],
-): HTMLElement[] => {
-  try {
-    const dynamicContainers = Array.from(
-      container.querySelectorAll<HTMLElement>(
-        '[data-reactroot], [data-vue-app], [ng-app], [class*="app"], [id*="app"], [class*="root"], [id*="root"]',
-      ),
-    );
-
-    const dynamicFields: HTMLElement[] = [];
-    for (const dynamicContainer of dynamicContainers) {
-      try {
-        // Look for fields that might be loaded dynamically
-        const fields = Array.from(
-          dynamicContainer.querySelectorAll<HTMLElement>(
-            'div[role="textbox"], div[contenteditable], span[role="textbox"], div[tabindex], span[tabindex]',
-          ),
-        );
-
-        dynamicFields.push(...fields.filter(el => !existingFields.includes(el)));
-      } catch (e) {
-        console.debug("Dynamic content detection failed:", e);
-      }
-    }
-
-    return [...existingFields, ...dynamicFields];
-  } catch (dynamicError) {
-    console.debug("Dynamic content detection failed:", dynamicError);
-    return existingFields;
-  }
-};
-
-/**
- * Apply advanced filtering to remove non-form elements and hidden fields
- */
-const applyAdvancedFieldFiltering = (fields: HTMLElement[]): HTMLElement[] =>
-  fields.filter(el => {
-    try {
-      if (!isElementVisible(el)) return false;
-      if (isElementDisabledOrReadonly(el)) return false;
-      if (isElementDecorative(el)) return false;
-      if (!isElementLikelyFormField(el)) return false;
-
-      return true;
-    } catch (e) {
-      console.debug("Error filtering element:", e);
-      return false;
-    }
-  });
-
-/**
- * Check if element is visible and interactive
- */
-const isElementVisible = (el: HTMLElement): boolean => {
-  const style = window.getComputedStyle(el);
-
-  // Enhanced visibility check - allow for modern CSS patterns
-  const isCompletelyHidden = style.display === "none" && style.visibility === "hidden" && style.opacity === "0";
-  if (isCompletelyHidden) return false;
-
-  // Enhanced dimension check for modern UI patterns
-  const rect = el.getBoundingClientRect();
-  const isCheckableField = el instanceof HTMLInputElement && (el.type === "checkbox" || el.type === "radio");
-  const hasAriaRole = ["checkbox", "radio", "switch", "textbox", "combobox"].includes(el.getAttribute("role") || "");
-  const isCustomInput = el.hasAttribute("contenteditable") || el.getAttribute("role") === "textbox";
-
-  // Allow zero-dimension elements if they're functional inputs or have proper ARIA roles
-  if (!isCheckableField && !hasAriaRole && !isCustomInput && rect.width === 0 && rect.height === 0) {
-    return false;
-  }
-
-  return true;
-};
-
-/**
- * Check if element is disabled or readonly
- */
-const isElementDisabledOrReadonly = (el: HTMLElement): boolean =>
-  el.hasAttribute("disabled") || el.hasAttribute("readonly");
-
-/**
- * Check if element is decorative (not interactive)
- */
-const isElementDecorative = (el: HTMLElement): boolean =>
-  el.getAttribute("aria-hidden") === "true" ||
-  el.getAttribute("role") === "presentation" ||
-  el.getAttribute("role") === "none";
-
-/**
- * Check if element is likely a form field vs decorative element
- */
-const isElementLikelyFormField = (el: HTMLElement): boolean =>
-  el.tagName === "INPUT" ||
-  el.tagName === "SELECT" ||
-  el.tagName === "TEXTAREA" ||
-  el.hasAttribute("contenteditable") ||
-  ["textbox", "combobox", "checkbox", "radio", "switch"].includes(el.getAttribute("role") || "") ||
-  /\b(input|field|control)\b/i.test(el.className || "");
 
 /**
  * Fallback to basic form field detection when enhanced methods fail
@@ -1296,3 +1971,10 @@ const fallbackToBasicDetection = (container: HTMLElement | ShadowRoot): HTMLElem
     return [];
   }
 };
+
+// Export all field type handlers
+export * from "./utils";
+export * from "./text";
+export * from "./checkable";
+export * from "./file";
+export * from "./select";

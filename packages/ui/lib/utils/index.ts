@@ -26,6 +26,3 @@ export {
   type ComponentInjectionConfig,
   type ShadowDOMInitConfig,
 } from "./unified-shadow-dom";
-
-// Re-export all utilities for convenience
-export * from "./shadow-injection";

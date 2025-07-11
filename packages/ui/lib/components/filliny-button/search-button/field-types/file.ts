@@ -333,6 +333,14 @@ const simulateDragAndDrop = async (dropZone: HTMLElement, files: File[]): Promis
  */
 const triggerCustomUploadComponent = async (element: HTMLElement, files: File[]): Promise<void> => {
   try {
+    // Check for cloud storage integration first
+    const cloudStorageIntegration = detectCloudStorageIntegration(element);
+    if (cloudStorageIntegration) {
+      console.log(`Detected cloud storage integration: ${cloudStorageIntegration.provider}`);
+      await handleCloudStorageUpload(element, files, cloudStorageIntegration);
+      return;
+    }
+
     // Try different approaches to trigger file selection
     const approaches = [
       // Approach 1: Click the element
@@ -361,12 +369,24 @@ const triggerCustomUploadComponent = async (element: HTMLElement, files: File[])
           }
         });
       },
+
+      // Approach 5: Enhanced drag-and-drop zone detection
+      () => {
+        const isDragDropTarget = detectEnhancedDragDropZone(element);
+        if (isDragDropTarget) {
+          return simulateDragAndDrop(element, files);
+        }
+        return undefined;
+      },
     ];
 
     // Try each approach
     for (const approach of approaches) {
       try {
-        approach();
+        const result = approach();
+        if (result !== undefined && result !== null && typeof result === "object" && "then" in result) {
+          await result;
+        }
         await new Promise(resolve => setTimeout(resolve, 100));
       } catch (error) {
         console.debug("Upload trigger approach failed:", error);
@@ -990,6 +1010,19 @@ const FILE_UPLOAD_PATTERNS = {
     /\b(react-dropzone|vue-upload|ng-upload|ant-upload)\b/i,
     /\b(el-upload|v-upload|mat-file-upload|md-file-upload)\b/i,
     /\b(filepond|dropzone-js|fine-uploader|plupload)\b/i,
+    // Cloud storage patterns
+    /\b(dropbox|google-drive|onedrive|box|drive)\b/i,
+    /\b(cloud-upload|cloud-storage|remote-upload)\b/i,
+    /\b(gdrive|gdocs|gcloud|aws-s3|azure-blob)\b/i,
+    /\b(sharepoint|teams-file|slack-file|notion-file)\b/i,
+    // Job application specific patterns
+    /\b(resume|cv|portfolio|document|certificate)\b/i,
+    /\b(application-upload|candidate-upload|job-upload)\b/i,
+    /\b(recruiter-upload|hiring-upload|talent-upload)\b/i,
+    // Drag and drop specific patterns
+    /\b(droppable|draggable|drop-target|drag-target)\b/i,
+    /\b(dnd|drag-n-drop|drag-and-drop)\b/i,
+    /\b(file-zone|upload-zone|target-zone)\b/i,
   ],
 
   // Data attributes that indicate file upload functionality
@@ -1130,6 +1163,190 @@ const findAssociatedFileInput = (element: HTMLElement): HTMLInputElement | null 
 
   return null;
 };
+
+/**
+ * Detect enhanced drag-and-drop zones with modern patterns
+ */
+function detectEnhancedDragDropZone(element: HTMLElement): boolean {
+  // Check for modern drag-and-drop patterns
+  const dragDropPatterns = [
+    /\b(drop-zone|dropzone|drop-area|drag-area)\b/i,
+    /\b(file-drop|file-drag|upload-drop)\b/i,
+    /\b(droppable|draggable|sortable)\b/i,
+  ];
+
+  const className = element.className || "";
+  const hasDropClass = dragDropPatterns.some(pattern => pattern.test(className));
+
+  // Check for HTML5 drag-and-drop attributes
+  const hasDropAttributes =
+    element.hasAttribute("droppable") ||
+    element.hasAttribute("ondrop") ||
+    element.hasAttribute("ondragover") ||
+    element.hasAttribute("ondragenter");
+
+  // Check for ARIA indicators
+  const ariaLabel = element.getAttribute("aria-label") || "";
+  const hasDropAria = /\b(drop|drag|upload)\b/i.test(ariaLabel);
+
+  // Check for text content indicating drop zone
+  const textContent = element.textContent || "";
+  const hasDropText = /\b(drop\s+file|drag\s+file|drop\s+here)\b/i.test(textContent);
+
+  return hasDropClass || hasDropAttributes || hasDropAria || hasDropText;
+}
+
+/**
+ * Cloud storage integration detection
+ */
+interface CloudStorageIntegration {
+  provider: "dropbox" | "google-drive" | "onedrive" | "box" | "aws-s3" | "unknown";
+  button?: HTMLElement;
+  container?: HTMLElement;
+  apiEndpoint?: string;
+}
+
+/**
+ * Detect cloud storage integration patterns
+ */
+function detectCloudStorageIntegration(element: HTMLElement): CloudStorageIntegration | null {
+  const className = element.className.toLowerCase();
+  const textContent = element.textContent?.toLowerCase() || "";
+  const ariaLabel = element.getAttribute("aria-label")?.toLowerCase() || "";
+  const combinedText = `${className} ${textContent} ${ariaLabel}`;
+
+  // Dropbox integration
+  if (/\b(dropbox|dbx)\b/i.test(combinedText)) {
+    return {
+      provider: "dropbox",
+      button: element.querySelector('[class*="dropbox"], [data-service="dropbox"]') as HTMLElement,
+      container: element.closest('[class*="dropbox"]') as HTMLElement,
+    };
+  }
+
+  // Google Drive integration
+  if (/\b(google[\s-]?drive|gdrive|gcloud)\b/i.test(combinedText)) {
+    return {
+      provider: "google-drive",
+      button: element.querySelector('[class*="google"], [data-service="google"]') as HTMLElement,
+      container: element.closest('[class*="google"]') as HTMLElement,
+    };
+  }
+
+  // OneDrive integration
+  if (/\b(onedrive|microsoft[\s-]?drive)\b/i.test(combinedText)) {
+    return {
+      provider: "onedrive",
+      button: element.querySelector('[class*="onedrive"], [data-service="onedrive"]') as HTMLElement,
+      container: element.closest('[class*="onedrive"]') as HTMLElement,
+    };
+  }
+
+  // Box integration
+  if (/\bbox\b/i.test(combinedText) && /\b(cloud|storage|file)\b/i.test(combinedText)) {
+    return {
+      provider: "box",
+      button: element.querySelector('[class*="box"], [data-service="box"]') as HTMLElement,
+      container: element.closest('[class*="box"]') as HTMLElement,
+    };
+  }
+
+  return null;
+}
+
+/**
+ * Handle cloud storage upload interactions
+ */
+async function handleCloudStorageUpload(
+  element: HTMLElement,
+  files: File[],
+  integration: CloudStorageIntegration,
+): Promise<void> {
+  try {
+    console.log(`Handling ${integration.provider} upload with ${files.length} files`);
+
+    // Find the appropriate button to click
+    const targetButton =
+      integration.button || (element.querySelector('button, [role="button"]') as HTMLElement) || element;
+
+    if (targetButton) {
+      // Click the cloud storage button
+      targetButton.click();
+
+      // Wait for cloud storage interface to load
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // Try to simulate file selection in the cloud storage interface
+      await simulateCloudStorageSelection(integration.provider, files);
+    }
+
+    // Also try drag-and-drop as fallback
+    if (integration.container) {
+      await simulateDragAndDrop(integration.container, files);
+    }
+  } catch (error) {
+    console.warn(`Error handling ${integration.provider} upload:`, error);
+  }
+}
+
+/**
+ * Simulate file selection in cloud storage interfaces
+ */
+async function simulateCloudStorageSelection(provider: string, files: File[]): Promise<void> {
+  try {
+    // Wait for potential modal/popup to appear
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // Look for common cloud storage interface elements
+    const cloudSelectors = [
+      // Generic cloud storage selectors
+      '[class*="file-picker"]',
+      '[class*="cloud-picker"]',
+      '[role="dialog"] [class*="file"]',
+      '[role="dialog"] [class*="select"]',
+      // Provider-specific selectors
+      `[class*="${provider}"] [class*="file"]`,
+      `[class*="${provider}"] [class*="select"]`,
+      // Common button patterns
+      'button[class*="select"]',
+      'button[class*="choose"]',
+      'button[class*="confirm"]',
+    ];
+
+    // Try to find and interact with cloud storage interface
+    for (const selector of cloudSelectors) {
+      const elements = document.querySelectorAll(selector);
+      if (elements.length > 0) {
+        console.log(`Found cloud storage interface elements: ${selector}`);
+
+        // Click the first available element
+        const firstElement = elements[0] as HTMLElement;
+        if (firstElement) {
+          firstElement.click();
+          await new Promise(resolve => setTimeout(resolve, 200));
+        }
+        break;
+      }
+    }
+
+    // Dispatch custom events that cloud storage APIs might listen for
+    const customEvents = ["cloud-file-selected", "files-chosen", `${provider}-file-selected`, "picker-file-selected"];
+
+    customEvents.forEach(eventName => {
+      try {
+        const event = new CustomEvent(eventName, {
+          detail: { files, provider },
+          bubbles: true,
+        });
+        document.dispatchEvent(event);
+      } catch (error) {
+        console.debug(`Could not dispatch ${eventName}:`, error);
+      }
+    });
+  } catch (error) {
+    console.warn(`Error simulating ${provider} selection:`, error);
+  }
+}
 
 /**
  * Detect file input fields from a set of elements

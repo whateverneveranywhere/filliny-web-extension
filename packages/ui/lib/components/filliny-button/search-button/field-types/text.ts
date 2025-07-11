@@ -357,7 +357,7 @@ export const updateTextField = async (element: HTMLElement, value: string): Prom
 
     if (hasReactProps) {
       console.log("Detected React component, using enhanced update strategy");
-      await handleReactTextInput(element, normalizedValue);
+      await handleReactTextInput(element, normalizedValue, { isReact: true, type: "unknown" });
       return;
     }
 
@@ -406,55 +406,441 @@ export const updateTextField = async (element: HTMLElement, value: string): Prom
 };
 
 /**
- * Handle React-specific text input components
+ * Enhanced React component detection with state management patterns
  */
-async function handleReactTextInput(element: HTMLElement, value: string): Promise<void> {
+interface ReactDetection {
+  isReact: boolean;
+  type:
+    | "controlled"
+    | "uncontrolled"
+    | "hook-based"
+    | "class-based"
+    | "material-ui"
+    | "ant-design"
+    | "chakra-ui"
+    | "formik"
+    | "react-hook-form"
+    | "unknown";
+  framework?: string;
+  stateManager?: string;
+  fiber?: unknown;
+  props?: unknown;
+}
+
+const detectReactComponent = (element: HTMLElement): ReactDetection => {
+  // Check for React Fiber (React 16+)
+  const fiberKey = Object.keys(element).find(
+    key => key.startsWith("__reactFiber") || key.startsWith("__reactInternalInstance"),
+  );
+  if (fiberKey) {
+    const fiber = (element as unknown as Record<string, unknown>)[fiberKey];
+    return {
+      isReact: true,
+      type: detectReactComponentType(element, fiber),
+      fiber: fiber,
+      props:
+        (fiber as { memoizedProps?: unknown; pendingProps?: unknown } | null)?.memoizedProps ??
+        (fiber as { memoizedProps?: unknown; pendingProps?: unknown } | null)?.pendingProps,
+    };
+  }
+
+  // Check for React DevTools markers
+  if (element.hasAttribute("data-reactid") || element.hasAttribute("data-react-class")) {
+    return {
+      isReact: true,
+      type: "class-based",
+    };
+  }
+
+  // Check for React root markers
+  if (document.querySelector('[data-reactroot], #root, [id*="react"], [class*="react-root"]')) {
+    // Check for specific component library patterns
+    const componentType = detectComponentLibrary(element);
+    if (componentType !== "unknown") {
+      return {
+        isReact: true,
+        type: componentType,
+      };
+    }
+  }
+
+  // Check for React event handlers
+  const hasReactEvents = Object.keys(element).some(key => key.startsWith("__reactEventHandlers"));
+  if (hasReactEvents) {
+    return {
+      isReact: true,
+      type: "hook-based",
+    };
+  }
+
+  // Check for React class patterns
+  const className = element.className || "";
+  if (/\breact-/i.test(className)) {
+    return {
+      isReact: true,
+      type: "class-based",
+    };
+  }
+
+  return { isReact: false, type: "unknown" };
+};
+
+const detectReactComponentType = (element: HTMLElement, fiber: unknown): ReactDetection["type"] => {
+  // Check for controlled vs uncontrolled
+  if (element instanceof HTMLInputElement) {
+    // Controlled components have value prop managed by React
+    const fiberObj = fiber as {
+      memoizedProps?: { value?: unknown; defaultValue?: unknown };
+      pendingProps?: { value?: unknown; defaultValue?: unknown };
+    } | null;
+    if (fiberObj?.memoizedProps?.value !== undefined || fiberObj?.pendingProps?.value !== undefined) {
+      return "controlled";
+    }
+    // Uncontrolled components use defaultValue
+    if (fiberObj?.memoizedProps?.defaultValue !== undefined || fiberObj?.pendingProps?.defaultValue !== undefined) {
+      return "uncontrolled";
+    }
+  }
+
+  // Check for component library patterns
+  const componentType = detectComponentLibrary(element);
+  if (componentType !== "unknown") {
+    return componentType;
+  }
+
+  // Check for form library patterns
+  const formLibrary = detectFormLibrary(element);
+  if (formLibrary !== "unknown") {
+    return formLibrary;
+  }
+
+  // Default to hook-based for modern React
+  return "hook-based";
+};
+
+const detectComponentLibrary = (element: HTMLElement): ReactDetection["type"] => {
+  const className = element.className || "";
+  const parentClasses = element.parentElement?.className || "";
+  const combinedClasses = `${className} ${parentClasses}`.toLowerCase();
+
+  // Material-UI patterns
+  if (/\bmui|\bmaterial-ui/i.test(combinedClasses) || element.closest('[class*="Mui"]')) {
+    return "material-ui";
+  }
+
+  // Ant Design patterns
+  if (/\bant-|\bantd/i.test(combinedClasses) || element.closest('[class*="ant-"]')) {
+    return "ant-design";
+  }
+
+  // Chakra UI patterns
+  if (/\bchakra|\bchakra-ui/i.test(combinedClasses) || element.closest('[class*="chakra"]')) {
+    return "chakra-ui";
+  }
+
+  return "unknown";
+};
+
+const detectFormLibrary = (element: HTMLElement): ReactDetection["type"] => {
+  // Check for Formik patterns
+  if (element.closest('[class*="formik"]') || element.hasAttribute("data-formik")) {
+    return "formik";
+  }
+
+  // Check for React Hook Form patterns
+  if (element.hasAttribute("data-react-hook-form") || element.closest("[data-react-hook-form]")) {
+    return "react-hook-form";
+  }
+
+  // Check for form names that suggest form libraries
+  const formElement = element.closest("form");
+  if (formElement) {
+    const formName = formElement.getAttribute("name") || formElement.className || "";
+    if (/\b(formik|react-hook-form|final-form)\b/i.test(formName)) {
+      return "formik";
+    }
+  }
+
+  return "unknown";
+};
+
+/**
+ * Handle React-specific text input components with enhanced state management
+ */
+async function handleReactTextInput(element: HTMLElement, value: string, detection: ReactDetection): Promise<void> {
   try {
-    // Most React components listen to onFocus, onChange, and onBlur
-    // Focus the element
+    console.log(`Handling React ${detection.type} component`);
+
+    // Focus the element first
     element.focus();
 
-    // For controlled components, we need to dispatch specific events
-    // that React is listening for
-    if (element instanceof HTMLInputElement) {
-      // Set the value property directly
-      element.value = value;
-    } else if (element.isContentEditable) {
-      element.textContent = value;
-    }
-
-    // Trigger React-specific events
-    // React listens to specific synthetic events rather than native ones
-    ["input", "change"].forEach(eventName => {
-      const event = new Event(eventName, { bubbles: true, cancelable: true });
-      element.dispatchEvent(event);
-
-      // Also try to find and call any attached event handlers directly
-      const reactHandler =
-        // @ts-expect-error - Dynamic property access for event handlers
-        element[`on${eventName}`] || element.getAttribute(`on${eventName}`);
-
-      if (typeof reactHandler === "function") {
-        reactHandler.call(element, event);
-      }
-    });
-
-    // For Material UI and other component libraries, try additional strategies
-    // Some libraries store state in data attributes
-    if (element.closest('[class*="MuiInputBase"]')) {
-      const rootElement = element.closest('[class*="MuiInputBase"]');
-      rootElement?.setAttribute("data-value", value);
-
-      // Trigger events on the container element too
-      ["input", "change"].forEach(eventName => {
-        const event = new Event(eventName, { bubbles: true, cancelable: true });
-        rootElement?.dispatchEvent(event);
-      });
+    // Handle different React component types
+    switch (detection.type) {
+      case "controlled":
+        await handleControlledComponent(element, value, detection);
+        break;
+      case "uncontrolled":
+        await handleUncontrolledComponent(element, value, detection);
+        break;
+      case "material-ui":
+        await handleMaterialUIComponent(element, value, detection);
+        break;
+      case "ant-design":
+        await handleAntDesignComponent(element, value, detection);
+        break;
+      case "chakra-ui":
+        await handleChakraUIComponent(element, value, detection);
+        break;
+      case "formik":
+        await handleFormikComponent(element, value, detection);
+        break;
+      case "react-hook-form":
+        await handleReactHookFormComponent(element, value, detection);
+        break;
+      case "hook-based":
+      case "class-based":
+      default:
+        await handleGenericReactComponent(element, value, detection);
+        break;
     }
   } catch (error) {
     console.error("Error in React input handler:", error);
     // Fall back to standard typing simulation
     await simulateTyping(element, value);
+  }
+}
+
+/**
+ * Handle controlled React components
+ */
+async function handleControlledComponent(
+  element: HTMLElement,
+  value: string,
+  detection: ReactDetection,
+): Promise<void> {
+  // For controlled components, we need to update the state, not just the DOM
+  if (element instanceof HTMLInputElement) {
+    // Try to trigger state update through React's synthetic event system
+    await triggerReactStateUpdate(element, value, detection);
+  }
+}
+
+/**
+ * Handle uncontrolled React components
+ */
+async function handleUncontrolledComponent(
+  element: HTMLElement,
+  value: string,
+  detection: ReactDetection,
+): Promise<void> {
+  // For uncontrolled components, direct DOM manipulation should work
+  if (element instanceof HTMLInputElement) {
+    element.value = value;
+    await triggerReactEvents(element, ["input", "change"]);
+  }
+}
+
+/**
+ * Handle Material-UI components
+ */
+async function handleMaterialUIComponent(
+  element: HTMLElement,
+  value: string,
+  detection: ReactDetection,
+): Promise<void> {
+  // Material-UI uses controlled components with special event handling
+  const muiContainer = element.closest('[class*="MuiInputBase"], [class*="MuiTextField"], [class*="MuiInput"]');
+
+  if (element instanceof HTMLInputElement) {
+    element.value = value;
+
+    // Trigger events on both the input and container
+    await triggerReactEvents(element, ["focus", "input", "change", "blur"]);
+
+    if (muiContainer) {
+      muiContainer.setAttribute("data-value", value);
+      await triggerReactEvents(muiContainer as HTMLElement, ["input", "change"]);
+    }
+  }
+}
+
+/**
+ * Handle Ant Design components
+ */
+async function handleAntDesignComponent(element: HTMLElement, value: string, detection: ReactDetection): Promise<void> {
+  const antContainer = element.closest('[class*="ant-input"], [class*="ant-form-item"]');
+
+  if (element instanceof HTMLInputElement) {
+    element.value = value;
+    await triggerReactEvents(element, ["focus", "input", "change", "blur"]);
+
+    if (antContainer) {
+      // Ant Design often uses data attributes for state
+      antContainer.setAttribute("data-value", value);
+      await triggerReactEvents(antContainer as HTMLElement, ["input", "change"]);
+    }
+  }
+}
+
+/**
+ * Handle Chakra UI components
+ */
+async function handleChakraUIComponent(element: HTMLElement, value: string, detection: ReactDetection): Promise<void> {
+  if (element instanceof HTMLInputElement) {
+    element.value = value;
+    await triggerReactEvents(element, ["focus", "input", "change", "blur"]);
+  }
+}
+
+/**
+ * Handle Formik components
+ */
+async function handleFormikComponent(element: HTMLElement, value: string, detection: ReactDetection): Promise<void> {
+  if (element instanceof HTMLInputElement) {
+    element.value = value;
+
+    // Formik listens to specific events for validation
+    await triggerReactEvents(element, ["input", "change", "blur"]);
+
+    // Also try to trigger Formik's setFieldValue if available
+    try {
+      const formikBag = (
+        element as unknown as {
+          __formik?: { setFieldValue?: (name: string, value: string) => void };
+        }
+      ).__formik;
+      if (formikBag && formikBag.setFieldValue) {
+        const fieldName = element.name || element.id;
+        if (fieldName) {
+          formikBag.setFieldValue(fieldName, value);
+        }
+      }
+    } catch (error) {
+      console.debug("Could not access Formik bag:", error);
+    }
+  }
+}
+
+/**
+ * Handle React Hook Form components
+ */
+async function handleReactHookFormComponent(
+  element: HTMLElement,
+  value: string,
+  detection: ReactDetection,
+): Promise<void> {
+  if (element instanceof HTMLInputElement) {
+    element.value = value;
+
+    // React Hook Form uses register() which attaches specific event handlers
+    await triggerReactEvents(element, ["input", "change", "blur"]);
+
+    // Try to trigger React Hook Form's setValue if available
+    try {
+      const rhfController = (
+        element as unknown as {
+          __reactHookForm?: { setValue?: (name: string, value: string) => void };
+        }
+      ).__reactHookForm;
+      if (rhfController && rhfController.setValue) {
+        const fieldName = element.name || element.id;
+        if (fieldName) {
+          rhfController.setValue(fieldName, value);
+        }
+      }
+    } catch (error) {
+      console.debug("Could not access React Hook Form controller:", error);
+    }
+  }
+}
+
+/**
+ * Handle generic React components
+ */
+async function handleGenericReactComponent(
+  element: HTMLElement,
+  value: string,
+  detection: ReactDetection,
+): Promise<void> {
+  if (element instanceof HTMLInputElement) {
+    element.value = value;
+  } else if (element.isContentEditable) {
+    element.textContent = value;
+  }
+
+  // Try to trigger state update through React's synthetic event system
+  await triggerReactStateUpdate(element, value, detection);
+}
+
+/**
+ * Trigger React state updates using synthetic events
+ */
+async function triggerReactStateUpdate(element: HTMLElement, value: string, detection: ReactDetection): Promise<void> {
+  // For controlled components, we need to simulate user input to trigger state updates
+  if (element instanceof HTMLInputElement) {
+    // Clear the input first
+    element.value = "";
+    await triggerReactEvents(element, ["focus"]);
+
+    // Simulate typing character by character for controlled components
+    for (let i = 0; i < value.length; i++) {
+      const char = value[i];
+      const newValue = value.substring(0, i + 1);
+
+      // Update the value
+      element.value = newValue;
+
+      // Create synthetic events
+      const inputEvent = new InputEvent("input", {
+        bubbles: true,
+        cancelable: true,
+        data: char,
+        inputType: "insertText",
+      });
+
+      element.dispatchEvent(inputEvent);
+
+      // Small delay to allow React to process the state update
+      await new Promise(resolve => setTimeout(resolve, 10));
+    }
+
+    // Final change event
+    await triggerReactEvents(element, ["change", "blur"]);
+  }
+}
+
+/**
+ * Trigger React events with proper synthetic event handling
+ */
+async function triggerReactEvents(element: HTMLElement, events: string[]): Promise<void> {
+  for (const eventName of events) {
+    try {
+      // Create native event
+      const event = new Event(eventName, { bubbles: true, cancelable: true });
+      element.dispatchEvent(event);
+
+      // Also create InputEvent for input events
+      if (eventName === "input" && element instanceof HTMLInputElement) {
+        const inputEvent = new InputEvent("input", {
+          bubbles: true,
+          cancelable: true,
+          data: element.value,
+          inputType: "insertText",
+        });
+        element.dispatchEvent(inputEvent);
+      }
+
+      // Try to call React event handlers directly
+      const reactHandler = (element as unknown as Record<string, unknown>)[`on${eventName}`];
+      if (typeof reactHandler === "function") {
+        reactHandler.call(element, event);
+      }
+
+      // Small delay between events
+      await new Promise(resolve => setTimeout(resolve, 5));
+    } catch (error) {
+      console.debug(`Error triggering ${eventName} event:`, error);
+    }
   }
 }
 
