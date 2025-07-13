@@ -901,16 +901,34 @@ const analyzeSemanticMeaning = (el: HTMLElement): number => {
   const contextMatches = formContextIndicators.filter(pattern => pattern.test(allText)).length;
   score += Math.min(6, contextMatches * 1.5);
 
-  // Job application specific patterns
+  // Enhanced job application specific patterns
   const jobApplicationIndicators = [
     /\b(resume|cv|portfolio|experience|education)\b/,
     /\b(skill|qualification|certification|degree)\b/,
     /\b(position|role|job|career|employment)\b/,
     /\b(salary|compensation|availability|location)\b/,
+    // Enhanced personal information patterns
+    /\b(first.?name|last.?name|full.?name|given.?name|family.?name)\b/,
+    /\b(personal.?info|contact.?info|demographic)\b/,
+    /\b(address|street|city|state|country|zip|postal)\b/,
+    /\b(phone|telephone|mobile|email|contact)\b/,
+    // Professional information patterns
+    /\b(company|organization|employer|workplace|current.?employer)\b/,
+    /\b(title|position|role|designation|current.?title)\b/,
+    /\b(years.?of.?experience|experience.?level|seniority)\b/,
+    /\b(linkedin|professional.?profile|website|github)\b/,
+    // Application specific patterns
+    /\b(cover.?letter|motivation|why.?interested|objective)\b/,
+    /\b(references|recommendation|referee|contact.?person)\b/,
+    /\b(start.?date|available.?date|notice.?period|joining.?date)\b/,
+    /\b(visa|work.?authorization|eligible.?to.?work|citizenship)\b/,
+    /\b(relocation|willing.?to.?relocate|remote.?work)\b/,
+    // Document upload patterns
+    /\b(upload|attach|document|file|certificate|transcript)\b/,
   ];
 
   const jobMatches = jobApplicationIndicators.filter(pattern => pattern.test(allText)).length;
-  score += Math.min(4, jobMatches * 2);
+  score += Math.min(8, jobMatches * 1.5); // Increased scoring for job applications
 
   // Framework-specific class patterns
   const frameworkIndicators = [

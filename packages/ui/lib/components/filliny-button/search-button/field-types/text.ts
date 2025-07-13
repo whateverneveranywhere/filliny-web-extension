@@ -407,6 +407,7 @@ export const updateTextField = async (element: HTMLElement, value: string): Prom
 
 /**
  * Enhanced React component detection with state management patterns
+ * Extended support for Next.js, React 18+, and modern frameworks
  */
 interface ReactDetection {
   isReact: boolean;
@@ -420,72 +421,124 @@ interface ReactDetection {
     | "chakra-ui"
     | "formik"
     | "react-hook-form"
+    | "nextjs"
+    | "react-18-concurrent"
+    | "react-query"
+    | "redux-toolkit"
+    | "zustand"
+    | "jotai"
+    | "recoil"
     | "unknown";
   framework?: string;
   stateManager?: string;
+  reactVersion?: string;
+  isNextJs?: boolean;
+  isConcurrentMode?: boolean;
+  hasStateManager?: boolean;
   fiber?: unknown;
   props?: unknown;
 }
 
 const detectReactComponent = (element: HTMLElement): ReactDetection => {
+  const detection: ReactDetection = {
+    isReact: false,
+    type: "unknown",
+    isNextJs: detectNextJs(),
+    reactVersion: detectReactVersion(),
+    isConcurrentMode: detectConcurrentMode(),
+    hasStateManager: detectStateManager().length > 0,
+  };
+
   // Check for React Fiber (React 16+)
   const fiberKey = Object.keys(element).find(
     key => key.startsWith("__reactFiber") || key.startsWith("__reactInternalInstance"),
   );
+
   if (fiberKey) {
     const fiber = (element as unknown as Record<string, unknown>)[fiberKey];
-    return {
-      isReact: true,
-      type: detectReactComponentType(element, fiber),
-      fiber: fiber,
-      props:
-        (fiber as { memoizedProps?: unknown; pendingProps?: unknown } | null)?.memoizedProps ??
-        (fiber as { memoizedProps?: unknown; pendingProps?: unknown } | null)?.pendingProps,
-    };
+    detection.isReact = true;
+    detection.type = detectReactComponentType(element, fiber, detection);
+    detection.fiber = fiber;
+    detection.props =
+      (fiber as { memoizedProps?: unknown; pendingProps?: unknown } | null)?.memoizedProps ??
+      (fiber as { memoizedProps?: unknown; pendingProps?: unknown } | null)?.pendingProps;
+
+    return detection;
+  }
+
+  // Enhanced Next.js detection
+  if (detection.isNextJs) {
+    detection.isReact = true;
+    detection.type = "nextjs";
+
+    // Check for Next.js specific patterns
+    const nextjsComponentType = detectNextjsComponentType(element);
+    if (nextjsComponentType !== "unknown") {
+      detection.type = nextjsComponentType;
+    }
+
+    return detection;
+  }
+
+  // Check for React 18+ concurrent features
+  if (detection.isConcurrentMode) {
+    detection.isReact = true;
+    detection.type = "react-18-concurrent";
+    return detection;
+  }
+
+  // Check for state management libraries
+  if (detection.hasStateManager) {
+    const stateManagers = detectStateManager();
+    detection.isReact = true;
+    detection.type = stateManagers[0] as ReactDetection["type"];
+    detection.stateManager = stateManagers.join(", ");
+    return detection;
   }
 
   // Check for React DevTools markers
   if (element.hasAttribute("data-reactid") || element.hasAttribute("data-react-class")) {
-    return {
-      isReact: true,
-      type: "class-based",
-    };
+    detection.isReact = true;
+    detection.type = "class-based";
+    return detection;
   }
 
   // Check for React root markers
-  if (document.querySelector('[data-reactroot], #root, [id*="react"], [class*="react-root"]')) {
+  if (document.querySelector('[data-reactroot], #root, [id*="react"], [class*="react-root"], #__next')) {
+    detection.isReact = true;
+
     // Check for specific component library patterns
     const componentType = detectComponentLibrary(element);
     if (componentType !== "unknown") {
-      return {
-        isReact: true,
-        type: componentType,
-      };
+      detection.type = componentType;
+      return detection;
     }
   }
 
   // Check for React event handlers
   const hasReactEvents = Object.keys(element).some(key => key.startsWith("__reactEventHandlers"));
   if (hasReactEvents) {
-    return {
-      isReact: true,
-      type: "hook-based",
-    };
+    detection.isReact = true;
+    detection.type = "hook-based";
+    return detection;
   }
 
   // Check for React class patterns
   const className = element.className || "";
   if (/\breact-/i.test(className)) {
-    return {
-      isReact: true,
-      type: "class-based",
-    };
+    detection.isReact = true;
+    detection.type = "class-based";
+    return detection;
   }
 
-  return { isReact: false, type: "unknown" };
+  return detection;
 };
 
-const detectReactComponentType = (element: HTMLElement, fiber: unknown): ReactDetection["type"] => {
+const detectReactComponentType = (
+  element: HTMLElement,
+  fiber: unknown,
+  detection: ReactDetection,
+): ReactDetection["type"] => {
   // Check for controlled vs uncontrolled
   if (element instanceof HTMLInputElement) {
     // Controlled components have value prop managed by React
@@ -565,6 +618,151 @@ const detectFormLibrary = (element: HTMLElement): ReactDetection["type"] => {
 };
 
 /**
+ * Detect Next.js application
+ */
+const detectNextJs = (): boolean =>
+  // Check for Next.js specific elements and scripts
+  !!(
+    document.getElementById("__next") ||
+    document.querySelector('script[src*="_next"]') ||
+    document.querySelector('link[href*="_next"]') ||
+    window.location.pathname.includes("/_next/") ||
+    document.querySelector('meta[name="next-head-count"]') ||
+    (window as unknown as { __NEXT_DATA__?: unknown }).__NEXT_DATA__ ||
+    document.querySelector('script[id="__NEXT_DATA__"]')
+  );
+/**
+ * Detect React version from global objects or DOM
+ */
+const detectReactVersion = (): string | undefined => {
+  try {
+    // Check for React DevTools version info
+    const reactDevTools = (
+      window as unknown as { __REACT_DEVTOOLS_GLOBAL_HOOK__?: { renderers?: Map<number, { version?: string }> } }
+    ).__REACT_DEVTOOLS_GLOBAL_HOOK__;
+    if (reactDevTools?.renderers) {
+      for (const renderer of reactDevTools.renderers.values()) {
+        if (renderer.version) {
+          return renderer.version;
+        }
+      }
+    }
+
+    // Check for React in window object
+    const reactGlobal = (window as unknown as { React?: { version?: string } }).React;
+    if (reactGlobal?.version) {
+      return reactGlobal.version;
+    }
+
+    // Check for React version in bundle comments or scripts
+    const scripts = Array.from(document.querySelectorAll('script[src*="react"]'));
+    for (const script of scripts) {
+      const src = script.getAttribute("src") || "";
+      const versionMatch = src.match(/react@([\d.]+)/);
+      if (versionMatch) {
+        return versionMatch[1];
+      }
+    }
+  } catch (error) {
+    console.debug("Error detecting React version:", error);
+  }
+
+  return undefined;
+};
+
+/**
+ * Detect React 18+ concurrent mode features
+ */
+const detectConcurrentMode = (): boolean => {
+  try {
+    // Check for concurrent mode APIs
+    const hasConcurrentFeatures = !!(
+      (window as unknown as { createRoot?: unknown }).createRoot ||
+      document.querySelector('[data-react-concurrent="true"]') ||
+      document.querySelector(".react-concurrent-mode")
+    );
+
+    // Check for Suspense boundaries
+    const hasSuspense = !!(
+      document.querySelector("[data-react-suspense]") || document.querySelector(".react-suspense")
+    );
+
+    // Check for startTransition usage indicators
+    const hasTransitions = !!(
+      document.querySelector("[data-react-transition]") || document.querySelector(".react-transition")
+    );
+
+    return hasConcurrentFeatures || hasSuspense || hasTransitions;
+  } catch (error) {
+    console.debug("Error detecting concurrent mode:", error);
+    return false;
+  }
+};
+
+/**
+ * Detect state management libraries
+ */
+const detectStateManager = (): string[] => {
+  const stateManagers: string[] = [];
+
+  try {
+    // Redux/Redux Toolkit
+    if (
+      (window as unknown as { __REDUX_DEVTOOLS_EXTENSION__?: unknown }).__REDUX_DEVTOOLS_EXTENSION__ ||
+      document.querySelector("[data-redux]") ||
+      document.querySelector(".redux-store")
+    ) {
+      stateManagers.push("redux-toolkit");
+    }
+
+    // Zustand
+    if (document.querySelector("[data-zustand]") || document.querySelector(".zustand-store")) {
+      stateManagers.push("zustand");
+    }
+
+    // Jotai
+    if (document.querySelector("[data-jotai]") || document.querySelector(".jotai-atom")) {
+      stateManagers.push("jotai");
+    }
+
+    // Recoil
+    if (document.querySelector("[data-recoil]") || document.querySelector(".recoil-root")) {
+      stateManagers.push("recoil");
+    }
+
+    // React Query/TanStack Query
+    if (document.querySelector("[data-react-query]") || document.querySelector(".react-query-client")) {
+      stateManagers.push("react-query");
+    }
+  } catch (error) {
+    console.debug("Error detecting state managers:", error);
+  }
+
+  return stateManagers;
+};
+
+/**
+ * Detect Next.js specific component types
+ */
+const detectNextjsComponentType = (element: HTMLElement): ReactDetection["type"] => {
+  // Check for Next.js specific patterns
+  const nextPatterns = ["[data-nextjs]", ".next-component", '[class*="__next"]', '[id*="__next"]'];
+
+  for (const pattern of nextPatterns) {
+    if (element.matches(pattern) || element.closest(pattern)) {
+      return "nextjs";
+    }
+  }
+
+  // Check for Next.js form patterns
+  if (element.closest('form[action*="/_next/"]') || element.closest("[data-next-form]")) {
+    return "nextjs";
+  }
+
+  return "unknown";
+};
+
+/**
  * Handle React-specific text input components with enhanced state management
  */
 async function handleReactTextInput(element: HTMLElement, value: string, detection: ReactDetection): Promise<void> {
@@ -596,6 +794,27 @@ async function handleReactTextInput(element: HTMLElement, value: string, detecti
         break;
       case "react-hook-form":
         await handleReactHookFormComponent(element, value, detection);
+        break;
+      case "nextjs":
+        await handleNextjsComponent(element, value, detection);
+        break;
+      case "react-18-concurrent":
+        await handleReact18ConcurrentComponent(element, value, detection);
+        break;
+      case "react-query":
+        await handleReactQueryComponent(element, value, detection);
+        break;
+      case "redux-toolkit":
+        await handleReduxToolkitComponent(element, value, detection);
+        break;
+      case "zustand":
+        await handleZustandComponent(element, value, detection);
+        break;
+      case "jotai":
+        await handleJotaiComponent(element, value, detection);
+        break;
+      case "recoil":
+        await handleRecoilComponent(element, value, detection);
         break;
       case "hook-based":
       case "class-based":
@@ -884,6 +1103,221 @@ async function handleAngularTextInput(element: HTMLElement, value: string): Prom
     // Fall back to standard typing simulation
     await simulateTyping(element, value);
   }
+}
+
+/**
+ * Handle Next.js components with enhanced SSR/hydration support
+ */
+async function handleNextjsComponent(element: HTMLElement, value: string, detection: ReactDetection): Promise<void> {
+  try {
+    console.log("Handling Next.js component with enhanced SSR support");
+
+    // Check if component is hydrated
+    const isHydrated = !!(
+      document.querySelector("[data-reactroot]") ||
+      document.querySelector("#__next[data-reactroot]") ||
+      (window as unknown as { __NEXT_DATA__?: { props?: unknown } }).__NEXT_DATA__?.props
+    );
+
+    if (!isHydrated) {
+      // Wait for hydration before attempting to update
+      console.log("Waiting for Next.js hydration...");
+      await waitForNextjsHydration();
+    }
+
+    // Handle form updates with Next.js specific patterns
+    if (element instanceof HTMLInputElement) {
+      element.value = value;
+
+      // Next.js forms often use router for submissions
+      await triggerReactEvents(element, ["focus", "input", "change", "blur"]);
+
+      // Check for Next.js form action patterns
+      const form = element.closest("form");
+      if (form?.getAttribute("action")?.includes("/_next/")) {
+        // This is likely a server action form
+        console.log("Detected Next.js server action form");
+        await new Promise(resolve => setTimeout(resolve, 100)); // Allow for server action processing
+      }
+    }
+  } catch (error) {
+    console.error("Error in Next.js input handler:", error);
+    await handleGenericReactComponent(element, value, detection);
+  }
+}
+
+/**
+ * Handle React 18+ concurrent mode components
+ */
+async function handleReact18ConcurrentComponent(
+  element: HTMLElement,
+  value: string,
+  detection: ReactDetection,
+): Promise<void> {
+  try {
+    console.log("Handling React 18+ concurrent component");
+
+    if (element instanceof HTMLInputElement) {
+      // For concurrent mode, use startTransition pattern
+      element.value = value;
+
+      // Trigger events with consideration for concurrent features
+      await triggerReactEvents(element, ["focus"]);
+
+      // Simulate gradual typing for concurrent mode
+      for (let i = 0; i <= value.length; i++) {
+        const partialValue = value.substring(0, i);
+        element.value = partialValue;
+
+        const inputEvent = new InputEvent("input", {
+          bubbles: true,
+          cancelable: true,
+          data: value[i - 1] || "",
+          inputType: "insertText",
+        });
+
+        element.dispatchEvent(inputEvent);
+
+        // Small delay to allow concurrent features to process
+        await new Promise(resolve => setTimeout(resolve, 5));
+      }
+
+      await triggerReactEvents(element, ["change", "blur"]);
+    }
+  } catch (error) {
+    console.error("Error in React 18+ concurrent input handler:", error);
+    await handleGenericReactComponent(element, value, detection);
+  }
+}
+
+/**
+ * Handle React Query/TanStack Query components
+ */
+async function handleReactQueryComponent(
+  element: HTMLElement,
+  value: string,
+  detection: ReactDetection,
+): Promise<void> {
+  try {
+    console.log("Handling React Query component");
+
+    if (element instanceof HTMLInputElement) {
+      element.value = value;
+      await triggerReactEvents(element, ["focus", "input", "change", "blur"]);
+
+      // React Query might invalidate queries on form changes
+      // Wait a bit for potential query invalidation
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+  } catch (error) {
+    console.error("Error in React Query input handler:", error);
+    await handleGenericReactComponent(element, value, detection);
+  }
+}
+
+/**
+ * Handle Redux Toolkit components
+ */
+async function handleReduxToolkitComponent(
+  element: HTMLElement,
+  value: string,
+  detection: ReactDetection,
+): Promise<void> {
+  try {
+    console.log("Handling Redux Toolkit component");
+
+    if (element instanceof HTMLInputElement) {
+      element.value = value;
+
+      // Redux Toolkit components often use controlled inputs with dispatch actions
+      await triggerReactEvents(element, ["focus", "input", "change", "blur"]);
+
+      // Give time for Redux actions to process
+      await new Promise(resolve => setTimeout(resolve, 30));
+    }
+  } catch (error) {
+    console.error("Error in Redux Toolkit input handler:", error);
+    await handleGenericReactComponent(element, value, detection);
+  }
+}
+
+/**
+ * Handle Zustand components
+ */
+async function handleZustandComponent(element: HTMLElement, value: string, detection: ReactDetection): Promise<void> {
+  try {
+    console.log("Handling Zustand component");
+
+    if (element instanceof HTMLInputElement) {
+      element.value = value;
+      await triggerReactEvents(element, ["focus", "input", "change", "blur"]);
+    }
+  } catch (error) {
+    console.error("Error in Zustand input handler:", error);
+    await handleGenericReactComponent(element, value, detection);
+  }
+}
+
+/**
+ * Handle Jotai components
+ */
+async function handleJotaiComponent(element: HTMLElement, value: string, detection: ReactDetection): Promise<void> {
+  try {
+    console.log("Handling Jotai component");
+
+    if (element instanceof HTMLInputElement) {
+      element.value = value;
+      await triggerReactEvents(element, ["focus", "input", "change", "blur"]);
+    }
+  } catch (error) {
+    console.error("Error in Jotai input handler:", error);
+    await handleGenericReactComponent(element, value, detection);
+  }
+}
+
+/**
+ * Handle Recoil components
+ */
+async function handleRecoilComponent(element: HTMLElement, value: string, detection: ReactDetection): Promise<void> {
+  try {
+    console.log("Handling Recoil component");
+
+    if (element instanceof HTMLInputElement) {
+      element.value = value;
+      await triggerReactEvents(element, ["focus", "input", "change", "blur"]);
+    }
+  } catch (error) {
+    console.error("Error in Recoil input handler:", error);
+    await handleGenericReactComponent(element, value, detection);
+  }
+}
+
+/**
+ * Wait for Next.js hydration to complete
+ */
+async function waitForNextjsHydration(): Promise<void> {
+  return new Promise(resolve => {
+    let attempts = 0;
+    const maxAttempts = 50; // 5 seconds max wait
+
+    const checkHydration = () => {
+      const isHydrated = !!(
+        document.querySelector("[data-reactroot]") ||
+        document.querySelector("#__next[data-reactroot]") ||
+        (window as unknown as { __NEXT_DATA__?: { props?: unknown } }).__NEXT_DATA__?.props
+      );
+
+      if (isHydrated || attempts >= maxAttempts) {
+        resolve();
+        return;
+      }
+
+      attempts++;
+      setTimeout(checkHydration, 100);
+    };
+
+    checkHydration();
+  });
 }
 
 /**

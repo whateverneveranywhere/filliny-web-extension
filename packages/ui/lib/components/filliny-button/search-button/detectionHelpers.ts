@@ -68,6 +68,28 @@ const FORM_DEFINITION_API_PATTERNS = [
   /personio.*form/i,
   /\.json.*form/i,
   /form.*\.json/i,
+  // Enhanced patterns for modern job platforms
+  /onlyfy.*application/i,
+  /workday.*form/i,
+  /bamboohr.*form/i,
+  /lever.*application/i,
+  /breezy.*form/i,
+  /indeed.*apply/i,
+  /linkedin.*application/i,
+  // Next.js and React specific patterns
+  /_next\/static.*form/i,
+  /_next\/data.*application/i,
+  /api\/trpc.*form/i,
+  /graphql.*form/i,
+  // Configuration and metadata patterns
+  /config.*fields/i,
+  /metadata.*form/i,
+  /schema.*application/i,
+  /definition.*fields/i,
+  // Multi-step form patterns
+  /steps?.*form/i,
+  /wizard.*config/i,
+  /flow.*definition/i,
 ];
 
 // Universal patterns that indicate form content is ready
@@ -520,7 +542,7 @@ function shouldTerminateEarly(
 
 /**
  * Enhanced form container detection with improved scoring for group detection
- * Now includes universal dynamic content detection and progressive strategy
+ * Now includes universal dynamic content detection, progressive strategy, and multi-step form detection
  */
 export const detectFormLikeContainers = async (): Promise<HTMLElement[]> => {
   console.log("Starting enhanced form container detection with progressive strategy...");
@@ -530,8 +552,17 @@ export const detectFormLikeContainers = async (): Promise<HTMLElement[]> => {
   // Use progressive detection strategy
   const progressiveResults = await performProgressiveDetection(documents);
 
-  console.log("🎯 Final form container candidates:", progressiveResults.length);
-  return progressiveResults;
+  // Enhanced detection for multi-step forms
+  const multiStepContainers = await detectMultiStepFormContainers(documents);
+
+  // Combine results and deduplicate
+  const allContainers = [...progressiveResults, ...multiStepContainers];
+  const uniqueContainers = Array.from(new Set(allContainers));
+
+  console.log(
+    `🎯 Final form container candidates: ${uniqueContainers.length} (${progressiveResults.length} progressive + ${multiStepContainers.length} multi-step)`,
+  );
+  return uniqueContainers;
 };
 
 // --- Re-export shared helpers for convenience ---
@@ -1148,13 +1179,16 @@ export function initializeAPIResponseMonitoring(doc: Document, onFormDefinitionL
           const data = await clonedResponse.json();
           console.log(`🔍 Detected form definition API response from: ${url}`);
 
-          // Store the response data
-          monitor.interceptedResponses.set(url, data);
+          // Enhanced form definition data processing
+          const processedData = processFormDefinitionData(data, url);
+
+          // Store both raw and processed data
+          monitor.interceptedResponses.set(url, { raw: data, processed: processedData });
 
           // Trigger form detection after a short delay to allow DOM updates
           setTimeout(() => {
             console.log(`📡 Processing form definition data from ${url}`);
-            monitor.onFormDefinitionLoaded?.(data);
+            monitor.onFormDefinitionLoaded?.(processedData);
           }, 100);
         } catch (parseError) {
           console.debug("Failed to parse potential form definition response:", parseError);
@@ -1190,11 +1224,15 @@ export function initializeAPIResponseMonitoring(doc: Document, onFormDefinitionL
             const responseData = JSON.parse(this.responseText);
             console.log(`🔍 Detected form definition XHR response from: ${urlString}`);
 
-            monitor.interceptedResponses.set(urlString, responseData);
+            // Enhanced form definition data processing
+            const processedData = processFormDefinitionData(responseData, urlString);
+
+            // Store both raw and processed data
+            monitor.interceptedResponses.set(urlString, { raw: responseData, processed: processedData });
 
             setTimeout(() => {
               console.log(`📡 Processing form definition data from ${urlString}`);
-              monitor.onFormDefinitionLoaded?.(responseData);
+              monitor.onFormDefinitionLoaded?.(processedData);
             }, 100);
           } catch (parseError) {
             console.debug("Failed to parse XHR form definition response:", parseError);
@@ -1385,4 +1423,730 @@ function detectJobApplicationElement(element: Element): boolean {
   ];
 
   return jobPatterns.some(pattern => pattern.test(allText));
+}
+
+/**
+ * Enhanced multi-step form detection
+ * Detects forms with step-based navigation and handles them appropriately
+ */
+async function detectMultiStepFormContainers(documents: Document[]): Promise<HTMLElement[]> {
+  console.log("🔍 Starting multi-step form detection...");
+
+  const containers: HTMLElement[] = [];
+
+  for (const doc of documents) {
+    try {
+      // Strategy 1: Look for explicit step navigation elements
+      const stepNavigators = detectStepNavigationElements(doc);
+
+      // Strategy 2: Look for step content containers
+      const stepContainers = detectStepContentContainers(doc);
+
+      // Strategy 3: Look for wizard/flow patterns
+      const wizardContainers = detectWizardPatterns(doc);
+
+      // Strategy 4: Look for progress indicators
+      const progressContainers = detectProgressIndicators(doc);
+
+      // Combine and deduplicate step-related containers
+      const allStepContainers = [...stepNavigators, ...stepContainers, ...wizardContainers, ...progressContainers];
+
+      // Find the best container for each step-based form
+      const processedContainers = processMultiStepContainers(allStepContainers);
+      containers.push(...processedContainers);
+    } catch (error) {
+      console.error("Error in multi-step form detection:", error);
+    }
+  }
+
+  console.log(`📋 Multi-step detection found ${containers.length} containers`);
+  return containers;
+}
+
+/**
+ * Detect step navigation elements (prev/next buttons, step indicators)
+ */
+function detectStepNavigationElements(doc: Document): HTMLElement[] {
+  const containers: HTMLElement[] = [];
+
+  // Look for step navigation patterns
+  const navigationSelectors = [
+    // Button patterns
+    'button[class*="next"], button[class*="prev"], button[class*="step"]',
+    'button[class*="continue"], button[class*="back"]',
+    '[class*="next-button"], [class*="prev-button"], [class*="step-button"]',
+
+    // ARIA patterns
+    '[role="button"][aria-label*="next"], [role="button"][aria-label*="previous"]',
+    '[role="button"][aria-label*="step"], [role="button"][aria-label*="continue"]',
+
+    // Generic navigation patterns
+    '[class*="navigation"][class*="step"], [class*="step-nav"]',
+    '[class*="wizard-nav"], [class*="form-nav"]',
+
+    // Progress indicator patterns
+    '[class*="progress"], [class*="stepper"], [class*="breadcrumb"]',
+    '[role="progressbar"], [role="tablist"][class*="step"]',
+  ];
+
+  for (const selector of navigationSelectors) {
+    try {
+      const elements = Array.from(doc.querySelectorAll<HTMLElement>(selector));
+
+      for (const element of elements) {
+        // Find the container that likely contains the entire form
+        const container = findMultiStepFormContainer(element);
+        if (container && !containers.includes(container)) {
+          containers.push(container);
+          console.log(`📍 Found multi-step form via navigation: ${container.tagName}.${container.className}`);
+        }
+      }
+    } catch (error) {
+      console.debug(`Navigation selector failed: ${selector}`, error);
+    }
+  }
+
+  return containers;
+}
+
+/**
+ * Detect step content containers
+ */
+function detectStepContentContainers(doc: Document): HTMLElement[] {
+  const containers: HTMLElement[] = [];
+
+  // Look for step content patterns
+  const stepContentSelectors = [
+    '[class*="step-content"], [class*="step-body"], [class*="step-panel"]',
+    '[class*="wizard-step"], [class*="form-step"]',
+    '[role="tabpanel"][class*="step"], [class*="tab-pane"][class*="step"]',
+    "[data-step], [data-step-id], [data-step-name]",
+    '[id*="step"], [class*="step-"]:not([class*="stepper"])',
+  ];
+
+  for (const selector of stepContentSelectors) {
+    try {
+      const elements = Array.from(doc.querySelectorAll<HTMLElement>(selector));
+
+      for (const element of elements) {
+        // Check if this element contains form fields
+        const fields = getFormFieldsRobust(element);
+        if (fields.length > 0) {
+          const container = findMultiStepFormContainer(element);
+          if (container && !containers.includes(container)) {
+            containers.push(container);
+            console.log(`📍 Found multi-step form via step content: ${container.tagName}.${container.className}`);
+          }
+        }
+      }
+    } catch (error) {
+      console.debug(`Step content selector failed: ${selector}`, error);
+    }
+  }
+
+  return containers;
+}
+
+/**
+ * Detect wizard/flow patterns
+ */
+function detectWizardPatterns(doc: Document): HTMLElement[] {
+  const containers: HTMLElement[] = [];
+
+  // Look for wizard/flow specific patterns
+  const wizardSelectors = [
+    '[class*="wizard"], [class*="flow"], [class*="multi-step"]',
+    "[data-wizard], [data-flow], [data-multi-step]",
+    '[role="application"][class*="form"]',
+  ];
+
+  for (const selector of wizardSelectors) {
+    try {
+      const elements = Array.from(doc.querySelectorAll<HTMLElement>(selector));
+
+      for (const element of elements) {
+        // Check if this element contains form fields or step navigation
+        const fields = getFormFieldsRobust(element);
+        const hasStepNavigation = element.querySelector('[class*="step"], [class*="next"], [class*="prev"]');
+
+        if (fields.length > 0 || hasStepNavigation) {
+          if (!containers.includes(element)) {
+            containers.push(element);
+            console.log(`📍 Found wizard/flow form: ${element.tagName}.${element.className}`);
+          }
+        }
+      }
+    } catch (error) {
+      console.debug(`Wizard selector failed: ${selector}`, error);
+    }
+  }
+
+  return containers;
+}
+
+/**
+ * Detect progress indicators
+ */
+function detectProgressIndicators(doc: Document): HTMLElement[] {
+  const containers: HTMLElement[] = [];
+
+  // Look for progress indicator patterns
+  const progressSelectors = [
+    '[role="progressbar"]',
+    '[class*="progress"][class*="step"], [class*="step-progress"]',
+    '[class*="stepper"], [class*="breadcrumb"][class*="step"]',
+    ".progress-bar, .progress-indicator",
+  ];
+
+  for (const selector of progressSelectors) {
+    try {
+      const elements = Array.from(doc.querySelectorAll<HTMLElement>(selector));
+
+      for (const element of elements) {
+        // Check if progress indicator shows multiple steps
+        const stepTexts = element.textContent || "";
+        const hasMultipleSteps =
+          /step\s*\d+.*step\s*\d+/i.test(stepTexts) ||
+          /\d+.*of.*\d+/i.test(stepTexts) ||
+          element.querySelectorAll('[class*="step"], [data-step]').length > 1;
+
+        if (hasMultipleSteps) {
+          const container = findMultiStepFormContainer(element);
+          if (container && !containers.includes(container)) {
+            containers.push(container);
+            console.log(`📍 Found multi-step form via progress indicator: ${container.tagName}.${container.className}`);
+          }
+        }
+      }
+    } catch (error) {
+      console.debug(`Progress selector failed: ${selector}`, error);
+    }
+  }
+
+  return containers;
+}
+
+/**
+ * Find the appropriate container for a multi-step form
+ */
+function findMultiStepFormContainer(element: HTMLElement): HTMLElement | null {
+  // Start from the element and traverse up to find the most appropriate container
+  let current = element;
+  let bestContainer: HTMLElement | null = null;
+  let bestScore = 0;
+
+  while (current && current !== document.body) {
+    const score = scoreMultiStepContainer(current);
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestContainer = current;
+    }
+
+    current = current.parentElement!;
+  }
+
+  return bestContainer && bestScore > 10 ? bestContainer : null;
+}
+
+/**
+ * Score a container for multi-step form likelihood
+ */
+function scoreMultiStepContainer(container: HTMLElement): number {
+  let score = 0;
+
+  // Check for form-related tags
+  if (["FORM", "FIELDSET"].includes(container.tagName)) {
+    score += 20;
+  }
+
+  // Check for semantic roles
+  const role = container.getAttribute("role");
+  if (role === "form" || role === "application" || role === "region") {
+    score += 15;
+  }
+
+  // Check for multi-step related classes/attributes
+  const className = container.className.toLowerCase();
+  const hasMultiStepClass = [
+    "wizard",
+    "multi-step",
+    "stepper",
+    "flow",
+    "steps",
+    "form-wizard",
+    "step-form",
+    "application-form",
+  ].some(cls => className.includes(cls));
+
+  if (hasMultiStepClass) {
+    score += 25;
+  }
+
+  // Check for step navigation elements inside
+  const hasNavigation = container.querySelector(
+    '[class*="next"], [class*="prev"], [class*="step-nav"], [class*="continue"], [class*="back"]',
+  );
+  if (hasNavigation) {
+    score += 15;
+  }
+
+  // Check for progress indicators inside
+  const hasProgress = container.querySelector('[role="progressbar"], [class*="progress"], [class*="stepper"]');
+  if (hasProgress) {
+    score += 10;
+  }
+
+  // Check for multiple step containers inside
+  const stepContainers = container.querySelectorAll('[class*="step-"], [data-step], [class*="tab-pane"]');
+  if (stepContainers.length > 1) {
+    score += Math.min(20, stepContainers.length * 5);
+  }
+
+  // Check for form fields
+  const fields = getFormFieldsRobust(container);
+  if (fields.length > 0) {
+    score += Math.min(15, fields.length * 2);
+  }
+
+  // Penalty for being too small (likely just a button)
+  try {
+    const rect = container.getBoundingClientRect();
+    if (rect.width < 200 || rect.height < 100) {
+      score -= 10;
+    }
+  } catch {
+    // Ignore sizing errors
+  }
+
+  return score;
+}
+
+/**
+ * Process and optimize multi-step containers
+ */
+function processMultiStepContainers(containers: HTMLElement[]): HTMLElement[] {
+  const processed: HTMLElement[] = [];
+  const processedSet = new Set<HTMLElement>();
+
+  // Remove nested containers (keep the outermost one)
+  for (const container of containers) {
+    let isNested = false;
+
+    for (const other of containers) {
+      if (other !== container && other.contains(container)) {
+        isNested = true;
+        break;
+      }
+    }
+
+    if (!isNested && !processedSet.has(container)) {
+      processed.push(container);
+      processedSet.add(container);
+    }
+  }
+
+  return processed;
+}
+
+/**
+ * Enhanced form definition data processing
+ * Extracts and normalizes form configuration from various API response formats
+ */
+interface ProcessedFormDefinition {
+  fields: ProcessedFormField[];
+  steps?: ProcessedFormStep[];
+  validation?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
+  source: string;
+}
+
+interface ProcessedFormField {
+  id: string;
+  name: string;
+  type: string;
+  label?: string;
+  placeholder?: string;
+  required?: boolean;
+  options?: Array<{ value: string; label: string }>;
+  validation?: Record<string, unknown>;
+  step?: string | number;
+  dependencies?: string[];
+  metadata?: Record<string, unknown>;
+}
+
+interface ProcessedFormStep {
+  id: string | number;
+  name: string;
+  label?: string;
+  fields: string[];
+  order?: number;
+  metadata?: Record<string, unknown>;
+}
+
+function processFormDefinitionData(data: unknown, source: string): ProcessedFormDefinition | null {
+  try {
+    if (!data || typeof data !== "object") {
+      return null;
+    }
+
+    console.log(`🔍 Processing form definition from ${source}:`, data);
+
+    const result: ProcessedFormDefinition = {
+      fields: [],
+      steps: [],
+      source,
+      metadata: {},
+    };
+
+    // Handle different API response formats
+    const normalizedData = normalizeAPIResponse(data);
+
+    // Extract fields from various formats
+    result.fields = extractFieldsFromData(normalizedData);
+
+    // Extract steps if present
+    result.steps = extractStepsFromData(normalizedData);
+
+    // Extract validation rules
+    result.validation = extractValidationFromData(normalizedData);
+
+    // Store original metadata
+    result.metadata = normalizedData;
+
+    console.log(`📊 Processed ${result.fields.length} fields and ${result.steps?.length || 0} steps from API response`);
+
+    return result.fields.length > 0 ? result : null;
+  } catch (error) {
+    console.error("Error processing form definition data:", error);
+    return null;
+  }
+}
+
+/**
+ * Normalize different API response formats to a common structure
+ */
+function normalizeAPIResponse(data: unknown): Record<string, unknown> {
+  if (!data || typeof data !== "object") {
+    return {};
+  }
+
+  const dataObj = data as Record<string, unknown>;
+
+  // Handle common wrapper patterns
+  if (dataObj.data) {
+    return normalizeAPIResponse(dataObj.data);
+  }
+
+  if (dataObj.result) {
+    return normalizeAPIResponse(dataObj.result);
+  }
+
+  if (dataObj.payload) {
+    return normalizeAPIResponse(dataObj.payload);
+  }
+
+  // Handle Next.js specific patterns
+  if (dataObj.pageProps) {
+    return normalizeAPIResponse(dataObj.pageProps);
+  }
+
+  // Handle nested form configuration
+  if (dataObj.form || dataObj.formConfig || dataObj.formDefinition) {
+    const formData = dataObj.form || dataObj.formConfig || dataObj.formDefinition;
+    return normalizeAPIResponse(formData);
+  }
+
+  return dataObj;
+}
+
+/**
+ * Extract field definitions from normalized data
+ */
+function extractFieldsFromData(data: Record<string, unknown>): ProcessedFormField[] {
+  const fields: ProcessedFormField[] = [];
+
+  // Strategy 1: Direct fields array
+  if (Array.isArray(data.fields)) {
+    fields.push(...processFieldsArray(data.fields));
+  }
+
+  // Strategy 2: Schema-based fields
+  if (data.schema && typeof data.schema === "object") {
+    const schema = data.schema as Record<string, unknown>;
+    if (Array.isArray(schema.fields)) {
+      fields.push(...processFieldsArray(schema.fields));
+    }
+    if (schema.properties && typeof schema.properties === "object") {
+      fields.push(...processSchemaProperties(schema.properties as Record<string, unknown>));
+    }
+  }
+
+  // Strategy 3: Step-based fields
+  if (Array.isArray(data.steps)) {
+    for (const step of data.steps) {
+      if (step && typeof step === "object" && Array.isArray((step as Record<string, unknown>).fields)) {
+        const stepFields = processFieldsArray((step as Record<string, unknown>).fields as unknown[]);
+        stepFields.forEach(field => {
+          field.step = String((step as Record<string, unknown>).id || (step as Record<string, unknown>).name || "");
+        });
+        fields.push(...stepFields);
+      }
+    }
+  }
+
+  // Strategy 4: Flat object keys as fields
+  const potentialFields = Object.keys(data).filter(
+    key => key.includes("field") || key.includes("input") || key.endsWith("_field") || key.startsWith("field_"),
+  );
+
+  for (const key of potentialFields) {
+    const fieldData = data[key];
+    if (fieldData && typeof fieldData === "object") {
+      const processedField = processFieldDefinition(fieldData as Record<string, unknown>, key);
+      if (processedField) {
+        fields.push(processedField);
+      }
+    }
+  }
+
+  return fields;
+}
+
+/**
+ * Process an array of field definitions
+ */
+function processFieldsArray(fieldsArray: unknown[]): ProcessedFormField[] {
+  const fields: ProcessedFormField[] = [];
+
+  for (const fieldData of fieldsArray) {
+    if (fieldData && typeof fieldData === "object") {
+      const field = processFieldDefinition(fieldData as Record<string, unknown>);
+      if (field) {
+        fields.push(field);
+      }
+    }
+  }
+
+  return fields;
+}
+
+/**
+ * Process schema properties as field definitions
+ */
+function processSchemaProperties(properties: Record<string, unknown>): ProcessedFormField[] {
+  const fields: ProcessedFormField[] = [];
+
+  for (const [key, property] of Object.entries(properties)) {
+    if (property && typeof property === "object") {
+      const field = processFieldDefinition(property as Record<string, unknown>, key);
+      if (field) {
+        fields.push(field);
+      }
+    }
+  }
+
+  return fields;
+}
+
+/**
+ * Process individual field definition
+ */
+function processFieldDefinition(fieldData: Record<string, unknown>, fallbackId?: string): ProcessedFormField | null {
+  try {
+    const id = (fieldData.id || fieldData.name || fieldData.key || fallbackId) as string;
+    if (!id) return null;
+
+    const field: ProcessedFormField = {
+      id,
+      name: (fieldData.name || id) as string,
+      type: normalizeFieldType((fieldData.type || fieldData.fieldType || "text") as string),
+      label: (fieldData.label || fieldData.title || fieldData.displayName) as string,
+      placeholder: fieldData.placeholder as string,
+      required: Boolean(fieldData.required || fieldData.isRequired),
+      metadata: fieldData,
+    };
+
+    // Extract options for select/radio/checkbox fields
+    if (fieldData.options && Array.isArray(fieldData.options)) {
+      field.options = fieldData.options.map((option: unknown) => {
+        if (typeof option === "string") {
+          return { value: option, label: option };
+        }
+        if (option && typeof option === "object") {
+          const opt = option as Record<string, unknown>;
+          return {
+            value: (opt.value || opt.id || opt.key) as string,
+            label: (opt.label || opt.text || opt.name || opt.value) as string,
+          };
+        }
+        return { value: String(option), label: String(option) };
+      });
+    }
+
+    // Extract validation rules
+    if (fieldData.validation && typeof fieldData.validation === "object") {
+      field.validation = fieldData.validation as Record<string, unknown>;
+    }
+
+    // Extract dependencies
+    if (fieldData.dependencies && Array.isArray(fieldData.dependencies)) {
+      field.dependencies = fieldData.dependencies.map(dep => String(dep));
+    }
+
+    return field;
+  } catch (error) {
+    console.debug("Error processing field definition:", error);
+    return null;
+  }
+}
+
+/**
+ * Normalize field type from various formats
+ */
+function normalizeFieldType(type: string): string {
+  const normalizedType = type.toLowerCase().trim();
+
+  // Map common variations to standard types
+  const typeMap: Record<string, string> = {
+    string: "text",
+    varchar: "text",
+    textarea: "textarea",
+    longtext: "textarea",
+    dropdown: "select",
+    combobox: "select",
+    checkbox: "checkbox",
+    radio: "radio",
+    radiobutton: "radio",
+    file: "file",
+    upload: "file",
+    attachment: "file",
+    date: "date",
+    datetime: "datetime-local",
+    time: "time",
+    number: "number",
+    integer: "number",
+    decimal: "number",
+    email: "email",
+    url: "url",
+    tel: "tel",
+    phone: "tel",
+    password: "password",
+    hidden: "hidden",
+  };
+
+  return typeMap[normalizedType] || normalizedType;
+}
+
+/**
+ * Extract steps from form definition data
+ */
+function extractStepsFromData(data: Record<string, unknown>): ProcessedFormStep[] {
+  const steps: ProcessedFormStep[] = [];
+
+  if (Array.isArray(data.steps)) {
+    for (const stepData of data.steps) {
+      if (stepData && typeof stepData === "object") {
+        const step = processStepDefinition(stepData as Record<string, unknown>);
+        if (step) {
+          steps.push(step);
+        }
+      }
+    }
+  }
+
+  // Also check for wizard/flow configuration
+  if (data.wizard && typeof data.wizard === "object") {
+    const wizard = data.wizard as Record<string, unknown>;
+    if (Array.isArray(wizard.steps)) {
+      for (const stepData of wizard.steps) {
+        if (stepData && typeof stepData === "object") {
+          const step = processStepDefinition(stepData as Record<string, unknown>);
+          if (step) {
+            steps.push(step);
+          }
+        }
+      }
+    }
+  }
+
+  return steps;
+}
+
+/**
+ * Process individual step definition
+ */
+function processStepDefinition(stepData: Record<string, unknown>): ProcessedFormStep | null {
+  try {
+    const id = stepData.id || stepData.name || stepData.key;
+    if (!id) return null;
+
+    const step: ProcessedFormStep = {
+      id: id as string | number,
+      name: (stepData.name || stepData.title || id) as string,
+      label: stepData.label as string,
+      fields: [],
+      order: stepData.order as number,
+      metadata: stepData,
+    };
+
+    // Extract field IDs/names for this step
+    if (Array.isArray(stepData.fields)) {
+      step.fields = stepData.fields.map(field => {
+        if (typeof field === "string") return field;
+        if (field && typeof field === "object") {
+          const fieldObj = field as Record<string, unknown>;
+          return (fieldObj.id || fieldObj.name || fieldObj.key) as string;
+        }
+        return String(field);
+      });
+    }
+
+    return step;
+  } catch (error) {
+    console.debug("Error processing step definition:", error);
+    return null;
+  }
+}
+
+/**
+ * Extract validation rules from form definition data
+ */
+function extractValidationFromData(data: Record<string, unknown>): Record<string, unknown> {
+  const validation: Record<string, unknown> = {};
+
+  if (data.validation && typeof data.validation === "object") {
+    Object.assign(validation, data.validation);
+  }
+
+  if (data.rules && typeof data.rules === "object") {
+    Object.assign(validation, data.rules);
+  }
+
+  if (data.constraints && typeof data.constraints === "object") {
+    Object.assign(validation, data.constraints);
+  }
+
+  return validation;
+}
+
+/**
+ * Get processed form definitions for a document
+ */
+export function getProcessedFormDefinitions(doc: Document): ProcessedFormDefinition[] {
+  const monitor = apiResponseMonitors.get(doc);
+  if (!monitor) return [];
+
+  const definitions: ProcessedFormDefinition[] = [];
+
+  for (const [_url, responseData] of monitor.interceptedResponses) {
+    if (responseData && typeof responseData === "object") {
+      const data = responseData as { processed?: ProcessedFormDefinition };
+      if (data.processed) {
+        definitions.push(data.processed);
+      }
+    }
+  }
+
+  return definitions;
 }
