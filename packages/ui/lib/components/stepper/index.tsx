@@ -24,8 +24,8 @@ const Stepper = ({ steps, handleNext, handlePrev, handleFinish, isLoading, curre
             key={index}
             className={`filliny-flex-1 filliny-py-2 filliny-text-center ${
               index === currentStep
-                ? 'filliny-font-bold filliny-text-blue-500'
-                : 'filliny-font-light filliny-text-gray-500'
+                ? 'filliny-font-semibold filliny-text-primary'
+                : 'filliny-font-normal filliny-text-muted-foreground'
             }`}>
             {step.title}
           </div>

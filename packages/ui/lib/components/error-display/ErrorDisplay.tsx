@@ -1,31 +1,22 @@
+import { Button } from '../ui/button';
+import { Card, CardContent } from '../ui/card';
 import { t } from '@extension/i18n';
+import { AlertTriangle } from 'lucide-react';
 
 // ============================================================================
 // Internal Sub-components
 // ============================================================================
 
 /**
- * Warning icon SVG component
- */
-const WarningIcon = ({ className }: { className?: string }) => (
-  <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" className={className}>
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth="2"
-      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-    />
-  </svg>
-);
-
-/**
  * Error header with icon, title, and description
  */
 const ErrorHeader = () => (
-  <div className="text-center">
-    <WarningIcon className="mx-auto h-24 w-24 text-red-500" />
-    <h2 className="mt-6 text-3xl font-extrabold text-gray-900">{t('displayErrorInfo')}</h2>
-    <p className="mt-2 text-sm text-gray-600">{t('displayErrorDescription')}.</p>
+  <div className="filliny-text-center filliny-space-y-4">
+    <div className="filliny-mx-auto filliny-flex filliny-h-16 filliny-w-16 filliny-items-center filliny-justify-center filliny-rounded-full filliny-bg-destructive/10">
+      <AlertTriangle className="filliny-h-8 filliny-w-8 filliny-text-destructive" />
+    </div>
+    <h2 className="filliny-text-2xl filliny-font-bold filliny-text-foreground">{t('displayErrorInfo')}</h2>
+    <p className="filliny-text-sm filliny-text-muted-foreground">{t('displayErrorDescription')}.</p>
   </div>
 );
 
@@ -33,34 +24,38 @@ const ErrorHeader = () => (
  * Stack trace display with collapsible details
  */
 const ErrorStackTrace = ({ error }: { error?: Error }) => (
-  <div className="overflow-hidden rounded-lg bg-white shadow">
-    <div className="px-4 py-5 sm:p-6">
-      <div className="text-sm text-gray-500">
-        <p className="mb-2 font-medium text-gray-700">{t('displayErrorDetailsInfo')}</p>
-        <div className="overflow-auto rounded-md bg-red-50 p-4">
-          <p className="break-all font-mono text-red-700">{error?.message || t('displayErrorUnknownErrorInfo')}</p>
+  <Card className="filliny-border-destructive/20">
+    <CardContent className="filliny-p-4">
+      <div className="filliny-space-y-3">
+        <p className="filliny-text-sm filliny-font-medium filliny-text-foreground">{t('displayErrorDetailsInfo')}</p>
+        <div className="filliny-overflow-auto filliny-rounded-lg filliny-bg-destructive/5 filliny-p-4">
+          <p className="filliny-break-all filliny-font-mono filliny-text-sm filliny-text-destructive">
+            {error?.message || t('displayErrorUnknownErrorInfo')}
+          </p>
           {error?.stack && (
-            <details className="mt-3">
-              <summary className="cursor-pointer text-sm text-red-700">Stack trace</summary>
-              <pre className="mt-2 overflow-auto p-2 text-xs text-red-800">{error.stack}</pre>
+            <details className="filliny-mt-3">
+              <summary className="filliny-cursor-pointer filliny-text-sm filliny-text-destructive/80 hover:filliny-text-destructive">
+                Stack trace
+              </summary>
+              <pre className="filliny-mt-2 filliny-overflow-auto filliny-p-2 filliny-text-xs filliny-text-destructive/70">
+                {error.stack}
+              </pre>
             </details>
           )}
         </div>
       </div>
-    </div>
-  </div>
+    </CardContent>
+  </Card>
 );
 
 /**
  * Reset button to retry after error
  */
 const ErrorResetButton = ({ onReset }: { onReset?: () => void }) => (
-  <div className="flex items-center justify-center">
-    <button
-      onClick={onReset}
-      className="inline-flex items-center rounded-md border border-transparent bg-red-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2">
+  <div className="filliny-flex filliny-items-center filliny-justify-center">
+    <Button onClick={onReset} variant="destructive" size="lg">
       {t('displayErrorReset')}
-    </button>
+    </Button>
   </div>
 );
 
@@ -83,8 +78,8 @@ interface ErrorDisplayProps {
  * <ErrorDisplay error={error} resetErrorBoundary={resetErrorBoundary} />
  */
 const ErrorDisplay = ({ error, resetErrorBoundary }: ErrorDisplayProps) => (
-  <div className="flex items-center justify-center bg-gray-50 px-4 py-6 sm:px-6 lg:px-8">
-    <div className="w-full max-w-md space-y-8">
+  <div className="filliny-flex filliny-items-center filliny-justify-center filliny-bg-background filliny-px-4 filliny-py-8">
+    <div className="filliny-w-full filliny-max-w-md filliny-space-y-6">
       <ErrorHeader />
       <ErrorStackTrace error={error} />
       <ErrorResetButton onReset={resetErrorBoundary} />
@@ -96,6 +91,5 @@ const ErrorDisplay = ({ error, resetErrorBoundary }: ErrorDisplayProps) => (
 ErrorDisplay.Header = ErrorHeader;
 ErrorDisplay.StackTrace = ErrorStackTrace;
 ErrorDisplay.ResetButton = ErrorResetButton;
-ErrorDisplay.WarningIcon = WarningIcon;
 
 export { ErrorDisplay };

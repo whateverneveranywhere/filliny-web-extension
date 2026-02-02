@@ -64,7 +64,7 @@ const StatusBadge = ({ condition }: { condition: boolean }) => (
     variant={condition ? 'default' : 'secondary'}
     className={cn(
       'filliny-flex filliny-items-center filliny-gap-2',
-      condition ? 'filliny-bg-green-500/10 filliny-text-green-500' : 'filliny-bg-red-500/10 filliny-text-red-500',
+      condition ? 'filliny-bg-success/10 filliny-text-success' : 'filliny-bg-destructive/10 filliny-text-destructive',
     )}>
     {condition ? <Check className="filliny-h-3 filliny-w-3" /> : <X className="filliny-h-3 filliny-w-3" />}
     {condition ? 'Enabled' : 'Disabled'}

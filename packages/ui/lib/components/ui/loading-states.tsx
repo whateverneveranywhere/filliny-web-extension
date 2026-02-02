@@ -1,7 +1,7 @@
-import * as React from 'react';
-import { cn } from '../../utils';
 import { Skeleton } from './skeleton';
+import { cn } from '../../utils';
 import { Loader2 } from 'lucide-react';
+import type * as React from 'react';
 
 interface GlobalPendingProps extends React.HTMLAttributes<HTMLDivElement> {
   message?: string;

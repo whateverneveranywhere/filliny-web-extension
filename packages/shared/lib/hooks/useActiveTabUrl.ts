@@ -1,7 +1,7 @@
-import { useEffect, useState, useCallback, useMemo } from 'react';
-import type { DTOProfileFillingForm } from '@extension/storage';
 import { isValidUrl } from '../services/schemas/index.js';
 import { getCurrentVistingUrl, getMatchingWebsite } from '../utils/index.js';
+import { useEffect, useState, useCallback, useMemo } from 'react';
+import type { DTOProfileFillingForm } from '@extension/storage';
 
 interface UseActiveTabUrlReturn {
   activeTabUrl: string;

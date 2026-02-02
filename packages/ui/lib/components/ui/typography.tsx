@@ -1,6 +1,7 @@
-import * as React from 'react';
-import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '../../utils';
+import { cva } from 'class-variance-authority';
+import * as React from 'react';
+import type { VariantProps } from 'class-variance-authority';
 
 const headingVariants = cva('filliny-scroll-m-20 filliny-tracking-tight', {
   variants: {
@@ -12,7 +13,7 @@ const headingVariants = cva('filliny-scroll-m-20 filliny-tracking-tight', {
       5: 'filliny-text-lg filliny-font-semibold',
       6: 'filliny-text-base filliny-font-semibold',
     },
-    color: {
+    textColor: {
       default: 'filliny-text-foreground',
       muted: 'filliny-text-muted-foreground',
       primary: 'filliny-text-primary',
@@ -22,25 +23,27 @@ const headingVariants = cva('filliny-scroll-m-20 filliny-tracking-tight', {
   },
   defaultVariants: {
     level: 1,
-    color: 'default',
+    textColor: 'default',
   },
 });
 
+type HeadingElement = 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6';
+
 interface HeadingProps
-  extends React.HTMLAttributes<HTMLHeadingElement>,
+  extends Omit<React.HTMLAttributes<HTMLHeadingElement>, 'color'>,
     VariantProps<typeof headingVariants> {
-  as?: 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6';
+  as?: HeadingElement;
 }
 
 const Heading = React.forwardRef<HTMLHeadingElement, HeadingProps>(
-  ({ className, level = 1, color, as, children, ...props }, ref) => {
-    const Component = as || (`h${level}` as keyof JSX.IntrinsicElements);
+  ({ className, level = 1, textColor, as, children, ...props }, ref) => {
+    const Component = as || (`h${level}` as HeadingElement);
     return React.createElement(
       Component,
-      { ref, className: cn(headingVariants({ level, color }), className), ...props },
-      children
+      { ref, className: cn(headingVariants({ level, textColor }), className), ...props },
+      children,
     );
-  }
+  },
 );
 Heading.displayName = 'Heading';
 
@@ -52,7 +55,7 @@ const textVariants = cva('', {
       small: 'filliny-text-sm filliny-leading-normal',
       caption: 'filliny-text-xs filliny-leading-normal',
     },
-    color: {
+    textColor: {
       default: 'filliny-text-foreground',
       muted: 'filliny-text-muted-foreground',
       primary: 'filliny-text-primary',
@@ -62,24 +65,25 @@ const textVariants = cva('', {
   },
   defaultVariants: {
     variant: 'body',
-    color: 'default',
+    textColor: 'default',
   },
 });
 
+type TextElement = 'p' | 'span' | 'div';
+
 interface TextProps
-  extends React.HTMLAttributes<HTMLParagraphElement>,
+  extends Omit<React.HTMLAttributes<HTMLParagraphElement>, 'color'>,
     VariantProps<typeof textVariants> {
-  as?: 'p' | 'span' | 'div';
+  as?: TextElement;
 }
 
 const Text = React.forwardRef<HTMLParagraphElement, TextProps>(
-  ({ className, variant, color, as = 'p', children, ...props }, ref) => {
-    return React.createElement(
+  ({ className, variant, textColor, as = 'p', children, ...props }, ref) =>
+    React.createElement(
       as,
-      { ref, className: cn(textVariants({ variant, color }), className), ...props },
-      children
-    );
-  }
+      { ref, className: cn(textVariants({ variant, textColor }), className), ...props },
+      children,
+    ),
 );
 Text.displayName = 'Text';
 
@@ -93,25 +97,25 @@ const PageTitle = ({ title, description, className, ...props }: PageTitleProps) 
     <Heading level={1} className="filliny-text-2xl md:filliny-text-3xl">
       {title}
     </Heading>
-    {description && <Text color="muted">{description}</Text>}
+    {description && <Text textColor="muted">{description}</Text>}
   </div>
 );
 
-const SectionTitle = React.forwardRef<HTMLHeadingElement, React.HTMLAttributes<HTMLHeadingElement>>(
+const SectionTitle = React.forwardRef<HTMLHeadingElement, Omit<React.HTMLAttributes<HTMLHeadingElement>, 'color'>>(
   ({ className, children, ...props }, ref) => (
     <Heading ref={ref} level={2} className={className} {...props}>
       {children}
     </Heading>
-  )
+  ),
 );
 SectionTitle.displayName = 'SectionTitle';
 
-const CardTitleText = React.forwardRef<HTMLHeadingElement, React.HTMLAttributes<HTMLHeadingElement>>(
+const CardTitleText = React.forwardRef<HTMLHeadingElement, Omit<React.HTMLAttributes<HTMLHeadingElement>, 'color'>>(
   ({ className, children, ...props }, ref) => (
     <Heading ref={ref} level={3} className={cn('filliny-text-lg', className)} {...props}>
       {children}
     </Heading>
-  )
+  ),
 );
 CardTitleText.displayName = 'CardTitleText';
 
@@ -121,24 +125,14 @@ const LabelText = React.forwardRef<HTMLSpanElement, React.HTMLAttributes<HTMLSpa
       ref={ref}
       className={cn(
         'filliny-text-xs filliny-font-medium filliny-uppercase filliny-tracking-wider filliny-text-muted-foreground',
-        className
+        className,
       )}
-      {...props}
-    >
+      {...props}>
       {children}
     </span>
-  )
+  ),
 );
 LabelText.displayName = 'LabelText';
 
-export {
-  Heading,
-  headingVariants,
-  Text,
-  textVariants,
-  PageTitle,
-  SectionTitle,
-  CardTitleText,
-  LabelText,
-};
+export { Heading, headingVariants, Text, textVariants, PageTitle, SectionTitle, CardTitleText, LabelText };
 export type { HeadingProps, TextProps, PageTitleProps };

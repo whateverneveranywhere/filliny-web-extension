@@ -1,37 +1,31 @@
-import * as React from 'react';
-import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '../../utils';
+import { cva } from 'class-variance-authority';
+import * as React from 'react';
+import type { VariantProps } from 'class-variance-authority';
 
-const cardBaseVariants = cva(
-  'filliny-rounded-xl filliny-border filliny-bg-card filliny-text-card-foreground',
-  {
-    variants: {
-      variant: {
-        default: 'filliny-p-6 filliny-shadow-sm',
-        feature: 'filliny-p-6 filliny-shadow-sm hover:filliny-shadow-md filliny-transition-shadow',
-        step: 'filliny-p-6',
-      },
-      hover: {
-        true: 'hover:filliny-bg-accent/50 filliny-transition-colors filliny-cursor-pointer',
-        false: '',
-      },
+const cardBaseVariants = cva('filliny-rounded-xl filliny-border filliny-bg-card filliny-text-card-foreground', {
+  variants: {
+    variant: {
+      default: 'filliny-p-6 filliny-shadow-sm',
+      feature: 'filliny-p-6 filliny-shadow-sm hover:filliny-shadow-md filliny-transition-shadow',
+      step: 'filliny-p-6',
     },
-    defaultVariants: {
-      variant: 'default',
-      hover: false,
+    hover: {
+      true: 'hover:filliny-bg-accent/50 filliny-transition-colors filliny-cursor-pointer',
+      false: '',
     },
-  }
-);
+  },
+  defaultVariants: {
+    variant: 'default',
+    hover: false,
+  },
+});
 
-interface CardBaseProps
-  extends React.HTMLAttributes<HTMLDivElement>,
-    VariantProps<typeof cardBaseVariants> {}
+interface CardBaseProps extends React.HTMLAttributes<HTMLDivElement>, VariantProps<typeof cardBaseVariants> {}
 
-const CardBase = React.forwardRef<HTMLDivElement, CardBaseProps>(
-  ({ className, variant, hover, ...props }, ref) => (
-    <div ref={ref} className={cn(cardBaseVariants({ variant, hover }), className)} {...props} />
-  )
-);
+const CardBase = React.forwardRef<HTMLDivElement, CardBaseProps>(({ className, variant, hover, ...props }, ref) => (
+  <div ref={ref} className={cn(cardBaseVariants({ variant, hover }), className)} {...props} />
+));
 CardBase.displayName = 'CardBase';
 
 const cardIconVariants = cva(
@@ -50,41 +44,38 @@ const cardIconVariants = cva(
     defaultVariants: {
       variant: 'default',
     },
-  }
+  },
 );
 
-interface CardIconProps
-  extends React.HTMLAttributes<HTMLDivElement>,
-    VariantProps<typeof cardIconVariants> {}
+interface CardIconProps extends React.HTMLAttributes<HTMLDivElement>, VariantProps<typeof cardIconVariants> {}
 
-const CardIcon = React.forwardRef<HTMLDivElement, CardIconProps>(
-  ({ className, variant, ...props }, ref) => (
-    <div ref={ref} className={cn(cardIconVariants({ variant }), className)} {...props} />
-  )
-);
+const CardIcon = React.forwardRef<HTMLDivElement, CardIconProps>(({ className, variant, ...props }, ref) => (
+  <div ref={ref} className={cn(cardIconVariants({ variant }), className)} {...props} />
+));
 CardIcon.displayName = 'CardIcon';
 
-const CardBaseTitle = React.forwardRef<HTMLHeadingElement, React.HTMLAttributes<HTMLHeadingElement>>(
-  ({ className, ...props }, ref) => (
-    <h3
-      ref={ref}
-      className={cn('filliny-text-lg filliny-font-semibold filliny-text-foreground', className)}
-      {...props}
-    />
-  )
+interface CardBaseTitleProps extends React.HTMLAttributes<HTMLHeadingElement> {
+  children: React.ReactNode;
+}
+
+const CardBaseTitle = React.forwardRef<HTMLHeadingElement, CardBaseTitleProps>(
+  ({ className, children, ...props }, ref) => (
+    <h3 ref={ref} className={cn('filliny-text-lg filliny-font-semibold filliny-text-foreground', className)} {...props}>
+      {children}
+    </h3>
+  ),
 );
 CardBaseTitle.displayName = 'CardBaseTitle';
 
-const CardBaseDescription = React.forwardRef<
-  HTMLParagraphElement,
-  React.HTMLAttributes<HTMLParagraphElement>
->(({ className, ...props }, ref) => (
-  <p
-    ref={ref}
-    className={cn('filliny-text-sm filliny-text-muted-foreground filliny-leading-relaxed', className)}
-    {...props}
-  />
-));
+const CardBaseDescription = React.forwardRef<HTMLParagraphElement, React.HTMLAttributes<HTMLParagraphElement>>(
+  ({ className, ...props }, ref) => (
+    <p
+      ref={ref}
+      className={cn('filliny-text-sm filliny-text-muted-foreground filliny-leading-relaxed', className)}
+      {...props}
+    />
+  ),
+);
 CardBaseDescription.displayName = 'CardBaseDescription';
 
 interface FeatureCardProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -122,32 +113,19 @@ interface StepCardProps extends React.HTMLAttributes<HTMLDivElement> {
   state?: 'default' | 'active' | 'completed';
 }
 
-const StepCard = ({
-  icon,
-  step,
-  title,
-  description,
-  state = 'default',
-  className,
-  ...props
-}: StepCardProps) => (
+const StepCard = ({ icon, step, title, description, state = 'default', className, ...props }: StepCardProps) => (
   <CardBase
     variant="step"
     className={cn(
       'filliny-space-y-4',
       state === 'active' && 'filliny-border-primary filliny-bg-primary/5',
       state === 'completed' && 'filliny-border-success filliny-bg-success/5',
-      className
+      className,
     )}
-    {...props}
-  >
+    {...props}>
     <div className="filliny-flex filliny-items-center filliny-gap-3">
-      <CardIcon variant={state === 'completed' ? 'success' : state === 'active' ? 'step' : 'default'}>
-        {icon}
-      </CardIcon>
-      <span className="filliny-text-sm filliny-font-medium filliny-text-muted-foreground">
-        Step {step}
-      </span>
+      <CardIcon variant={state === 'completed' ? 'success' : state === 'active' ? 'step' : 'default'}>{icon}</CardIcon>
+      <span className="filliny-text-sm filliny-font-medium filliny-text-muted-foreground">Step {step}</span>
     </div>
     <div className="filliny-space-y-2">
       <CardBaseTitle>{title}</CardBaseTitle>
@@ -166,4 +144,4 @@ export {
   FeatureCard,
   StepCard,
 };
-export type { CardBaseProps, CardIconProps, FeatureCardProps, StepCardProps };
+export type { CardBaseProps, CardBaseTitleProps, CardIconProps, FeatureCardProps, StepCardProps };
