@@ -18,7 +18,7 @@ import type {
  * Enum for supported frontend frameworks
  * Used for type-safe framework identification across the codebase
  */
-export enum Framework {
+enum Framework {
   REACT = 'react',
   VUE = 'vue',
   ANGULAR = 'angular',
@@ -32,7 +32,7 @@ export enum Framework {
  * Enum for UI component libraries
  * Extends framework detection to specific component libraries
  */
-export enum UILibrary {
+enum UILibrary {
   MATERIAL_UI = 'material-ui',
   ANT_DESIGN = 'ant-design',
   CHAKRA_UI = 'chakra-ui',
@@ -51,7 +51,7 @@ export enum UILibrary {
 /**
  * Enum for form libraries
  */
-export enum FormLibrary {
+enum FormLibrary {
   FORMIK = 'formik',
   REACT_HOOK_FORM = 'react-hook-form',
   FINAL_FORM = 'final-form',
@@ -65,7 +65,7 @@ export enum FormLibrary {
 /**
  * Enum for state management libraries
  */
-export enum StateManager {
+enum StateManager {
   REDUX = 'redux',
   REDUX_TOOLKIT = 'redux-toolkit',
   ZUSTAND = 'zustand',
@@ -87,7 +87,7 @@ export enum StateManager {
 /**
  * Framework detection result schema
  */
-export const FrameworkDetectionResultSchema = z.object({
+const FrameworkDetectionResultSchema = z.object({
   framework: z.nativeEnum(Framework),
   version: z.string().optional(),
   uiLibrary: z.nativeEnum(UILibrary),
@@ -99,16 +99,6 @@ export const FrameworkDetectionResultSchema = z.object({
   detectionMethod: z.string(),
 });
 
-/**
- * Shadow DOM observer schema (internal use)
- */
-const ShadowDOMObserverSchema = z.object({
-  observer: z.custom<MutationObserver>(val => val instanceof MutationObserver, {
-    message: 'Expected MutationObserver',
-  }),
-  roots: z.custom<Set<ShadowRoot>>(val => val instanceof Set, { message: 'Expected Set<ShadowRoot>' }),
-});
-
 // ============================================================================
 // Type Exports (inferred from schemas)
 // ============================================================================
@@ -116,12 +106,15 @@ const ShadowDOMObserverSchema = z.object({
 /**
  * Result of framework detection
  */
-export type FrameworkDetectionResult = z.infer<typeof FrameworkDetectionResultSchema>;
+type FrameworkDetectionResult = z.infer<typeof FrameworkDetectionResultSchema>;
 
 /**
  * Shadow DOM observer registry (internal)
  */
-type ShadowDOMObserver = z.infer<typeof ShadowDOMObserverSchema>;
+interface ShadowDOMObserver {
+  observer: MutationObserver;
+  roots: Set<ShadowRoot>;
+}
 
 // Global registry for Shadow DOM observers
 const shadowDOMObservers = new Map<Document, ShadowDOMObserver>();
@@ -133,10 +126,41 @@ let originalAttachShadow: typeof HTMLElement.prototype.attachShadow | null = nul
 const shadowRootCallbacks: Set<(root: ShadowRoot, host: HTMLElement) => void> = new Set();
 
 /**
+ * Observe a shadow root for changes and trigger callbacks
+ */
+const observeShadowRoot = (shadowRoot: ShadowRoot, host: HTMLElement): void => {
+  // Notify all registered callbacks
+  for (const callback of shadowRootCallbacks) {
+    try {
+      callback(shadowRoot, host);
+    } catch (error) {
+      console.error('Error in shadow root callback:', error);
+    }
+  }
+};
+
+/**
+ * Find existing shadow roots in the document
+ */
+const findExistingShadowRoots = (root: Document | ShadowRoot | Element, observerData: ShadowDOMObserver): void => {
+  const elements = Array.from(root.querySelectorAll('*'));
+  for (const element of elements) {
+    if (element instanceof HTMLElement && element.shadowRoot) {
+      if (!observerData.roots.has(element.shadowRoot)) {
+        observeShadowRoot(element.shadowRoot, element);
+        observerData.roots.add(element.shadowRoot);
+        // Recursively find shadow roots within this shadow root
+        findExistingShadowRoots(element.shadowRoot, observerData);
+      }
+    }
+  }
+};
+
+/**
  * Initialize Shadow DOM observation for a document
  * Patches attachShadow to observe new shadow roots automatically
  */
-export const initializeShadowDOMObservation = (
+const initializeShadowDOMObservation = (
   doc: Document,
   onShadowRootAttached?: (root: ShadowRoot, host: HTMLElement) => void,
 ): void => {
@@ -191,40 +215,9 @@ export const initializeShadowDOMObservation = (
 };
 
 /**
- * Find existing shadow roots in the document
- */
-const findExistingShadowRoots = (root: Document | ShadowRoot | Element, observerData: ShadowDOMObserver): void => {
-  const elements = Array.from(root.querySelectorAll('*'));
-  for (const element of elements) {
-    if (element instanceof HTMLElement && element.shadowRoot) {
-      if (!observerData.roots.has(element.shadowRoot)) {
-        observeShadowRoot(element.shadowRoot, element);
-        observerData.roots.add(element.shadowRoot);
-        // Recursively find shadow roots within this shadow root
-        findExistingShadowRoots(element.shadowRoot, observerData);
-      }
-    }
-  }
-};
-
-/**
- * Observe a shadow root for changes and trigger callbacks
- */
-const observeShadowRoot = (shadowRoot: ShadowRoot, host: HTMLElement): void => {
-  // Notify all registered callbacks
-  for (const callback of shadowRootCallbacks) {
-    try {
-      callback(shadowRoot, host);
-    } catch (error) {
-      console.error('Error in shadow root callback:', error);
-    }
-  }
-};
-
-/**
  * Get all elements including those in Shadow DOM
  */
-export const querySelectorAllDeep = <T extends Element = Element>(
+const querySelectorAllDeep = <T extends Element = Element>(
   selector: string,
   root: Document | Element | ShadowRoot = document,
 ): T[] => {
@@ -252,7 +245,7 @@ export const querySelectorAllDeep = <T extends Element = Element>(
 /**
  * Query a single element including Shadow DOM
  */
-export const querySelectorDeep = <T extends Element = Element>(
+const querySelectorDeep = <T extends Element = Element>(
   selector: string,
   root: Document | Element | ShadowRoot = document,
 ): T | null => {
@@ -279,7 +272,7 @@ export const querySelectorDeep = <T extends Element = Element>(
 /**
  * Cleanup Shadow DOM observation
  */
-export const cleanupShadowDOMObservation = (doc?: Document): void => {
+const cleanupShadowDOMObservation = (doc?: Document): void => {
   if (doc) {
     const observerData = shadowDOMObservers.get(doc);
     if (observerData) {
@@ -306,7 +299,7 @@ export const cleanupShadowDOMObservation = (doc?: Document): void => {
 /**
  * Detect Vue.js framework on an element
  */
-export const detectVue = (element: Element): boolean =>
+const detectVue = (element: Element): boolean =>
   // Check for Vue.js specific attributes and properties
   element.hasAttribute('v-model') ||
   element.hasAttribute('v-bind') ||
@@ -331,7 +324,7 @@ export const detectVue = (element: Element): boolean =>
 /**
  * Detect React framework on an element
  */
-export const detectReact = (element: Element): boolean => {
+const detectReact = (element: Element): boolean => {
   // Check for React Fiber (React 16+)
   const hasFiber = Object.keys(element).some(
     key => key.startsWith('__reactFiber') || key.startsWith('__reactInternalInstance'),
@@ -357,7 +350,7 @@ export const detectReact = (element: Element): boolean => {
 /**
  * Detect Angular framework on an element
  */
-export const detectAngular = (element: Element): boolean =>
+const detectAngular = (element: Element): boolean =>
   // Check for Angular directives
   element.hasAttribute('ng-model') ||
   element.hasAttribute('[(ngModel)]') ||
@@ -375,7 +368,7 @@ export const detectAngular = (element: Element): boolean =>
 /**
  * Detect Svelte framework on an element
  */
-export const detectSvelte = (element: Element): boolean =>
+const detectSvelte = (element: Element): boolean =>
   // Check for Svelte-specific attributes
   Array.from(element.attributes).some(attr => attr.name.startsWith('svelte-')) ||
   // Check for Svelte action attribute pattern
@@ -393,7 +386,7 @@ export const detectSvelte = (element: Element): boolean =>
 /**
  * Detect Qwik framework on an element
  */
-export const detectQwik = (element: Element): boolean =>
+const detectQwik = (element: Element): boolean =>
   // Check for Qwik-specific attributes
   element.hasAttribute('q:slot') ||
   element.hasAttribute('q:id') ||
@@ -407,7 +400,7 @@ export const detectQwik = (element: Element): boolean =>
 /**
  * Detect the framework used by an element
  */
-export const detectFrameworkForElement = (element: Element): Framework => {
+const detectFrameworkForElement = (element: Element): Framework => {
   if (detectReact(element)) return Framework.REACT;
   if (detectVue(element)) return Framework.VUE;
   if (detectAngular(element)) return Framework.ANGULAR;
@@ -419,7 +412,7 @@ export const detectFrameworkForElement = (element: Element): Framework => {
 /**
  * Detect the primary framework used in the document
  */
-export const detectDocumentFramework = (doc: Document = document): Framework => {
+const detectDocumentFramework = (doc: Document = document): Framework => {
   // Check for global framework indicators
   const win = doc.defaultView as FrameworkDetectionWindow | null;
 
@@ -478,7 +471,7 @@ export const detectDocumentFramework = (doc: Document = document): Framework => 
 /**
  * Detect UI library used
  */
-export const detectUILibrary = (element: Element): UILibrary => {
+const detectUILibrary = (element: Element): UILibrary => {
   const className = element.className?.toString().toLowerCase() || '';
   const parentClasses =
     (element.parentElement?.className?.toString().toLowerCase() || '') +
@@ -544,7 +537,7 @@ export const detectUILibrary = (element: Element): UILibrary => {
 /**
  * Detect form library used
  */
-export const detectFormLibrary = (element: Element): FormLibrary => {
+const detectFormLibrary = (element: Element): FormLibrary => {
   // Formik
   if (element.closest('[class*="formik"]') || element.hasAttribute('data-formik')) {
     return FormLibrary.FORMIK;
@@ -581,7 +574,7 @@ export const detectFormLibrary = (element: Element): FormLibrary => {
 /**
  * Detect state management library used
  */
-export const detectStateManager = (doc: Document = document): StateManager => {
+const detectStateManager = (doc: Document = document): StateManager => {
   const win = doc.defaultView as StateManagerDetectionWindow | null;
 
   if (!win) return StateManager.UNKNOWN;
@@ -632,7 +625,7 @@ export const detectStateManager = (doc: Document = document): StateManager => {
 /**
  * Comprehensive framework detection for a document
  */
-export const detectFramework = (doc: Document = document): FrameworkDetectionResult => {
+const detectFramework = (doc: Document = document): FrameworkDetectionResult => {
   const framework = detectDocumentFramework(doc);
   const stateManager = detectStateManager(doc);
 
@@ -662,7 +655,7 @@ export const detectFramework = (doc: Document = document): FrameworkDetectionRes
 /**
  * Check if an element is inside a Shadow DOM
  */
-export const isInShadowDOM = (element: Element): boolean => {
+const isInShadowDOM = (element: Element): boolean => {
   let node: Node | null = element;
   while (node) {
     if (node instanceof ShadowRoot) {
@@ -676,12 +669,12 @@ export const isInShadowDOM = (element: Element): boolean => {
 /**
  * Get the root of an element (document or shadow root)
  */
-export const getRoot = (element: Element): Document | ShadowRoot => element.getRootNode() as Document | ShadowRoot;
+const getRoot = (element: Element): Document | ShadowRoot => element.getRootNode() as Document | ShadowRoot;
 
 /**
  * Traverse all shadow roots from an element
  */
-export const traverseShadowRoots = (element: Element, callback: (shadowRoot: ShadowRoot) => void): void => {
+const traverseShadowRoots = (element: Element, callback: (shadowRoot: ShadowRoot) => void): void => {
   const allElements = Array.from(element.querySelectorAll('*'));
   for (const el of allElements) {
     if (el instanceof HTMLElement && el.shadowRoot) {
@@ -689,4 +682,32 @@ export const traverseShadowRoots = (element: Element, callback: (shadowRoot: Sha
       traverseShadowRoots(el.shadowRoot as unknown as Element, callback);
     }
   }
+};
+
+// ============================================================================
+// All exports at end of file to comply with import-x/exports-last
+// ============================================================================
+
+export { Framework, UILibrary, FormLibrary, StateManager };
+export { FrameworkDetectionResultSchema };
+export type { FrameworkDetectionResult };
+export {
+  initializeShadowDOMObservation,
+  querySelectorAllDeep,
+  querySelectorDeep,
+  cleanupShadowDOMObservation,
+  detectVue,
+  detectReact,
+  detectAngular,
+  detectSvelte,
+  detectQwik,
+  detectFrameworkForElement,
+  detectDocumentFramework,
+  detectUILibrary,
+  detectFormLibrary,
+  detectStateManager,
+  detectFramework,
+  isInShadowDOM,
+  getRoot,
+  traverseShadowRoots,
 };

@@ -12,12 +12,12 @@ import {
 import { profileStorage } from '@extension/storage';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2 } from 'lucide-react';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import type { ProfileFormValues, Step } from '@extension/shared';
 import type { DTOProfileFillingForm } from '@extension/storage';
 
-export type ProfileFormTypes = ProfileFormValues;
+type ProfileFormTypes = ProfileFormValues;
 
 const defaultFormValues: ProfileFormTypes = {
   profileName: '',
@@ -36,7 +36,7 @@ interface Props {
   onFormSubmit: () => void;
 }
 
-function ProfileForm({ id, onFormSubmit }: Props) {
+const ProfileForm = ({ id, onFormSubmit }: Props) => {
   const [currentStep, setCurrentStep] = useState<number>(0);
   const isEdit = !!id;
 
@@ -72,7 +72,8 @@ function ProfileForm({ id, onFormSubmit }: Props) {
       ...formData,
       // filter out the user side isNew variable before sending to api
 
-      fillingWebsites: formData.fillingWebsites.map(({ isNew, ...rest }) => rest),
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      fillingWebsites: formData.fillingWebsites.map(({ isNew: _, ...rest }) => rest),
       preferences: {
         ...formData.preferences,
         povId: Number(formData.preferences?.povId),
@@ -159,6 +160,7 @@ function ProfileForm({ id, onFormSubmit }: Props) {
       />
     </FormProvider>
   );
-}
+};
 
 export { ProfileForm };
+export type { ProfileFormTypes };

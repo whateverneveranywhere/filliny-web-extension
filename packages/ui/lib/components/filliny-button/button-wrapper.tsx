@@ -3,12 +3,12 @@ import { durations, easings, animationClasses } from '@/lib/animations';
 import type { ReactNode, CSSProperties } from 'react';
 import type * as React from 'react';
 
-export interface ButtonComponentProps {
+interface ButtonComponentProps {
   isHovered: boolean;
   isDragging: boolean;
 }
 
-export interface ButtonWrapperProps {
+interface ButtonWrapperProps {
   isHovered: boolean;
   isDragging: boolean;
   position: CSSProperties;
@@ -46,3 +46,4 @@ const ButtonWrapper: React.FC<ButtonWrapperProps> = ({ children, isHovered, isDr
 };
 
 export { ButtonWrapper };
+export type { ButtonComponentProps, ButtonWrapperProps };

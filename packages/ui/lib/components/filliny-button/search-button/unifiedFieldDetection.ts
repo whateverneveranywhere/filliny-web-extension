@@ -10,7 +10,7 @@ import type { Field } from '@extension/shared';
 /**
  * Detected field info schema
  */
-export const DetectedFieldInfoSchema = z.object({
+const DetectedFieldInfoSchema = z.object({
   field: FieldSchema,
   container: z.custom<HTMLElement>(val => val instanceof HTMLElement, { message: 'Expected HTMLElement' }),
   containerId: z.string(),

@@ -17,7 +17,7 @@ import { z } from 'zod';
  * URL validation schema with support for relative URLs
  * Validates that a string is a valid URL (absolute or relative)
  */
-export const UrlSchema = z.string().refine(
+const UrlSchema = z.string().refine(
   url => {
     if (!url) return false;
 
@@ -44,7 +44,7 @@ export const UrlSchema = z.string().refine(
  * Validates a URL string and returns whether it's valid
  * Use this instead of manual URL validation functions
  */
-export const isValidUrl = (url: string): boolean => UrlSchema.safeParse(url).success;
+const isValidUrl = (url: string): boolean => UrlSchema.safeParse(url).success;
 
 // ============================================================================
 // Auth Schemas
@@ -53,7 +53,7 @@ export const isValidUrl = (url: string): boolean => UrlSchema.safeParse(url).suc
 /**
  * Plan schema for subscription information
  */
-export const PlanSchema = z.object({
+const PlanSchema = z.object({
   id: z.number(),
   planName: z.string(),
   maxFillingProfiles: z.number(),
@@ -68,7 +68,7 @@ export const PlanSchema = z.object({
 /**
  * User schema for authenticated user information
  */
-export const UserSchema = z.object({
+const UserSchema = z.object({
   id: z.string(),
   name: z.string(),
   email: z.string(),
@@ -81,7 +81,7 @@ export const UserSchema = z.object({
 /**
  * Limitations schema for user plan limitations
  */
-export const LimitationsSchema = z.object({
+const LimitationsSchema = z.object({
   plan: PlanSchema.nullable().optional(),
   maxFillingProfiles: z.number(),
   maxWebsitesPerProfile: z.number(),
@@ -90,7 +90,7 @@ export const LimitationsSchema = z.object({
 /**
  * Auth health check response schema
  */
-export const AuthHealthCheckSchema = z.object({
+const AuthHealthCheckSchema = z.object({
   status: z.enum(['success', 'error']),
   user: UserSchema,
   limitations: LimitationsSchema,
@@ -103,7 +103,7 @@ export const AuthHealthCheckSchema = z.object({
 /**
  * Dashboard overview response schema
  */
-export const DTOOverviewSchema = z.object({
+const DTOOverviewSchema = z.object({
   aiHistoryCount: z.number(),
   fillingProfilesCount: z.number(),
   fillingWebsitesCount: z.number(),
@@ -122,7 +122,7 @@ export const DTOOverviewSchema = z.object({
  * than detail endpoints. The DTOProfileFillingFormSchema uses 'profileName' to match the
  * detail/create/edit API contracts.
  */
-export const DTOFillingProfileItemSchema = z.object({
+const DTOFillingProfileItemSchema = z.object({
   id: z.number(),
   isActive: z.boolean(),
   name: z.string(),
@@ -131,7 +131,7 @@ export const DTOFillingProfileItemSchema = z.object({
 /**
  * Suggested website schema
  */
-export const DTOSuggestedWebsiteSchema = z.object({
+const DTOSuggestedWebsiteSchema = z.object({
   label: z.string(),
   value: z.string(),
   id: z.number(),
@@ -140,7 +140,7 @@ export const DTOSuggestedWebsiteSchema = z.object({
 /**
  * Tone option schema
  */
-export const DTOToneSchema = z.object({
+const DTOToneSchema = z.object({
   label: z.string(),
   value: z.string(),
   id: z.number(),
@@ -149,7 +149,7 @@ export const DTOToneSchema = z.object({
 /**
  * Point of view option schema
  */
-export const DTOPovSchema = z.object({
+const DTOPovSchema = z.object({
   label: z.string(),
   value: z.string(),
   id: z.number(),
@@ -158,7 +158,7 @@ export const DTOPovSchema = z.object({
 /**
  * Filling website schema
  */
-export const DTOFillingWebsiteSchema = z.object({
+const DTOFillingWebsiteSchema = z.object({
   id: z.number().optional(), // Optional because it may not exist on creation
   websiteUrl: z.string(),
   isRootLoad: z.boolean(),
@@ -168,7 +168,7 @@ export const DTOFillingWebsiteSchema = z.object({
 /**
  * Filling preferences schema
  */
-export const DTOFillingPreferencesSchema = z.object({
+const DTOFillingPreferencesSchema = z.object({
   isFormal: z.boolean(),
   isGapFillingAllowed: z.boolean(),
   toneId: z.number().positive(),
@@ -182,7 +182,7 @@ export const DTOFillingPreferencesSchema = z.object({
  * This is intentional - the list endpoint returns lightweight objects with 'name',
  * while detail/CRUD endpoints use the full schema with 'profileName'.
  */
-export const DTOProfileFillingFormSchema = z.object({
+const DTOProfileFillingFormSchema = z.object({
   id: z.union([z.string(), z.number()]).optional(),
   profileName: z.string(),
   defaultFillingContext: z.string(),
@@ -198,7 +198,7 @@ export const DTOProfileFillingFormSchema = z.object({
  * Input field type enum schema
  * Includes all form field types matching the API's INPUT_FIELD_TYPES constant
  */
-export const InputFieldTypeSchema = z.enum([
+const InputFieldTypeSchema = z.enum([
   'text',
   'password',
   'email',
@@ -225,7 +225,7 @@ export const InputFieldTypeSchema = z.enum([
 /**
  * Field type schema (includes all form field types)
  */
-export const FieldTypeSchema = z.enum([
+const FieldTypeSchema = z.enum([
   'text',
   'password',
   'email',
@@ -252,12 +252,12 @@ export const FieldTypeSchema = z.enum([
 /**
  * Accept type category schema for file uploads
  */
-export const AcceptTypeCategorySchema = z.enum(['image', 'document', 'video', 'audio', 'archive', 'text', 'other']);
+const AcceptTypeCategorySchema = z.enum(['image', 'document', 'video', 'audio', 'archive', 'text', 'other']);
 
 /**
  * Accept type schema for file input validation
  */
-export const AcceptTypeSchema = z.object({
+const AcceptTypeSchema = z.object({
   type: z.enum(['mime', 'extension']),
   value: z.string(),
   category: AcceptTypeCategorySchema,
@@ -284,7 +284,7 @@ const HTMLElementSchema = z.custom<HTMLElement>(val => typeof window !== 'undefi
  * File upload data schema
  * Uses custom schemas for DOM elements with proper type guards
  */
-export const FileUploadDataSchema = z.object({
+const FileUploadDataSchema = z.object({
   acceptedTypes: z.array(AcceptTypeSchema).optional(),
   fileInput: HTMLInputElementSchema.optional(),
   isCustomUpload: z.boolean().optional(),
@@ -297,12 +297,12 @@ export const FileUploadDataSchema = z.object({
  * Framework type schema for detected frameworks
  * Uses z.nativeEnum to work with the existing Framework enum from enums.ts
  */
-export const FrameworkTypeSchema = z.nativeEnum(Framework);
+const FrameworkTypeSchema = z.nativeEnum(Framework);
 
 /**
  * Field option schema for select/radio/checkbox options
  */
-export const FieldOptionSchema = z.object({
+const FieldOptionSchema = z.object({
   value: z.string(),
   text: z.string(),
   selected: z.boolean(),
@@ -311,7 +311,7 @@ export const FieldOptionSchema = z.object({
 /**
  * Field visibility schema
  */
-export const FieldVisibilitySchema = z.object({
+const FieldVisibilitySchema = z.object({
   isVisible: z.boolean(),
   hiddenReason: z.string().optional(),
 });
@@ -320,7 +320,7 @@ export const FieldVisibilitySchema = z.object({
  * Field metadata schema
  * Includes file upload data for file input fields
  */
-export const FieldMetadataSchema = z.object({
+const FieldMetadataSchema = z.object({
   fileUploadData: FileUploadDataSchema.optional(),
   framework: FrameworkTypeSchema,
   frameworkProps: z.record(z.string(), z.function().optional()).optional(),
@@ -336,7 +336,7 @@ export const FieldMetadataSchema = z.object({
 /**
  * Field validation schema
  */
-export const FieldValidationSchema = z.object({
+const FieldValidationSchema = z.object({
   pattern: z.string().optional(),
   minLength: z.number().optional(),
   maxLength: z.number().optional(),
@@ -348,7 +348,7 @@ export const FieldValidationSchema = z.object({
 /**
  * Field schema for form field detection
  */
-export const FieldSchema = z.object({
+const FieldSchema = z.object({
   id: z.string(),
   name: z.string().optional(),
   type: FieldTypeSchema,
@@ -376,7 +376,7 @@ export const FieldSchema = z.object({
  * - If no profile is available (edge case), the server will use sensible defaults
  * - The profileStorage can return undefined, making defaultProfile?.preferences also undefined
  */
-export const DTOFillPayloadSchema = z.object({
+const DTOFillPayloadSchema = z.object({
   contextText: z.string(),
   formData: z.array(FieldSchema),
   websiteUrl: z.string(),
@@ -390,7 +390,7 @@ export const DTOFillPayloadSchema = z.object({
 /**
  * Success response schema
  */
-export const SuccessResponseSchema = z.object({
+const SuccessResponseSchema = z.object({
   success: z.boolean(),
   message: z.string().optional(),
 });
@@ -398,19 +398,19 @@ export const SuccessResponseSchema = z.object({
 /**
  * Edit profile response schema
  */
-export const EditProfileResponseSchema = SuccessResponseSchema.extend({
+const EditProfileResponseSchema = SuccessResponseSchema.extend({
   profile: DTOProfileFillingFormSchema.optional(),
 });
 
 /**
  * Change active profile response schema
  */
-export const ChangeActiveProfileResponseSchema = SuccessResponseSchema;
+const ChangeActiveProfileResponseSchema = SuccessResponseSchema;
 
 /**
  * Delete profile response schema
  */
-export const DeleteProfileResponseSchema = SuccessResponseSchema;
+const DeleteProfileResponseSchema = SuccessResponseSchema;
 
 // ============================================================================
 // Overlay Position Schema (for UI components)
@@ -419,7 +419,7 @@ export const DeleteProfileResponseSchema = SuccessResponseSchema;
 /**
  * Overlay position schema for form overlays
  */
-export const OverlayPositionSchema = z.object({
+const OverlayPositionSchema = z.object({
   top: z.number(),
   left: z.number(),
   width: z.number(),
@@ -429,63 +429,10 @@ export const OverlayPositionSchema = z.object({
 /**
  * Highlight forms options schema
  */
-export const HighlightFormsOptionsSchema = z.object({
+const HighlightFormsOptionsSchema = z.object({
   visionOnly: z.boolean().optional(),
   testMode: z.boolean().optional(),
 });
-
-// ============================================================================
-// Type Exports (inferred from schemas)
-// ============================================================================
-
-// Auth types
-export type Plan = z.infer<typeof PlanSchema>;
-export type User = z.infer<typeof UserSchema>;
-export type Limitations = z.infer<typeof LimitationsSchema>;
-export type AuthHealthCheckResponse = z.infer<typeof AuthHealthCheckSchema>;
-
-// Dashboard types
-export type DTOOverviewResponse = z.infer<typeof DTOOverviewSchema>;
-
-// Profile types (with Response suffix for API responses, without for storage)
-export type DTOFillingProfileItem = z.infer<typeof DTOFillingProfileItemSchema>;
-export type DTOFillingProfileItemResponse = z.infer<typeof DTOFillingProfileItemSchema>;
-export type DTOSuggestedWebsite = z.infer<typeof DTOSuggestedWebsiteSchema>;
-export type DTOSuggestedWebsiteResponse = z.infer<typeof DTOSuggestedWebsiteSchema>;
-export type DTOTone = z.infer<typeof DTOToneSchema>;
-export type DTOToneResponse = z.infer<typeof DTOToneSchema>;
-export type DTOPov = z.infer<typeof DTOPovSchema>;
-export type DTOPovResponse = z.infer<typeof DTOPovSchema>;
-export type DTOFillingWebsite = z.infer<typeof DTOFillingWebsiteSchema>;
-export type DTOFillingWebsiteResponse = z.infer<typeof DTOFillingWebsiteSchema>;
-export type DTOFillingPreferences = z.infer<typeof DTOFillingPreferencesSchema>;
-export type DTOFillingPreferencesResponse = z.infer<typeof DTOFillingPreferencesSchema>;
-export type DTOProfileFillingForm = z.infer<typeof DTOProfileFillingFormSchema>;
-export type DTOProfileFillingFormResponse = z.infer<typeof DTOProfileFillingFormSchema>;
-
-// Field types
-export type InputFieldType = z.infer<typeof InputFieldTypeSchema>;
-export type FieldType = z.infer<typeof FieldTypeSchema>;
-export type AcceptTypeCategory = z.infer<typeof AcceptTypeCategorySchema>;
-export type AcceptType = z.infer<typeof AcceptTypeSchema>;
-export type FileUploadData = z.infer<typeof FileUploadDataSchema>;
-export type FrameworkType = z.infer<typeof FrameworkTypeSchema>;
-export type FieldOption = z.infer<typeof FieldOptionSchema>;
-export type FieldVisibility = z.infer<typeof FieldVisibilitySchema>;
-export type FieldMetadata = z.infer<typeof FieldMetadataSchema>;
-export type FieldValidation = z.infer<typeof FieldValidationSchema>;
-export type Field = z.infer<typeof FieldSchema>;
-export type DTOFillPayload = z.infer<typeof DTOFillPayloadSchema>;
-
-// API Response types
-export type SuccessResponse = z.infer<typeof SuccessResponseSchema>;
-export type EditProfileResponse = z.infer<typeof EditProfileResponseSchema>;
-export type ChangeActiveProfileResponse = z.infer<typeof ChangeActiveProfileResponseSchema>;
-export type DeleteProfileResponse = z.infer<typeof DeleteProfileResponseSchema>;
-
-// UI types
-export type OverlayPosition = z.infer<typeof OverlayPositionSchema>;
-export type HighlightFormsOptions = z.infer<typeof HighlightFormsOptionsSchema>;
 
 // ============================================================================
 // Validation Helpers
@@ -494,7 +441,7 @@ export type HighlightFormsOptions = z.infer<typeof HighlightFormsOptionsSchema>;
 /**
  * Safely parse data with a schema, returning either the parsed data or null
  */
-export const safeParse = <T extends z.ZodType>(schema: T, data: unknown): z.infer<T> | null => {
+const safeParse = <T extends z.ZodType>(schema: T, data: unknown): z.infer<T> | null => {
   const result = schema.safeParse(data);
   if (result.success) {
     return result.data;
@@ -506,19 +453,19 @@ export const safeParse = <T extends z.ZodType>(schema: T, data: unknown): z.infe
 /**
  * Parse data with a schema, throwing if validation fails
  */
-export const parseOrThrow = <T extends z.ZodType>(schema: T, data: unknown): z.infer<T> => schema.parse(data);
+const parseOrThrow = <T extends z.ZodType>(schema: T, data: unknown): z.infer<T> => schema.parse(data);
 
 /**
  * Type guard using Zod schema validation
  * Returns true if data matches the schema
  */
-export const isValidSchema = <T extends z.ZodType>(schema: T, data: unknown): data is z.infer<T> =>
+const isValidSchema = <T extends z.ZodType>(schema: T, data: unknown): data is z.infer<T> =>
   schema.safeParse(data).success;
 
 /**
  * Validate data against a schema and return detailed errors if invalid
  */
-export const validateWithErrors = <T extends z.ZodType>(
+const validateWithErrors = <T extends z.ZodType>(
   schema: T,
   data: unknown,
 ): { success: true; data: z.infer<T> } | { success: false; errors: z.ZodError['errors'] } => {
@@ -537,7 +484,7 @@ export const validateWithErrors = <T extends z.ZodType>(
  * Safely parse an ISO date string and validate it
  * Returns the Date object if valid, or null if invalid
  */
-export const parseDate = (dateString: string): Date | null => {
+const parseDate = (dateString: string): Date | null => {
   const date = parseISO(dateString);
   return isValid(date) ? date : null;
 };
@@ -545,7 +492,7 @@ export const parseDate = (dateString: string): Date | null => {
 /**
  * Zod schema for validating ISO date strings
  */
-export const isoDateStringSchema = z.string().refine(
+const isoDateStringSchema = z.string().refine(
   val => {
     const date = parseISO(val);
     return isValid(date);
@@ -560,7 +507,7 @@ export const isoDateStringSchema = z.string().refine(
 /**
  * Website item schema for form arrays
  */
-export const FillingWebsiteFormItemSchema = z.object({
+const FillingWebsiteFormItemSchema = z.object({
   websiteUrl: z.string().url().min(1, { message: 'Website URL is required' }),
   isRootLoad: z.boolean().default(false),
   fillingContext: z.string().default(''),
@@ -570,7 +517,7 @@ export const FillingWebsiteFormItemSchema = z.object({
 /**
  * Profile form schema for creating/editing filling profiles
  */
-export const ProfileFormSchema = z.object({
+const ProfileFormSchema = z.object({
   profileName: z.string().min(1, { message: 'Profile name is required' }),
   defaultFillingContext: z.string().min(1, { message: 'Default context is required' }),
   preferences: z.object({
@@ -585,7 +532,7 @@ export const ProfileFormSchema = z.object({
 /**
  * Website edit schema for editing a single website
  */
-export const WebsiteEditSchema = z.object({
+const WebsiteEditSchema = z.object({
   fillingWebsites: z.array(
     z.object({
       websiteUrl: z.string().url().min(1, { message: 'Website URL is required' }),
@@ -598,12 +545,170 @@ export const WebsiteEditSchema = z.object({
 /**
  * Profile selector schema
  */
-export const ProfileSelectorSchema = z.object({
+const ProfileSelectorSchema = z.object({
   defaultActiveProfileId: z.string(),
 });
 
+// ============================================================================
+// Type Exports (inferred from schemas)
+// ============================================================================
+
+// Auth types
+type Plan = z.infer<typeof PlanSchema>;
+type User = z.infer<typeof UserSchema>;
+type Limitations = z.infer<typeof LimitationsSchema>;
+type AuthHealthCheckResponse = z.infer<typeof AuthHealthCheckSchema>;
+
+// Dashboard types
+type DTOOverviewResponse = z.infer<typeof DTOOverviewSchema>;
+
+// Profile types (with Response suffix for API responses, without for storage)
+type DTOFillingProfileItem = z.infer<typeof DTOFillingProfileItemSchema>;
+type DTOFillingProfileItemResponse = z.infer<typeof DTOFillingProfileItemSchema>;
+type DTOSuggestedWebsite = z.infer<typeof DTOSuggestedWebsiteSchema>;
+type DTOSuggestedWebsiteResponse = z.infer<typeof DTOSuggestedWebsiteSchema>;
+type DTOTone = z.infer<typeof DTOToneSchema>;
+type DTOToneResponse = z.infer<typeof DTOToneSchema>;
+type DTOPov = z.infer<typeof DTOPovSchema>;
+type DTOPovResponse = z.infer<typeof DTOPovSchema>;
+type DTOFillingWebsite = z.infer<typeof DTOFillingWebsiteSchema>;
+type DTOFillingWebsiteResponse = z.infer<typeof DTOFillingWebsiteSchema>;
+type DTOFillingPreferences = z.infer<typeof DTOFillingPreferencesSchema>;
+type DTOFillingPreferencesResponse = z.infer<typeof DTOFillingPreferencesSchema>;
+type DTOProfileFillingForm = z.infer<typeof DTOProfileFillingFormSchema>;
+type DTOProfileFillingFormResponse = z.infer<typeof DTOProfileFillingFormSchema>;
+
+// Field types
+type InputFieldType = z.infer<typeof InputFieldTypeSchema>;
+type FieldType = z.infer<typeof FieldTypeSchema>;
+type AcceptTypeCategory = z.infer<typeof AcceptTypeCategorySchema>;
+type AcceptType = z.infer<typeof AcceptTypeSchema>;
+type FileUploadData = z.infer<typeof FileUploadDataSchema>;
+type FrameworkType = z.infer<typeof FrameworkTypeSchema>;
+type FieldOption = z.infer<typeof FieldOptionSchema>;
+type FieldVisibility = z.infer<typeof FieldVisibilitySchema>;
+type FieldMetadata = z.infer<typeof FieldMetadataSchema>;
+type FieldValidation = z.infer<typeof FieldValidationSchema>;
+type Field = z.infer<typeof FieldSchema>;
+type DTOFillPayload = z.infer<typeof DTOFillPayloadSchema>;
+
+// API Response types
+type SuccessResponse = z.infer<typeof SuccessResponseSchema>;
+type EditProfileResponse = z.infer<typeof EditProfileResponseSchema>;
+type ChangeActiveProfileResponse = z.infer<typeof ChangeActiveProfileResponseSchema>;
+type DeleteProfileResponse = z.infer<typeof DeleteProfileResponseSchema>;
+
+// UI types
+type OverlayPosition = z.infer<typeof OverlayPositionSchema>;
+type HighlightFormsOptions = z.infer<typeof HighlightFormsOptionsSchema>;
+
 // Form schema type exports
-export type ProfileFormValues = z.infer<typeof ProfileFormSchema>;
-export type WebsiteEditFormValues = z.infer<typeof WebsiteEditSchema>;
-export type ProfileSelectorFormValues = z.infer<typeof ProfileSelectorSchema>;
-export type FillingWebsiteFormItem = z.infer<typeof FillingWebsiteFormItemSchema>;
+type ProfileFormValues = z.infer<typeof ProfileFormSchema>;
+type WebsiteEditFormValues = z.infer<typeof WebsiteEditSchema>;
+type ProfileSelectorFormValues = z.infer<typeof ProfileSelectorSchema>;
+type FillingWebsiteFormItem = z.infer<typeof FillingWebsiteFormItemSchema>;
+
+// ============================================================================
+// All exports at end of file to comply with import-x/exports-last
+// ============================================================================
+
+// URL Validation
+export { UrlSchema, isValidUrl };
+
+// Auth Schemas
+export { PlanSchema, UserSchema, LimitationsSchema, AuthHealthCheckSchema };
+
+// Dashboard Schemas
+export { DTOOverviewSchema };
+
+// Profile Schemas
+export {
+  DTOFillingProfileItemSchema,
+  DTOSuggestedWebsiteSchema,
+  DTOToneSchema,
+  DTOPovSchema,
+  DTOFillingWebsiteSchema,
+  DTOFillingPreferencesSchema,
+  DTOProfileFillingFormSchema,
+};
+
+// Field Type Schemas
+export {
+  InputFieldTypeSchema,
+  FieldTypeSchema,
+  AcceptTypeCategorySchema,
+  AcceptTypeSchema,
+  FileUploadDataSchema,
+  FrameworkTypeSchema,
+  FieldOptionSchema,
+  FieldVisibilitySchema,
+  FieldMetadataSchema,
+  FieldValidationSchema,
+  FieldSchema,
+  DTOFillPayloadSchema,
+};
+
+// API Response Schemas
+export {
+  SuccessResponseSchema,
+  EditProfileResponseSchema,
+  ChangeActiveProfileResponseSchema,
+  DeleteProfileResponseSchema,
+};
+
+// Overlay Schemas
+export { OverlayPositionSchema, HighlightFormsOptionsSchema };
+
+// Validation Helpers
+export { safeParse, parseOrThrow, isValidSchema, validateWithErrors };
+
+// Date Validation Helpers
+export { parseDate, isoDateStringSchema };
+
+// Form Schemas
+export { FillingWebsiteFormItemSchema, ProfileFormSchema, WebsiteEditSchema, ProfileSelectorSchema };
+
+// Type Exports
+export type {
+  Plan,
+  User,
+  Limitations,
+  AuthHealthCheckResponse,
+  DTOOverviewResponse,
+  DTOFillingProfileItem,
+  DTOFillingProfileItemResponse,
+  DTOSuggestedWebsite,
+  DTOSuggestedWebsiteResponse,
+  DTOTone,
+  DTOToneResponse,
+  DTOPov,
+  DTOPovResponse,
+  DTOFillingWebsite,
+  DTOFillingWebsiteResponse,
+  DTOFillingPreferences,
+  DTOFillingPreferencesResponse,
+  DTOProfileFillingForm,
+  DTOProfileFillingFormResponse,
+  InputFieldType,
+  FieldType,
+  AcceptTypeCategory,
+  AcceptType,
+  FileUploadData,
+  FrameworkType,
+  FieldOption,
+  FieldVisibility,
+  FieldMetadata,
+  FieldValidation,
+  Field,
+  DTOFillPayload,
+  SuccessResponse,
+  EditProfileResponse,
+  ChangeActiveProfileResponse,
+  DeleteProfileResponse,
+  OverlayPosition,
+  HighlightFormsOptions,
+  ProfileFormValues,
+  WebsiteEditFormValues,
+  ProfileSelectorFormValues,
+  FillingWebsiteFormItem,
+};

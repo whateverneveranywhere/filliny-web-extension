@@ -5,8 +5,8 @@ import { authStorage, positionStorage, profileStorage } from '@extension/storage
 import type { ErrorResponse, GetAuthTokenResponse, Request, ExcludeValuesFromBaseArrayType } from './types.js';
 import type { DTOProfileFillingForm } from '@extension/storage';
 
-// Re-export isValidUrl from schemas so it's accessible via utils
-export { isValidUrl };
+// Note: isValidUrl is exported from services/schemas/index.ts
+// Do NOT re-export here to avoid duplicate exports
 
 const getFaviconUrl = (url: string) => `https://www.google.com/s2/favicons?sz=64&domain_url=${url}`;
 

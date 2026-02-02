@@ -32,7 +32,7 @@ const getFormattedURL = (url: string, rootLoad: boolean) => {
   }
 };
 
-function WebsitePreviewCard({
+const WebsitePreviewCard = ({
   websiteURL,
   isLoading = false,
   isRootLoad,
@@ -42,7 +42,7 @@ function WebsitePreviewCard({
   hideExpandTrigger = false,
   className,
   onRemove,
-}: Props) {
+}: Props) => {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
   const [faviconError, setFaviconError] = useState(false);
 
@@ -147,6 +147,6 @@ function WebsitePreviewCard({
       )}
     </Card>
   );
-}
+};
 
 export { WebsitePreviewCard };

@@ -73,7 +73,7 @@ interface ExtendedGlobalThis {
 }
 
 // Store the current environment in storage for consistent access across contexts
-function storeEnvironmentInStorage() {
+const storeEnvironmentInStorage = () => {
   try {
     // Get the environment from the same source as getConfig()
     const extendedGlobal = globalThis as unknown as ExtendedGlobalThis;
@@ -135,7 +135,7 @@ function storeEnvironmentInStorage() {
       // Last-resort error handling - at this point we've done what we can
     }
   }
-}
+};
 
 // Initialize environment storage
 storeEnvironmentInStorage();
@@ -176,7 +176,7 @@ chrome.runtime.onMessageExternal.addListener((request, sender, sendResponse) => 
 });
 
 // Open the installation URL in a new tab or focus existing one
-function handleInstallationRedirect() {
+const handleInstallationRedirect = () => {
   const configToUse = getConfig();
   const installUrl = `${configToUse.baseURL}/install-extension`;
 
@@ -191,25 +191,27 @@ function handleInstallationRedirect() {
         chrome.windows.update(existingTab.windowId, { focused: true });
 
         // Notify the website when the tab is ready
-        chrome.tabs.onUpdated.addListener(function listener(tabId, changeInfo) {
+        const listener = (tabId: number, changeInfo: chrome.tabs.TabChangeInfo) => {
           if (tabId === existingTab.id && changeInfo.status === 'complete') {
             chrome.tabs.onUpdated.removeListener(listener);
             notifyTabAboutExtensionInstallation(existingTab.id);
             resolve();
           }
-        });
+        };
+        chrome.tabs.onUpdated.addListener(listener);
       } else {
         // No existing tab, create a new one
         chrome.tabs.create({ url: installUrl }, newTab => {
           // Wait for the tab to load, then notify it
           if (newTab.id) {
-            chrome.tabs.onUpdated.addListener(function listener(tabId, changeInfo) {
+            const listener = (tabId: number, changeInfo: chrome.tabs.TabChangeInfo) => {
               if (tabId === newTab.id && changeInfo.status === 'complete') {
                 chrome.tabs.onUpdated.removeListener(listener);
                 notifyTabAboutExtensionInstallation(newTab.id);
                 resolve();
               }
-            });
+            };
+            chrome.tabs.onUpdated.addListener(listener);
           } else {
             resolve(); // Resolve anyway if tab creation failed
           }
@@ -217,10 +219,10 @@ function handleInstallationRedirect() {
       }
     });
   });
-}
+};
 
 // Function to notify a tab about extension installation
-function notifyTabAboutExtensionInstallation(tabId: number) {
+const notifyTabAboutExtensionInstallation = (tabId: number) => {
   chrome.tabs.sendMessage(tabId, { type: MessageType.EXTENSION_INSTALLED });
 
   // Execute script to dispatch the event directly in the page context
@@ -232,7 +234,7 @@ function notifyTabAboutExtensionInstallation(tabId: number) {
       },
     })
     .catch(err => console.error('[Background] Failed to execute script:', err));
-}
+};
 
 // Handle extension installation
 chrome.runtime.onInstalled.addListener(async details => {

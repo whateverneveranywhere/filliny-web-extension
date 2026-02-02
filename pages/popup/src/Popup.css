@@ -24,7 +24,7 @@
 }
 
 code {
-  background: rgba(148, 163, 184, 0.5);
+  background: oklch(from var(--muted) l c h / 50%);
   border-radius: 0.25rem;
   padding: 0.2rem 0.5rem;
 }

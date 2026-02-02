@@ -231,7 +231,7 @@ export const FieldFillManager: React.FC = () => {
       observer.disconnect();
       document.removeEventListener('filliny:bulkFillComplete', handleBulkFillComplete);
     };
-  }, [detectAllFields, isInitialDetectionDone]);
+  }, [detectAllFields, isInitialDetectionDone, debounce]);
 
   // Handle field fill
   const handleFillField = useCallback(async (field: Field, useTestMode: boolean = false) => {

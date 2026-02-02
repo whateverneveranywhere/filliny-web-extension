@@ -3,7 +3,7 @@ import { Button } from '../components/ui';
 import { PageLayout } from '../layout';
 import { getConfig } from '@extension/shared';
 
-function SigninPage() {
+const SigninPage = () => {
   const config = getConfig();
   console.log('[SigninPage] Using URL:', config.baseURL);
 
@@ -44,6 +44,6 @@ function SigninPage() {
       </div>
     </PageLayout>
   );
-}
+};
 
 export default SigninPage;

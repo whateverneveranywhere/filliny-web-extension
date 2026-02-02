@@ -12,7 +12,7 @@ interface Props {
   websitesCount: number;
 }
 
-function QuickAddWebsiteToProfile({ onQuickAdd, isLoading, currentPlan, maxWebsites, websitesCount }: Props) {
+const QuickAddWebsiteToProfile = ({ onQuickAdd, isLoading, currentPlan, maxWebsites, websitesCount }: Props) => {
   const isDisabled = websitesCount >= maxWebsites;
   const tooltipText = isDisabled
     ? `You've reached the maximum number of websites (${maxWebsites}) allowed for your ${currentPlan} plan`
@@ -67,6 +67,6 @@ function QuickAddWebsiteToProfile({ onQuickAdd, isLoading, currentPlan, maxWebsi
       </Card>
     </div>
   );
-}
+};
 
 export { QuickAddWebsiteToProfile };

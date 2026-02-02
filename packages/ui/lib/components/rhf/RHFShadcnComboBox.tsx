@@ -6,7 +6,7 @@ import { FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessa
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { cn } from '@/lib/utils';
 import { Check, ChevronsUpDown, Edit, Loader2, Trash } from 'lucide-react';
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useFormContext } from 'react-hook-form';
 import type { FormOptions, GeneralFormProps } from '@extension/shared';
 
@@ -18,7 +18,7 @@ interface Props extends GeneralFormProps {
   onEdit?: (id: string) => void;
 }
 
-function RHFShadcnComboBox({
+const RHFShadcnComboBox = ({
   name,
   title,
   description,
@@ -29,7 +29,7 @@ function RHFShadcnComboBox({
   placeholder,
   disabled,
   onChange: externalOnChange,
-}: Props) {
+}: Props) => {
   const { control, setValue } = useFormContext();
   const [popoverOpen, setPopoverOpen] = useState(false);
 
@@ -147,6 +147,6 @@ function RHFShadcnComboBox({
       )}
     />
   );
-}
+};
 
 export default RHFShadcnComboBox;

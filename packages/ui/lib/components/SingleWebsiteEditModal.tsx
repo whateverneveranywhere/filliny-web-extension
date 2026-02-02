@@ -3,7 +3,6 @@ import { Button } from './ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { WebsiteEditSchema } from '@extension/shared';
 import { zodResolver } from '@hookform/resolvers/zod';
-import React from 'react';
 import { useForm, FormProvider } from 'react-hook-form';
 import type { WebsiteEditFormValues } from '@extension/shared';
 import type { DTOFillingWebsite, DTOProfileFillingForm } from '@extension/storage';
@@ -16,7 +15,7 @@ interface Props {
   onSubmit: (data: DTOFillingWebsite) => Promise<void>;
 }
 
-export function SingleWebsiteEditModal({ open, onOpenChange, website, onSubmit }: Props) {
+export const SingleWebsiteEditModal = ({ open, onOpenChange, website, onSubmit }: Props) => {
   const methods = useForm<WebsiteEditFormValues>({
     defaultValues: {
       fillingWebsites: [website],
@@ -52,4 +51,4 @@ export function SingleWebsiteEditModal({ open, onOpenChange, website, onSubmit }
       </DialogContent>
     </Dialog>
   );
-}
+};

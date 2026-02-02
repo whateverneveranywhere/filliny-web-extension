@@ -20,7 +20,7 @@ import { useForm } from 'react-hook-form';
 import type { FormValues, ProfileSelectorFormValues } from '@extension/shared';
 import type { DTOProfileFillingForm } from '@extension/storage';
 
-function ProfileSelector() {
+const ProfileSelector = () => {
   const profileModal = useBoolean();
   const [editingId, setEditingId] = useState<string>();
 
@@ -181,6 +181,6 @@ function ProfileSelector() {
       </Drawer>
     </div>
   );
-}
+};
 
 export { ProfileSelector };

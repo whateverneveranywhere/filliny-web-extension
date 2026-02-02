@@ -12,62 +12,58 @@ import { z } from 'zod';
 /**
  * Type guard for HTMLInputElement
  */
-export const isHTMLInputElement = (element: unknown): element is HTMLInputElement =>
-  element instanceof HTMLInputElement;
+const isHTMLInputElement = (element: unknown): element is HTMLInputElement => element instanceof HTMLInputElement;
 
 /**
  * Type guard for HTMLSelectElement
  */
-export const isHTMLSelectElement = (element: unknown): element is HTMLSelectElement =>
-  element instanceof HTMLSelectElement;
+const isHTMLSelectElement = (element: unknown): element is HTMLSelectElement => element instanceof HTMLSelectElement;
 
 /**
  * Type guard for HTMLTextAreaElement
  */
-export const isHTMLTextAreaElement = (element: unknown): element is HTMLTextAreaElement =>
+const isHTMLTextAreaElement = (element: unknown): element is HTMLTextAreaElement =>
   element instanceof HTMLTextAreaElement;
 
 /**
  * Type guard for HTMLButtonElement
  */
-export const isHTMLButtonElement = (element: unknown): element is HTMLButtonElement =>
-  element instanceof HTMLButtonElement;
+const isHTMLButtonElement = (element: unknown): element is HTMLButtonElement => element instanceof HTMLButtonElement;
 
 /**
  * Type guard for HTMLElement
  */
-export const isHTMLElement = (element: unknown): element is HTMLElement => element instanceof HTMLElement;
+const isHTMLElement = (element: unknown): element is HTMLElement => element instanceof HTMLElement;
 
 /**
  * Type guard for HTMLDivElement
  */
-export const isHTMLDivElement = (element: unknown): element is HTMLDivElement => element instanceof HTMLDivElement;
+const isHTMLDivElement = (element: unknown): element is HTMLDivElement => element instanceof HTMLDivElement;
 
 /**
  * Type guard for HTMLFormElement
  */
-export const isHTMLFormElement = (element: unknown): element is HTMLFormElement => element instanceof HTMLFormElement;
+const isHTMLFormElement = (element: unknown): element is HTMLFormElement => element instanceof HTMLFormElement;
 
 /**
  * Type guard for HTMLLabelElement
  */
-export const isHTMLLabelElement = (element: unknown): element is HTMLLabelElement =>
-  element instanceof HTMLLabelElement;
+const isHTMLLabelElement = (element: unknown): element is HTMLLabelElement => element instanceof HTMLLabelElement;
 
 /**
  * Type guard for Element
  */
-export const isElement = (node: unknown): node is Element => node instanceof Element;
+const isElement = (node: unknown): node is Element => node instanceof Element;
 
 /**
  * Type guard for ShadowRoot
  */
-export const isShadowRoot = (node: unknown): node is ShadowRoot => node instanceof ShadowRoot;
+const isShadowRoot = (node: unknown): node is ShadowRoot => node instanceof ShadowRoot;
 
 /**
  * Type guard for Document
  */
-export const isDocument = (node: unknown): node is Document => node instanceof Document;
+const isDocument = (node: unknown): node is Document => node instanceof Document;
 
 // ============================================================================
 // Form Field Type Guards
@@ -76,25 +72,25 @@ export const isDocument = (node: unknown): node is Document => node instanceof D
 /**
  * Check if an input element is a checkbox
  */
-export const isCheckboxInput = (element: unknown): element is HTMLInputElement =>
+const isCheckboxInput = (element: unknown): element is HTMLInputElement =>
   isHTMLInputElement(element) && element.type === 'checkbox';
 
 /**
  * Check if an input element is a radio button
  */
-export const isRadioInput = (element: unknown): element is HTMLInputElement =>
+const isRadioInput = (element: unknown): element is HTMLInputElement =>
   isHTMLInputElement(element) && element.type === 'radio';
 
 /**
  * Check if an input element is a file input
  */
-export const isFileInput = (element: unknown): element is HTMLInputElement =>
+const isFileInput = (element: unknown): element is HTMLInputElement =>
   isHTMLInputElement(element) && element.type === 'file';
 
 /**
  * Check if an input element is a text-like input
  */
-export const isTextLikeInput = (element: unknown): element is HTMLInputElement =>
+const isTextLikeInput = (element: unknown): element is HTMLInputElement =>
   isHTMLInputElement(element) && ['text', 'email', 'password', 'search', 'tel', 'url', 'number'].includes(element.type);
 
 // ============================================================================
@@ -104,10 +100,7 @@ export const isTextLikeInput = (element: unknown): element is HTMLInputElement =
 /**
  * Safely query for an HTMLInputElement
  */
-export const queryInputElement = (
-  container: Document | Element | ShadowRoot,
-  selector: string,
-): HTMLInputElement | null => {
+const queryInputElement = (container: Document | Element | ShadowRoot, selector: string): HTMLInputElement | null => {
   const element = container.querySelector(selector);
   return isHTMLInputElement(element) ? element : null;
 };
@@ -115,10 +108,7 @@ export const queryInputElement = (
 /**
  * Safely query for an HTMLSelectElement
  */
-export const querySelectElement = (
-  container: Document | Element | ShadowRoot,
-  selector: string,
-): HTMLSelectElement | null => {
+const querySelectElement = (container: Document | Element | ShadowRoot, selector: string): HTMLSelectElement | null => {
   const element = container.querySelector(selector);
   return isHTMLSelectElement(element) ? element : null;
 };
@@ -126,10 +116,7 @@ export const querySelectElement = (
 /**
  * Safely query for an HTMLDivElement
  */
-export const queryDivElement = (
-  container: Document | Element | ShadowRoot,
-  selector: string,
-): HTMLDivElement | null => {
+const queryDivElement = (container: Document | Element | ShadowRoot, selector: string): HTMLDivElement | null => {
   const element = container.querySelector(selector);
   return isHTMLDivElement(element) ? element : null;
 };
@@ -137,7 +124,7 @@ export const queryDivElement = (
 /**
  * Safely query for an HTMLElement
  */
-export const queryHTMLElement = (container: Document | Element | ShadowRoot, selector: string): HTMLElement | null => {
+const queryHTMLElement = (container: Document | Element | ShadowRoot, selector: string): HTMLElement | null => {
   const element = container.querySelector(selector);
   return isHTMLElement(element) ? element : null;
 };
@@ -145,7 +132,7 @@ export const queryHTMLElement = (container: Document | Element | ShadowRoot, sel
 /**
  * Safely get element by ID as HTMLInputElement
  */
-export const getInputElementById = (doc: Document, id: string): HTMLInputElement | null => {
+const getInputElementById = (doc: Document, id: string): HTMLInputElement | null => {
   const element = doc.getElementById(id);
   return isHTMLInputElement(element) ? element : null;
 };
@@ -153,7 +140,7 @@ export const getInputElementById = (doc: Document, id: string): HTMLInputElement
 /**
  * Safely get element by ID as HTMLSelectElement
  */
-export const getSelectElementById = (doc: Document, id: string): HTMLSelectElement | null => {
+const getSelectElementById = (doc: Document, id: string): HTMLSelectElement | null => {
   const element = doc.getElementById(id);
   return isHTMLSelectElement(element) ? element : null;
 };
@@ -161,7 +148,7 @@ export const getSelectElementById = (doc: Document, id: string): HTMLSelectEleme
 /**
  * Safely get element by ID as HTMLElement
  */
-export const getHTMLElementById = (doc: Document, id: string): HTMLElement | null => {
+const getHTMLElementById = (doc: Document, id: string): HTMLElement | null => {
   const element = doc.getElementById(id);
   return isHTMLElement(element) ? element : null;
 };
@@ -173,7 +160,7 @@ export const getHTMLElementById = (doc: Document, id: string): HTMLElement | nul
 /**
  * Schema for objects with optional value property
  */
-export const ValuePropertySchema = z.object({
+const ValuePropertySchema = z.object({
   value: z.string().optional(),
 });
 
@@ -190,7 +177,7 @@ const SelectedOptionItemSchema = z.object({
 /**
  * Schema for form-like objects with value
  */
-export const FormFieldValueSchema = z.object({
+const FormFieldValueSchema = z.object({
   value: z.union([z.string(), z.number(), z.boolean()]).optional(),
   checked: z.boolean().optional(),
   selectedOptions: z.array(SelectedOptionItemSchema).optional(),
@@ -210,7 +197,7 @@ const ReactPropsRecordSchema = z.record(z.string(), ReactPropValueSchema.nullabl
  * Schema for React fiber-like object
  * memoizedProps and pendingProps are React internal structures
  */
-export const ReactFiberSchema = z.object({
+const ReactFiberSchema = z.object({
   memoizedProps: ReactPropsRecordSchema.optional(),
   pendingProps: ReactPropsRecordSchema.optional(),
 });
@@ -223,7 +210,7 @@ const FormInputValueSchema = z.union([z.string(), z.number(), z.boolean(), z.arr
 /**
  * Schema for React props with value
  */
-export const ReactPropsWithValueSchema = z.object({
+const ReactPropsWithValueSchema = z.object({
   value: FormInputValueSchema.optional(),
   defaultValue: FormInputValueSchema.optional(),
 });
@@ -236,7 +223,7 @@ const NextPagePropsRecordSchema = z.record(z.string(), ReactPropValueSchema.null
 /**
  * Schema for window with __NEXT_DATA__
  */
-export const NextDataWindowSchema = z.object({
+const NextDataWindowSchema = z.object({
   __NEXT_DATA__: z
     .object({
       props: z
@@ -251,7 +238,7 @@ export const NextDataWindowSchema = z.object({
 /**
  * Schema for window with React DevTools hook
  */
-export const ReactDevToolsWindowSchema = z.object({
+const ReactDevToolsWindowSchema = z.object({
   __REACT_DEVTOOLS_GLOBAL_HOOK__: z
     .object({
       renderers: z.map(z.number(), z.object({ version: z.string().optional() })).optional(),
@@ -262,7 +249,7 @@ export const ReactDevToolsWindowSchema = z.object({
 /**
  * Schema for window with React global
  */
-export const ReactGlobalWindowSchema = z.object({
+const ReactGlobalWindowSchema = z.object({
   React: z
     .object({
       version: z.string().optional(),
@@ -279,14 +266,14 @@ const ReduxDevToolsExtensionFnSchema = z.function().args().returns(z.record(z.st
 /**
  * Schema for window with Redux DevTools
  */
-export const ReduxDevToolsWindowSchema = z.object({
+const ReduxDevToolsWindowSchema = z.object({
   __REDUX_DEVTOOLS_EXTENSION__: ReduxDevToolsExtensionFnSchema.optional(),
 });
 
 /**
  * Schema for element with event listeners (Chrome DevTools API)
  */
-export const ElementWithEventListenersSchema = z.object({
+const ElementWithEventListenersSchema = z.object({
   getEventListeners: z.function().optional(),
 });
 
@@ -298,7 +285,7 @@ const AngularLViewContextSchema = z.array(z.union([z.string(), z.number(), z.boo
 /**
  * Schema for Angular context
  */
-export const AngularContextSchema = z.object({
+const AngularContextSchema = z.object({
   __ngContext__: AngularLViewContextSchema.optional(),
 });
 
@@ -313,14 +300,14 @@ const JQueryFunctionSchema = z
 /**
  * Schema for jQuery window
  */
-export const JQueryWindowSchema = z.object({
+const JQueryWindowSchema = z.object({
   jQuery: JQueryFunctionSchema.optional(),
 });
 
 /**
  * Schema for Formik bag
  */
-export const FormikBagSchema = z.object({
+const FormikBagSchema = z.object({
   __formik: z
     .object({
       setFieldValue: z.function().optional(),
@@ -331,7 +318,7 @@ export const FormikBagSchema = z.object({
 /**
  * Schema for React Hook Form controller
  */
-export const ReactHookFormSchema = z.object({
+const ReactHookFormSchema = z.object({
   __reactHookForm: z
     .object({
       setValue: z.function().optional(),
@@ -346,7 +333,7 @@ export const ReactHookFormSchema = z.object({
 /**
  * Safely access a property from an unknown object
  */
-export const safeGetProperty = <T>(obj: unknown, key: string): T | undefined => {
+const safeGetProperty = <T>(obj: unknown, key: string): T | undefined => {
   if (obj !== null && typeof obj === 'object' && key in obj) {
     return (obj as Record<string, unknown>)[key] as T | undefined;
   }
@@ -356,13 +343,13 @@ export const safeGetProperty = <T>(obj: unknown, key: string): T | undefined => 
 /**
  * Safely check if object has a property
  */
-export const hasProperty = <K extends string>(obj: unknown, key: K): obj is Record<K, unknown> =>
+const hasProperty = <K extends string>(obj: unknown, key: K): obj is Record<K, unknown> =>
   obj !== null && typeof obj === 'object' && key in obj;
 
 /**
  * Safely access nested property using dot notation
  */
-export const safeGetNestedProperty = <T>(obj: unknown, path: string): T | undefined => {
+const safeGetNestedProperty = <T>(obj: unknown, path: string): T | undefined => {
   const keys = path.split('.');
   let current: unknown = obj;
 
@@ -383,7 +370,7 @@ export const safeGetNestedProperty = <T>(obj: unknown, path: string): T | undefi
 /**
  * Schema for globalThis with import.meta
  */
-export const GlobalWithImportMetaSchema = z.object({
+const GlobalWithImportMetaSchema = z.object({
   import: z
     .object({
       meta: z
@@ -402,7 +389,7 @@ export const GlobalWithImportMetaSchema = z.object({
 /**
  * Schema for globalThis with process.env
  */
-export const GlobalWithProcessEnvSchema = z.object({
+const GlobalWithProcessEnvSchema = z.object({
   process: z
     .object({
       env: z.record(z.string().optional()).optional(),
@@ -420,13 +407,13 @@ export const GlobalWithProcessEnvSchema = z.object({
 /**
  * Check if data matches a Zod schema
  */
-export const matchesSchema = <T extends z.ZodType>(schema: T, data: unknown): data is z.infer<T> =>
+const matchesSchema = <T extends z.ZodType>(schema: T, data: unknown): data is z.infer<T> =>
   schema.safeParse(data).success;
 
 /**
  * Parse data with fallback value
  */
-export const parseWithFallback = <T extends z.ZodType>(schema: T, data: unknown, fallback: z.infer<T>): z.infer<T> => {
+const parseWithFallback = <T extends z.ZodType>(schema: T, data: unknown, fallback: z.infer<T>): z.infer<T> => {
   const result = schema.safeParse(data);
   return result.success ? result.data : fallback;
 };
@@ -438,7 +425,7 @@ export const parseWithFallback = <T extends z.ZodType>(schema: T, data: unknown,
 /**
  * Schema for option data (used in select, radio, checkbox fields)
  */
-export const OptionDataSchema = z.object({
+const OptionDataSchema = z.object({
   value: z.union([z.string(), z.number()]).optional(),
   id: z.union([z.string(), z.number()]).optional(),
   key: z.string().optional(),
@@ -463,7 +450,7 @@ const ValidationRuleSchema = z.object({
 /**
  * Schema for field data from API
  */
-export const FieldDataSchema = z.object({
+const FieldDataSchema = z.object({
   id: z.union([z.string(), z.number()]).optional(),
   name: z.string().optional(),
   key: z.string().optional(),
@@ -483,7 +470,7 @@ export const FieldDataSchema = z.object({
 /**
  * Schema for step data in multi-step forms
  */
-export const StepDataSchema = z.object({
+const StepDataSchema = z.object({
   id: z.union([z.string(), z.number()]).optional(),
   name: z.string().optional(),
   title: z.string().optional(),
@@ -522,7 +509,7 @@ const ProcessedStepItemSchema = z.object({
 /**
  * Schema for processed form definition from API
  */
-export const ProcessedFormDefinitionSchema = z.object({
+const ProcessedFormDefinitionSchema = z.object({
   processed: z
     .object({
       fields: z.array(ProcessedFieldItemSchema).optional(),
@@ -546,8 +533,73 @@ const ApiDataValueSchema = z.union([
 /**
  * Schema for API response with data wrapper
  */
-export const ApiResponseWrapperSchema = z.object({
+const ApiResponseWrapperSchema = z.object({
   data: ApiDataValueSchema.optional(),
   result: ApiDataValueSchema.optional(),
   payload: ApiDataValueSchema.optional(),
 });
+
+// ============================================================================
+// All exports at end of file to comply with import-x/exports-last
+// ============================================================================
+
+// DOM Element Type Guards
+export {
+  isHTMLInputElement,
+  isHTMLSelectElement,
+  isHTMLTextAreaElement,
+  isHTMLButtonElement,
+  isHTMLElement,
+  isHTMLDivElement,
+  isHTMLFormElement,
+  isHTMLLabelElement,
+  isElement,
+  isShadowRoot,
+  isDocument,
+};
+
+// Form Field Type Guards
+export { isCheckboxInput, isRadioInput, isFileInput, isTextLikeInput };
+
+// Safe Element Query Utilities
+export {
+  queryInputElement,
+  querySelectElement,
+  queryDivElement,
+  queryHTMLElement,
+  getInputElementById,
+  getSelectElementById,
+  getHTMLElementById,
+};
+
+// Zod Schemas
+export {
+  ValuePropertySchema,
+  FormFieldValueSchema,
+  ReactFiberSchema,
+  ReactPropsWithValueSchema,
+  NextDataWindowSchema,
+  ReactDevToolsWindowSchema,
+  ReactGlobalWindowSchema,
+  ReduxDevToolsWindowSchema,
+  ElementWithEventListenersSchema,
+  AngularContextSchema,
+  JQueryWindowSchema,
+  FormikBagSchema,
+  ReactHookFormSchema,
+};
+
+// Safe Property Access Utilities
+export { safeGetProperty, hasProperty, safeGetNestedProperty };
+
+// Environment Detection Schemas
+export { GlobalWithImportMetaSchema, GlobalWithProcessEnvSchema };
+
+// Type-Safe Parsing Utilities
+export { matchesSchema, parseWithFallback };
+
+// Form Field Definition Schemas
+export { OptionDataSchema, FieldDataSchema, StepDataSchema };
+
+// API Response Schemas
+export { ProcessedFormDefinitionSchema, ApiResponseWrapperSchema };

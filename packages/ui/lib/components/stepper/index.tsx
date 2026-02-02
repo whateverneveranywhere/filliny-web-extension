@@ -1,8 +1,7 @@
 import { Button } from '../ui/button';
-import React from 'react';
 import type { StepperProps } from '@extension/shared';
 
-function Stepper({ steps, handleNext, handlePrev, handleFinish, isLoading, currentStep }: StepperProps) {
+const Stepper = ({ steps, handleNext, handlePrev, handleFinish, isLoading, currentStep }: StepperProps) => {
   const nextStep = async () => {
     if (currentStep < steps.length - 1) {
       handleNext();
@@ -49,6 +48,6 @@ function Stepper({ steps, handleNext, handlePrev, handleFinish, isLoading, curre
       </div>
     </div>
   );
-}
+};
 
 export { Stepper };

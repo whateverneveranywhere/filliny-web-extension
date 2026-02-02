@@ -11,10 +11,7 @@ import { useCallback } from 'react';
 import { useFieldArray, useFormContext } from 'react-hook-form';
 import type { ProfileFormTypes } from '@/lib/containers/profile-form';
 
-// Re-export WebsiteFormFields for backward compatibility
-export { WebsiteFormFields } from './WebsiteFormFields';
-
-function StepperForm1() {
+const StepperForm1 = () => {
   const { control, watch } = useFormContext<ProfileFormTypes>();
   const { fields, append, remove } = useFieldArray({
     control,
@@ -104,6 +101,9 @@ function StepperForm1() {
       </TooltipProvider>
     </div>
   );
-}
+};
 
 export default StepperForm1;
+
+// Re-export WebsiteFormFields for backward compatibility
+export { WebsiteFormFields } from './WebsiteFormFields';

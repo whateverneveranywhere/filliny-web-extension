@@ -1,6 +1,5 @@
 import { unifiedShadowDOM } from '../../../../utils/unified-shadow-dom';
 import { FormsOverlay } from '../FormsOverlay';
-import React from 'react';
 import type { ComponentInjectionConfig } from '../../../../utils/unified-shadow-dom';
 import type { OverlayPosition } from '../types';
 

@@ -48,7 +48,7 @@ const togglePillOptionVariants = cva(
   },
 );
 
-export interface TogglePillProps extends React.HTMLAttributes<HTMLDivElement>, VariantProps<typeof togglePillVariants> {
+interface TogglePillProps extends React.HTMLAttributes<HTMLDivElement>, VariantProps<typeof togglePillVariants> {
   value: string;
   onValueChange: (value: string) => void;
   options: {
@@ -60,7 +60,7 @@ export interface TogglePillProps extends React.HTMLAttributes<HTMLDivElement>, V
   disabled?: boolean;
 }
 
-export const TogglePill = React.forwardRef<HTMLDivElement, TogglePillProps>(
+const TogglePill = React.forwardRef<HTMLDivElement, TogglePillProps>(
   ({ className, variant, size, value, onValueChange, options, disabled = false, ...props }, ref) => {
     const activeIndex = options.findIndex(option => option.value === value);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -147,3 +147,6 @@ export const TogglePill = React.forwardRef<HTMLDivElement, TogglePillProps>(
 );
 
 TogglePill.displayName = 'TogglePill';
+
+export { TogglePill };
+export type { TogglePillProps };

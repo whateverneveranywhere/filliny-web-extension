@@ -18,7 +18,7 @@ import {
   initializeShadowDOMObservation,
   cleanupShadowDOMObservation,
   querySelectorAllDeep,
-  isInShadowDOM,
+  isInShadowDOM as _isInShadowDOM, // Available for future use
   hasProperty,
 } from '@extension/shared';
 import { z } from 'zod';
@@ -43,18 +43,21 @@ const isElement = (node: Node): node is Element => node.nodeType === Node.ELEMEN
  * Schema for document with observer extension
  * Note: Document is a native type, so we define the extension properties
  */
-const DocumentWithObserverPropsSchema = z.object({
+// Zod schema for type inference - not used at runtime
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const _DocumentWithObserverPropsSchema = z.object({
   __fillinyFrameObserver: z.custom<MutationObserver>(val => val instanceof MutationObserver).optional(),
 });
 
-type DocumentWithObserverProps = z.infer<typeof DocumentWithObserverPropsSchema>;
+type DocumentWithObserverProps = z.infer<typeof _DocumentWithObserverPropsSchema>;
 type DocumentWithObserver = Document & DocumentWithObserverProps;
 
 /**
  * Type guard to check if a document has the observer extension
  * This allows safely accessing the __fillinyFrameObserver property
  */
-const isDocumentWithObserver = (doc: Document): doc is DocumentWithObserver =>
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const _isDocumentWithObserver = (doc: Document): doc is DocumentWithObserver =>
   '__fillinyFrameObserver' in doc || doc instanceof Document;
 
 /**
@@ -70,7 +73,8 @@ export type FormDetectionCallback = (doc: Document) => void;
 /**
  * Schema for dynamic content detector
  */
-const DynamicContentDetectorSchema = z.object({
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const _DynamicContentDetectorSchema = z.object({
   observer: z.custom<MutationObserver>(val => val instanceof MutationObserver, {
     message: 'Expected MutationObserver',
   }),
@@ -80,7 +84,7 @@ const DynamicContentDetectorSchema = z.object({
   onStableCallback: z.function().returns(z.void()).optional(),
 });
 
-type DynamicContentDetector = z.infer<typeof DynamicContentDetectorSchema>;
+type DynamicContentDetector = z.infer<typeof _DynamicContentDetectorSchema>;
 
 // Global registry for dynamic content detection
 const dynamicDetectors = new Map<Document, DynamicContentDetector>();
@@ -88,7 +92,8 @@ const dynamicDetectors = new Map<Document, DynamicContentDetector>();
 /**
  * Schema for API response monitor
  */
-const APIResponseMonitorSchema = z.object({
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const _APIResponseMonitorSchema = z.object({
   originalFetch: z.custom<typeof fetch>(val => typeof val === 'function', { message: 'Expected fetch function' }),
   originalXHROpen: z.custom<typeof XMLHttpRequest.prototype.open>(val => typeof val === 'function', {
     message: 'Expected XHR open function',
@@ -100,7 +105,7 @@ const APIResponseMonitorSchema = z.object({
   onFormDefinitionLoaded: z.function().args(z.unknown()).returns(z.void()).optional(),
 });
 
-type APIResponseMonitor = z.infer<typeof APIResponseMonitorSchema>;
+type APIResponseMonitor = z.infer<typeof _APIResponseMonitorSchema>;
 
 // API response monitoring registry
 const apiResponseMonitors = new Map<Document, APIResponseMonitor>();
@@ -412,14 +417,15 @@ export const getAllFrameDocuments = (onNewFrameLoaded?: FormDetectionCallback): 
 /**
  * Schema for form candidate detection results
  */
-const FormCandidateSchema = z.object({
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const _FormCandidateSchema = z.object({
   element: z.custom<HTMLElement>(val => val instanceof HTMLElement, { message: 'Expected HTMLElement' }),
   score: z.number(),
   fieldCount: z.number(),
   reasons: z.array(z.string()),
 });
 
-type FormCandidate = z.infer<typeof FormCandidateSchema>;
+type FormCandidate = z.infer<typeof _FormCandidateSchema>;
 
 /**
  * Gets all form containers from the unified registry.
@@ -1920,7 +1926,9 @@ const ValidationRuleSchema = z.object({
   maxLength: z.number().optional(),
   required: z.boolean().optional(),
 });
-type ValidationRule = z.infer<typeof ValidationRuleSchema>;
+// Type alias used in ValidationRulesSchema union type
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+type _ValidationRule = z.infer<typeof ValidationRuleSchema>;
 
 const ValidationRulesSchema = z.record(
   z.string(),

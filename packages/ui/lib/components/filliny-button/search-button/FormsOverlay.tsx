@@ -35,7 +35,7 @@ interface ActionButtonsProps {
   isFormLikelyOutOfView: boolean;
   onFillClick: (event: React.MouseEvent<HTMLButtonElement>) => Promise<void>;
   onDismiss: () => void;
-  buttonRef: React.RefObject<HTMLButtonElement>;
+  buttonRef: React.RefObject<HTMLButtonElement | null>;
 }
 
 /**
@@ -114,7 +114,7 @@ const OverlayContainer: React.FC<OverlayContainerProps> = ({
     height: `${overlayPosition.height}px`,
     pointerEvents: loading ? ('auto' as const) : ('none' as const),
     contain: 'layout style paint' as const,
-    zIndex: 10000000,
+    zIndex: 999999,
     transition: 'all 0.3s ease',
   };
 

@@ -1,4 +1,4 @@
-export const resetOverlays = (): void => {
+const resetOverlays = (): void => {
   // Remove all form overlays
   const overlaysContainer = document
     .querySelector('#chrome-extension-filliny-all')
@@ -26,7 +26,7 @@ export const resetOverlays = (): void => {
   });
 };
 
-export const addGlowingBorder = (element: HTMLElement, color: string = 'green'): void => {
+const addGlowingBorder = (element: HTMLElement, color: string = 'green'): void => {
   Object.assign(element.style, {
     boxShadow: `0 0 10px 2px ${color}`,
     transition: 'box-shadow 0.3s ease-in-out',
@@ -37,7 +37,7 @@ export const addGlowingBorder = (element: HTMLElement, color: string = 'green'):
   }, 2000);
 };
 
-export const showLoadingIndicator = (formId: string): void => {
+const showLoadingIndicator = (formId: string): void => {
   const form = document.querySelector<HTMLFormElement>(`form[data-form-id="${formId}"]`);
   if (!form) return;
 
@@ -79,7 +79,7 @@ const ensureSpinnerAnimation = (): void => {
   document.head.appendChild(animation);
 };
 
-export const disableOtherButtons = (formId: string): void => {
+const disableOtherButtons = (formId: string): void => {
   document.querySelectorAll<HTMLButtonElement>('button[data-form-id]').forEach(button => {
     if (button.dataset.formId !== formId) {
       button.disabled = true;
@@ -88,7 +88,7 @@ export const disableOtherButtons = (formId: string): void => {
 };
 
 // domUtils.ts
-export const createElementWithStyles = (tag: string, id: string, styles: Partial<CSSStyleDeclaration>): HTMLElement => {
+const createElementWithStyles = (tag: string, id: string, styles: Partial<CSSStyleDeclaration>): HTMLElement => {
   const element = document.createElement(tag);
   element.id = id;
   Object.assign(element.style, {
@@ -99,7 +99,7 @@ export const createElementWithStyles = (tag: string, id: string, styles: Partial
   return element;
 };
 
-export const getFormPosition = (form: HTMLElement) => {
+const getFormPosition = (form: HTMLElement) => {
   const rect = form.getBoundingClientRect();
   const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
   const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
@@ -118,7 +118,7 @@ export const getFormPosition = (form: HTMLElement) => {
   };
 };
 
-export const findOrCreateShadowContainer = (shadowRoot: ShadowRoot): HTMLDivElement => {
+const findOrCreateShadowContainer = (shadowRoot: ShadowRoot): HTMLDivElement => {
   let container = shadowRoot.querySelector('#filliny-overlays-container') as HTMLDivElement;
 
   if (!container) {
@@ -132,4 +132,14 @@ export const findOrCreateShadowContainer = (shadowRoot: ShadowRoot): HTMLDivElem
   }
 
   return container;
+};
+
+export {
+  resetOverlays,
+  addGlowingBorder,
+  showLoadingIndicator,
+  disableOtherButtons,
+  createElementWithStyles,
+  getFormPosition,
+  findOrCreateShadowContainer,
 };

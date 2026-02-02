@@ -13,7 +13,7 @@ interface TokenDisplayProps {
 
 const COOLDOWN_DURATION = 10000; // 10 seconds in milliseconds
 
-function TokenDisplay({ tokens = 0, onRefresh, isRefetching = false, isLoading = false }: TokenDisplayProps) {
+const TokenDisplay = ({ tokens = 0, onRefresh, isRefetching = false, isLoading = false }: TokenDisplayProps) => {
   const [isOnCooldown, setIsOnCooldown] = useState(false);
   const [cooldownRemaining, setCooldownRemaining] = useState(0);
   const formattedTokens = tokens.toLocaleString();
@@ -86,7 +86,7 @@ function TokenDisplay({ tokens = 0, onRefresh, isRefetching = false, isLoading =
       </Tooltip>
     </TooltipProvider>
   );
-}
+};
 
 export { TokenDisplay };
 export type { TokenDisplayProps };

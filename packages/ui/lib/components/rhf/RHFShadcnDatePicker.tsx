@@ -6,7 +6,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { cn } from '@/lib/utils';
 import { format, parseISO, isValid } from 'date-fns';
 import { CalendarIcon } from 'lucide-react';
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 import { Controller, useFormContext } from 'react-hook-form';
 import type { GeneralFormProps } from '@extension/shared';
 
@@ -15,7 +15,7 @@ const safeParseDate = (dateString: string): Date | undefined => {
   return isValid(date) ? date : undefined;
 };
 
-function RHFShadcnDatePicker({
+const RHFShadcnDatePicker = ({
   title,
   name,
   description,
@@ -23,7 +23,7 @@ function RHFShadcnDatePicker({
   required,
   value: externalValue,
   onChange: externalOnChange,
-}: GeneralFormProps) {
+}: GeneralFormProps) => {
   const { control } = useFormContext();
 
   const UTCtoUserDate = useMemo(
@@ -77,6 +77,6 @@ function RHFShadcnDatePicker({
       )}
     />
   );
-}
+};
 
 export default RHFShadcnDatePicker;

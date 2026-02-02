@@ -25,7 +25,7 @@ interface Props {
   children: React.ReactNode;
 }
 
-function Drawer(props: Props) {
+const Drawer = (props: Props) => {
   const {
     hideFooter = false,
     onOpenChange,
@@ -65,6 +65,6 @@ function Drawer(props: Props) {
       </DrawerContent>
     </ShadcnDrawer>
   );
-}
+};
 
 export { Drawer };

@@ -1,13 +1,14 @@
-import React from 'react';
+import { Component } from 'react';
 import { createRoot } from 'react-dom/client';
+import type { ReactNode, ErrorInfo } from 'react';
 import type { Root } from 'react-dom/client';
 
 // Error boundary component for safer rendering
-class ErrorBoundary extends React.Component<
-  { children: React.ReactNode; containerId: string },
+class ErrorBoundary extends Component<
+  { children: ReactNode; containerId: string },
   { hasError: boolean; error?: Error }
 > {
-  constructor(props: { children: React.ReactNode; containerId: string }) {
+  constructor(props: { children: ReactNode; containerId: string }) {
     super(props);
     this.state = { hasError: false };
   }
@@ -16,7 +17,7 @@ class ErrorBoundary extends React.Component<
     return { hasError: true, error };
   }
 
-  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error(`Filliny component error in ${this.props.containerId}:`, error, errorInfo);
   }
 
@@ -46,7 +47,7 @@ export interface ShadowContainerConfig {
 }
 
 export interface ComponentInjectionConfig extends ShadowContainerConfig {
-  component: React.ReactNode;
+  component: ReactNode;
   onError?: (error: Error) => void;
 }
 

@@ -6,7 +6,7 @@ interface Props {
   children: React.ReactNode;
 }
 
-function QueryClientProvider(props: Props) {
+const QueryClientProvider = (props: Props) => {
   const { children } = props;
   const [queryClient] = useState(
     () =>
@@ -32,6 +32,6 @@ function QueryClientProvider(props: Props) {
       <>{children}</>
     </ReactQueryClientProvider>
   );
-}
+};
 
 export default QueryClientProvider;

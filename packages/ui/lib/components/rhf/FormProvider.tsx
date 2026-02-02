@@ -8,14 +8,12 @@ type Props<T extends FieldValues = FieldValues> = {
   onSubmit?: VoidFunction;
 };
 
-function FormProvider<T extends FieldValues = FieldValues>({ children, onSubmit, methods }: Props<T>) {
-  return (
-    <Form {...methods}>
-      <form onSubmit={onSubmit} className="filliny-size-full">
-        {children}
-      </form>
-    </Form>
-  );
-}
+const FormProvider = <T extends FieldValues = FieldValues>({ children, onSubmit, methods }: Props<T>) => (
+  <Form {...methods}>
+    <form onSubmit={onSubmit} className="filliny-size-full">
+      {children}
+    </form>
+  </Form>
+);
 
 export default FormProvider;

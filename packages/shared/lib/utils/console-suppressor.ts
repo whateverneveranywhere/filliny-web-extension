@@ -14,23 +14,36 @@ interface ViteImportMeta {
 }
 
 /**
+ * Safely checks for Vite import.meta.env
+ * Uses eval to avoid static analysis issues with import.meta in non-ESM contexts
+ */
+const getViteEnv = (): ViteImportMeta['env'] | null => {
+  try {
+    // Use indirect eval to check for import.meta in browser ESM context
+    // This avoids static parsing issues in non-ESM contexts like jiti
+    const meta = new Function('return typeof import.meta !== "undefined" ? import.meta : null')();
+    if (meta && 'env' in meta) {
+      return (meta as ViteImportMeta).env;
+    }
+  } catch {
+    // import.meta not available in this context
+  }
+  return null;
+};
+
+/**
  * Determines if the current environment is production
  */
-export const isProduction = (): boolean => {
+const isProduction = (): boolean => {
   // Check for Node.js environment
   if (typeof process !== 'undefined' && process.env) {
     return process.env.NODE_ENV === 'production';
   }
 
   // Check for Vite environment (browser)
-  if (typeof import.meta !== 'undefined') {
-    try {
-      const viteImportMeta = import.meta as unknown as ViteImportMeta;
-      return viteImportMeta.env.VITE_WEBAPP_ENV === 'prod' || viteImportMeta.env.MODE === 'production';
-    } catch {
-      // If import.meta.env is not available
-      return false;
-    }
+  const viteEnv = getViteEnv();
+  if (viteEnv) {
+    return viteEnv.VITE_WEBAPP_ENV === 'prod' || viteEnv.MODE === 'production';
   }
 
   // Default to false if environment check fails

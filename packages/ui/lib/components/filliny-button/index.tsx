@@ -60,7 +60,7 @@ const DraggableButton = ({ position }: { position: Position }) => {
     right: 10,
     transform: CSS.Transform.toString(transform),
     touchAction: 'none',
-    zIndex: 1000000000000,
+    zIndex: 9999999,
   };
 
   return (
@@ -71,7 +71,7 @@ const DraggableButton = ({ position }: { position: Position }) => {
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}>
       <div ref={nodeRef} className="filliny-relative">
-        <div className="filliny-absolute filliny-z-[1000000000000]">
+        <div className="filliny-absolute filliny-z-[9999999]">
           <div className="filliny-pointer-events-auto">
             <LogoButton isHovered={isHovered} isDragging={isDragging} />
           </div>

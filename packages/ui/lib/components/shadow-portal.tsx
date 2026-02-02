@@ -1,11 +1,12 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { createPortal } from 'react-dom';
+import type { ReactNode, FC, ComponentType } from 'react';
 
 interface ShadowPortalProps {
   /**
    * The content to render in the shadow DOM
    */
-  children: React.ReactNode;
+  children: ReactNode;
 
   /**
    * Optional container ID within the shadow root
@@ -25,15 +26,11 @@ interface ShadowPortalProps {
  * Useful for components like popovers, dropdowns, and tooltips that need to be rendered
  * within the Shadow DOM boundary to inherit styles properly
  */
-export const ShadowPortal: React.FC<ShadowPortalProps> = ({
-  children,
-  containerId = 'shadow-portal-container',
-  zIndex,
-}) => {
+const ShadowPortal: FC<ShadowPortalProps> = ({ children, containerId = 'shadow-portal-container', zIndex }) => {
   // Find the Shadow DOM root element
-  const shadowHost = React.useMemo(() => document.querySelector('#chrome-extension-filliny-all'), []);
+  const shadowHost = useMemo(() => document.querySelector('#chrome-extension-filliny-all'), []);
 
-  const shadowRoot = React.useMemo(() => shadowHost?.shadowRoot, [shadowHost]);
+  const shadowRoot = useMemo(() => shadowHost?.shadowRoot, [shadowHost]);
 
   // If no shadow root is found, return null (or render in place as fallback)
   if (!shadowRoot) {
@@ -63,13 +60,12 @@ export const ShadowPortal: React.FC<ShadowPortalProps> = ({
  * @param Component The component to wrap
  * @returns A wrapped component that renders into Shadow DOM
  */
-export function withShadowPortal<P extends object>(
-  Component: React.ComponentType<P>,
-  portalProps?: Omit<ShadowPortalProps, 'children'>,
-) {
-  return (props: P) => (
+const withShadowPortal =
+  <P extends object>(WrappedComponent: ComponentType<P>, portalProps?: Omit<ShadowPortalProps, 'children'>) =>
+  (props: P) => (
     <ShadowPortal {...portalProps}>
-      <Component {...props} />
+      <WrappedComponent {...props} />
     </ShadowPortal>
   );
-}
+
+export { ShadowPortal, withShadowPortal };

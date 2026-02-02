@@ -1,12 +1,15 @@
 import { getFormFieldsRobust } from './field-types';
 import { safeGetLowerString } from './field-types/utils';
 
-interface FormCandidate {
+// Note: FormCandidate interface is defined in detectionHelpers.ts with Zod schema
+// Keeping this local definition for future use - prefixed with underscore
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+type _FormCandidate = {
   element: HTMLElement;
   score: number;
   fieldCount: number;
   reasons: string[];
-}
+};
 
 /**
  * Get the depth of an element in the DOM tree

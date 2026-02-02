@@ -7,7 +7,7 @@ const config = getConfig();
 // Dashboard path for the dashboard route
 const dashboardPath = '/dashboard';
 
-function Header() {
+const Header = () => {
   const { data, refetch, isRefetching, isLoading } = useDashboardOverview();
 
   const handleRefresh = async () => {
@@ -41,6 +41,6 @@ function Header() {
       </div>
     </header>
   );
-}
+};
 
 export { Header };

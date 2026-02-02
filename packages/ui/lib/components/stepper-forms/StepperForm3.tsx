@@ -1,8 +1,7 @@
 import { RHFShadcnComboBox, RHFShadcnSwitch } from '../rhf';
 import { usePOVListQuery, useTonesListQuery } from '@extension/shared';
-import React from 'react';
 
-function StepperForm3() {
+const StepperForm3 = () => {
   const { data: povList, isLoading: isLoadingPOVs } = usePOVListQuery();
   const { data: tonesList, isLoading: isLoadingTones } = useTonesListQuery();
   return (
@@ -29,6 +28,6 @@ function StepperForm3() {
       </div>
     </>
   );
-}
+};
 
 export default StepperForm3;

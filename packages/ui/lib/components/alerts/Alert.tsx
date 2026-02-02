@@ -35,28 +35,26 @@ interface AlertProps extends VariantProps<typeof alertVariants> {
   onButtonClick?: () => void;
 }
 
-export function Alert({
+export const Alert = ({
   title,
   description,
   buttonText,
   buttonIcon: ButtonIcon,
   onButtonClick,
   variant = 'default',
-}: AlertProps) {
-  return (
-    <div className={alertVariants({ variant })}>
-      <div className="filliny-flex filliny-flex-col filliny-items-center filliny-justify-between filliny-gap-5">
-        <div className="filliny-flex filliny-flex-col filliny-gap-1">
-          <p className={titleVariants({ variant })}>{title}</p>
-          <p className="filliny-text-sm filliny-text-muted-foreground">{description}</p>
-        </div>
-        {buttonText && (
-          <Button variant={variant} size="sm" className="filliny-w-full filliny-gap-1.5" onClick={onButtonClick}>
-            {buttonText}
-            {ButtonIcon && <ButtonIcon className="filliny-h-3.5 filliny-w-3.5" />}
-          </Button>
-        )}
+}: AlertProps) => (
+  <div className={alertVariants({ variant })}>
+    <div className="filliny-flex filliny-flex-col filliny-items-center filliny-justify-between filliny-gap-5">
+      <div className="filliny-flex filliny-flex-col filliny-gap-1">
+        <p className={titleVariants({ variant })}>{title}</p>
+        <p className="filliny-text-sm filliny-text-muted-foreground">{description}</p>
       </div>
+      {buttonText && (
+        <Button variant={variant} size="sm" className="filliny-w-full filliny-gap-1.5" onClick={onButtonClick}>
+          {buttonText}
+          {ButtonIcon && <ButtonIcon className="filliny-h-3.5 filliny-w-3.5" />}
+        </Button>
+      )}
     </div>
-  );
-}
+  </div>
+);
