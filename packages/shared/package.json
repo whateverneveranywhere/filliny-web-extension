@@ -23,6 +23,7 @@
     "postinstall": "pnpm ready"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.90.20",
     "react-error-boundary": "^6.0.0"
   },
   "devDependencies": {
