@@ -97,7 +97,7 @@ interface ViteImportMeta {
 const config: Record<WebappEnvs, ConfigEntry> = {
   dev: {
     cookieName: 'authjs.session-token',
-    baseURL: 'http://localhost:5174',
+    baseURL: 'http://localhost:5173',
     webappEnv: WebappEnvs.DEV,
   },
   preview: {

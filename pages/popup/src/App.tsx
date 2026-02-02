@@ -22,7 +22,7 @@ const HomePage = () => {
       // Determine which environment is being used by comparing baseURL
       let currentEnv = 'unknown';
 
-      if (config.baseURL === 'http://localhost:5174') {
+      if (config.baseURL === 'http://localhost:5173') {
         currentEnv = WebappEnvs.DEV;
       } else if (config.baseURL === 'https://dev.filliny-app.pages.dev') {
         currentEnv = WebappEnvs.PREVIEW;

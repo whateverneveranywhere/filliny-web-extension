@@ -71,7 +71,7 @@ The main feature is AI-powered form filling through:
 
 ### Environment Configuration
 The extension supports multiple environments:
-- **Development**: `localhost:5174` (local development)
+- **Development**: `localhost:5173` (local development)
 - **Preview**: `dev.filliny-app.pages.dev` (staging)
 - **Production**: `filliny.io` (live)
 
