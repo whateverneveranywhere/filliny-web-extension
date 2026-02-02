@@ -264,7 +264,11 @@ const createRealisticFile = (filename: string, mimeType?: string): File => {
     finalContent = new Uint8Array([...content, ...padding]);
   }
 
-  const blob = new Blob([finalContent], { type: detectedMimeType });
+  // Create a clean ArrayBuffer copy for Blob compatibility
+  const cleanBuffer = new ArrayBuffer(finalContent.length);
+  const cleanView = new Uint8Array(cleanBuffer);
+  cleanView.set(finalContent);
+  const blob = new Blob([cleanBuffer], { type: detectedMimeType });
   return new File([blob], filename, {
     type: detectedMimeType,
     lastModified: Date.now() - Math.random() * 86400000, // Random time within last 24h
