@@ -1,8 +1,8 @@
-import { streamFileToZip } from "@extension/dev-utils";
-import fg from "fast-glob";
-import { Zip } from "fflate";
-import { createWriteStream, existsSync, mkdirSync } from "node:fs";
-import { posix, resolve } from "node:path";
+import { streamFileToZip } from '@extension/dev-utils';
+import fg from 'fast-glob';
+import { Zip } from 'fflate';
+import { createWriteStream, existsSync, mkdirSync } from 'node:fs';
+import { posix, resolve } from 'node:path';
 
 const toMB = (bytes: number): number => bytes / 1024 / 1024;
 
@@ -35,8 +35,8 @@ export const zipBundle = async (
 
   const fileList = await fg(
     [
-      "**/*", // Pick all nested files
-      ...(!withMaps ? ["!**/(*.js.map|*.css.map)"] : []), // Exclude source maps conditionally
+      '**/*', // Pick all nested files
+      ...(!withMaps ? ['!**/(*.js.map|*.css.map)'] : []), // Exclude source maps conditionally
     ],
     {
       cwd: distDirectory,

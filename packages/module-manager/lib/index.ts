@@ -1,5 +1,5 @@
-import { processCLIArgs, runModuleManager } from "./base/index.js";
-import { colorfulLog, sleep } from "@extension/shared";
+import { processCLIArgs, runModuleManager } from './base/index.js';
+import { colorfulLog, sleep } from '@extension/shared';
 
 const cliOptions = processCLIArgs();
 
@@ -9,7 +9,7 @@ export const startManager = () => {
 
     (async () => {
       for (const moduleName of targets) {
-        colorfulLog(`Processing module: ${moduleName}`, "info");
+        colorfulLog(`Processing module: ${moduleName}`, 'info');
         const isLastIndex = targets.at(-1) === moduleName;
         await runModuleManager(moduleName, cliOptions.action, isLastIndex);
         await sleep(500);

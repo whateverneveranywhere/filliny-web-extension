@@ -228,6 +228,8 @@ trigger a repo update with the forked upstream:
 
 ## Debugging
 
+## Debugging
+
 If you're debugging one, you can use [Brie](https://go.briehq.com/github?utm_source=CEB) lets you capture screenshots, errors, and network activity, making it easier for us to help.
 
 ## Reference

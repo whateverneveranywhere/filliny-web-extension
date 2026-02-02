@@ -1,4 +1,4 @@
-import initClient from "../initializers/init-client.js";
+import initClient from '../initializers/init-client.js';
 
 (() => {
   let pendingReload = false;
@@ -29,5 +29,5 @@ import initClient from "../initializers/init-client.js";
     }
   };
 
-  document.addEventListener("visibilitychange", reloadWhenTabIsVisible);
+  document.addEventListener('visibilitychange', reloadWhenTabIsVisible);
 })();

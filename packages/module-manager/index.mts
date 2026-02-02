@@ -1,3 +1,3 @@
-import { startManager } from "./lib/index.js";
+import { startManager } from './lib/index.js';
 
 startManager();

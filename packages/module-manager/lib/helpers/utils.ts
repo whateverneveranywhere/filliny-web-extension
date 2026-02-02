@@ -1,17 +1,17 @@
-import { DEFAULT_CHOICES_VALUES, EXIT_PROMPT_ERROR, MODULE_CONFIG } from "../const.js";
-import { colorfulLog } from "@extension/shared";
-import { select } from "@inquirer/prompts";
-import { readdirSync } from "node:fs";
-import type { DELETE_CHOICE_QUESTION, RECOVER_CHOICE_QUESTION } from "../const.js";
+import { DEFAULT_CHOICES_VALUES, EXIT_PROMPT_ERROR, MODULE_CONFIG } from '../const.js';
+import { colorfulLog } from '@extension/shared';
+import { select } from '@inquirer/prompts';
+import { readdirSync } from 'node:fs';
+import type { DELETE_CHOICE_QUESTION, RECOVER_CHOICE_QUESTION } from '../const.js';
 import type {
   ChoicesType,
   CliEntriesType,
   InputConfigType,
   ModuleNameType,
   WritableModuleConfigValuesType,
-} from "../types.js";
-import type { ConditionalPickDeep, Entries, ManifestType } from "@extension/shared";
-import type { Arguments } from "yargs";
+} from '../types.js';
+import type { ConditionalPickDeep, Entries, ManifestType } from '@extension/shared';
+import type { Arguments } from 'yargs';
 
 export const isFolderEmpty = (path: string) => !readdirSync(path).length;
 
@@ -20,7 +20,7 @@ export const promptSelection = async (inputConfig: InputConfigType) =>
     if (err.name === EXIT_PROMPT_ERROR) {
       process.exit(0);
     } else {
-      colorfulLog(err.message, "error");
+      colorfulLog(err.message, 'error');
     }
   }) as Promise<string>;
 
@@ -29,14 +29,14 @@ export const processModuleConfig = (
   moduleName: ModuleNameType,
   isRecovering?: boolean,
 ) => {
-  if (moduleName === "content-runtime" || moduleName === "devtools-panel" || moduleName === "tests") {
+  if (moduleName === 'content-runtime' || moduleName === 'devtools-panel' || moduleName === 'tests') {
     return;
   }
 
   const moduleConfigValues = MODULE_CONFIG[moduleName];
   const moduleConfigEntriesOfKeys = Object.entries(moduleConfigValues) as Entries<typeof moduleConfigValues>;
 
-  if (moduleName === "content" || moduleName === "content-ui") {
+  if (moduleName === 'content' || moduleName === 'content-ui') {
     if (isRecovering) {
       (moduleConfigValues as WritableModuleConfigValuesType<typeof moduleName>).content_scripts.map(script =>
         manifestObject.content_scripts?.push(script),
@@ -45,7 +45,7 @@ export const processModuleConfig = (
       const outputFileName = new RegExp(`${moduleName}/+`);
 
       manifestObject.content_scripts = manifestObject.content_scripts?.filter(
-        script => !outputFileName.test(script.js ? script.js[0] : ""),
+        script => !outputFileName.test(script.js ? script.js[0] : ''),
       );
     }
     return;
@@ -96,7 +96,7 @@ export const processSelection = async (
   moduleName?: ModuleNameType,
 ) => {
   if (!choices.length) {
-    colorfulLog("No options available", "warning");
+    colorfulLog('No options available', 'warning');
     process.exit(0);
   }
 

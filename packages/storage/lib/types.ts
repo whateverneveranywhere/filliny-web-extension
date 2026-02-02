@@ -1,4 +1,4 @@
-import type { ValueOrUpdateType } from "./base/index.js";
+import type { ValueOrUpdateType } from './base/index.js';
 
 export type BaseStorageType<D> = {
   get: () => Promise<D>;

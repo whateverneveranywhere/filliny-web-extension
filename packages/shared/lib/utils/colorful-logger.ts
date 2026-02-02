@@ -1,20 +1,20 @@
-import { COLORS } from "./const.js";
-import type { ColorType, ValueOf } from "./types.js";
+import { COLORS } from './const.js';
+import type { ColorType, ValueOf } from './types.js';
 
 export const colorfulLog = (message: string, type: ColorType) => {
   let color: ValueOf<typeof COLORS>;
 
   switch (type) {
-    case "success":
+    case 'success':
       color = COLORS.FgGreen;
       break;
-    case "info":
+    case 'info':
       color = COLORS.FgBlue;
       break;
-    case "error":
+    case 'error':
       color = COLORS.FgRed;
       break;
-    case "warning":
+    case 'warning':
       color = COLORS.FgYellow;
       break;
     default:
@@ -23,5 +23,5 @@ export const colorfulLog = (message: string, type: ColorType) => {
   }
 
   console.info(color, message);
-  console.info(COLORS["Reset"]);
+  console.info(COLORS['Reset']);
 };

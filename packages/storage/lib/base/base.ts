@@ -1,5 +1,5 @@
-import { SessionAccessLevelEnum, StorageEnum } from "./enums.js";
-import type { BaseStorageType, StorageConfigType, ValueOrUpdateType } from "./types.js";
+import { SessionAccessLevelEnum, StorageEnum } from './enums.js';
+import type { BaseStorageType, StorageConfigType, ValueOrUpdateType } from './types.js';
 
 /**
  * Chrome reference error while running `processTailwindFeatures` in tailwindcss.
@@ -13,7 +13,7 @@ const chrome = globalThis.chrome;
 const updateCache = async <D>(valueOrUpdate: ValueOrUpdateType<D>, cache: D | null): Promise<D> => {
   // Type guard to check if our value or update is a function
   const isFunction = <D>(value: ValueOrUpdateType<D>): value is (prev: D) => D | Promise<D> =>
-    typeof value === "function";
+    typeof value === 'function';
 
   // Type guard to check in case of a function if it's a Promise
   const returnsPromise = <D>(func: (prev: D) => D | Promise<D>): func is (prev: D) => Promise<D> =>
@@ -35,7 +35,7 @@ const updateCache = async <D>(valueOrUpdate: ValueOrUpdateType<D>, cache: D | nu
  * If one session storage needs access from content scripts, we need to enable it globally.
  * @default false
  */
-let globalSessionAccessLevelFlag: StorageConfigType["sessionAccessForContentScripts"] = false;
+let globalSessionAccessLevelFlag: StorageConfigType['sessionAccessForContentScripts'] = false;
 
 /**
  * Checks if the storage permission is granted in the manifest.json.
@@ -82,7 +82,7 @@ export const createStorage = <D = string>(
       })
       .catch(error => {
         console.error(error);
-        console.error("Please call .setAccessLevel() into different context, like a background script.");
+        console.error('Please call .setAccessLevel() into different context, like a background script.');
       });
     globalSessionAccessLevelFlag = true;
   }

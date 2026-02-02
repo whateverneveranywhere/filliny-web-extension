@@ -1,5 +1,5 @@
-import { withUI } from "@extension/ui";
+import { withUI } from '@extension/ui';
 
 export default withUI({
-  content: ["src/**/*.tsx"],
+  content: ['src/**/*.tsx'],
 });

@@ -1,13 +1,13 @@
-import { fixupConfigRules } from "@eslint/compat";
-import { FlatCompat } from "@eslint/eslintrc";
-import js from "@eslint/js";
-import { flatConfigs as importXFlatConfig } from "eslint-plugin-import-x";
-import jsxA11y from "eslint-plugin-jsx-a11y";
-import eslintPluginPrettierRecommended from "eslint-plugin-prettier/recommended";
-import reactPlugin from "eslint-plugin-react";
-import { browser, es2020, node } from "globals";
-import { config, configs as tsConfigs, parser as tsParser } from "typescript-eslint";
-import type { FixupConfigArray } from "@eslint/compat";
+import { fixupConfigRules } from '@eslint/compat';
+import { FlatCompat } from '@eslint/eslintrc';
+import js from '@eslint/js';
+import { flatConfigs as importXFlatConfig } from 'eslint-plugin-import-x';
+import jsxA11y from 'eslint-plugin-jsx-a11y';
+import eslintPluginPrettierRecommended from 'eslint-plugin-prettier/recommended';
+import reactPlugin from 'eslint-plugin-react';
+import { browser, es2020, node } from 'globals';
+import { config, configs as tsConfigs, parser as tsParser } from 'typescript-eslint';
+import type { FixupConfigArray } from '@eslint/compat';
 
 export default config(
   // Shared configs
@@ -17,22 +17,22 @@ export default config(
   importXFlatConfig.recommended,
   importXFlatConfig.typescript,
   eslintPluginPrettierRecommended,
-  ...fixupConfigRules(new FlatCompat().extends("plugin:react-hooks/recommended") as FixupConfigArray),
+  ...fixupConfigRules(new FlatCompat().extends('plugin:react-hooks/recommended') as FixupConfigArray),
   {
-    files: ["**/*.{ts,tsx}"],
+    files: ['**/*.{ts,tsx}'],
     ...reactPlugin.configs.flat.recommended,
-    ...reactPlugin.configs.flat["jsx-runtime"],
+    ...reactPlugin.configs.flat['jsx-runtime'],
   },
   // Custom config
   {
-    ignores: ["**/build/**", "**/dist/**", "**/node_modules/**", "chrome-extension/manifest.js", "**/*/pdf.worker.*"],
+    ignores: ['**/build/**', '**/dist/**', '**/node_modules/**', 'chrome-extension/manifest.js', '**/*/pdf.worker.*'],
   },
   {
-    files: ["**/*.{ts,tsx}"],
+    files: ['**/*.{ts,tsx}'],
     languageOptions: {
       parser: tsParser,
-      ecmaVersion: "latest",
-      sourceType: "module",
+      ecmaVersion: 'latest',
+      sourceType: 'module',
       parserOptions: {
         ecmaFeatures: { jsx: true },
         projectService: true,
@@ -41,71 +41,67 @@ export default config(
         ...browser,
         ...es2020,
         ...node,
-        chrome: "readonly",
+        chrome: 'readonly',
       },
     },
     settings: {
       react: {
-        version: "detect",
+        version: 'detect',
       },
     },
     rules: {
-      "react/react-in-jsx-scope": "off",
-      "react/prop-types": "off",
-      "prefer-const": "error",
-      "no-var": "error",
-      "@typescript-eslint/no-unused-vars": "warn",
-      // "func-style": ["error", "expression", { allowArrowFunctions: true }],
-      "func-style": ["warn", "expression", { allowArrowFunctions: true }],
-      "no-restricted-imports": [
-        "error",
+      'react/react-in-jsx-scope': 'off',
+      'react/prop-types': 'off',
+      'prefer-const': 'error',
+      'no-var': 'error',
+      '@typescript-eslint/no-unused-vars': 'warn',
+      'func-style': ['warn', 'expression', { allowArrowFunctions: true }],
+      'no-restricted-imports': [
+        'error',
         {
-          name: "type-fest",
-          message: "Please import from `@extension/shared` instead of `type-fest`.",
+          name: 'type-fest',
+          message: 'Please import from `@extension/shared` instead of `type-fest`.',
         },
       ],
-      "arrow-body-style": ["error", "as-needed"],
-      "@typescript-eslint/consistent-type-imports": "error",
-      "@typescript-eslint/consistent-type-exports": "error",
-      "import-x/order": [
-        "error",
+      'arrow-body-style': ['error', 'as-needed'],
+      '@typescript-eslint/consistent-type-imports': 'error',
+      '@typescript-eslint/consistent-type-exports': 'error',
+      'import-x/order': [
+        'error',
         {
-          "newlines-between": "never",
-          alphabetize: { order: "asc", caseInsensitive: true },
-          groups: ["index", "sibling", "parent", "internal", "external", "builtin", "object", "type"],
+          'newlines-between': 'never',
+          alphabetize: { order: 'asc', caseInsensitive: true },
+          groups: ['index', 'sibling', 'parent', 'internal', 'external', 'builtin', 'object', 'type'],
           pathGroups: [
             {
-              pattern: "@*/**",
-              group: "internal",
-              position: "before",
+              pattern: '@*/**',
+              group: 'internal',
+              position: 'before',
             },
           ],
-          pathGroupsExcludedImportTypes: ["type"],
+          pathGroupsExcludedImportTypes: ['type'],
         },
       ],
-      "import-x/no-unresolved": "off",
-      "import-x/no-named-as-default": "error",
-      // "import-x/no-named-as-default-member": "error",
-      "import-x/no-named-as-default-member": "warn",
-      "import-x/newline-after-import": "error",
-      "import-x/no-deprecated": "error",
-      "import-x/no-duplicates": ["error", { considerQueryString: true, "prefer-inline": false }],
-      "import-x/consistent-type-specifier-style": "error",
-      "import-x/exports-last": "warn",
-      "import-x/export": "warn",
-      // "import-x/exports-last": "error",
-      // "import-x/export-multiple": "warn",
-      "import-x/first": "error",
+      'import-x/no-unresolved': 'off',
+      'import-x/no-named-as-default': 'error',
+      'import-x/no-named-as-default-member': 'warn',
+      'import-x/newline-after-import': 'error',
+      'import-x/no-deprecated': 'error',
+      'import-x/no-duplicates': ['error', { considerQueryString: true, 'prefer-inline': false }],
+      'import-x/consistent-type-specifier-style': 'error',
+      'import-x/exports-last': 'warn',
+      'import-x/export': 'warn',
+      'import-x/first': 'error',
     },
     linterOptions: {
-      reportUnusedDisableDirectives: "error",
+      reportUnusedDisableDirectives: 'error',
     },
   },
   // Overrides Rules
   {
-    files: ["**/packages/shared/**/*.ts"],
+    files: ['**/packages/shared/**/*.ts'],
     rules: {
-      "no-restricted-imports": "off",
+      'no-restricted-imports': 'off',
     },
   },
 );

@@ -1,17 +1,17 @@
-import { readFileSync } from "node:fs";
-import type { ManifestType } from "@extension/shared";
+import { readFileSync } from 'node:fs';
+import type { ManifestType } from '@extension/shared';
 
-const packageJson = JSON.parse(readFileSync("./package.json", "utf8"));
+const packageJson = JSON.parse(readFileSync('./package.json', 'utf8'));
 
 // WebappEnvs enum definition
 enum WebappEnvs {
-  DEV = "dev",
-  PREVIEW = "preview",
-  PROD = "prod",
+  DEV = 'dev',
+  PREVIEW = 'preview',
+  PROD = 'prod',
 }
 
 // Get environment from process.env
-const envFromEnv = process.env.VITE_WEBAPP_ENV || "";
+const envFromEnv = process.env.VITE_WEBAPP_ENV || '';
 console.log(`[manifest.ts] Environment from VITE_WEBAPP_ENV: "${envFromEnv}"`);
 
 // Use the environment if it's valid, otherwise default to DEV
@@ -19,22 +19,22 @@ const env = Object.values(WebappEnvs).includes(envFromEnv as WebappEnvs) ? (envF
 
 console.log(`[manifest.ts] Using environment for extension name: "${env}"`);
 console.log(
-  `[manifest.ts] Extension name will be: ${env === WebappEnvs.PROD ? "Filliny" : `Filliny ${env.toUpperCase()}`}`,
+  `[manifest.ts] Extension name will be: ${env === WebappEnvs.PROD ? 'Filliny' : `Filliny ${env.toUpperCase()}`}`,
 );
 
 // Get the appropriate extension name message key based on the environment
 const getExtensionNameKey = (environment: WebappEnvs): string => {
   switch (environment) {
     case WebappEnvs.DEV:
-      return "__MSG_extensionNameDev__";
+      return '__MSG_extensionNameDev__';
     case WebappEnvs.PREVIEW:
-      return "__MSG_extensionNamePreview__";
+      return '__MSG_extensionNamePreview__';
     case WebappEnvs.PROD:
-      return "__MSG_extensionNameProd__";
+      return '__MSG_extensionNameProd__';
     default:
       // Default to DEV naming if an unknown environment is provided
       console.warn(`Unknown environment: ${environment}, using DEV extension name`);
-      return "__MSG_extensionNameDev__";
+      return '__MSG_extensionNameDev__';
   }
 };
 
@@ -52,57 +52,56 @@ const getExtensionNameKey = (environment: WebappEnvs): string => {
  */
 const manifest = {
   manifest_version: 3,
-  default_locale: "en",
+  default_locale: 'en',
   name: getExtensionNameKey(env),
   browser_specific_settings: {
     gecko: {
-      id: "example@example.com",
-      strict_min_version: "109.0",
+      id: 'example@example.com',
+      strict_min_version: '109.0',
     },
   },
   version: packageJson.version,
-  description: "__MSG_extensionDescription__",
-  host_permissions: ["<all_urls>"],
-  permissions: ["storage", "tabs", "sidePanel", "cookies", "scripting"],
+  description: '__MSG_extensionDescription__',
+  host_permissions: ['<all_urls>'],
+  permissions: ['storage', 'tabs', 'sidePanel', 'cookies', 'scripting'],
   background: {
-    service_worker: "background.js",
-    type: "module",
+    service_worker: 'background.js',
+    type: 'module',
   },
   action: {
-    default_popup: "popup/index.html",
-    default_icon: "icon-34.png",
+    default_popup: 'popup/index.html',
+    default_icon: 'icon-34.png',
   },
   icons: {
-    128: "icon-128.png",
+    '128': 'icon-128.png',
   },
   content_scripts: [
     {
-      matches: ["http://*/*", "https://*/*", "<all_urls>"],
-      js: ["content/all.iife.js"],
-      // run_at: "document_start",
+      matches: ['http://*/*', 'https://*/*', '<all_urls>'],
+      js: ['content/all.iife.js'],
     },
     {
-      matches: ["http://*/*", "https://*/*", "<all_urls>"],
-      js: ["content-ui/all.iife.js"],
+      matches: ['http://*/*', 'https://*/*', '<all_urls>'],
+      js: ['content-ui/all.iife.js'],
     },
     {
-      matches: ["http://*/*", "https://*/*", "<all_urls>"],
-      css: ["content.css"],
+      matches: ['http://*/*', 'https://*/*', '<all_urls>'],
+      css: ['content.css'],
     },
   ],
   web_accessible_resources: [
     {
-      resources: ["*.js", "*.css", "*.svg", "icon-128.png", "icon-34.png", "assets/*"],
-      matches: ["*://*/*"],
+      resources: ['*.js', '*.css', '*.svg', 'icon-128.png', 'icon-34.png', 'assets/*'],
+      matches: ['*://*/*'],
     },
   ],
   side_panel: {
-    default_path: "side-panel/index.html",
+    default_path: 'side-panel/index.html',
   },
   externally_connectable: {
     matches: [
-      "https://*.filliny.io/*", // Production domain
-      ...(env === WebappEnvs.DEV ? ["http://localhost:*/*"] : []), // Local development only in DEV
+      'https://*.filliny.io/*', // Production domain
+      ...(env === WebappEnvs.DEV ? ['http://localhost:*/*'] : []), // Local development only in DEV
     ],
   },
 } satisfies ManifestType;
