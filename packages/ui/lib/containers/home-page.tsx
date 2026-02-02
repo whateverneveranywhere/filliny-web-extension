@@ -1,6 +1,6 @@
 import { ActiveProfileWebsitePreview } from './active-profile-website-preview';
 import { QuickAddWebsiteToProfile } from './quick-add-website';
-import { Loading, NoTokensAlert, LoadingPage } from '../components';
+import { Loading, NoTokensAlert } from '../components';
 import { useToast } from '../hooks/use-toast';
 import { PageLayout } from '../layout';
 import {
@@ -148,7 +148,7 @@ const HomePage = () => {
               />
             )
           ) : (
-            <LoadingPage message="Waiting for the page to fully load..." />
+            <Loading variant="page" size="xl" message="Waiting for the page to fully load..." />
           )}
         </div>
       </>

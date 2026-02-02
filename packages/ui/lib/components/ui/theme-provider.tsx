@@ -1,40 +1,44 @@
+import { Theme } from '@extension/shared';
 import { createContext, useContext, useEffect, useState } from 'react';
 
-type Theme = 'dark' | 'light' | 'system';
+/**
+ * Theme type derived from Theme enum for type-safe theme handling
+ */
+type ThemeType = `${Theme}`;
 
 type ThemeProviderProps = {
   children: React.ReactNode;
-  defaultTheme?: Theme;
+  defaultTheme?: ThemeType;
   storageKey?: string;
 };
 
 type ThemeProviderState = {
-  theme: Theme;
-  setTheme: (theme: Theme) => void;
+  theme: ThemeType;
+  setTheme: (theme: ThemeType) => void;
 };
 
 const initialState: ThemeProviderState = {
-  theme: 'system',
+  theme: Theme.SYSTEM,
   setTheme: () => null,
 };
 
 const ThemeProviderContext = createContext<ThemeProviderState>(initialState);
 
-export function ThemeProvider({
+export const ThemeProvider = ({
   children,
-  defaultTheme = 'system',
+  defaultTheme = Theme.SYSTEM,
   storageKey = 'vite-ui-theme',
   ...props
-}: ThemeProviderProps) {
-  const [theme, setTheme] = useState<Theme>(() => (localStorage.getItem(storageKey) as Theme) || defaultTheme);
+}: ThemeProviderProps) => {
+  const [theme, setTheme] = useState<ThemeType>(() => (localStorage.getItem(storageKey) as ThemeType) || defaultTheme);
 
   useEffect(() => {
     const root = window.document.documentElement;
 
-    root.classList.remove('light', 'dark');
+    root.classList.remove(Theme.LIGHT, Theme.DARK);
 
-    if (theme === 'system') {
-      const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    if (theme === Theme.SYSTEM) {
+      const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? Theme.DARK : Theme.LIGHT;
 
       root.classList.add(systemTheme);
       return;
@@ -45,9 +49,9 @@ export function ThemeProvider({
 
   const value = {
     theme,
-    setTheme: (theme: Theme) => {
-      localStorage.setItem(storageKey, theme);
-      setTheme(theme);
+    setTheme: (newTheme: ThemeType) => {
+      localStorage.setItem(storageKey, newTheme);
+      setTheme(newTheme);
     },
   };
 
@@ -56,7 +60,7 @@ export function ThemeProvider({
       {children}
     </ThemeProviderContext.Provider>
   );
-}
+};
 
 export const useTheme = () => {
   const context = useContext(ThemeProviderContext);

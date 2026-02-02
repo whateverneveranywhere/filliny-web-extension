@@ -1,4 +1,4 @@
-import { WebsiteFormFields } from './stepper-forms/StepperForm1';
+import { WebsiteFormFields } from './stepper-forms/WebsiteFormFields';
 import { Button } from './ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { WebsiteEditSchema } from '@extension/shared';

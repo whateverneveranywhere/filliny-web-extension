@@ -1,12 +1,25 @@
 import { createStorage } from '../base/base.js';
 import { StorageEnum } from '../base/enums.js';
+import { z } from 'zod';
 import type { BaseStorageType } from '../base/types.js';
 
-// Interface for field button settings
-export interface FieldButtonSettings {
-  enabled: boolean; // Whether field buttons are enabled
-  preferTestMode: boolean; // Whether to use test mode by default
-}
+// ============================================================================
+// Zod Schemas
+// ============================================================================
+
+/**
+ * Field button settings schema
+ */
+const FieldButtonSettingsSchema = z.object({
+  enabled: z.boolean(), // Whether field buttons are enabled
+  preferTestMode: z.boolean(), // Whether to use test mode by default
+});
+
+// ============================================================================
+// Type Exports (inferred from schemas)
+// ============================================================================
+
+type FieldButtonSettings = z.infer<typeof FieldButtonSettingsSchema>;
 
 // Default settings
 const defaultSettings: FieldButtonSettings = {
@@ -30,7 +43,7 @@ const storage = createStorage<FieldButtonSettings>('field-buttons-settings', def
 });
 
 // Export the storage with helper methods
-export const fieldButtonsStorage: FieldButtonsStorage = {
+const fieldButtonsStorage: FieldButtonsStorage = {
   ...storage,
 
   // Toggle enabled state and return new value
@@ -66,3 +79,6 @@ export const fieldButtonsStorage: FieldButtonsStorage = {
     await storage.set(defaultSettings);
   },
 };
+
+export { FieldButtonSettingsSchema, fieldButtonsStorage };
+export type { FieldButtonSettings };

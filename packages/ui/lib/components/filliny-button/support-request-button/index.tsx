@@ -1,4 +1,5 @@
 import { Button } from '../../ui/button';
+import { cn, iconButtonClasses } from '@/lib/utils';
 import { getConfig } from '@extension/shared';
 import { HelpCircle } from 'lucide-react';
 import type { ButtonComponentProps } from '../button-wrapper';
@@ -27,9 +28,9 @@ const SupportRequestButton: React.FC<ButtonComponentProps> = () => {
 
   return (
     <Button
-      variant={'default'}
-      size={'icon'}
-      className="filliny-size-10 filliny-min-h-10 filliny-min-w-10 filliny-overflow-hidden !filliny-rounded-full filliny-text-white"
+      variant="default"
+      size="icon"
+      className={cn(iconButtonClasses, 'filliny-text-white')}
       onClick={gatherBugDetails}>
       <HelpCircle className="filliny-size-4" />
     </Button>

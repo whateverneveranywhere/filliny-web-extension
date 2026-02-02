@@ -3,6 +3,7 @@ import { makeEntryPointPlugin } from '@extension/hmr';
 import { getContentScriptEntries, withPageConfig } from '@extension/vite-config';
 import { IS_DEV } from '@extension/env';
 import { build } from 'vite';
+import type { InlineConfig } from 'vite';
 
 const rootDir = resolve(import.meta.dirname);
 const srcDir = resolve(rootDir, 'src');
@@ -31,9 +32,12 @@ const configs = Object.entries(getContentScriptEntries(matchesDir)).map(([name, 
 );
 
 const builds = configs.map(async config => {
-  //@ts-expect-error This is hidden property into vite's resolveConfig()
-  config.configFile = false;
-  await build(config);
+  // Create an InlineConfig by extending the base config with configFile
+  const inlineConfig: InlineConfig = {
+    ...config,
+    configFile: false,
+  };
+  await build(inlineConfig);
 });
 
 await Promise.all(builds);

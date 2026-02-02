@@ -1,8 +1,8 @@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './tooltip';
-import { springQuick } from '@/lib/animations';
+import { easings, durations } from '@/lib/animations';
 import { cn } from '@/lib/utils';
 import { cva } from 'class-variance-authority';
-import { motion } from 'framer-motion';
+import { useState, useRef, useLayoutEffect } from 'react';
 import * as React from 'react';
 import type { VariantProps } from 'class-variance-authority';
 
@@ -63,6 +63,27 @@ export interface TogglePillProps extends React.HTMLAttributes<HTMLDivElement>, V
 export const TogglePill = React.forwardRef<HTMLDivElement, TogglePillProps>(
   ({ className, variant, size, value, onValueChange, options, disabled = false, ...props }, ref) => {
     const activeIndex = options.findIndex(option => option.value === value);
+    const containerRef = useRef<HTMLDivElement>(null);
+    const [highlightStyle, setHighlightStyle] = useState<React.CSSProperties>({});
+
+    // Calculate highlight position based on active index
+    useLayoutEffect(() => {
+      if (activeIndex === -1 || !containerRef.current) return;
+
+      const buttons = containerRef.current.querySelectorAll('button');
+      const activeButton = buttons[activeIndex];
+
+      if (activeButton) {
+        const containerRect = containerRef.current.getBoundingClientRect();
+        const buttonRect = activeButton.getBoundingClientRect();
+
+        setHighlightStyle({
+          width: `${buttonRect.width}px`,
+          transform: `translateX(${buttonRect.left - containerRect.left}px)`,
+          transition: `transform ${durations.normal}ms ${easings.spring}, width ${durations.normal}ms ${easings.spring}`,
+        });
+      }
+    }, [activeIndex, options.length]);
 
     return (
       <div
@@ -72,25 +93,21 @@ export const TogglePill = React.forwardRef<HTMLDivElement, TogglePillProps>(
           disabled && 'filliny-opacity-60 filliny-pointer-events-none',
         )}
         {...props}>
-        {/* Background highlight - using transform for GPU acceleration */}
+        {/* Background highlight - using CSS transform for smooth animation */}
         {activeIndex !== -1 && (
-          <motion.div
-            className="filliny-absolute filliny-top-0 filliny-bottom-0 filliny-rounded-full filliny-bg-primary"
+          <div
+            className="filliny-absolute filliny-top-1 filliny-bottom-1 filliny-left-0 filliny-rounded-full filliny-bg-primary"
             style={{
-              width: `calc(${100 / options.length}% - 8px)`,
-              left: '4px',
-              willChange: 'transform',
+              ...highlightStyle,
+              willChange: 'transform, width',
             }}
-            initial={false}
-            animate={{
-              x: `calc(${activeIndex} * (100% + 8px))`,
-            }}
-            transition={springQuick}
           />
         )}
 
         {/* Options */}
-        <div className="filliny-relative filliny-flex filliny-w-full filliny-items-stretch filliny-justify-between">
+        <div
+          ref={containerRef}
+          className="filliny-relative filliny-flex filliny-w-full filliny-items-stretch filliny-justify-between">
           {options.map(option => (
             <TooltipProvider key={option.value} delayDuration={300}>
               <Tooltip>

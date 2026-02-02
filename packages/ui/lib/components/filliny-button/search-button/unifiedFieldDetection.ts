@@ -1,5 +1,80 @@
 import { detectFields } from './field-types';
+import { FieldSchema } from '@extension/shared';
+import { z } from 'zod';
 import type { Field } from '@extension/shared';
+
+// ============================================================================
+// Zod Schemas for unified field detection
+// ============================================================================
+
+/**
+ * Detected field info schema
+ */
+export const DetectedFieldInfoSchema = z.object({
+  field: FieldSchema,
+  container: z.custom<HTMLElement>(val => val instanceof HTMLElement, { message: 'Expected HTMLElement' }),
+  containerId: z.string(),
+  element: z.custom<HTMLElement | null>(val => val === null || val instanceof HTMLElement, {
+    message: 'Expected HTMLElement or null',
+  }),
+  isGrouped: z.boolean(),
+  groupId: z.string().optional(),
+});
+
+/**
+ * Field option schema for grouped fields
+ */
+const GroupedFieldOptionSchema = z.object({
+  value: z.string(),
+  text: z.string(),
+  selected: z.boolean(),
+});
+
+/**
+ * Grouped field info schema
+ */
+export const GroupedFieldInfoSchema = z.object({
+  groupId: z.string(),
+  containerId: z.string(),
+  groupType: z.enum(['radio', 'checkbox']),
+  fields: z.array(DetectedFieldInfoSchema),
+  options: z.array(GroupedFieldOptionSchema),
+  container: z.custom<HTMLElement>(val => val instanceof HTMLElement, { message: 'Expected HTMLElement' }),
+  primaryElement: z.custom<HTMLElement | null>(val => val === null || val instanceof HTMLElement, {
+    message: 'Expected HTMLElement or null',
+  }),
+});
+
+/**
+ * Detected container info schema
+ */
+export const DetectedContainerInfoSchema = z.object({
+  containerId: z.string(),
+  container: z.custom<HTMLElement>(val => val instanceof HTMLElement, { message: 'Expected HTMLElement' }),
+  allFields: z.array(FieldSchema),
+  individualFields: z.array(DetectedFieldInfoSchema),
+  groupedFields: z.array(GroupedFieldInfoSchema),
+  totalFieldCount: z.number(),
+});
+
+/**
+ * Field button data schema
+ */
+export const FieldButtonDataSchema = z.object({
+  field: FieldSchema,
+  element: z.custom<HTMLElement>(val => val instanceof HTMLElement, { message: 'Expected HTMLElement' }),
+  type: z.enum(['individual', 'grouped']),
+  groupId: z.string().optional(),
+});
+
+// ============================================================================
+// Type Exports (inferred from schemas)
+// ============================================================================
+
+export type DetectedFieldInfo = z.infer<typeof DetectedFieldInfoSchema>;
+export type GroupedFieldInfo = z.infer<typeof GroupedFieldInfoSchema>;
+export type DetectedContainerInfo = z.infer<typeof DetectedContainerInfoSchema>;
+export type FieldButtonData = z.infer<typeof FieldButtonDataSchema>;
 
 // Central field registry to ensure consistency across all strategies
 export class UnifiedFieldRegistry {
@@ -422,41 +497,7 @@ export class UnifiedFieldRegistry {
   }
 }
 
-// Types for the unified system
-export interface DetectedFieldInfo {
-  field: Field;
-  container: HTMLElement;
-  containerId: string;
-  element: HTMLElement | null;
-  isGrouped: boolean;
-  groupId?: string;
-}
-
-export interface GroupedFieldInfo {
-  groupId: string;
-  containerId: string;
-  groupType: 'radio' | 'checkbox';
-  fields: DetectedFieldInfo[];
-  options: Array<{ value: string; text: string; selected: boolean }>;
-  container: HTMLElement;
-  primaryElement: HTMLElement | null;
-}
-
-export interface DetectedContainerInfo {
-  containerId: string;
-  container: HTMLElement;
-  allFields: Field[];
-  individualFields: DetectedFieldInfo[];
-  groupedFields: GroupedFieldInfo[];
-  totalFieldCount: number;
-}
-
-export interface FieldButtonData {
-  field: Field;
-  element: HTMLElement;
-  type: 'individual' | 'grouped';
-  groupId?: string;
-}
+// Types moved to top of file with Zod schemas
 
 // Export singleton instance
 export const unifiedFieldRegistry = UnifiedFieldRegistry.getInstance();

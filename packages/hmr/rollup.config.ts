@@ -1,13 +1,23 @@
-import sucrase from '@rollup/plugin-sucrase';
+import * as sucraseModule from '@rollup/plugin-sucrase';
 import type { Plugin, RollupOptions } from 'rollup';
 
-const plugins = [
-  // @ts-expect-error Because of the lack of calling signature
+// Define minimal options interface
+interface SucraseOptions {
+  exclude?: string | string[];
+  include?: string | string[];
+  transforms?: Array<'typescript' | 'jsx' | 'imports' | 'react-hot-loader' | 'jest' | 'flow'>;
+}
+
+// Handle ESM/CJS interop with NodeNext module resolution
+// sucraseModule.default is the actual function exported by the package
+const sucrase = sucraseModule.default as unknown as (options?: SucraseOptions) => Plugin;
+
+const plugins: Plugin[] = [
   sucrase({
     exclude: ['node_modules/**'],
     transforms: ['typescript'],
   }),
-] satisfies Plugin[];
+];
 
 export default [
   {

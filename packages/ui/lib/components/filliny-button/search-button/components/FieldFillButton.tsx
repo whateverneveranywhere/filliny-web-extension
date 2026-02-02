@@ -1,11 +1,10 @@
 import { Button } from '../../../ui/button';
 import { TogglePill } from '../../../ui/toggle-pill';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../../../ui/tooltip';
-import { togglePillVariants } from '@/lib/animations';
-import { cn } from '@/lib/utils';
+import { animationClasses } from '@/lib/animations';
+import { cn, iconButtonClasses } from '@/lib/utils';
 import { useStorage } from '@extension/shared';
 import { fieldButtonsStorage } from '@extension/storage';
-import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle, Wand2, TestTube2 } from 'lucide-react';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { Field } from '@extension/shared';
@@ -144,38 +143,36 @@ export const FieldFillButton: React.FC<FieldFillButtonProps> = ({ fieldElement, 
       <div className="filliny-flex filliny-items-center filliny-justify-end filliny-relative">
         {/* Toggle container - positioned to connect with the action button */}
         <div className="filliny-absolute filliny-right-[calc(100%-6px)] filliny-top-1/2 filliny-z-0 filliny-translate-y-[-50%] filliny-pointer-events-none">
-          <AnimatePresence mode="wait">
-            {shouldShowToggle && (
-              <motion.div
-                className="filliny-flex filliny-items-center filliny-justify-end filliny-pointer-events-auto"
-                variants={togglePillVariants}
-                initial="hidden"
-                animate="visible"
-                exit="hidden"
-                style={{ originX: 1, willChange: 'transform, opacity' }}>
-                <TogglePill
-                  value={fillMode}
-                  onValueChange={handleModeChange}
-                  size="sm"
-                  className="filliny-shadow-md filliny-min-w-[140px] filliny-mr-1"
-                  options={[
-                    {
-                      value: 'test',
-                      label: 'Test',
-                      icon: <TestTube2 />,
-                      tooltip: 'Fill with test data',
-                    },
-                    {
-                      value: 'ai',
-                      label: 'AI',
-                      icon: <CheckCircle />,
-                      tooltip: 'Fill with AI-generated data',
-                    },
-                  ]}
-                />
-              </motion.div>
+          <div
+            className={cn(
+              'filliny-flex filliny-items-center filliny-justify-end filliny-pointer-events-auto filliny-origin-right',
+              animationClasses.transition,
+              shouldShowToggle
+                ? 'filliny-opacity-100 filliny-scale-100 filliny-translate-x-0'
+                : 'filliny-opacity-0 filliny-scale-90 filliny-translate-x-5 filliny-pointer-events-none',
             )}
-          </AnimatePresence>
+            style={{ willChange: 'transform, opacity' }}>
+            <TogglePill
+              value={fillMode}
+              onValueChange={handleModeChange}
+              size="sm"
+              className="filliny-shadow-md filliny-min-w-[140px] filliny-mr-1"
+              options={[
+                {
+                  value: 'test',
+                  label: 'Test',
+                  icon: <TestTube2 />,
+                  tooltip: 'Fill with test data',
+                },
+                {
+                  value: 'ai',
+                  label: 'AI',
+                  icon: <CheckCircle />,
+                  tooltip: 'Fill with AI-generated data',
+                },
+              ]}
+            />
+          </div>
         </div>
 
         {/* Action button - higher z-index for proper layering */}
@@ -183,22 +180,18 @@ export const FieldFillButton: React.FC<FieldFillButtonProps> = ({ fieldElement, 
           <TooltipProvider delayDuration={300}>
             <Tooltip>
               <TooltipTrigger asChild>
-                <motion.div
-                  style={{ willChange: 'transform' }}
-                  initial={{ opacity: 0.8, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  transition={{ duration: 0.15 }}>
+                <div
+                  className={cn(animationClasses.transitionFast, 'hover:filliny-scale-105 active:filliny-scale-95')}
+                  style={{ willChange: 'transform' }}>
                   <Button
                     variant="default"
                     onClick={handleFieldFill}
                     disabled={isLoading}
                     loading={isLoading}
-                    className="filliny-size-10 filliny-min-h-10 filliny-min-w-10 filliny-overflow-hidden !filliny-rounded-full filliny-shadow-md">
+                    className={cn(iconButtonClasses, 'filliny-shadow-md')}>
                     {!isLoading && <Wand2 className="filliny-size-4 filliny-text-white" />}
                   </Button>
-                </motion.div>
+                </div>
               </TooltipTrigger>
               <TooltipContent side="top">
                 <p>Fill field with {preferTestMode ? 'test' : 'AI'} data</p>

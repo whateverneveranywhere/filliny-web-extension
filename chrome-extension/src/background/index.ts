@@ -8,7 +8,7 @@ setupAuthTokenListener();
 let isExtensionPinned = false;
 
 // Check if extension is pinned by checking action visibility
-function checkPinStatus() {
+const checkPinStatus = () => {
   if (chrome.action && chrome.action.getUserSettings) {
     chrome.action.getUserSettings(settings => {
       const newPinStatus = settings.isOnToolbar;
@@ -19,10 +19,10 @@ function checkPinStatus() {
       }
     });
   }
-}
+};
 
 // Function to notify all tabs about the current pin status
-function notifyTabsAboutPinStatus() {
+const notifyTabsAboutPinStatus = () => {
   chrome.tabs.query({}, tabs => {
     tabs.forEach(tab => {
       if (tab.id) {
@@ -38,7 +38,7 @@ function notifyTabsAboutPinStatus() {
       }
     });
   });
-}
+};
 
 // Check pin status initially
 checkPinStatus();
@@ -288,10 +288,16 @@ interface APIRequestMessage {
   };
 }
 
+// Define the API response data type - recursive structure for JSON data
+type JSONValue = string | number | boolean | null | JSONObject | JSONValue[];
+interface JSONObject {
+  [key: string]: JSONValue;
+}
+
 // Define the API response type
 interface APIRequestResponse {
   error?: string;
-  data?: Record<string, unknown> | null;
+  data?: JSONObject | null;
   success?: boolean;
 }
 

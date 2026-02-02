@@ -5,9 +5,12 @@ import { authStorage, positionStorage, profileStorage } from '@extension/storage
 import type { ErrorResponse, GetAuthTokenResponse, Request, ExcludeValuesFromBaseArrayType } from './types.js';
 import type { DTOProfileFillingForm } from '@extension/storage';
 
-export const getFaviconUrl = (url: string) => `https://www.google.com/s2/favicons?sz=64&domain_url=${url}`;
+// Re-export isValidUrl from schemas so it's accessible via utils
+export { isValidUrl };
 
-export const cleanUrl = (url: string) => {
+const getFaviconUrl = (url: string) => `https://www.google.com/s2/favicons?sz=64&domain_url=${url}`;
+
+const cleanUrl = (url: string) => {
   try {
     const parsedUrl = new URL(url);
     return parsedUrl.hostname;
@@ -17,10 +20,7 @@ export const cleanUrl = (url: string) => {
   }
 };
 
-// Re-export isValidUrl for backwards compatibility - now uses Zod schema validation
-export { isValidUrl };
-
-export const formatToK = (number: number): string => {
+const formatToK = (number: number): string => {
   if (number >= 1000) {
     const thousands = number / 1000;
     return thousands % 1 === 0 ? `${thousands.toFixed(0)}k` : `${thousands.toFixed(1)}k`;
@@ -28,7 +28,7 @@ export const formatToK = (number: number): string => {
   return number.toString();
 };
 
-export const getMatchingWebsite = (websites: DTOProfileFillingForm['fillingWebsites'], currentUrl: string) => {
+const getMatchingWebsite = (websites: DTOProfileFillingForm['fillingWebsites'], currentUrl: string) => {
   if (!isValidUrl(currentUrl)) {
     return null;
   }
@@ -133,7 +133,7 @@ const handleGetAuthToken = (
 const VITE_WEBAPP_ENV = (import.meta as ViteImportMeta).env?.VITE_WEBAPP_ENV;
 console.log('Build-time VITE_WEBAPP_ENV:', VITE_WEBAPP_ENV);
 
-export const getConfig = (): ConfigEntry => {
+const getConfig = (): ConfigEntry => {
   // Get cached environment from memory to avoid repeated calculations
   const extendedGlobal = globalThis as unknown as ExtendedGlobalThis;
   if (extendedGlobal.__CACHED_ENV_CONFIG__) {
@@ -265,9 +265,9 @@ const handleAuthTokenChanged = (
   return true; // Keep message channel open for async response
 };
 
-export const handleAction = (
+const handleAction = (
   request: Request,
-  sender: chrome.runtime.MessageSender,
+  _sender: chrome.runtime.MessageSender,
   sendResponse: (response: GetAuthTokenResponse | ErrorResponse) => void,
 ): boolean => {
   const envConfig = getConfig();
@@ -287,7 +287,7 @@ export const handleAction = (
   }
 };
 
-export const getCurrentVistingUrl = (): Promise<string> =>
+const getCurrentVistingUrl = (): Promise<string> =>
   new Promise((resolve, reject) => {
     chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
       if (chrome.runtime.lastError) {
@@ -304,7 +304,7 @@ export const getCurrentVistingUrl = (): Promise<string> =>
   });
 
 // Add a new function to listen for cookie changes
-export const setupAuthTokenListener = () => {
+const setupAuthTokenListener = () => {
   const envConfig = getConfig();
 
   // Listen for changes to the specific cookie
@@ -324,15 +324,28 @@ export const setupAuthTokenListener = () => {
   });
 };
 
-export const clearUserStorage = () => {
+const clearUserStorage = () => {
   authStorage.deleteToken();
   positionStorage.resetPosition();
   profileStorage.resetDefaultProfile();
 };
 
-export const excludeValuesFromBaseArray = <B extends string[], E extends (string | number)[]>(
-  baseArray: B,
-  excludeArray: E,
-) => baseArray.filter(value => !excludeArray.includes(value)) as ExcludeValuesFromBaseArrayType<B, E>;
+const excludeValuesFromBaseArray = <B extends string[], E extends (string | number)[]>(baseArray: B, excludeArray: E) =>
+  baseArray.filter(value => !excludeArray.includes(value)) as ExcludeValuesFromBaseArrayType<B, E>;
 
-export const sleep = async (time: number) => new Promise(r => setTimeout(r, time));
+const sleep = async (time: number) => new Promise(r => setTimeout(r, time));
+
+// All exports at end of file
+export {
+  getFaviconUrl,
+  cleanUrl,
+  formatToK,
+  getMatchingWebsite,
+  getConfig,
+  handleAction,
+  getCurrentVistingUrl,
+  setupAuthTokenListener,
+  clearUserStorage,
+  excludeValuesFromBaseArray,
+  sleep,
+};

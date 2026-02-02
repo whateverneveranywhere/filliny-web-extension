@@ -4,6 +4,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui'
 import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Skeleton } from '../ui/skeleton';
+import { animationClasses } from '@/lib/animations';
 import { cn } from '@/lib/utils';
 import { getFaviconUrl } from '@extension/shared';
 import { ChevronDown, ChevronUp, Loader2, Globe, ExternalLink, Trash } from 'lucide-react';
@@ -55,7 +56,7 @@ function WebsitePreviewCard({
   };
 
   return (
-    <Card className={cn('w-full transition-all duration-200 hover:shadow-md', className)}>
+    <Card className={cn('w-full hover:shadow-md', animationClasses.transition, className)}>
       <CardHeader className="filliny-w-full filliny-space-y-0 !filliny-p-2">
         <CardTitle className="filliny-flex filliny-w-full filliny-items-center filliny-gap-4 !filliny-p-1">
           {/* Favicon Section */}
@@ -142,9 +143,7 @@ function WebsitePreviewCard({
       </CardHeader>
 
       {isExpanded && children && (
-        <CardContent className={cn('p-4 pt-0', 'animate-in fade-in-0 slide-in-from-top-2 duration-200')}>
-          {children}
-        </CardContent>
+        <CardContent className={cn('p-4 pt-0', animationClasses.slideInTop)}>{children}</CardContent>
       )}
     </Card>
   );

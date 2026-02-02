@@ -3,6 +3,7 @@ import { IS_DEV } from '@extension/env';
 import { makeEntryPointPlugin } from '@extension/hmr';
 import { build as buildTW } from 'tailwindcss/lib/cli/build';
 import { build } from 'vite';
+import type { InlineConfig } from 'vite';
 import { readdirSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 
@@ -74,9 +75,12 @@ const builds = async ({ srcDir, contentName, rootDir, matchesDir, withTw }: ICon
       await buildTW(args);
     }
 
-    //@ts-expect-error This is hidden property from vite's resolveConfig()
-    config.configFile = false;
-    return build(config);
+    // Create an InlineConfig by extending the base config with configFile
+    const inlineConfig: InlineConfig = {
+      ...config,
+      configFile: false,
+    };
+    return build(inlineConfig);
   });
 
 /**

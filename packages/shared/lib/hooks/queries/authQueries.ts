@@ -1,10 +1,11 @@
 import { authHealthCheckService } from '../../services/api/Auth/index.js';
+import { queryKeys } from '../queryKeys.js';
 import { authStorage } from '@extension/storage';
 import { useQuery } from '@tanstack/react-query';
 
 export const useAuthHealthCheckQuery = () =>
   useQuery({
-    queryKey: ['healthCheck'],
+    queryKey: queryKeys.auth.healthCheck(),
     queryFn: authHealthCheckService,
     // Add caching configuration to prevent excessive health check requests
     staleTime: 10 * 60 * 1000, // 10 minutes

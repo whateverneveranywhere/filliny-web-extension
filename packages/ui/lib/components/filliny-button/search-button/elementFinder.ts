@@ -5,7 +5,7 @@
  * across different detection scenarios. This consolidates the element finding
  * logic that was previously scattered across multiple files.
  */
-
+import { z } from 'zod';
 import type { Field } from '@extension/shared';
 
 /**
@@ -23,23 +23,47 @@ export enum FindStrategy {
   BY_CONTENT_EDITABLE = 'byContentEditable',
 }
 
+// ============================================================================
+// Zod Schemas
+// ============================================================================
+
+/**
+ * Find result schema
+ */
+export const FindResultSchema = z.object({
+  element: z.custom<HTMLElement | null>(val => val === null || val instanceof HTMLElement, {
+    message: 'Expected HTMLElement or null',
+  }),
+  strategy: z.nativeEnum(FindStrategy).nullable(),
+});
+
+/**
+ * Find config schema
+ */
+export const FindConfigSchema = z.object({
+  container: z
+    .custom<HTMLElement | Document>(val => val instanceof HTMLElement || val instanceof Document, {
+      message: 'Expected HTMLElement or Document',
+    })
+    .optional(),
+  strategies: z.array(z.nativeEnum(FindStrategy)).optional(),
+  skipHidden: z.boolean().optional(),
+  skipDisabled: z.boolean().optional(),
+});
+
+// ============================================================================
+// Type Exports (inferred from schemas)
+// ============================================================================
+
 /**
  * Result of an element finding operation
  */
-export interface FindResult {
-  element: HTMLElement | null;
-  strategy: FindStrategy | null;
-}
+export type FindResult = z.infer<typeof FindResultSchema>;
 
 /**
  * Configuration for element finding
  */
-export interface FindConfig {
-  container?: HTMLElement | Document;
-  strategies?: FindStrategy[];
-  skipHidden?: boolean;
-  skipDisabled?: boolean;
-}
+export type FindConfig = z.infer<typeof FindConfigSchema>;
 
 const DEFAULT_STRATEGIES: FindStrategy[] = [
   FindStrategy.BY_DATA_FILLINY_ID,

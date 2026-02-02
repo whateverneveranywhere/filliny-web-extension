@@ -1,5 +1,6 @@
 import { Button } from '../../ui';
 import { highlightForms } from '../search-button/highlightForms';
+import { cn, iconButtonClasses } from '@/lib/utils';
 import { useDOMReady } from '@/lib/utils/dom-utils';
 import { Eye } from 'lucide-react';
 import type { ButtonComponentProps } from '../button-wrapper';
@@ -10,9 +11,9 @@ const FillinyVisionButton: React.FC<ButtonComponentProps> = () => {
 
   return (
     <Button
-      variant={'default'}
-      size={'icon'}
-      className="filliny-size-10 filliny-min-h-10 filliny-min-w-10 filliny-overflow-hidden !filliny-rounded-full filliny-text-white"
+      variant="default"
+      size="icon"
+      className={cn(iconButtonClasses, 'filliny-text-white')}
       onClick={() => highlightForms({ visionOnly: true })}
       disabled={!isDOMReady}>
       <Eye className="filliny-size-4" />

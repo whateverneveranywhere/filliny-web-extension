@@ -295,8 +295,9 @@ export enum MessageType {
   EXTENSION_INSTALLED = 'EXTENSION_INSTALLED',
 }
 
-// Re-export Framework from centralized frameworkDetection module (single source of truth)
-export { Framework } from '../utils/frameworkDetection.js';
+// NOTE: Framework is exported from utils/frameworkDetection.ts (single source of truth)
+// Do NOT re-export here to avoid duplicate exports through the barrel files
+// Import Framework directly from '@extension/shared' which exports it via utils/index.ts
 
 /**
  * DOM Event types commonly used in form interactions
@@ -471,3 +472,142 @@ export const CHECKABLE_TYPES = {
  * Type for checkable field types
  */
 export type CheckableType = (typeof CHECKABLE_TYPES)[keyof typeof CHECKABLE_TYPES];
+
+// ============================================================================
+// Theme Enums
+// ============================================================================
+
+/**
+ * Theme types for UI theming
+ * Used for light/dark mode switching
+ */
+export enum Theme {
+  LIGHT = 'light',
+  DARK = 'dark',
+  SYSTEM = 'system',
+}
+
+/**
+ * Binary theme type (without system option)
+ * Used when a concrete theme value is required
+ */
+export enum BinaryTheme {
+  LIGHT = 'light',
+  DARK = 'dark',
+}
+
+// ============================================================================
+// CLI Action Enums
+// ============================================================================
+
+/**
+ * CLI action types for module manager
+ * Used for feature deletion and recovery
+ */
+export enum CliAction {
+  DELETE = 'delete',
+  RECOVER = 'recover',
+}
+
+// ============================================================================
+// UI Component Enums
+// ============================================================================
+
+/**
+ * Button variant types for styled buttons
+ */
+export enum ButtonVariant {
+  DEFAULT = 'default',
+  DESTRUCTIVE = 'destructive',
+  OUTLINE = 'outline',
+  SECONDARY = 'secondary',
+  GHOST = 'ghost',
+  LINK = 'link',
+}
+
+/**
+ * Button size types
+ */
+export enum ButtonSize {
+  DEFAULT = 'default',
+  SM = 'sm',
+  LG = 'lg',
+  ICON = 'icon',
+}
+
+/**
+ * Badge variant types
+ */
+export enum BadgeVariant {
+  DEFAULT = 'default',
+  SECONDARY = 'secondary',
+  DESTRUCTIVE = 'destructive',
+  OUTLINE = 'outline',
+}
+
+/**
+ * Alert variant types
+ */
+export enum AlertVariant {
+  DEFAULT = 'default',
+  DESTRUCTIVE = 'destructive',
+}
+
+// ============================================================================
+// File Category Enums
+// ============================================================================
+
+/**
+ * File category types for file uploads
+ * Used to categorize accepted file types
+ */
+export enum FileCategory {
+  IMAGE = 'image',
+  DOCUMENT = 'document',
+  VIDEO = 'video',
+  AUDIO = 'audio',
+  ARCHIVE = 'archive',
+  TEXT = 'text',
+  OTHER = 'other',
+}
+
+// ============================================================================
+// Log Level Enums
+// ============================================================================
+
+/**
+ * Log level/severity types for logging and alerts
+ */
+export enum LogLevel {
+  SUCCESS = 'success',
+  INFO = 'info',
+  WARNING = 'warning',
+  ERROR = 'error',
+}
+
+// ============================================================================
+// Form Input Variant Enums
+// ============================================================================
+
+/**
+ * Text input variant types for form components
+ */
+export enum TextInputVariant {
+  TEXT = 'text',
+  CHECKBOX = 'checkbox',
+  DATE = 'date',
+  SWITCH = 'switch',
+  NUMBER = 'number',
+  URL = 'url',
+  EMAIL = 'email',
+  TEXTAREA = 'textarea',
+}
+
+/**
+ * Options-based input variant types for form components
+ */
+export enum OptionsInputVariant {
+  RADIO = 'radio',
+  SELECT = 'select',
+  COMBOBOX = 'combobox',
+}

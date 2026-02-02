@@ -1,56 +1,66 @@
-import { FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '../ui/form';
+import FormFieldWrapper from './FormFieldWrapper';
 import { Textarea } from '../ui/textarea';
-import React from 'react';
-import { useFormContext } from 'react-hook-form';
-import type { GeneralFormProps } from '@extension/shared';
+import { cn } from '@/lib/utils';
+import type { BaseRHFFieldProps } from './types';
+import type { FieldValues, Path } from 'react-hook-form';
 
-interface Props extends GeneralFormProps {
-  placeholder?: string;
+interface RHFShadcnTextareaProps<T extends FieldValues = FieldValues> extends BaseRHFFieldProps<T> {
+  /** Number of visible text rows */
   rows?: number;
+  /** Whether to allow resizing */
+  resizable?: boolean;
 }
 
-function RHFShadcnTextarea({
+/**
+ * React Hook Form textarea component.
+ * Uses the unified FormFieldWrapper for consistent layout and behavior.
+ *
+ * @example
+ * // Basic textarea
+ * <RHFShadcnTextarea name="bio" title="Biography" rows={6} />
+ *
+ * // With type safety
+ * <RHFShadcnTextarea<FormSchema> name="description" title="Description" />
+ */
+const RHFShadcnTextarea = <T extends FieldValues = FieldValues>({
   name,
   title,
   description,
   placeholder,
   required,
+  disabled,
+  className,
+  control,
   value: externalValue,
-  rows = 4,
   onChange: externalOnChange,
-}: Props) {
-  const { control } = useFormContext();
-
-  return (
-    <FormField
-      control={control}
-      name={name}
-      render={({ field }) => (
-        <FormItem className="filliny-w-full">
-          <FormLabel>{title}</FormLabel>
-          <FormControl>
-            <Textarea
-              {...field}
-              required={required}
-              data-testid={field.name}
-              placeholder={placeholder}
-              className="filliny-resize-none"
-              rows={rows}
-              onChange={e => {
-                field.onChange(e);
-                if (externalOnChange) {
-                  externalOnChange(e.target.value);
-                }
-              }}
-              value={field.value !== undefined ? field.value : externalValue}
-            />
-          </FormControl>
-          <FormDescription>{description} </FormDescription>
-          <FormMessage />
-        </FormItem>
-      )}
-    />
-  );
-}
+  rows = 4,
+  resizable = false,
+}: RHFShadcnTextareaProps<T>) => (
+  <FormFieldWrapper<T>
+    name={name as Path<T>}
+    control={control}
+    title={title}
+    description={description}
+    required={required}
+    disabled={disabled}
+    className={className}
+    value={externalValue}
+    onChange={externalOnChange}>
+    {({ field, handleChange, getValue }) => (
+      <Textarea
+        {...field}
+        required={required}
+        disabled={disabled}
+        data-testid={field.name}
+        placeholder={placeholder}
+        className={cn(!resizable && 'filliny-resize-none')}
+        rows={rows}
+        onChange={e => handleChange(e.target.value)}
+        value={(getValue() as string) ?? ''}
+      />
+    )}
+  </FormFieldWrapper>
+);
 
 export default RHFShadcnTextarea;
+export type { RHFShadcnTextareaProps };

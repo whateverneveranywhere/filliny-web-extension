@@ -4,3 +4,4 @@
  */
 
 export * from './enums.js';
+export type * from './dom.js';

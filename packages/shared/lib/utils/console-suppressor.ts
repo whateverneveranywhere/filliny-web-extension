@@ -5,6 +5,14 @@
  * debug information from being visible to end users.
  */
 
+// Define the Vite-specific import.meta.env interface
+interface ViteImportMeta {
+  env: {
+    VITE_WEBAPP_ENV?: string;
+    MODE?: string;
+  };
+}
+
 /**
  * Determines if the current environment is production
  */
@@ -17,8 +25,8 @@ export const isProduction = (): boolean => {
   // Check for Vite environment (browser)
   if (typeof import.meta !== 'undefined') {
     try {
-      // @ts-expect-error - Vite specific property that TypeScript doesn't know about
-      return import.meta.env.VITE_WEBAPP_ENV === 'prod' || import.meta.env.MODE === 'production';
+      const viteImportMeta = import.meta as unknown as ViteImportMeta;
+      return viteImportMeta.env.VITE_WEBAPP_ENV === 'prod' || viteImportMeta.env.MODE === 'production';
     } catch {
       // If import.meta.env is not available
       return false;

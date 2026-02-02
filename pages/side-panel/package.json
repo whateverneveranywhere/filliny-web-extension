@@ -1,5 +1,5 @@
 {
-  "name": "@extension/sidepanel",
+  "name": "@extension/side-panel",
   "version": "1.4.0",
   "description": "chrome extension - side panel",
   "type": "module",

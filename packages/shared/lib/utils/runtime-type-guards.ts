@@ -178,29 +178,60 @@ export const ValuePropertySchema = z.object({
 });
 
 /**
+ * Selected option schema for form field dropdowns
+ */
+const SelectedOptionItemSchema = z.object({
+  value: z.string(),
+  text: z.string().optional(),
+  label: z.string().optional(),
+  selected: z.boolean().optional(),
+});
+
+/**
  * Schema for form-like objects with value
  */
 export const FormFieldValueSchema = z.object({
   value: z.union([z.string(), z.number(), z.boolean()]).optional(),
   checked: z.boolean().optional(),
-  selectedOptions: z.array(z.unknown()).optional(),
+  selectedOptions: z.array(SelectedOptionItemSchema).optional(),
 });
 
 /**
+ * Primitive value schema for React props (covers most common prop types)
+ */
+const ReactPropValueSchema = z.union([z.string(), z.number(), z.boolean(), z.null()]);
+
+/**
+ * Schema for React props record (used in fiber memoizedProps/pendingProps)
+ */
+const ReactPropsRecordSchema = z.record(z.string(), ReactPropValueSchema.nullable());
+
+/**
  * Schema for React fiber-like object
+ * memoizedProps and pendingProps are React internal structures
  */
 export const ReactFiberSchema = z.object({
-  memoizedProps: z.unknown().optional(),
-  pendingProps: z.unknown().optional(),
+  memoizedProps: ReactPropsRecordSchema.optional(),
+  pendingProps: ReactPropsRecordSchema.optional(),
 });
+
+/**
+ * Form value schema for input fields
+ */
+const FormInputValueSchema = z.union([z.string(), z.number(), z.boolean(), z.array(z.string())]);
 
 /**
  * Schema for React props with value
  */
 export const ReactPropsWithValueSchema = z.object({
-  value: z.unknown().optional(),
-  defaultValue: z.unknown().optional(),
+  value: FormInputValueSchema.optional(),
+  defaultValue: FormInputValueSchema.optional(),
 });
+
+/**
+ * Next.js page props schema
+ */
+const NextPagePropsRecordSchema = z.record(z.string(), ReactPropValueSchema.nullable());
 
 /**
  * Schema for window with __NEXT_DATA__
@@ -208,7 +239,11 @@ export const ReactPropsWithValueSchema = z.object({
 export const NextDataWindowSchema = z.object({
   __NEXT_DATA__: z
     .object({
-      props: z.unknown().optional(),
+      props: z
+        .object({
+          pageProps: NextPagePropsRecordSchema.optional(),
+        })
+        .optional(),
     })
     .optional(),
 });
@@ -236,10 +271,16 @@ export const ReactGlobalWindowSchema = z.object({
 });
 
 /**
+ * Redux DevTools extension function schema
+ * The extension is a function that returns an object with methods
+ */
+const ReduxDevToolsExtensionFnSchema = z.function().args().returns(z.record(z.string(), z.function()));
+
+/**
  * Schema for window with Redux DevTools
  */
 export const ReduxDevToolsWindowSchema = z.object({
-  __REDUX_DEVTOOLS_EXTENSION__: z.unknown().optional(),
+  __REDUX_DEVTOOLS_EXTENSION__: ReduxDevToolsExtensionFnSchema.optional(),
 });
 
 /**
@@ -250,17 +291,30 @@ export const ElementWithEventListenersSchema = z.object({
 });
 
 /**
+ * Angular LView context schema (Angular stores component data as arrays)
+ */
+const AngularLViewContextSchema = z.array(z.union([z.string(), z.number(), z.boolean(), z.null(), z.object({})]));
+
+/**
  * Schema for Angular context
  */
 export const AngularContextSchema = z.object({
-  __ngContext__: z.unknown().optional(),
+  __ngContext__: AngularLViewContextSchema.optional(),
 });
+
+/**
+ * jQuery function schema (jQuery is a callable function with methods)
+ */
+const JQueryFunctionSchema = z
+  .function()
+  .args(z.union([z.string(), z.object({})]))
+  .returns(z.object({}));
 
 /**
  * Schema for jQuery window
  */
 export const JQueryWindowSchema = z.object({
-  jQuery: z.unknown().optional(),
+  jQuery: JQueryFunctionSchema.optional(),
 });
 
 /**
@@ -378,33 +432,33 @@ export const parseWithFallback = <T extends z.ZodType>(schema: T, data: unknown,
 };
 
 // ============================================================================
-// API Response Schemas
-// ============================================================================
-
-/**
- * Schema for processed form definition from API
- */
-export const ProcessedFormDefinitionSchema = z.object({
-  processed: z
-    .object({
-      fields: z.array(z.unknown()).optional(),
-      steps: z.array(z.unknown()).optional(),
-    })
-    .optional(),
-});
-
-/**
- * Schema for API response with data wrapper
- */
-export const ApiResponseWrapperSchema = z.object({
-  data: z.unknown().optional(),
-  result: z.unknown().optional(),
-  payload: z.unknown().optional(),
-});
-
-// ============================================================================
 // Form Field Definition Schemas
 // ============================================================================
+
+/**
+ * Schema for option data (used in select, radio, checkbox fields)
+ */
+export const OptionDataSchema = z.object({
+  value: z.union([z.string(), z.number()]).optional(),
+  id: z.union([z.string(), z.number()]).optional(),
+  key: z.string().optional(),
+  label: z.string().optional(),
+  text: z.string().optional(),
+  name: z.string().optional(),
+});
+
+/**
+ * Validation rule schema for form field constraints
+ */
+const ValidationRuleSchema = z.object({
+  required: z.boolean().optional(),
+  minLength: z.number().optional(),
+  maxLength: z.number().optional(),
+  min: z.number().optional(),
+  max: z.number().optional(),
+  pattern: z.string().optional(),
+  message: z.string().optional(),
+});
 
 /**
  * Schema for field data from API
@@ -421,25 +475,13 @@ export const FieldDataSchema = z.object({
   placeholder: z.string().optional(),
   required: z.boolean().optional(),
   isRequired: z.boolean().optional(),
-  options: z.array(z.unknown()).optional(),
-  validation: z.record(z.unknown()).optional(),
+  options: z.array(OptionDataSchema).optional(),
+  validation: z.record(z.string(), ValidationRuleSchema).optional(),
   dependencies: z.array(z.string()).optional(),
 });
 
 /**
- * Schema for option data
- */
-export const OptionDataSchema = z.object({
-  value: z.union([z.string(), z.number()]).optional(),
-  id: z.union([z.string(), z.number()]).optional(),
-  key: z.string().optional(),
-  label: z.string().optional(),
-  text: z.string().optional(),
-  name: z.string().optional(),
-});
-
-/**
- * Schema for step data
+ * Schema for step data in multi-step forms
  */
 export const StepDataSchema = z.object({
   id: z.union([z.string(), z.number()]).optional(),
@@ -447,6 +489,65 @@ export const StepDataSchema = z.object({
   title: z.string().optional(),
   key: z.string().optional(),
   label: z.string().optional(),
-  fields: z.array(z.unknown()).optional(),
+  fields: z.array(FieldDataSchema).optional(),
   order: z.number().optional(),
+});
+
+// ============================================================================
+// API Response Schemas
+// ============================================================================
+
+/**
+ * Processed field schema for form definitions from API
+ */
+const ProcessedFieldItemSchema = z.object({
+  id: z.union([z.string(), z.number()]).optional(),
+  name: z.string().optional(),
+  type: z.string().optional(),
+  label: z.string().optional(),
+  value: z.union([z.string(), z.number(), z.boolean()]).optional(),
+  required: z.boolean().optional(),
+});
+
+/**
+ * Processed step schema for form definitions from API
+ */
+const ProcessedStepItemSchema = z.object({
+  id: z.union([z.string(), z.number()]).optional(),
+  name: z.string().optional(),
+  order: z.number().optional(),
+  fields: z.array(ProcessedFieldItemSchema).optional(),
+});
+
+/**
+ * Schema for processed form definition from API
+ */
+export const ProcessedFormDefinitionSchema = z.object({
+  processed: z
+    .object({
+      fields: z.array(ProcessedFieldItemSchema).optional(),
+      steps: z.array(ProcessedStepItemSchema).optional(),
+    })
+    .optional(),
+});
+
+/**
+ * Generic data value schema for API responses
+ */
+const ApiDataValueSchema = z.union([
+  z.string(),
+  z.number(),
+  z.boolean(),
+  z.null(),
+  z.array(z.union([z.string(), z.number(), z.boolean(), z.null()])),
+  z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()])),
+]);
+
+/**
+ * Schema for API response with data wrapper
+ */
+export const ApiResponseWrapperSchema = z.object({
+  data: ApiDataValueSchema.optional(),
+  result: ApiDataValueSchema.optional(),
+  payload: ApiDataValueSchema.optional(),
 });

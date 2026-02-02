@@ -1,15 +1,23 @@
-// components/TextInput.tsx
-import { FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '../ui/form';
+import FormFieldWrapper from './FormFieldWrapper';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import React from 'react';
-import { useFormContext } from 'react-hook-form';
-import type { FormOptions, GeneralFormProps } from '@extension/shared';
+import type { WithOptionsRHFFieldProps } from './types';
+import type { FieldValues, Path } from 'react-hook-form';
 
-interface Props extends GeneralFormProps {
-  options: FormOptions;
-}
-
-function RHFShadcnSelect({
+/**
+ * React Hook Form select dropdown component.
+ *
+ * @example
+ * // Basic select
+ * <RHFShadcnSelect
+ *   name="country"
+ *   title="Country"
+ *   options={[
+ *     { label: 'United States', value: 'us' },
+ *     { label: 'Canada', value: 'ca' },
+ *   ]}
+ * />
+ */
+const RHFShadcnSelect = <T extends FieldValues = FieldValues>({
   name,
   options,
   placeholder,
@@ -19,45 +27,39 @@ function RHFShadcnSelect({
   onChange: externalOnChange,
   required,
   disabled,
-}: Props) {
-  const { control } = useFormContext();
-
-  return (
-    <FormField
-      control={control}
-      name={name}
-      render={({ field }) => (
-        <FormItem className="filliny-w-full">
-          <FormLabel>{title}</FormLabel>
-          <Select
-            disabled={disabled}
-            required={required}
-            data-testid={field.name}
-            onValueChange={e => {
-              if (externalOnChange) {
-                return externalOnChange?.(e);
-              }
-              return field.onChange(e);
-            }}
-            defaultValue={field.value !== undefined ? field.value : externalValue}>
-            <FormControl>
-              <SelectTrigger>
-                <SelectValue placeholder={placeholder} />
-              </SelectTrigger>
-            </FormControl>
-            <SelectContent>
-              {options.map(item => (
-                <SelectItem key={item.value} value={item.value}>
-                  <p>{item.label}</p>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {description && <FormDescription>{description} </FormDescription>} <FormMessage />
-        </FormItem>
-      )}
-    />
-  );
-}
+  className,
+  control,
+}: WithOptionsRHFFieldProps<T>) => (
+  <FormFieldWrapper<T>
+    name={name as Path<T>}
+    control={control}
+    title={title}
+    description={description}
+    required={required}
+    disabled={disabled}
+    className={className}
+    value={externalValue}
+    onChange={externalOnChange}>
+    {({ field, handleChange, getValue }) => (
+      <Select
+        disabled={disabled}
+        required={required}
+        data-testid={field.name}
+        onValueChange={value => handleChange(value)}
+        defaultValue={(getValue() as string) ?? undefined}>
+        <SelectTrigger>
+          <SelectValue placeholder={placeholder} />
+        </SelectTrigger>
+        <SelectContent>
+          {options.map(item => (
+            <SelectItem key={item.value} value={item.value}>
+              {item.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    )}
+  </FormFieldWrapper>
+);
 
 export default RHFShadcnSelect;

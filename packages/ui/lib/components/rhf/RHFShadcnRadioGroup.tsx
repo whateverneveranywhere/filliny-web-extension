@@ -1,59 +1,87 @@
-// components/TextInput.tsx
-import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '../ui/form';
+import FormFieldWrapper from './FormFieldWrapper';
+import { FormControl, FormItem, FormLabel } from '../ui/form';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
-import React from 'react';
-import { useFormContext } from 'react-hook-form';
-import type { FormOptions, GeneralFormProps } from '@extension/shared';
+import type { WithOptionsRHFFieldProps } from './types';
+import type { FieldValues, Path } from 'react-hook-form';
 
-interface Props extends GeneralFormProps {
-  options: FormOptions;
+interface RHFShadcnRadioGroupProps<T extends FieldValues = FieldValues> extends WithOptionsRHFFieldProps<T> {
+  /** Layout direction for radio options */
+  direction?: 'horizontal' | 'vertical';
 }
-function RHFShadcnRadioGroup({
+
+/**
+ * React Hook Form radio group component.
+ *
+ * @example
+ * // Vertical radio group (default)
+ * <RHFShadcnRadioGroup
+ *   name="plan"
+ *   title="Select Plan"
+ *   options={[
+ *     { label: 'Free', value: 'free' },
+ *     { label: 'Pro', value: 'pro' },
+ *   ]}
+ * />
+ *
+ * // Horizontal radio group
+ * <RHFShadcnRadioGroup
+ *   name="size"
+ *   title="Size"
+ *   direction="horizontal"
+ *   options={[
+ *     { label: 'S', value: 's' },
+ *     { label: 'M', value: 'm' },
+ *     { label: 'L', value: 'l' },
+ *   ]}
+ * />
+ */
+const RHFShadcnRadioGroup = <T extends FieldValues = FieldValues>({
   name,
   options,
   title,
+  description,
   required,
+  disabled,
+  className,
+  control,
   value: externalValue,
   onChange: externalOnChange,
-}: Props) {
-  const { control } = useFormContext();
-
-  return (
-    <FormField
-      control={control}
-      name={name}
-      render={({ field }) => (
-        <FormItem className="filliny-w-full filliny-space-y-3">
-          <FormLabel>{title}</FormLabel>
-          <FormControl>
-            <RadioGroup
-              data-testid={field.name}
-              onValueChange={e => {
-                if (externalOnChange) {
-                  return externalOnChange?.(e);
-                }
-                return field.onChange(e);
-              }}
-              required={required}
-              defaultValue={field.value !== undefined ? field.value : externalValue}
-              className="filliny-flex filliny-flex-col filliny-space-y-1">
-              {options.map(item => (
-                <FormItem
-                  key={item.value}
-                  className="filliny-flex filliny-items-center filliny-space-x-3 filliny-space-y-0">
-                  <FormControl>
-                    <RadioGroupItem value={item.value} />
-                  </FormControl>
-                  <FormLabel className="filliny-font-normal">{item.label}</FormLabel>
-                </FormItem>
-              ))}
-            </RadioGroup>
-          </FormControl>
-          <FormMessage />
-        </FormItem>
-      )}
-    />
-  );
-}
+  direction = 'vertical',
+}: RHFShadcnRadioGroupProps<T>) => (
+  <FormFieldWrapper<T>
+    name={name as Path<T>}
+    control={control}
+    title={title}
+    description={description}
+    required={required}
+    disabled={disabled}
+    className={className}
+    value={externalValue}
+    onChange={externalOnChange}
+    itemClassName="filliny-space-y-3">
+    {({ field, handleChange, getValue }) => (
+      <RadioGroup
+        data-testid={field.name}
+        onValueChange={value => handleChange(value)}
+        required={required}
+        disabled={disabled}
+        defaultValue={(getValue() as string) ?? undefined}
+        className={
+          direction === 'horizontal'
+            ? 'filliny-flex filliny-flex-row filliny-flex-wrap filliny-gap-4'
+            : 'filliny-flex filliny-flex-col filliny-space-y-1'
+        }>
+        {options.map(item => (
+          <FormItem key={item.value} className="filliny-flex filliny-items-center filliny-space-x-3 filliny-space-y-0">
+            <FormControl>
+              <RadioGroupItem value={item.value} />
+            </FormControl>
+            <FormLabel className="filliny-font-normal">{item.label}</FormLabel>
+          </FormItem>
+        ))}
+      </RadioGroup>
+    )}
+  </FormFieldWrapper>
+);
 
 export default RHFShadcnRadioGroup;

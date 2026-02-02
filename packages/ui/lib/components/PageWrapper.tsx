@@ -1,5 +1,5 @@
 import { ErrorDisplay } from './error-display/ErrorDisplay';
-import { LoadingSpinner } from './LoadingSpinner';
+import { Loading } from './ui/loading';
 import { withErrorBoundary, withSuspense } from '@extension/shared';
 import type { ComponentType, JSX } from 'react';
 
@@ -15,4 +15,4 @@ import type { ComponentType, JSX } from 'react';
  * export default withPageWrapper(MyPage);
  */
 export const withPageWrapper = <T extends JSX.IntrinsicAttributes>(Component: ComponentType<T>) =>
-  withErrorBoundary(withSuspense(Component, <LoadingSpinner />), ErrorDisplay);
+  withErrorBoundary(withSuspense(Component, <Loading fullScreen size="xl" />), ErrorDisplay);

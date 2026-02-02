@@ -1,70 +1,102 @@
 /**
  * Profile types for storage
  *
- * NOTE: These types mirror the Zod schemas in @extension/shared/lib/services/schemas
- * If you update these types, ensure the schemas are also updated for consistency.
- * The types here exist due to package dependency constraints (storage can't import from shared).
+ * These types are Zod-inferred to ensure type safety and validation.
+ * Due to package dependency constraints (storage can't import from shared),
+ * we define local Zod schemas that match the API contract.
  */
+import { z } from 'zod';
+
+// ============================================================================
+// Zod Schemas
+// ============================================================================
 
 /**
- * Filling profile list item (used by list endpoint)
+ * Filling profile list item schema (used by list endpoint)
  *
  * NOTE: The list endpoint uses 'name' while the detail/CRUD endpoints use 'profileName'.
  * This is intentional - list endpoints return lightweight objects with different field names
  * than detail endpoints.
  */
-export interface DTOFillingProfileItem {
-  id: number;
-  isActive: boolean;
-  name: string;
-}
-
-export interface DTOSuggestedWebsite {
-  label: string;
-  value: string;
-  id: number;
-}
-
-export interface DTOTone {
-  label: string;
-  value: string;
-  id: number;
-}
-
-export interface DTOPov {
-  label: string;
-  value: string;
-  id: number;
-}
-
-export interface DTOFillingWebsite {
-  id?: number; // Optional because it may not exist on creation
-  websiteUrl: string;
-  isRootLoad: boolean;
-  fillingContext: string;
-}
-
-export interface DTOFillingPreferences {
-  isFormal: boolean;
-  isGapFillingAllowed: boolean;
-  toneId: number;
-  povId: number;
-}
-
-/** @deprecated Use DTOFillingPreferences instead */
-export type DTOFillingPrefrences = DTOFillingPreferences;
+export const DTOFillingProfileItemSchema = z.object({
+  id: z.number(),
+  isActive: z.boolean(),
+  name: z.string(),
+});
 
 /**
- * Profile filling form (used by detail/create/edit endpoints)
+ * Suggested website schema
+ */
+export const DTOSuggestedWebsiteSchema = z.object({
+  label: z.string(),
+  value: z.string(),
+  id: z.number(),
+});
+
+/**
+ * Tone option schema
+ */
+export const DTOToneSchema = z.object({
+  label: z.string(),
+  value: z.string(),
+  id: z.number(),
+});
+
+/**
+ * Point of view option schema
+ */
+export const DTOPovSchema = z.object({
+  label: z.string(),
+  value: z.string(),
+  id: z.number(),
+});
+
+/**
+ * Filling website schema
+ */
+export const DTOFillingWebsiteSchema = z.object({
+  id: z.number().optional(), // Optional because it may not exist on creation
+  websiteUrl: z.string(),
+  isRootLoad: z.boolean(),
+  fillingContext: z.string(),
+});
+
+/**
+ * Filling preferences schema
+ */
+export const DTOFillingPreferencesSchema = z.object({
+  isFormal: z.boolean(),
+  isGapFillingAllowed: z.boolean(),
+  toneId: z.number(),
+  povId: z.number(),
+});
+
+/**
+ * Profile filling form schema (used by detail/create/edit endpoints)
  *
  * NOTE: Uses 'profileName' while DTOFillingProfileItem uses 'name'.
  * This is intentional - the list endpoint returns lightweight objects with 'name',
  * while detail/CRUD endpoints use the full schema with 'profileName'.
  */
-export interface DTOProfileFillingForm {
-  id?: string | number;
-  profileName: string;
-  defaultFillingContext: string;
-  preferences: DTOFillingPreferences;
-  fillingWebsites: DTOFillingWebsite[];
-}
+export const DTOProfileFillingFormSchema = z.object({
+  id: z.union([z.string(), z.number()]).optional(),
+  profileName: z.string(),
+  defaultFillingContext: z.string(),
+  preferences: DTOFillingPreferencesSchema,
+  fillingWebsites: z.array(DTOFillingWebsiteSchema),
+});
+
+// ============================================================================
+// Type Exports (inferred from schemas)
+// ============================================================================
+
+export type DTOFillingProfileItem = z.infer<typeof DTOFillingProfileItemSchema>;
+export type DTOSuggestedWebsite = z.infer<typeof DTOSuggestedWebsiteSchema>;
+export type DTOTone = z.infer<typeof DTOToneSchema>;
+export type DTOPov = z.infer<typeof DTOPovSchema>;
+export type DTOFillingWebsite = z.infer<typeof DTOFillingWebsiteSchema>;
+export type DTOFillingPreferences = z.infer<typeof DTOFillingPreferencesSchema>;
+export type DTOProfileFillingForm = z.infer<typeof DTOProfileFillingFormSchema>;
+
+/** @deprecated Use DTOFillingPreferences instead */
+export type DTOFillingPrefrences = DTOFillingPreferences;

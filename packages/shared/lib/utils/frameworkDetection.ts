@@ -5,6 +5,15 @@
  * including support for Shadow DOM traversal and observation.
  */
 
+import { z } from 'zod';
+import type {
+  VueVnodeElement,
+  SvelteMetaElement,
+  FrameworkDetectionWindow,
+  StateManagerDetectionWindow,
+  SSRDetectionWindow,
+} from '../types/dom.js';
+
 /**
  * Enum for supported frontend frameworks
  * Used for type-safe framework identification across the codebase
@@ -71,28 +80,48 @@ export enum StateManager {
   UNKNOWN = 'unknown',
 }
 
+// ============================================================================
+// Zod Schemas
+// ============================================================================
+
+/**
+ * Framework detection result schema
+ */
+export const FrameworkDetectionResultSchema = z.object({
+  framework: z.nativeEnum(Framework),
+  version: z.string().optional(),
+  uiLibrary: z.nativeEnum(UILibrary),
+  formLibrary: z.nativeEnum(FormLibrary),
+  stateManager: z.nativeEnum(StateManager),
+  isSSR: z.boolean(),
+  isSPA: z.boolean(),
+  confidence: z.number(),
+  detectionMethod: z.string(),
+});
+
+/**
+ * Shadow DOM observer schema (internal use)
+ */
+const ShadowDOMObserverSchema = z.object({
+  observer: z.custom<MutationObserver>(val => val instanceof MutationObserver, {
+    message: 'Expected MutationObserver',
+  }),
+  roots: z.custom<Set<ShadowRoot>>(val => val instanceof Set, { message: 'Expected Set<ShadowRoot>' }),
+});
+
+// ============================================================================
+// Type Exports (inferred from schemas)
+// ============================================================================
+
 /**
  * Result of framework detection
  */
-export interface FrameworkDetectionResult {
-  framework: Framework;
-  version?: string;
-  uiLibrary: UILibrary;
-  formLibrary: FormLibrary;
-  stateManager: StateManager;
-  isSSR: boolean;
-  isSPA: boolean;
-  confidence: number;
-  detectionMethod: string;
-}
+export type FrameworkDetectionResult = z.infer<typeof FrameworkDetectionResultSchema>;
 
 /**
- * Shadow DOM observer registry
+ * Shadow DOM observer registry (internal)
  */
-interface ShadowDOMObserver {
-  observer: MutationObserver;
-  roots: Set<ShadowRoot>;
-}
+type ShadowDOMObserver = z.infer<typeof ShadowDOMObserverSchema>;
 
 // Global registry for Shadow DOM observers
 const shadowDOMObservers = new Map<Document, ShadowDOMObserver>();
@@ -295,7 +324,7 @@ export const detectVue = (element: Element): boolean =>
   // Check for Vue 3 parent component
   '__vueParentComponent__' in element ||
   // Check for Vue 3 proxy
-  (element as unknown as { __vnode__?: unknown }).__vnode__ !== undefined ||
+  (element as unknown as VueVnodeElement).__vnode__ !== undefined ||
   // Check for data-v-* scoped style attributes (Vue SFC)
   Array.from(element.attributes).some(attr => attr.name.startsWith('data-v-'));
 
@@ -359,7 +388,7 @@ export const detectSvelte = (element: Element): boolean =>
   Array.from(element.attributes).some(attr => attr.name.startsWith('class:')) ||
   // Check for Svelte component property
   '__svelte_component' in element ||
-  (element as unknown as { __svelte_meta?: unknown }).__svelte_meta !== undefined;
+  (element as unknown as SvelteMetaElement).__svelte_meta !== undefined;
 
 /**
  * Detect Qwik framework on an element
@@ -392,19 +421,7 @@ export const detectFrameworkForElement = (element: Element): Framework => {
  */
 export const detectDocumentFramework = (doc: Document = document): Framework => {
   // Check for global framework indicators
-  const win = doc.defaultView as Window & {
-    __REACT_DEVTOOLS_GLOBAL_HOOK__?: unknown;
-    __VUE_DEVTOOLS_GLOBAL_HOOK__?: unknown;
-    __VUE__?: unknown;
-    __NUXT__?: unknown;
-    angular?: unknown;
-    ng?: { probe?: unknown };
-    __SVELTE__?: unknown;
-    __QWIK_DEV__?: unknown;
-    __NEXT_DATA__?: unknown;
-    React?: unknown;
-    Vue?: unknown;
-  };
+  const win = doc.defaultView as FrameworkDetectionWindow | null;
 
   if (!win) return Framework.VANILLA;
 
@@ -565,13 +582,7 @@ export const detectFormLibrary = (element: Element): FormLibrary => {
  * Detect state management library used
  */
 export const detectStateManager = (doc: Document = document): StateManager => {
-  const win = doc.defaultView as Window & {
-    __REDUX_DEVTOOLS_EXTENSION__?: unknown;
-    __MOBX_DEVTOOLS_GLOBAL_HOOK__?: unknown;
-    __PINIA__?: unknown;
-    __VUE_DEVTOOLS_GLOBAL_HOOK__?: { pinia?: unknown };
-    __NGRX_STORE_DEV_TOOLS__?: unknown;
-  };
+  const win = doc.defaultView as StateManagerDetectionWindow | null;
 
   if (!win) return StateManager.UNKNOWN;
 
@@ -631,11 +642,7 @@ export const detectFramework = (doc: Document = document): FrameworkDetectionRes
   const formLibrary = formElement ? detectFormLibrary(formElement) : FormLibrary.UNKNOWN;
 
   // Detect SSR/SPA
-  const win = doc.defaultView as Window & {
-    __NEXT_DATA__?: unknown;
-    __NUXT__?: unknown;
-    __SVELTEKIT_APP_VERSION__?: unknown;
-  };
+  const win = doc.defaultView as SSRDetectionWindow | null;
 
   const isSSR = !!(win?.__NEXT_DATA__ || win?.__NUXT__ || win?.__SVELTEKIT_APP_VERSION__);
   const isSPA = !isSSR && framework !== Framework.VANILLA;

@@ -11,11 +11,22 @@ interface WrappedPromiseResult<T> {
 type WrappedPromise<T = unknown> = WrappedPromiseResult<T>;
 
 /**
- * Storage map using WeakMap for proper garbage collection.
- * We use object as key type since all storage instances are objects.
+ * Storage map key interface - captures the read-only structure of BaseStorageType
+ * that we need for Map key comparison (object identity).
+ * This avoids contravariance issues with the 'set' method while maintaining type safety.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const storageMap = new Map<BaseStorageType<any>, WrappedPromise>();
+interface StorageMapKey {
+  get: () => Promise<unknown>;
+  getSnapshot: () => unknown;
+  subscribe: (listener: () => void) => () => void;
+}
+
+/**
+ * Storage map for caching wrapped promises.
+ * Uses StorageMapKey as the key type since it's covariant and compatible
+ * with all BaseStorageType<T> instances through structural typing.
+ */
+const storageMap = new Map<StorageMapKey, WrappedPromise>();
 
 const wrapPromise = <R,>(promise: Promise<R>) => {
   let status = 'pending';

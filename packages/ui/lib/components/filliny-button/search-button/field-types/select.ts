@@ -1,5 +1,5 @@
 import { findSelectOptions, isCustomSelect, createBaseField } from './utils';
-import { createDebugLogger, Framework } from '@extension/shared';
+import { createDebugLogger, Framework, isHTMLElement, isHTMLSelectElement } from '@extension/shared';
 import type { Field } from '@extension/shared';
 
 const debug = createDebugLogger('Select');
@@ -147,11 +147,12 @@ function findReactSelectContainer(element: HTMLElement): HTMLElement | null {
   let closestDistance = Infinity;
 
   for (const select of Array.from(nearbySelects)) {
-    const selectElement = select as HTMLElement;
-    const distance = getElementDistance(element, selectElement);
-    if (distance < closestDistance) {
-      closestDistance = distance;
-      closest = selectElement;
+    if (isHTMLElement(select)) {
+      const distance = getElementDistance(element, select);
+      if (distance < closestDistance) {
+        closestDistance = distance;
+        closest = select;
+      }
     }
   }
 
@@ -211,8 +212,9 @@ function selectReactSelectOption(value: string, originalElement: HTMLElement): v
 
     let menu: HTMLElement | null = null;
     for (const selector of menuSelectors) {
-      menu = document.querySelector(selector) as HTMLElement;
-      if (menu && window.getComputedStyle(menu).display !== 'none') {
+      const element = document.querySelector(selector);
+      if (isHTMLElement(element) && window.getComputedStyle(element).display !== 'none') {
+        menu = element;
         break;
       }
     }
@@ -230,11 +232,15 @@ function selectReactSelectOption(value: string, originalElement: HTMLElement): v
       '[role="option"]',
     ];
 
-    let options: HTMLElement[] = [];
+    const options: HTMLElement[] = [];
     for (const selector of optionSelectors) {
       const foundOptions = menu.querySelectorAll(selector);
       if (foundOptions.length > 0) {
-        options = Array.from(foundOptions) as HTMLElement[];
+        for (const opt of Array.from(foundOptions)) {
+          if (isHTMLElement(opt)) {
+            options.push(opt);
+          }
+        }
         break;
       }
     }
@@ -386,7 +392,7 @@ function detectMaterialUIComponent(element: HTMLElement): boolean {
 
   // Check for hidden native select with Material-UI patterns
   const nativeSelect = element.querySelector('select') || element.parentElement?.querySelector('select');
-  if (nativeSelect && hasMaterialUIClasses(nativeSelect.parentElement as HTMLElement)) {
+  if (nativeSelect && nativeSelect.parentElement && hasMaterialUIClasses(nativeSelect.parentElement)) {
     return true;
   }
 
@@ -458,11 +464,12 @@ function findMaterialUISelectContainer(element: HTMLElement): HTMLElement | null
   let closestDistance = Infinity;
 
   for (const select of Array.from(nearbySelects)) {
-    const selectElement = select as HTMLElement;
-    const distance = getElementDistance(element, selectElement);
-    if (distance < closestDistance) {
-      closestDistance = distance;
-      closest = selectElement;
+    if (isHTMLElement(select)) {
+      const distance = getElementDistance(element, select);
+      if (distance < closestDistance) {
+        closestDistance = distance;
+        closest = select;
+      }
     }
   }
 
@@ -514,8 +521,9 @@ function selectMaterialUIOption(value: string, originalElement: HTMLElement): vo
 
     let menu: HTMLElement | null = null;
     for (const selector of menuSelectors) {
-      menu = document.querySelector(selector) as HTMLElement;
-      if (menu && window.getComputedStyle(menu).display !== 'none') {
+      const element = document.querySelector(selector);
+      if (isHTMLElement(element) && window.getComputedStyle(element).display !== 'none') {
+        menu = element;
         break;
       }
     }
@@ -534,11 +542,15 @@ function selectMaterialUIOption(value: string, originalElement: HTMLElement): vo
       '[role="menuitem"]',
     ];
 
-    let options: HTMLElement[] = [];
+    const options: HTMLElement[] = [];
     for (const selector of optionSelectors) {
       const foundOptions = menu.querySelectorAll(selector);
       if (foundOptions.length > 0) {
-        options = Array.from(foundOptions) as HTMLElement[];
+        for (const opt of Array.from(foundOptions)) {
+          if (isHTMLElement(opt)) {
+            options.push(opt);
+          }
+        }
         break;
       }
     }
@@ -647,19 +659,19 @@ export const handleTsselect = (element: HTMLSelectElement, normalizedValues: str
       const fieldNumber = elementId.match(/field-(\d+)/)?.[1] || '';
 
       // Try multiple strategies to find associated hidden selects
-      const possibleHiddenSelect = document.querySelector(
+      const possibleHiddenSelectEl = document.querySelector(
         `select.hide-at-sm-block[id$="field-${fieldNumber}"], ` +
           `select[id$="${elementId.split('_').pop()}"], ` +
           `select[data-filliny-id="${element.getAttribute('data-filliny-id')}"]`,
-      ) as HTMLSelectElement;
+      );
 
-      if (possibleHiddenSelect) {
-        debug.log('Found associated hidden select:', possibleHiddenSelect.id);
+      if (isHTMLSelectElement(possibleHiddenSelectEl)) {
+        debug.log('Found associated hidden select:', possibleHiddenSelectEl.id);
 
         // Try updating the hidden select directly
         try {
-          possibleHiddenSelect.value = normalizedValues[0];
-          possibleHiddenSelect.dispatchEvent(new Event('change', { bubbles: true }));
+          possibleHiddenSelectEl.value = normalizedValues[0];
+          possibleHiddenSelectEl.dispatchEvent(new Event('change', { bubbles: true }));
           debug.log('Updated hidden select value to', normalizedValues[0]);
         } catch (e) {
           debug.warn('Could not update hidden select:', e);
@@ -670,14 +682,20 @@ export const handleTsselect = (element: HTMLSelectElement, normalizedValues: str
       let selectContainer: HTMLElement | null = null;
 
       // Approach 1: Find through parent chain
-      selectContainer = element.closest('[class*="react-select"][class*="container"]') as HTMLElement;
+      const closestContainer = element.closest('[class*="react-select"][class*="container"]');
+      if (isHTMLElement(closestContainer)) {
+        selectContainer = closestContainer;
+      }
 
       // Approach 2: Find through related element IDs
       if (!selectContainer && elementId) {
         const relatedId = elementId.replace('input', 'control');
-        selectContainer = document.querySelector(
+        const relatedEl = document.querySelector(
           `[id="${relatedId}"], [id*="${elementId.split('_')[0]}"][class*="container"]`,
-        ) as HTMLElement;
+        );
+        if (isHTMLElement(relatedEl)) {
+          selectContainer = relatedEl;
+        }
       }
 
       // Approach 3: Find any React-Select container near this element
@@ -690,13 +708,15 @@ export const handleTsselect = (element: HTMLSelectElement, normalizedValues: str
           // Find the closest container to our element
           let closestDistance = Infinity;
           Array.from(allContainers).forEach(container => {
-            const rect1 = element.getBoundingClientRect();
-            const rect2 = container.getBoundingClientRect();
-            const distance = Math.abs(rect1.top - rect2.top) + Math.abs(rect1.left - rect2.left);
+            if (isHTMLElement(container)) {
+              const rect1 = element.getBoundingClientRect();
+              const rect2 = container.getBoundingClientRect();
+              const distance = Math.abs(rect1.top - rect2.top) + Math.abs(rect1.left - rect2.left);
 
-            if (distance < closestDistance) {
-              closestDistance = distance;
-              selectContainer = container as HTMLElement;
+              if (distance < closestDistance) {
+                closestDistance = distance;
+                selectContainer = container;
+              }
             }
           });
         }
@@ -847,13 +867,13 @@ export const handleTsselect = (element: HTMLSelectElement, normalizedValues: str
         }
       }
 
-      if (matchedOption) {
+      if (matchedOption && isHTMLElement(matchedOption)) {
         // Click the matched option
         debug.log('Clicking on matched option:', matchedOption.textContent);
 
         try {
           // Click and dispatch events immediately without timeouts
-          (matchedOption as HTMLElement).click();
+          matchedOption.click();
 
           // Dispatch additional events for React handlers
           // Some React components need these specific events
@@ -1632,8 +1652,8 @@ const detectDynamicSelectOptions = async (
     if (element.classList.contains('select2-container')) {
       const selectId = element.getAttribute('id')?.replace('s2id_', '');
       if (selectId) {
-        const actualSelect = document.getElementById(selectId) as HTMLSelectElement;
-        if (actualSelect && actualSelect instanceof HTMLSelectElement) {
+        const actualSelect = document.getElementById(selectId);
+        if (isHTMLSelectElement(actualSelect)) {
           return Array.from(actualSelect.options).map(opt => ({
             value: opt.value,
             text: opt.text.trim() || opt.value,

@@ -1,96 +1,18 @@
+import { RecommendedWebsites } from './RecommendedWebsites';
+import { WebsiteFormFields } from './WebsiteFormFields';
 import { WebsitePreviewCard } from './WebsitePreviewCard';
 import { UpgradeBanner } from '../alerts';
-import { RHFShadcnCheckbox, RHFShadcnTextField, RHFShadcnFileDrop } from '../rhf';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui';
-import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { ScrollArea, ScrollBar } from '../ui/scroll-area';
-import { cn } from '@/lib/utils';
-import { getFaviconUrl, useSuggestedWebsites, usePlanLimits, getConfig } from '@extension/shared';
+import { usePlanLimits } from '@extension/shared';
 import { Plus } from 'lucide-react';
-import React, { useCallback } from 'react';
+import { useCallback } from 'react';
 import { useFieldArray, useFormContext } from 'react-hook-form';
 import type { ProfileFormTypes } from '@/lib/containers/profile-form';
 
-// Get base URL for example placeholder
-const config = getConfig();
-const baseExampleURL = config.baseURL;
-
-// Separate component for recommended websites section
-const RecommendedWebsites = ({
-  onWebsiteSelect,
-  hasReachedLimit,
-}: {
-  onWebsiteSelect: (value: string) => void;
-  hasReachedLimit: boolean;
-}) => {
-  const { data: recommendedWebsites, isLoading } = useSuggestedWebsites();
-
-  if (isLoading) {
-    return <span className="filliny-text-muted-foreground">Loading recommendations...</span>;
-  }
-
-  if (!recommendedWebsites?.length) {
-    return <span className="filliny-text-muted-foreground">No recommendations available</span>;
-  }
-
-  return (
-    <div className="filliny-flex filliny-w-max filliny-space-x-1">
-      {recommendedWebsites.map(item => (
-        <TooltipProvider key={String(item.id)}>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Badge
-                variant="outline"
-                className={cn(
-                  'filliny-flex filliny-items-center filliny-gap-1',
-                  hasReachedLimit
-                    ? 'filliny-cursor-not-allowed filliny-opacity-50'
-                    : 'filliny-cursor-pointer hover:filliny-bg-accent',
-                )}
-                onClick={() => !hasReachedLimit && onWebsiteSelect(item.value)}>
-                <img
-                  src={getFaviconUrl(item.value)}
-                  alt={`${item.label} favicon`}
-                  width={15}
-                  height={15}
-                  className="filliny-rounded"
-                />
-                {item.label}
-              </Badge>
-            </TooltipTrigger>
-            {hasReachedLimit && (
-              <TooltipContent>
-                <p>Upgrade your plan to add more websites</p>
-              </TooltipContent>
-            )}
-          </Tooltip>
-        </TooltipProvider>
-      ))}
-    </div>
-  );
-};
-
-// Separate component for website form fields
-export const WebsiteFormFields = ({ index }: { index: number }) => (
-  <div className="filliny-grid filliny-gap-4">
-    <RHFShadcnTextField
-      placeholder={baseExampleURL}
-      name={`fillingWebsites[${index}].websiteUrl`}
-      title="Website's URL"
-    />
-    <RHFShadcnCheckbox
-      name={`fillingWebsites[${index}].isRootLoad`}
-      title="Load it in the entire website instead of the exact given URL"
-    />
-    <RHFShadcnFileDrop
-      name={`fillingWebsites[${index}].fillingContext`}
-      title="Filling context"
-      placeholder="Enter any specific instructions or context for filling this website's forms"
-      rows={10}
-    />
-  </div>
-);
+// Re-export WebsiteFormFields for backward compatibility
+export { WebsiteFormFields } from './WebsiteFormFields';
 
 function StepperForm1() {
   const { control, watch } = useFormContext<ProfileFormTypes>();

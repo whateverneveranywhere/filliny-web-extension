@@ -5,12 +5,13 @@ import {
   getSuggestedWebsitesService,
   getTonesListService,
 } from '../../services/api/Profiles/index.js';
+import { queryKeys } from '../queryKeys.js';
 import { useQuery } from '@tanstack/react-query';
 import type { DTOTone, DTOPov } from '@extension/storage';
 
 export const useProfilesListQuery = () =>
   useQuery({
-    queryKey: ['profilesList'],
+    queryKey: queryKeys.profile.list(),
     queryFn: getProfilesListService,
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
@@ -22,7 +23,7 @@ export const useProfilesListQuery = () =>
 
 export const useSuggestedWebsites = () =>
   useQuery({
-    queryKey: ['recommendedWebsites'],
+    queryKey: queryKeys.profile.suggestedWebsites(),
     queryFn: getSuggestedWebsitesService,
     staleTime: 30 * 60 * 1000, // 30 minutes - suggested websites don't change often
     refetchOnWindowFocus: false,
@@ -33,7 +34,7 @@ export const useSuggestedWebsites = () =>
 
 export const useFillingProfileById = (id: string) =>
   useQuery({
-    queryKey: ['fillingProfileById', id],
+    queryKey: queryKeys.profile.detail(id),
     queryFn: () => getFillingProfileByIdService(id),
     enabled: !!id,
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -46,7 +47,7 @@ export const useFillingProfileById = (id: string) =>
 
 export const useTonesListQuery = () =>
   useQuery({
-    queryKey: ['tones'],
+    queryKey: queryKeys.profile.tones(),
     queryFn: getTonesListService,
     select: (data: DTOTone[]) => data.map((item: DTOTone) => ({ label: item.label, value: String(item.id) })),
     staleTime: Infinity, // Static data - tones rarely change
@@ -59,7 +60,7 @@ export const useTonesListQuery = () =>
 
 export const usePOVListQuery = () =>
   useQuery({
-    queryKey: ['povs'],
+    queryKey: queryKeys.profile.povs(),
     queryFn: getPOVsListService,
     select: (data: DTOPov[]) => data.map((item: DTOPov) => ({ label: item.label, value: String(item.id) })),
     staleTime: Infinity, // Static data - POVs rarely change

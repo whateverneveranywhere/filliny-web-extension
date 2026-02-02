@@ -2,6 +2,7 @@ import manifest from '../../../../chrome-extension/manifest.js';
 import { MANAGER_ACTION_PROMPT_CONFIG } from '../const.js';
 import { promptSelection } from '../helpers/utils.js';
 import { deleteFeature, recoverFeature } from '../processing/index.js';
+import { CliAction } from '@extension/shared';
 import { execSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -19,10 +20,10 @@ export const runModuleManager = async (moduleName?: ModuleNameType, action?: Cli
   }
 
   switch (action) {
-    case 'delete':
+    case CliAction.DELETE:
       await deleteFeature(manifestObject, moduleName);
       break;
-    case 'recover':
+    case CliAction.RECOVER:
       await recoverFeature(manifestObject, moduleName);
   }
 

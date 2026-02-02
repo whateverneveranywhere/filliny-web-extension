@@ -1,46 +1,57 @@
+import FormFieldWrapper from './FormFieldWrapper';
 import { Checkbox } from '../ui/checkbox';
-import { FormControl, FormDescription, FormField, FormItem, FormLabel } from '../ui/form';
-import React from 'react';
-import { useFormContext } from 'react-hook-form';
-import type { GeneralFormProps } from '@extension/shared';
+import type { BaseRHFFieldProps } from './types';
+import type { FieldValues, Path } from 'react-hook-form';
 
-function RHFShadcnCheckbox({
+/**
+ * React Hook Form checkbox component.
+ * Renders a checkbox with label and optional description.
+ * Uses the unified FormFieldWrapper for consistent layout and behavior.
+ *
+ * @example
+ * // Basic checkbox
+ * <RHFShadcnCheckbox name="acceptTerms" title="I accept the terms" />
+ *
+ * // With description
+ * <RHFShadcnCheckbox
+ *   name="newsletter"
+ *   title="Subscribe to newsletter"
+ *   description="Get weekly updates"
+ * />
+ */
+const RHFShadcnCheckbox = <T extends FieldValues = FieldValues>({
   name,
   title,
   description,
   value: externalValue,
   required,
+  disabled,
+  control,
+  className,
   onChange: externalOnChange,
-}: GeneralFormProps) {
-  const { control } = useFormContext();
-
-  return (
-    <FormField
-      control={control}
-      name={name}
-      render={({ field }) => (
-        <FormItem className="filliny-flex filliny-w-full filliny-flex-row filliny-items-start filliny-space-x-3 filliny-space-y-0 filliny-rounded-md filliny-py-4">
-          <FormControl>
-            <Checkbox
-              required={required}
-              data-testid={field.name}
-              onCheckedChange={e => {
-                if (externalOnChange) {
-                  return externalOnChange?.(e);
-                }
-                return field.onChange(e);
-              }}
-              checked={field.value !== undefined ? field.value : externalValue}
-            />
-          </FormControl>
-          <div className="filliny-leading-none">
-            <FormLabel>{title}</FormLabel>
-            {description && <FormDescription>{description}</FormDescription>}
-          </div>
-        </FormItem>
-      )}
-    />
-  );
-}
+}: BaseRHFFieldProps<T>) => (
+  <FormFieldWrapper<T>
+    name={name as Path<T>}
+    control={control}
+    title={title}
+    description={description}
+    required={required}
+    disabled={disabled}
+    className={className}
+    value={externalValue}
+    onChange={externalOnChange}
+    layout={{ direction: 'horizontal', showError: true }}
+    itemClassName="filliny-flex filliny-w-full filliny-flex-row filliny-items-start filliny-space-x-3 filliny-space-y-0 filliny-rounded-md filliny-py-4">
+    {({ field, handleChange, getValue }) => (
+      <Checkbox
+        required={required}
+        disabled={disabled}
+        data-testid={field.name}
+        onCheckedChange={checked => handleChange(checked as boolean)}
+        checked={(getValue() as boolean) ?? false}
+      />
+    )}
+  </FormFieldWrapper>
+);
 
 export default RHFShadcnCheckbox;

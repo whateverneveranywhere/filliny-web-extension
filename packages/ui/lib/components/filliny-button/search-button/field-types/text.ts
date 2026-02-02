@@ -17,129 +17,76 @@ import {
   isHTMLTextAreaElement,
   hasProperty,
 } from '@extension/shared';
-import type { Field } from '@extension/shared';
+import type {
+  Field,
+  NextJsWindow,
+  ReactDevToolsWindow,
+  ReactGlobalWindow,
+  ReduxDevToolsWindow,
+  AngularContextElement,
+  FormikInputElement,
+  ReactHookFormInputElement,
+  ReactFiberProps,
+  DOMEventHandler,
+  SvelteComponentElement,
+} from '@extension/shared';
 
 // ============================================================================
-// Window Extension Interfaces for Framework Detection
+// Type Guards for Framework Detection
 // ============================================================================
-
-/**
- * Interface for window with Next.js data
- */
-interface WindowWithNextData {
-  __NEXT_DATA__?: {
-    props?: unknown;
-  };
-}
-
-/**
- * Interface for window with React DevTools hook
- */
-interface WindowWithReactDevTools {
-  __REACT_DEVTOOLS_GLOBAL_HOOK__?: {
-    renderers?: Map<number, { version?: string }>;
-  };
-}
-
-/**
- * Interface for window with React global
- */
-interface WindowWithReactGlobal {
-  React?: {
-    version?: string;
-  };
-}
-
-/**
- * Interface for window with Redux DevTools
- */
-interface WindowWithReduxDevTools {
-  __REDUX_DEVTOOLS_EXTENSION__?: unknown;
-}
-
-/**
- * Interface for window with createRoot (React 18+)
- */
-interface WindowWithCreateRoot {
-  createRoot?: unknown;
-}
-
-/**
- * Interface for element with Angular context
- */
-interface ElementWithAngularContext extends HTMLElement {
-  __ngContext__?: unknown;
-}
-
-/**
- * Interface for element with Formik bag
- */
-interface ElementWithFormik extends HTMLInputElement {
-  __formik?: {
-    setFieldValue?: (name: string, value: string) => void;
-  };
-}
-
-/**
- * Interface for element with React Hook Form controller
- */
-interface ElementWithReactHookForm extends HTMLInputElement {
-  __reactHookForm?: {
-    setValue?: (name: string, value: string) => void;
-  };
-}
-
-/**
- * React Fiber Props interface
- */
-interface ReactFiberProps {
-  memoizedProps?: { value?: unknown; defaultValue?: unknown };
-  pendingProps?: { value?: unknown; defaultValue?: unknown };
-}
 
 /**
  * Type guard to check if element has Angular context
  */
-const hasAngularContext = (element: HTMLElement): element is ElementWithAngularContext =>
+const hasAngularContext = (element: HTMLElement): element is AngularContextElement =>
   hasProperty(element, '__ngContext__');
 
 /**
  * Type guard to check if element has Formik bag
  */
-const hasFormikBag = (element: HTMLInputElement): element is ElementWithFormik => hasProperty(element, '__formik');
+const hasFormikBag = (element: HTMLInputElement): element is FormikInputElement => hasProperty(element, '__formik');
 
 /**
  * Type guard to check if element has React Hook Form controller
  */
-const hasReactHookFormController = (element: HTMLInputElement): element is ElementWithReactHookForm =>
+const hasReactHookFormController = (element: HTMLInputElement): element is ReactHookFormInputElement =>
   hasProperty(element, '__reactHookForm');
 
 /**
  * Type guard to check if window has Next.js data
  */
-const hasNextData = (win: Window): win is Window & WindowWithNextData => hasProperty(win, '__NEXT_DATA__');
+const hasNextData = (win: Window): win is NextJsWindow => hasProperty(win, '__NEXT_DATA__');
 
 /**
  * Type guard to check if window has React DevTools
  */
-const hasReactDevTools = (win: Window): win is Window & WindowWithReactDevTools =>
+const hasReactDevTools = (win: Window): win is ReactDevToolsWindow =>
   hasProperty(win, '__REACT_DEVTOOLS_GLOBAL_HOOK__');
 
 /**
  * Type guard to check if window has React global
  */
-const hasReactGlobal = (win: Window): win is Window & WindowWithReactGlobal => hasProperty(win, 'React');
+const hasReactGlobal = (win: Window): win is ReactGlobalWindow => hasProperty(win, 'React');
 
 /**
  * Type guard to check if window has Redux DevTools
  */
-const hasReduxDevTools = (win: Window): win is Window & WindowWithReduxDevTools =>
-  hasProperty(win, '__REDUX_DEVTOOLS_EXTENSION__');
+const hasReduxDevTools = (win: Window): win is ReduxDevToolsWindow => hasProperty(win, '__REDUX_DEVTOOLS_EXTENSION__');
 
 /**
  * Type guard to check if window has createRoot (React 18+)
  */
-const hasCreateRoot = (win: Window): win is Window & WindowWithCreateRoot => hasProperty(win, 'createRoot');
+const hasCreateRoot = (win: Window): win is ReactGlobalWindow => hasProperty(win, 'createRoot');
+
+/**
+ * Type guard to check if value is ReactFiberProps
+ */
+const isReactFiberProps = (value: unknown): value is ReactFiberProps => {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+  return hasProperty(value, 'memoizedProps') || hasProperty(value, 'pendingProps');
+};
 
 /**
  * Safely get React fiber from element
@@ -148,23 +95,30 @@ const getReactFiber = (element: HTMLElement): ReactFiberProps | null => {
   const fiberKey = Object.keys(element).find(
     key => key.startsWith('__reactFiber') || key.startsWith('__reactInternalInstance'),
   );
-  if (fiberKey) {
-    const fiber = (element as unknown as Record<string, unknown>)[fiberKey];
-    if (fiber && typeof fiber === 'object') {
-      return fiber as ReactFiberProps;
+  if (fiberKey && hasProperty(element, fiberKey)) {
+    const fiber = element[fiberKey];
+    if (isReactFiberProps(fiber)) {
+      return fiber;
     }
   }
   return null;
 };
 
 /**
+ * Type guard for event handler functions
+ */
+const isEventHandler = (value: unknown): value is DOMEventHandler => typeof value === 'function';
+
+/**
  * Safely get event handler from element
  */
-const getEventHandler = (element: HTMLElement, eventName: string): ((event: Event) => void) | null => {
+const getEventHandler = (element: HTMLElement, eventName: string): DOMEventHandler | null => {
   const handlerKey = `on${eventName}`;
-  const handler = (element as unknown as Record<string, unknown>)[handlerKey];
-  if (typeof handler === 'function') {
-    return handler as (event: Event) => void;
+  if (hasProperty(element, handlerKey)) {
+    const handler = element[handlerKey];
+    if (isEventHandler(handler)) {
+      return handler;
+    }
   }
   return null;
 };
@@ -181,11 +135,13 @@ export const detectTextField = async (
   const fields: Field[] = [];
 
   // Process standard input elements
-  const inputFields = elements.filter(
-    el =>
-      el instanceof HTMLInputElement &&
-      TEXT_INPUT_TYPES.includes((el as HTMLInputElement).type as (typeof TEXT_INPUT_TYPES)[number]),
-  );
+  const inputFields = elements.filter((el): el is HTMLInputElement => {
+    if (!isHTMLInputElement(el)) {
+      return false;
+    }
+    // Check if the input type is one of the text input types
+    return TEXT_INPUT_TYPES.some(inputType => inputType === el.type);
+  });
 
   if (inputFields.length > 0) {
     const results = await detectInputField(inputFields, baseIndex, testMode);
@@ -583,29 +539,46 @@ export const updateTextField = async (element: HTMLElement, value: string): Prom
 };
 
 /**
+ * Valid state manager types for React detection
+ */
+const STATE_MANAGER_TYPES = ['redux-toolkit', 'zustand', 'jotai', 'recoil', 'react-query'] as const;
+
+type StateManagerType = (typeof STATE_MANAGER_TYPES)[number];
+
+/**
+ * All valid React detection types
+ */
+const REACT_DETECTION_TYPES = [
+  'controlled',
+  'uncontrolled',
+  'hook-based',
+  'class-based',
+  'material-ui',
+  'ant-design',
+  'chakra-ui',
+  'formik',
+  'react-hook-form',
+  'nextjs',
+  'react-18-concurrent',
+  ...STATE_MANAGER_TYPES,
+  'unknown',
+] as const;
+
+type ReactDetectionType = (typeof REACT_DETECTION_TYPES)[number];
+
+/**
+ * Type guard for valid React detection type
+ */
+const isValidReactDetectionType = (value: string): value is ReactDetectionType =>
+  REACT_DETECTION_TYPES.includes(value as ReactDetectionType);
+
+/**
  * Enhanced React component detection with state management patterns
  * Extended support for Next.js, React 18+, and modern frameworks
  */
 interface ReactDetection {
   isReact: boolean;
-  type:
-    | 'controlled'
-    | 'uncontrolled'
-    | 'hook-based'
-    | 'class-based'
-    | 'material-ui'
-    | 'ant-design'
-    | 'chakra-ui'
-    | 'formik'
-    | 'react-hook-form'
-    | 'nextjs'
-    | 'react-18-concurrent'
-    | 'react-query'
-    | 'redux-toolkit'
-    | 'zustand'
-    | 'jotai'
-    | 'recoil'
-    | 'unknown';
+  type: ReactDetectionType;
   framework?: string;
   stateManager?: string;
   reactVersion?: string;
@@ -663,7 +636,10 @@ const detectReactComponent = (element: HTMLElement): ReactDetection => {
   if (detection.hasStateManager) {
     const stateManagers = detectStateManager();
     detection.isReact = true;
-    detection.type = stateManagers[0] as ReactDetection['type'];
+    // Validate that the state manager is a valid detection type
+    if (stateManagers.length > 0 && isValidReactDetectionType(stateManagers[0])) {
+      detection.type = stateManagers[0];
+    }
     detection.stateManager = stateManagers.join(', ');
     return detection;
   }
@@ -796,7 +772,7 @@ const detectNextJs = (): boolean =>
     document.querySelector('link[href*="_next"]') ||
     window.location.pathname.includes('/_next/') ||
     document.querySelector('meta[name="next-head-count"]') ||
-    (window as unknown as { __NEXT_DATA__?: unknown }).__NEXT_DATA__ ||
+    (window as unknown as NextJsWindow).__NEXT_DATA__ ||
     document.querySelector('script[id="__NEXT_DATA__"]')
   );
 /**
@@ -805,9 +781,7 @@ const detectNextJs = (): boolean =>
 const detectReactVersion = (): string | undefined => {
   try {
     // Check for React DevTools version info
-    const reactDevTools = (
-      window as unknown as { __REACT_DEVTOOLS_GLOBAL_HOOK__?: { renderers?: Map<number, { version?: string }> } }
-    ).__REACT_DEVTOOLS_GLOBAL_HOOK__;
+    const reactDevTools = (window as unknown as ReactDevToolsWindow).__REACT_DEVTOOLS_GLOBAL_HOOK__;
     if (reactDevTools?.renderers) {
       for (const renderer of reactDevTools.renderers.values()) {
         if (renderer.version) {
@@ -817,7 +791,7 @@ const detectReactVersion = (): string | undefined => {
     }
 
     // Check for React in window object
-    const reactGlobal = (window as unknown as { React?: { version?: string } }).React;
+    const reactGlobal = (window as ReactGlobalWindow).React;
     if (reactGlobal?.version) {
       return reactGlobal.version;
     }
@@ -845,7 +819,7 @@ const detectConcurrentMode = (): boolean => {
   try {
     // Check for concurrent mode APIs
     const hasConcurrentFeatures = !!(
-      (window as unknown as { createRoot?: unknown }).createRoot ||
+      (window as ReactGlobalWindow).createRoot ||
       document.querySelector('[data-react-concurrent="true"]') ||
       document.querySelector('.react-concurrent-mode')
     );
@@ -876,7 +850,7 @@ const detectStateManager = (): string[] => {
   try {
     // Redux/Redux Toolkit
     if (
-      (window as unknown as { __REDUX_DEVTOOLS_EXTENSION__?: unknown }).__REDUX_DEVTOOLS_EXTENSION__ ||
+      (window as ReduxDevToolsWindow).__REDUX_DEVTOOLS_EXTENSION__ ||
       document.querySelector('[data-redux]') ||
       document.querySelector('.redux-store')
     ) {
@@ -1044,9 +1018,9 @@ async function handleMaterialUIComponent(
     // Trigger events on both the input and container
     await triggerReactEvents(element, ['focus', 'input', 'change', 'blur']);
 
-    if (muiContainer) {
+    if (muiContainer && muiContainer instanceof HTMLElement) {
       muiContainer.setAttribute('data-value', value);
-      await triggerReactEvents(muiContainer as HTMLElement, ['input', 'change']);
+      await triggerReactEvents(muiContainer, ['input', 'change']);
     }
   }
 }
@@ -1061,10 +1035,10 @@ async function handleAntDesignComponent(element: HTMLElement, value: string, det
     element.value = value;
     await triggerReactEvents(element, ['focus', 'input', 'change', 'blur']);
 
-    if (antContainer) {
+    if (antContainer && antContainer instanceof HTMLElement) {
       // Ant Design often uses data attributes for state
       antContainer.setAttribute('data-value', value);
-      await triggerReactEvents(antContainer as HTMLElement, ['input', 'change']);
+      await triggerReactEvents(antContainer, ['input', 'change']);
     }
   }
 }
@@ -1091,15 +1065,10 @@ async function handleFormikComponent(element: HTMLElement, value: string, detect
 
     // Also try to trigger Formik's setFieldValue if available
     try {
-      const formikBag = (
-        element as unknown as {
-          __formik?: { setFieldValue?: (name: string, value: string) => void };
-        }
-      ).__formik;
-      if (formikBag && formikBag.setFieldValue) {
+      if (hasFormikBag(element) && element.__formik?.setFieldValue) {
         const fieldName = element.name || element.id;
         if (fieldName) {
-          formikBag.setFieldValue(fieldName, value);
+          element.__formik.setFieldValue(fieldName, value);
         }
       }
     } catch (error) {
@@ -1124,15 +1093,10 @@ async function handleReactHookFormComponent(
 
     // Try to trigger React Hook Form's setValue if available
     try {
-      const rhfController = (
-        element as unknown as {
-          __reactHookForm?: { setValue?: (name: string, value: string) => void };
-        }
-      ).__reactHookForm;
-      if (rhfController && rhfController.setValue) {
+      if (hasReactHookFormController(element) && element.__reactHookForm?.setValue) {
         const fieldName = element.name || element.id;
         if (fieldName) {
-          rhfController.setValue(fieldName, value);
+          element.__reactHookForm.setValue(fieldName, value);
         }
       }
     } catch (error) {
@@ -1218,8 +1182,8 @@ async function triggerReactEvents(element: HTMLElement, events: string[]): Promi
       }
 
       // Try to call React event handlers directly
-      const reactHandler = (element as unknown as Record<string, unknown>)[`on${eventName}`];
-      if (typeof reactHandler === 'function') {
+      const reactHandler = getEventHandler(element, eventName);
+      if (reactHandler) {
         reactHandler.call(element, event);
       }
 
@@ -1260,8 +1224,7 @@ async function handleAngularTextInput(element: HTMLElement, value: string): Prom
 
     if (ngModelName) {
       // Try to find Angular context
-      const elementWithContext = element as unknown as { __ngContext__?: unknown };
-      if (elementWithContext.__ngContext__) {
+      if (hasAngularContext(element)) {
         console.log(`Found Angular context for model: ${ngModelName}`);
         // We can't directly modify Angular context, but the events should trigger updates
       }
@@ -1345,8 +1308,7 @@ async function handleSvelteTextInput(element: HTMLElement, value: string): Promi
 
     // For Svelte, also try the bind:value pattern
     // Svelte stores component references in the element
-    const svelteComponent = (element as unknown as Record<string, unknown>).__svelte_component__;
-    if (svelteComponent) {
+    if (hasProperty(element, '__svelte_component__') && element.__svelte_component__) {
       console.log('Svelte component detected');
     }
 
@@ -1410,7 +1372,7 @@ async function handleNextjsComponent(element: HTMLElement, value: string, detect
     const isHydrated = !!(
       document.querySelector('[data-reactroot]') ||
       document.querySelector('#__next[data-reactroot]') ||
-      (window as unknown as { __NEXT_DATA__?: { props?: unknown } }).__NEXT_DATA__?.props
+      (window as NextJsWindow).__NEXT_DATA__?.props
     );
 
     if (!isHydrated) {
@@ -1598,7 +1560,7 @@ async function waitForNextjsHydration(): Promise<void> {
       const isHydrated = !!(
         document.querySelector('[data-reactroot]') ||
         document.querySelector('#__next[data-reactroot]') ||
-        (window as unknown as { __NEXT_DATA__?: { props?: unknown } }).__NEXT_DATA__?.props
+        (window as NextJsWindow).__NEXT_DATA__?.props
       );
 
       if (isHydrated || attempts >= maxAttempts) {

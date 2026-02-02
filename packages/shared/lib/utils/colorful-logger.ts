@@ -18,7 +18,8 @@ export const colorfulLog = (message: string, type: ColorType) => {
       color = COLORS.FgYellow;
       break;
     default:
-      color = COLORS[type];
+      // type is narrowed to keyof typeof COLORS here
+      color = COLORS[type as keyof typeof COLORS];
       break;
   }
 

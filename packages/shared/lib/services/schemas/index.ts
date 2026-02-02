@@ -5,7 +5,7 @@
  * IMPORTANT: All types in the codebase should be inferred from these schemas using z.infer<>
  * Do NOT define types manually - always use schema inference for type safety
  */
-import { Framework } from '../../types/enums.js';
+import { Framework } from '../../utils/frameworkDetection.js';
 import { isValid, parseISO } from 'date-fns';
 import { z } from 'zod';
 
@@ -264,15 +264,31 @@ export const AcceptTypeSchema = z.object({
 });
 
 /**
+ * Custom schema for HTMLInputElement
+ * Uses z.custom() with proper type guard instead of z.any()
+ */
+const HTMLInputElementSchema = z.custom<HTMLInputElement>(
+  val => typeof window !== 'undefined' && val instanceof HTMLInputElement,
+  { message: 'Expected HTMLInputElement' },
+);
+
+/**
+ * Custom schema for HTMLElement
+ * Uses z.custom() with proper type guard instead of z.any()
+ */
+const HTMLElementSchema = z.custom<HTMLElement>(val => typeof window !== 'undefined' && val instanceof HTMLElement, {
+  message: 'Expected HTMLElement',
+});
+
+/**
  * File upload data schema
- * Note: fileInput, triggerElement fields are HTMLElements that can't be validated with Zod
- * They are typed as z.any() for runtime flexibility
+ * Uses custom schemas for DOM elements with proper type guards
  */
 export const FileUploadDataSchema = z.object({
   acceptedTypes: z.array(AcceptTypeSchema).optional(),
-  fileInput: z.any().optional(), // HTMLInputElement - can't be validated
+  fileInput: HTMLInputElementSchema.optional(),
   isCustomUpload: z.boolean().optional(),
-  triggerElement: z.any().optional(), // HTMLElement - can't be validated
+  triggerElement: HTMLElementSchema.optional(),
   maxFileSize: z.number().nullable().optional(),
   allowedExtensions: z.array(z.string()).optional(),
 });
@@ -457,8 +473,6 @@ export type FrameworkType = z.infer<typeof FrameworkTypeSchema>;
 export type FieldOption = z.infer<typeof FieldOptionSchema>;
 export type FieldVisibility = z.infer<typeof FieldVisibilitySchema>;
 export type FieldMetadata = z.infer<typeof FieldMetadataSchema>;
-/** @deprecated Use FieldMetadata instead - they are now the same type */
-export type FileFieldMetadata = FieldMetadata;
 export type FieldValidation = z.infer<typeof FieldValidationSchema>;
 export type Field = z.infer<typeof FieldSchema>;
 export type DTOFillPayload = z.infer<typeof DTOFillPayloadSchema>;
@@ -472,10 +486,6 @@ export type DeleteProfileResponse = z.infer<typeof DeleteProfileResponseSchema>;
 // UI types
 export type OverlayPosition = z.infer<typeof OverlayPositionSchema>;
 export type HighlightFormsOptions = z.infer<typeof HighlightFormsOptionsSchema>;
-
-// Legacy type aliases for backwards compatibility (deprecated, use the main types)
-/** @deprecated Use DTOFillingPreferences instead */
-export type DTOFillingPrefrences = DTOFillingPreferences;
 
 // ============================================================================
 // Validation Helpers

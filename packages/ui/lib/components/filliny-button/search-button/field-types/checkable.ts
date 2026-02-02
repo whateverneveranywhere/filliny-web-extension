@@ -1,9 +1,46 @@
 import { createBaseField, findRelatedRadioButtons } from './utils';
 import { getFieldLabel } from '../fieldUtils';
-import { createDebugLogger } from '@extension/shared';
+import { createDebugLogger, isHTMLElement, isHTMLInputElement, queryInputElement } from '@extension/shared';
+import { z } from 'zod';
 import type { Field } from '@extension/shared';
 
 const debug = createDebugLogger('Checkable');
+
+// ============================================================================
+// Zod Schemas for Value Checking
+// ============================================================================
+
+/**
+ * Schema for truthy string values
+ */
+const TruthyStringValues = ['true', 'yes', 'on', '1', 'selected', 'checked'] as const;
+const TruthyStringSchema = z.enum(TruthyStringValues);
+
+/**
+ * Schema for falsy string values
+ */
+const FalsyStringValues = ['false', 'no', 'off', '0', 'unselected', 'unchecked'] as const;
+const FalsyStringSchema = z.enum(FalsyStringValues);
+
+/**
+ * Schema for boolean values
+ */
+const BooleanValueSchema = z.boolean();
+
+/**
+ * Schema for number values
+ */
+const NumberValueSchema = z.number();
+
+/**
+ * Schema for string values
+ */
+const StringValueSchema = z.string();
+
+/**
+ * Schema for array values
+ */
+const ArrayValueSchema = z.array(z.unknown());
 
 // Extend Field type with checkable-specific properties
 interface CheckableField extends Field {
@@ -13,49 +50,48 @@ interface CheckableField extends Field {
 }
 
 /**
+ * Convert a base Field to a CheckableField by adding checkable-specific properties
+ */
+const toCheckableField = (baseField: Field, checkableProps?: Partial<CheckableField>): CheckableField => ({
+  ...baseField,
+  ...checkableProps,
+});
+
+/**
  * Check if a value indicates a "checked" or "true" state
  * Handles various formats like true/false, 0/1, "yes"/"no", etc.
+ * Uses Zod for type validation.
  */
 export const isValueChecked = (value: unknown): boolean => {
+  // Null/undefined check
   if (value === undefined || value === null) {
     return false;
   }
 
-  // Direct boolean
-  if (typeof value === 'boolean') {
-    return value;
+  // Direct boolean check using Zod
+  const booleanResult = BooleanValueSchema.safeParse(value);
+  if (booleanResult.success) {
+    return booleanResult.data;
   }
 
-  // Numbers (0 = false, anything else = true)
-  if (typeof value === 'number') {
-    return value !== 0;
+  // Number check using Zod (0 = false, anything else = true)
+  const numberResult = NumberValueSchema.safeParse(value);
+  if (numberResult.success) {
+    return numberResult.data !== 0;
   }
 
-  // String representations
-  if (typeof value === 'string') {
-    const normalized = value.trim().toLowerCase();
+  // String check using Zod
+  const stringResult = StringValueSchema.safeParse(value);
+  if (stringResult.success) {
+    const normalized = stringResult.data.trim().toLowerCase();
 
-    // Standard boolean strings
-    if (
-      normalized === 'true' ||
-      normalized === 'yes' ||
-      normalized === 'on' ||
-      normalized === '1' ||
-      normalized === 'selected' ||
-      normalized === 'checked'
-    ) {
+    // Check for truthy strings using Zod enum
+    if (TruthyStringSchema.safeParse(normalized).success) {
       return true;
     }
 
-    // Standard false strings
-    if (
-      normalized === 'false' ||
-      normalized === 'no' ||
-      normalized === 'off' ||
-      normalized === '0' ||
-      normalized === 'unselected' ||
-      normalized === 'unchecked'
-    ) {
+    // Check for falsy strings using Zod enum
+    if (FalsyStringSchema.safeParse(normalized).success) {
       return false;
     }
 
@@ -63,9 +99,10 @@ export const isValueChecked = (value: unknown): boolean => {
     return normalized !== '';
   }
 
-  // Arrays - if there are any items, consider it checked
-  if (Array.isArray(value)) {
-    return value.length > 0;
+  // Array check using Zod (if there are any items, consider it checked)
+  const arrayResult = ArrayValueSchema.safeParse(value);
+  if (arrayResult.success) {
+    return arrayResult.data.length > 0;
   }
 
   // For objects, treat as true (existence implies checked)
@@ -75,6 +112,7 @@ export const isValueChecked = (value: unknown): boolean => {
 /**
  * Match checkbox values considering different formats
  * Used to determine if a checkbox should be checked when multiple values are involved
+ * Uses Zod for type validation.
  */
 export const matchesCheckboxValue = (optionValue: string, targetValue: unknown): boolean => {
   // Handle direct equality
@@ -82,15 +120,17 @@ export const matchesCheckboxValue = (optionValue: string, targetValue: unknown):
     return true;
   }
 
-  // If target is an array, check if this value is in the array
-  if (Array.isArray(targetValue)) {
-    return targetValue.some(v => String(v) === optionValue);
+  // Check if target is an array using Zod
+  const arrayResult = ArrayValueSchema.safeParse(targetValue);
+  if (arrayResult.success) {
+    return arrayResult.data.some(v => String(v) === optionValue);
   }
 
-  // Handle string comparison
-  if (typeof targetValue === 'string') {
+  // Check if target is a string using Zod
+  const stringResult = StringValueSchema.safeParse(targetValue);
+  if (stringResult.success) {
     const normalizedOption = optionValue.toLowerCase();
-    const normalizedTarget = targetValue.toLowerCase();
+    const normalizedTarget = stringResult.data.toLowerCase();
 
     // Exact match after normalization
     if (normalizedOption === normalizedTarget) {
@@ -215,28 +255,28 @@ const findControlledInput = (element: HTMLElement): HTMLInputElement | null => {
   // Check for common patterns
 
   // 1. Input might be a child
-  const childInput = element.querySelector('input[type="checkbox"], input[type="radio"]') as HTMLInputElement;
+  const childInput = queryInputElement(element, 'input[type="checkbox"], input[type="radio"]');
   if (childInput) return childInput;
 
   // 2. Input might be a sibling
-  const siblingInput = element.parentElement?.querySelector(
-    'input[type="checkbox"], input[type="radio"]',
-  ) as HTMLInputElement;
+  const siblingInput = element.parentElement
+    ? queryInputElement(element.parentElement, 'input[type="checkbox"], input[type="radio"]')
+    : null;
   if (siblingInput && siblingInput !== element) return siblingInput;
 
   // 3. Input might be linked by ARIA attributes
   const controlsId = element.getAttribute('aria-controls');
   if (controlsId) {
     const controlledElement = document.getElementById(controlsId);
-    if (controlledElement instanceof HTMLInputElement) {
+    if (isHTMLInputElement(controlledElement)) {
       return controlledElement;
     }
   }
 
   // 4. Input might be hidden in the DOM
   if (element.id) {
-    const relatedInput = document.querySelector(`input[aria-labelledby="${element.id}"]`) as HTMLInputElement;
-    if (relatedInput) return relatedInput;
+    const relatedInput = document.querySelector(`input[aria-labelledby="${element.id}"]`);
+    if (isHTMLInputElement(relatedInput)) return relatedInput;
   }
 
   return null;
@@ -271,7 +311,7 @@ const updateCustomCheckable = (element: HTMLElement, checked: boolean): void => 
   let inputFound = false;
 
   // Check if element contains an input
-  const containedInput = element.querySelector('input[type="checkbox"], input[type="radio"]') as HTMLInputElement;
+  const containedInput = queryInputElement(element, 'input[type="checkbox"], input[type="radio"]');
   if (containedInput) {
     updateNativeCheckable(containedInput, checked);
     inputFound = true;
@@ -279,9 +319,7 @@ const updateCustomCheckable = (element: HTMLElement, checked: boolean): void => 
 
   // Check if element's parent contains an input
   if (!inputFound && element.parentElement) {
-    const parentInput = element.parentElement.querySelector(
-      'input[type="checkbox"], input[type="radio"]',
-    ) as HTMLInputElement;
+    const parentInput = queryInputElement(element.parentElement, 'input[type="checkbox"], input[type="radio"]');
     if (parentInput && !parentInput.contains(element)) {
       updateNativeCheckable(parentInput, checked);
       inputFound = true;
@@ -292,8 +330,8 @@ const updateCustomCheckable = (element: HTMLElement, checked: boolean): void => 
   if (!inputFound && element.tagName === 'LABEL') {
     const labelFor = element.getAttribute('for');
     if (labelFor) {
-      const linkedInput = document.getElementById(labelFor) as HTMLInputElement;
-      if (linkedInput && (linkedInput.type === 'checkbox' || linkedInput.type === 'radio')) {
+      const linkedInput = document.getElementById(labelFor);
+      if (isHTMLInputElement(linkedInput) && (linkedInput.type === 'checkbox' || linkedInput.type === 'radio')) {
         updateNativeCheckable(linkedInput, checked);
         inputFound = true;
       }
@@ -635,8 +673,8 @@ const groupBySemanticContainers = async (
 
     // Find the best semantic container for this element
     for (const selector of semanticSelectors) {
-      const container = element.closest(selector) as HTMLElement;
-      if (container) {
+      const container = element.closest(selector);
+      if (isHTMLElement(container)) {
         // Score this container based on how appropriate it is
         const score = scoreSemanticContainer(container, elements, type);
         if (score > bestScore) {
@@ -812,7 +850,7 @@ const createRadioGroupField = async (
   testMode: boolean,
 ): Promise<CheckableField> => {
   const firstElement = elements[0];
-  const field = (await createBaseField(firstElement, index, 'radio', testMode)) as CheckableField;
+  const field = toCheckableField(await createBaseField(firstElement, index, 'radio', testMode));
 
   // Set group metadata
   field.groupName = groupId;
@@ -906,7 +944,7 @@ const createRadioGroupField = async (
  * Create a field for a single checkbox
  */
 const createCheckboxField = async (element: HTMLElement, index: number, testMode: boolean): Promise<CheckableField> => {
-  const field = (await createBaseField(element, index, 'checkbox', testMode)) as CheckableField;
+  const field = toCheckableField(await createBaseField(element, index, 'checkbox', testMode));
 
   // Set current state
   if (element instanceof HTMLInputElement) {
@@ -935,7 +973,7 @@ const createCheckboxGroupField = async (
   testMode: boolean,
 ): Promise<CheckableField> => {
   const firstElement = elements[0];
-  const field = (await createBaseField(firstElement, index, 'checkbox', testMode)) as CheckableField;
+  const field = toCheckableField(await createBaseField(firstElement, index, 'checkbox', testMode));
 
   // Set group metadata
   field.groupName = groupId;
@@ -995,7 +1033,7 @@ const createCheckboxGroupField = async (
  * Create a field for a switch element
  */
 const createSwitchField = async (element: HTMLElement, index: number, testMode: boolean): Promise<CheckableField> => {
-  const field = (await createBaseField(element, index, 'checkbox', testMode)) as CheckableField;
+  const field = toCheckableField(await createBaseField(element, index, 'checkbox', testMode));
 
   // Set current state
   field.checked = element.getAttribute('aria-checked') === 'true';

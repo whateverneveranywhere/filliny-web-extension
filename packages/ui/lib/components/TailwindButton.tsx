@@ -1,20 +1,39 @@
+import { Button } from './ui/button';
 import { cn } from '../utils';
+import { BinaryTheme } from '@extension/shared';
 import type { ComponentPropsWithoutRef } from 'react';
 
+/**
+ * Binary theme type (light/dark without system option)
+ */
+type BinaryThemeType = `${BinaryTheme}`;
+
 export type TWButtonProps = {
-  theme?: 'light' | 'dark';
+  /** Theme determines the button's color scheme */
+  theme?: BinaryThemeType;
 } & ComponentPropsWithoutRef<'button'>;
 
-export function TailwindButton({ theme, className, children, ...props }: TWButtonProps) {
-  return (
-    <button
-      className={cn(
-        className,
-        'filliny-py-1 filliny-px-4 filliny-rounded filliny-shadow hover:filliny-scale-105',
-        theme === 'light' ? 'filliny-bg-white filliny-text-black' : 'filliny-bg-black filliny-text-white',
-      )}
-      {...props}>
-      {children}
-    </button>
-  );
-}
+/**
+ * Theme-aware button component.
+ *
+ * @deprecated Prefer using <Button variant="outline" /> or <Button variant="secondary" />
+ * with appropriate className for theme-specific styling.
+ *
+ * @example
+ * // Preferred approach:
+ * <Button variant="outline" className={isLight ? 'bg-white text-black' : 'bg-black text-white'}>
+ *   Click me
+ * </Button>
+ */
+export const TailwindButton = ({ theme, className, children, ...props }: TWButtonProps) => (
+  <Button
+    variant="ghost"
+    className={cn(
+      'filliny-py-1 filliny-px-4 filliny-rounded filliny-shadow hover:filliny-scale-105',
+      theme === BinaryTheme.LIGHT ? 'filliny-bg-white filliny-text-black' : 'filliny-bg-black filliny-text-white',
+      className,
+    )}
+    {...props}>
+    {children}
+  </Button>
+);

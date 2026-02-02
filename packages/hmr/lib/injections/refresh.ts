@@ -1,10 +1,12 @@
 import initClient from '../initializers/init-client.js';
 
+// Declare the global __HMR_ID variable that's injected at build time
+declare const __HMR_ID: string;
+
 (() => {
   let pendingReload = false;
 
   initClient({
-    // @ts-expect-error That's because of the dynamic code loading
     id: __HMR_ID,
     onUpdate: () => {
       // disable reload when tab is hidden

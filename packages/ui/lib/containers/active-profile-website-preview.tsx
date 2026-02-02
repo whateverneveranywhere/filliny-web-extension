@@ -16,7 +16,7 @@ import {
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { Separator } from '../components/ui/separator';
-import { useToast } from '../components/ui/use-toast';
+import { useToast } from '../hooks/use-toast';
 import { cn } from '../utils';
 import { usePOVListQuery, useTonesListQuery, useEditFillingProfileMutation } from '@extension/shared';
 import { profileStorage } from '@extension/storage';

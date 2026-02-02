@@ -1,3 +1,12 @@
+/**
+ * Constants barrel file
+ * Consolidates all constant definitions from the shared package
+ */
+
+// ============================================================================
+// Console Color Constants
+// ============================================================================
+
 export const COLORS = {
   Reset: '\x1b[0m',
   Bright: '\x1b[1m',
@@ -22,4 +31,12 @@ export const COLORS = {
   BgMagenta: '\x1b[45m',
   BgCyan: '\x1b[46m',
   BgWhite: '\x1b[47m',
+} as const;
+
+// ============================================================================
+// Project URL Constants
+// ============================================================================
+
+export const PROJECT_URL_OBJECT = {
+  url: 'https://github.com/Jonghakseo/chrome-extension-boilerplate-react-vite',
 } as const;

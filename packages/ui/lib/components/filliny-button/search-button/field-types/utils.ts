@@ -2,7 +2,15 @@
  * Safely get a string value from potentially complex field values
  */
 import { getFieldLabel } from '../fieldUtils';
-import type { Field, FieldType } from '@extension/shared';
+import { hasProperty, isHTMLElement, isHTMLInputElement, FieldTypeSchema } from '@extension/shared';
+import type {
+  Field,
+  FieldType,
+  JQueryStatic,
+  JQueryWindow,
+  DOMEventHandler,
+  AngularContextElement,
+} from '@extension/shared';
 
 // Track used field IDs to ensure uniqueness
 const usedFieldIds = new Set<string>();
@@ -12,6 +20,23 @@ export const getStringValue = (value: unknown): string => {
   if (Array.isArray(value)) return value.join(',');
   return String(value);
 };
+
+/**
+ * Type guard to check if a value is an event handler function
+ */
+const isEventHandler = (value: unknown): value is DOMEventHandler => typeof value === 'function';
+
+/**
+ * Type guard to check if an object has an Angular context
+ */
+const hasAngularContext = (element: HTMLElement): element is AngularContextElement =>
+  hasProperty(element, '__ngContext__');
+
+/**
+ * Type guard to check if window has jQuery
+ */
+const hasJQuery = (win: Window): win is JQueryWindow =>
+  hasProperty(win, 'jQuery') && typeof (win as JQueryWindow).jQuery !== 'undefined';
 
 /**
  * Dispatches an event on the given element
@@ -29,26 +54,29 @@ export const dispatchEvent = (element: HTMLElement, eventName: string): void => 
 
     // For React and other frameworks that may use synthetic events
     // Try to find and call any attached event handlers directly
-    const reactHandler =
-      // @ts-expect-error - Dynamic property access for event handlers
-      element[`on${eventName}`] || element.getAttribute(`on${eventName}`);
-
-    if (typeof reactHandler === 'function') {
-      reactHandler.call(element, event);
+    // Use a type-safe approach for accessing dynamic event handler properties
+    const handlerPropertyName = `on${eventName}`;
+    if (hasProperty(element, handlerPropertyName)) {
+      const handler = element[handlerPropertyName];
+      if (isEventHandler(handler)) {
+        try {
+          handler.call(element, event);
+        } catch {
+          // Handler call failed, continue silently
+        }
+      }
     }
 
     // For Angular, look for event handlers in the __ngContext__ property
-    const elementWithContext = element as { __ngContext__?: unknown };
-    if (elementWithContext.__ngContext__) {
+    if (hasAngularContext(element)) {
       console.log(`Found Angular context, trying to trigger ${eventName} handler`);
     }
 
     // For jQuery-based sites
-    const windowWithJQuery = window as { jQuery?: unknown };
-    if (typeof windowWithJQuery.jQuery !== 'undefined') {
+    const win = window as Window;
+    if (hasJQuery(win) && win.jQuery) {
       try {
-        // @ts-expect-error - jQuery is not typed
-        windowWithJQuery.jQuery(element).trigger(eventName);
+        win.jQuery(element).trigger(eventName);
       } catch (e) {
         console.log(`jQuery trigger failed:`, e);
       }
@@ -154,7 +182,11 @@ export const findRelatedRadioButtons = (radioButton: HTMLElement): HTMLElement[]
     // Find the radiogroup container
     const radioGroup = radioButton.closest('[role="radiogroup"]');
     if (radioGroup) {
-      Array.from(radioGroup.querySelectorAll('[role="radio"]')).forEach(radio => related.push(radio as HTMLElement));
+      Array.from(radioGroup.querySelectorAll('[role="radio"]')).forEach(radio => {
+        if (isHTMLElement(radio)) {
+          related.push(radio);
+        }
+      });
       return related;
     }
   }
@@ -220,7 +252,11 @@ export const findRelatedCheckboxes = (checkbox: HTMLElement): HTMLElement[] => {
     // Find the checkboxgroup container
     const checkboxGroup = checkbox.closest('[role="group"]');
     if (checkboxGroup) {
-      Array.from(checkboxGroup.querySelectorAll('[role="checkbox"]')).forEach(cb => related.push(cb as HTMLElement));
+      Array.from(checkboxGroup.querySelectorAll('[role="checkbox"]')).forEach(cb => {
+        if (isHTMLElement(cb)) {
+          related.push(cb);
+        }
+      });
       return related;
     }
   }
@@ -312,19 +348,24 @@ export const findSelectOptions = (
   // Case 2: ARIA Combobox/Listbox
   if (selectElement.getAttribute('role') === 'combobox' || selectElement.getAttribute('role') === 'listbox') {
     // Find the listbox element
-    let listbox = selectElement;
+    let listbox: HTMLElement | null = selectElement;
     if (selectElement.getAttribute('role') === 'combobox') {
       // If it's a combobox, look for its associated listbox
       const listboxId = selectElement.getAttribute('aria-controls') || selectElement.getAttribute('aria-owns');
       if (listboxId) {
-        listbox = document.getElementById(listboxId) as HTMLElement;
+        const foundListbox = document.getElementById(listboxId);
+        listbox = isHTMLElement(foundListbox) ? foundListbox : null;
       } else {
         // Try to find a listbox within or adjacent to the combobox
-        listbox =
-          (selectElement.querySelector('[role="listbox"]') as HTMLElement) ||
-          (selectElement.nextElementSibling?.getAttribute('role') === 'listbox'
-            ? (selectElement.nextElementSibling as HTMLElement)
-            : null);
+        const innerListbox = selectElement.querySelector('[role="listbox"]');
+        const siblingListbox = selectElement.nextElementSibling;
+        if (isHTMLElement(innerListbox)) {
+          listbox = innerListbox;
+        } else if (siblingListbox?.getAttribute('role') === 'listbox' && isHTMLElement(siblingListbox)) {
+          listbox = siblingListbox;
+        } else {
+          listbox = null;
+        }
       }
     }
 
@@ -332,14 +373,18 @@ export const findSelectOptions = (
       // Find all options within the listbox
       const optionElements = listbox.querySelectorAll('[role="option"]');
       optionElements.forEach(optionEl => {
-        const option = optionEl as HTMLElement;
-        options.push({
-          element: option,
-          value:
-            option.getAttribute('aria-value') || option.getAttribute('data-value') || option.textContent?.trim() || '',
-          text: option.textContent?.trim() || '',
-          selected: option.getAttribute('aria-selected') === 'true',
-        });
+        if (isHTMLElement(optionEl)) {
+          options.push({
+            element: optionEl,
+            value:
+              optionEl.getAttribute('aria-value') ||
+              optionEl.getAttribute('data-value') ||
+              optionEl.textContent?.trim() ||
+              '',
+            text: optionEl.textContent?.trim() || '',
+            selected: optionEl.getAttribute('aria-selected') === 'true',
+          });
+        }
       });
     }
 
@@ -348,8 +393,8 @@ export const findSelectOptions = (
 
   // Case 3: Custom dropdown components - look for common patterns
   // Look for a button that toggles the dropdown
-  const toggleButton = selectElement.querySelector('button, [role="button"]') as HTMLElement;
-  if (toggleButton) {
+  const toggleButtonEl = selectElement.querySelector('button, [role="button"]');
+  if (isHTMLElement(toggleButtonEl)) {
     // Try to find the dropdown list - could be next to or within the container
     const dropdownLists = [
       selectElement.querySelector('ul, [class*="dropdown"], [class*="options"], [class*="menu"]'),
@@ -362,19 +407,19 @@ export const findSelectOptions = (
         const listItems = list.querySelectorAll('li, [class*="option"], [class*="item"]');
         if (listItems.length > 0) {
           listItems.forEach(item => {
-            const option = item as HTMLElement;
-            const isSelected =
-              option.classList.contains('selected') ||
-              option.classList.contains('active') ||
-              option.getAttribute('aria-selected') === 'true';
+            if (isHTMLElement(item)) {
+              const isSelected =
+                item.classList.contains('selected') ||
+                item.classList.contains('active') ||
+                item.getAttribute('aria-selected') === 'true';
 
-            options.push({
-              element: option,
-              value:
-                option.getAttribute('data-value') || option.getAttribute('value') || option.textContent?.trim() || '',
-              text: option.textContent?.trim() || '',
-              selected: isSelected,
-            });
+              options.push({
+                element: item,
+                value: item.getAttribute('data-value') || item.getAttribute('value') || item.textContent?.trim() || '',
+                text: item.textContent?.trim() || '',
+                selected: isSelected,
+              });
+            }
           });
           return options;
         }
@@ -437,8 +482,8 @@ export const simulateTyping = async (element: HTMLElement, value: string): Promi
           console.debug('Native event creation failed:', e);
         }
       }
-    } else if ('value' in element) {
-      (element as { value: string }).value = value;
+    } else if (hasProperty(element, 'value') && typeof element.value === 'string') {
+      element.value = value;
     } else if (element.isContentEditable) {
       element.textContent = value;
     }
@@ -629,9 +674,12 @@ export const createBaseField = async (
 ): Promise<Field> => {
   const fieldId = getUniqueFieldId(index);
   element.setAttribute('data-filliny-id', fieldId);
+  // Validate type using Zod schema, defaulting to 'text' if invalid
+  const validatedType = FieldTypeSchema.safeParse(type);
+  const fieldType: FieldType = validatedType.success ? validatedType.data : 'text';
   const field: Field = {
     id: fieldId,
-    type: type as FieldType,
+    type: fieldType,
     xpath: getElementXPath(element),
     uniqueSelectors: generateUniqueSelectors(element),
     value: '',

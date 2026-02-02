@@ -1,2 +1,2 @@
-import "@packages/shared/src/utils/console-suppressor";
+import "@packages/shared/lib/utils/console-suppressor";
 // ... existing code ...

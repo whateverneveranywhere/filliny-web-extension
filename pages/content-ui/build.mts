@@ -3,6 +3,7 @@ import { makeEntryPointPlugin } from '@extension/hmr';
 import { getContentScriptEntries, withPageConfig } from '@extension/vite-config';
 import { IS_DEV } from '@extension/env';
 import { build } from 'vite';
+import type { InlineConfig } from 'vite';
 import { build as buildTW } from 'tailwindcss/lib/cli/build';
 
 const rootDir = resolve(import.meta.dirname);
@@ -41,9 +42,12 @@ const builds = configs.map(async ({ name, config }) => {
     ['--watch']: IS_DEV,
   };
   await buildTW(args);
-  //@ts-expect-error This is hidden property into vite's resolveConfig()
-  config.configFile = false;
-  await build(config);
+  // Create an InlineConfig by extending the base config with configFile
+  const inlineConfig: InlineConfig = {
+    ...config,
+    configFile: false,
+  };
+  await build(inlineConfig);
 });
 
 await Promise.all(builds);

@@ -1,11 +1,23 @@
 export {
-  springQuick,
-  springSmooth,
-  springBouncy,
-  fadeIn,
-  fadeInScale,
-  slideInRight,
-  slideInLeft,
-  togglePillVariants,
+  // Duration constants
+  durations,
+  durationsInSeconds,
+  // CSS easing functions
+  easings,
+  // Tailwind animation class combinations
+  animationClasses,
+  // Inline CSS transition styles
+  transitionStyles,
+  // CSS keyframes
+  keyframes,
+  // Helper functions
+  combineAnimations,
+  // Framer-motion variants
+  fadeVariants,
+  slideVariants,
+  scaleVariants,
+  staggerContainerVariants,
+  staggerItemVariants,
+  // Framer-motion transition configurations
+  motionTransitions,
 } from './variants';
-export type { Transition, Variants } from './variants';

@@ -1,6 +1,6 @@
 import { useExtensionAuth, useStorage, getConfig, WebappEnvs } from '@extension/shared';
 import { authStorage } from '@extension/storage';
-import { LoadingSpinner, QueryClientProvider, RouterProvider, SigninPage, withPageWrapper } from '@extension/ui';
+import { Loading, QueryClientProvider, RouterProvider, SigninPage, withPageWrapper } from '@extension/ui';
 import { useEffect, useState } from 'react';
 
 // Define the type for the config
@@ -41,7 +41,7 @@ const HomePage = () => {
   }, []);
 
   if (isLoading) {
-    return <LoadingSpinner />;
+    return <Loading fullScreen />;
   }
 
   return (

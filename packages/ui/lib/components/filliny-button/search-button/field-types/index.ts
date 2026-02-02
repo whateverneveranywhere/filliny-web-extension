@@ -5,7 +5,7 @@ import { detectSelectFields } from './select';
 import { UNIVERSAL_FORM_SELECTORS } from './selectors';
 import { detectTextField } from './text';
 import type { SelectorWithConfidence } from './selectors';
-import type { Field } from '@extension/shared';
+import type { Field, ShadowDOMHostElement, ElementWithEventListeners } from '@extension/shared';
 
 /**
  * Universal field detection with multiple strategies and robust error handling
@@ -637,7 +637,7 @@ const analyzeAdvancedInteractionPatterns = (el: HTMLElement): number => {
   // Check for modern event listeners (not just inline handlers)
   // Note: getEventListeners is a Chrome DevTools API, may not be available in all contexts
   try {
-    const listeners = (el as unknown as { getEventListeners?: () => Record<string, unknown[]> }).getEventListeners?.();
+    const listeners = (el as unknown as ElementWithEventListeners).getEventListeners?.();
     if (listeners && Object.keys(listeners).length > 0) {
       score += 3;
     }
@@ -857,13 +857,11 @@ const enhanceWithAdvancedShadowDOMDetection = (
   const shadowElements: HTMLElement[] = [];
 
   // Strategy 1: Direct Shadow DOM access
-  const shadowHosts = Array.from(container.querySelectorAll('*')).filter(
-    el => (el as HTMLElement & { shadowRoot?: ShadowRoot }).shadowRoot,
-  );
+  const shadowHosts = Array.from(container.querySelectorAll('*')).filter(el => (el as ShadowDOMHostElement).shadowRoot);
 
   for (const host of shadowHosts) {
     try {
-      const shadowRoot = (host as HTMLElement & { shadowRoot?: ShadowRoot }).shadowRoot;
+      const shadowRoot = (host as ShadowDOMHostElement).shadowRoot;
       if (shadowRoot) {
         const elements = getFormElementsRobust(shadowRoot);
         shadowElements.push(...elements);

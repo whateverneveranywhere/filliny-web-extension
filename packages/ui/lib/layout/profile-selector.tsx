@@ -2,8 +2,8 @@ import { Button } from '../components';
 import { Drawer } from '../components/drawer';
 import { RHFShadcnComboBox } from '../components/rhf';
 import FormProvider from '../components/rhf/FormProvider';
-import { ProfileForm } from '@/lib/containers/profile-form';
-import { toast } from '@/lib/hooks/use-toast';
+import { ProfileForm } from '../containers/profile-form';
+import { toast } from '../hooks/use-toast';
 import {
   ProfileSelectorSchema,
   useActiveProfile,
@@ -26,7 +26,7 @@ function ProfileSelector() {
 
   const { activeProfileId, activeProfile } = useActiveProfile();
   // Queries and Mutations
-  const { data: profiles, isLoading, isFetching, refetch: refetchProfiles } = useProfilesListQuery();
+  const { data: profiles, isLoading, isFetching } = useProfilesListQuery();
   const { mutateAsync: deleteProfile, isPending: isDeleting } = useDeleteProfileByIdMutation();
   const { mutateAsync: updateActiveProfile, isPending: isUpdating } = useChangeActiveFillingProfileMutation();
 
@@ -70,8 +70,8 @@ function ProfileSelector() {
       try {
         const isActiveProfile = id === activeProfileId;
 
+        // Mutation automatically invalidates profile queries via invalidateProfileMutationQueries
         await deleteProfile({ id });
-        await refetchProfiles();
 
         if (isActiveProfile && profiles) {
           // Only reset if we don't have any remaining profiles
@@ -94,7 +94,7 @@ function ProfileSelector() {
         toast({ variant: 'destructive', title: 'Failed to delete profile' });
       }
     },
-    [deleteProfile, refetchProfiles, activeProfileId, profiles, updateActiveProfile, setValue],
+    [deleteProfile, activeProfileId, profiles, updateActiveProfile, setValue],
   );
 
   const handleEditProfile = useCallback(
@@ -113,11 +113,11 @@ function ProfileSelector() {
     [profileModal],
   );
 
+  // ProfileForm mutations already invalidate queries via invalidateProfileMutationQueries
   const handleFormSubmit = useCallback(() => {
     setEditingId(undefined);
     profileModal.onFalse();
-    refetchProfiles();
-  }, [profileModal, refetchProfiles]);
+  }, [profileModal]);
 
   // Initialize default profile if needed
   useEffect(() => {

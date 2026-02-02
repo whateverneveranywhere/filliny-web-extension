@@ -1,16 +1,24 @@
-// components/TextInput.tsx
-import { FormControl, FormDescription, FormField, FormItem, FormLabel } from '../ui/form';
+import FormFieldWrapper from './FormFieldWrapper';
 import { Switch } from '../ui/switch';
-import { cn } from '@/lib/utils';
-import React from 'react';
-import { useFormContext } from 'react-hook-form';
-import type { GeneralFormProps } from '@extension/shared';
+import type { BaseRHFFieldProps } from './types';
+import type { FieldValues, Path } from 'react-hook-form';
 
-interface Props extends GeneralFormProps {
-  className?: string;
-}
-
-function RHFShadcnSwitch({
+/**
+ * React Hook Form switch/toggle component.
+ * Renders as a horizontal layout with label on the left and switch on the right.
+ *
+ * @example
+ * // Basic switch
+ * <RHFShadcnSwitch name="notifications" title="Enable notifications" />
+ *
+ * // With description
+ * <RHFShadcnSwitch
+ *   name="darkMode"
+ *   title="Dark mode"
+ *   description="Use dark color scheme"
+ * />
+ */
+const RHFShadcnSwitch = <T extends FieldValues = FieldValues>({
   name,
   title,
   description,
@@ -18,40 +26,30 @@ function RHFShadcnSwitch({
   onChange: externalOnChange,
   className,
   required,
-
   disabled = false,
-}: Props) {
-  const { control } = useFormContext();
-
-  return (
-    <FormField
-      control={control}
-      name={name}
-      render={({ field }) => (
-        <FormItem
-          className={`${cn('filliny-flex filliny-flex-row filliny-items-center filliny-justify-between', className)}`}>
-          <div className="filliny-space-y-0.5">
-            <FormLabel className="filliny-text-base">{title}</FormLabel>
-            {description && <FormDescription>{description}</FormDescription>}
-          </div>
-          <FormControl>
-            <Switch
-              required={required}
-              data-testid={field.name}
-              disabled={disabled}
-              onCheckedChange={e => {
-                if (externalOnChange) {
-                  return externalOnChange?.(e);
-                }
-                return field.onChange(e);
-              }}
-              checked={field.value !== undefined ? field.value : externalValue}
-            />
-          </FormControl>
-        </FormItem>
-      )}
-    />
-  );
-}
+  control,
+}: BaseRHFFieldProps<T>) => (
+  <FormFieldWrapper<T>
+    name={name as Path<T>}
+    control={control}
+    title={title}
+    description={description}
+    required={required}
+    disabled={disabled}
+    className={className}
+    value={externalValue}
+    onChange={externalOnChange}
+    layout={{ direction: 'horizontal', showError: false }}>
+    {({ field, handleChange, getValue }) => (
+      <Switch
+        required={required}
+        data-testid={field.name}
+        disabled={disabled}
+        onCheckedChange={checked => handleChange(checked)}
+        checked={(getValue() as boolean) ?? false}
+      />
+    )}
+  </FormFieldWrapper>
+);
 
 export default RHFShadcnSwitch;

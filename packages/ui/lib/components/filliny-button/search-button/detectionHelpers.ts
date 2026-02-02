@@ -19,32 +19,88 @@ import {
   cleanupShadowDOMObservation,
   querySelectorAllDeep,
   isInShadowDOM,
+  hasProperty,
 } from '@extension/shared';
+import { z } from 'zod';
 
 const debug = createDebugLogger('Detection');
 
 // Shadow DOM roots registry for form detection
 const observedShadowRoots = new Set<ShadowRoot>();
 
+/**
+ * Type guard to check if a node is an Element
+ */
+const isElement = (node: Node): node is Element => node.nodeType === Node.ELEMENT_NODE;
+
 // --- Frame Document Utilities ---
-interface DocumentWithObserver extends Document {
-  __fillinyFrameObserver?: MutationObserver;
-}
+
+// ============================================================================
+// Zod Schemas for Detection Helper Types
+// ============================================================================
+
+/**
+ * Schema for document with observer extension
+ * Note: Document is a native type, so we define the extension properties
+ */
+const DocumentWithObserverPropsSchema = z.object({
+  __fillinyFrameObserver: z.custom<MutationObserver>(val => val instanceof MutationObserver).optional(),
+});
+
+type DocumentWithObserverProps = z.infer<typeof DocumentWithObserverPropsSchema>;
+type DocumentWithObserver = Document & DocumentWithObserverProps;
+
+/**
+ * Type guard to check if a document has the observer extension
+ * This allows safely accessing the __fillinyFrameObserver property
+ */
+const isDocumentWithObserver = (doc: Document): doc is DocumentWithObserver =>
+  '__fillinyFrameObserver' in doc || doc instanceof Document;
+
+/**
+ * Safely attach observer to document
+ */
+const attachObserverToDocument = (doc: Document, observer: MutationObserver): void => {
+  (doc as DocumentWithObserver).__fillinyFrameObserver = observer;
+};
 
 // Callback type for notifying about new forms
 export type FormDetectionCallback = (doc: Document) => void;
 
-// Universal dynamic content detection system
-interface DynamicContentDetector {
-  observer: MutationObserver;
-  confidence: number;
-  lastDetectionTime: number;
-  stableStateTimeout: number;
-  onStableCallback?: () => void;
-}
+/**
+ * Schema for dynamic content detector
+ */
+const DynamicContentDetectorSchema = z.object({
+  observer: z.custom<MutationObserver>(val => val instanceof MutationObserver, {
+    message: 'Expected MutationObserver',
+  }),
+  confidence: z.number(),
+  lastDetectionTime: z.number(),
+  stableStateTimeout: z.number(),
+  onStableCallback: z.function().returns(z.void()).optional(),
+});
+
+type DynamicContentDetector = z.infer<typeof DynamicContentDetectorSchema>;
 
 // Global registry for dynamic content detection
 const dynamicDetectors = new Map<Document, DynamicContentDetector>();
+
+/**
+ * Schema for API response monitor
+ */
+const APIResponseMonitorSchema = z.object({
+  originalFetch: z.custom<typeof fetch>(val => typeof val === 'function', { message: 'Expected fetch function' }),
+  originalXHROpen: z.custom<typeof XMLHttpRequest.prototype.open>(val => typeof val === 'function', {
+    message: 'Expected XHR open function',
+  }),
+  interceptedResponses: z.custom<Map<string, unknown>>(val => val instanceof Map, {
+    message: 'Expected Map<string, unknown>',
+  }),
+  formDefinitionPatterns: z.array(z.custom<RegExp>(val => val instanceof RegExp, { message: 'Expected RegExp' })),
+  onFormDefinitionLoaded: z.function().args(z.unknown()).returns(z.void()).optional(),
+});
+
+type APIResponseMonitor = z.infer<typeof APIResponseMonitorSchema>;
 
 // API response monitoring registry
 const apiResponseMonitors = new Map<Document, APIResponseMonitor>();
@@ -66,15 +122,6 @@ const FORM_LOADING_INDICATORS = [
   '[class*="lazy"]',
   '[data-defer]',
 ];
-
-// API response monitoring interface
-interface APIResponseMonitor {
-  originalFetch: typeof fetch;
-  originalXHROpen: typeof XMLHttpRequest.prototype.open;
-  interceptedResponses: Map<string, unknown>;
-  formDefinitionPatterns: RegExp[];
-  onFormDefinitionLoaded?: (data: unknown) => void;
-}
 
 // Patterns that indicate form definition API responses
 const FORM_DEFINITION_API_PATTERNS = [
@@ -231,15 +278,15 @@ export const getAllFrameDocuments = (onNewFrameLoaded?: FormDetectionCallback): 
         return iframe.contentDocument;
       }
     } catch (e) {
-      const error = e as Error;
+      const errorMessage = e instanceof Error ? e.message : String(e);
       debug.log('Frame access error:', {
         src: iframe.src,
-        error: error.message,
+        error: errorMessage,
         retryCount,
         maxRetries,
       });
 
-      if (error.message.includes('cross-origin') || error.message.includes('Permission denied')) {
+      if (errorMessage.includes('cross-origin') || errorMessage.includes('Permission denied')) {
         iframe.setAttribute('data-filliny-cross-origin', 'true');
         return null;
       }
@@ -263,7 +310,7 @@ export const getAllFrameDocuments = (onNewFrameLoaded?: FormDetectionCallback): 
           if (iframeDoc && !docs.includes(iframeDoc)) {
             docs.push(iframeDoc);
             await processIframes(iframeDoc);
-            observeNewFrames(iframeDoc as DocumentWithObserver);
+            observeNewFrames(iframeDoc);
 
             // Initialize API monitoring for this iframe too
             initializeAPIResponseMonitoring(iframeDoc, () => {
@@ -281,7 +328,7 @@ export const getAllFrameDocuments = (onNewFrameLoaded?: FormDetectionCallback): 
         if (iframeDoc) {
           docs.push(iframeDoc);
           await processIframes(iframeDoc);
-          observeNewFrames(iframeDoc as DocumentWithObserver);
+          observeNewFrames(iframeDoc);
           if (onNewFrameLoaded) onNewFrameLoaded(iframeDoc);
         }
       }
@@ -290,7 +337,8 @@ export const getAllFrameDocuments = (onNewFrameLoaded?: FormDetectionCallback): 
     const objects = Array.from(doc.getElementsByTagName('object'));
     for (const obj of objects) {
       try {
-        const objDoc = (obj as HTMLObjectElement & { contentDocument?: Document }).contentDocument;
+        // HTMLObjectElement has contentDocument property
+        const objDoc = obj.contentDocument;
         if (objDoc && !processedFrames.has(obj.data || 'object')) {
           processedFrames.add(obj.data || 'object');
           docs.push(objDoc);
@@ -302,7 +350,7 @@ export const getAllFrameDocuments = (onNewFrameLoaded?: FormDetectionCallback): 
     }
   };
 
-  const observeNewFrames = (doc: DocumentWithObserver) => {
+  const observeNewFrames = (doc: Document) => {
     const observer = new MutationObserver(async mutations => {
       for (const mutation of mutations) {
         if (mutation.type === 'childList') {
@@ -319,7 +367,7 @@ export const getAllFrameDocuments = (onNewFrameLoaded?: FormDetectionCallback): 
                 if (iframeDoc && !docs.includes(iframeDoc)) {
                   docs.push(iframeDoc);
                   await processIframes(iframeDoc);
-                  observeNewFrames(iframeDoc as DocumentWithObserver);
+                  observeNewFrames(iframeDoc);
 
                   // Initialize API monitoring for this iframe too
                   initializeAPIResponseMonitoring(iframeDoc, () => {
@@ -337,7 +385,7 @@ export const getAllFrameDocuments = (onNewFrameLoaded?: FormDetectionCallback): 
               if (iframeDoc) {
                 docs.push(iframeDoc);
                 await processIframes(iframeDoc);
-                observeNewFrames(iframeDoc as DocumentWithObserver);
+                observeNewFrames(iframeDoc);
                 if (onNewFrameLoaded) onNewFrameLoaded(iframeDoc);
               }
             }
@@ -347,12 +395,12 @@ export const getAllFrameDocuments = (onNewFrameLoaded?: FormDetectionCallback): 
     });
 
     observer.observe(doc, { childList: true, subtree: true });
-    doc.__fillinyFrameObserver = observer;
+    attachObserverToDocument(doc, observer);
   };
 
   const init = async () => {
     await processIframes(document);
-    observeNewFrames(document as DocumentWithObserver);
+    observeNewFrames(document);
   };
 
   init().catch(console.error);
@@ -361,12 +409,17 @@ export const getAllFrameDocuments = (onNewFrameLoaded?: FormDetectionCallback): 
 
 // --- Form Container Detection ---
 
-interface FormCandidate {
-  element: HTMLElement;
-  score: number;
-  fieldCount: number;
-  reasons: string[];
-}
+/**
+ * Schema for form candidate detection results
+ */
+const FormCandidateSchema = z.object({
+  element: z.custom<HTMLElement>(val => val instanceof HTMLElement, { message: 'Expected HTMLElement' }),
+  score: z.number(),
+  fieldCount: z.number(),
+  reasons: z.array(z.string()),
+});
+
+type FormCandidate = z.infer<typeof FormCandidateSchema>;
 
 /**
  * Gets all form containers from the unified registry.
@@ -735,8 +788,8 @@ function initializeDynamicContentDetection(doc: Document, onNewFormLoaded?: Form
 
           // Check for form-related additions with enhanced detection
           const hasFormAdditions = addedNodes.some(node => {
-            if (node.nodeType === Node.ELEMENT_NODE) {
-              const element = node as Element;
+            if (isElement(node)) {
+              const element = node;
 
               // Direct form field detection
               const isFormField = FORM_READY_INDICATORS.some(selector => {
@@ -768,8 +821,8 @@ function initializeDynamicContentDetection(doc: Document, onNewFormLoaded?: Form
 
           // Enhanced loading indicator removal detection
           const hasLoadingRemovals = removedNodes.some(node => {
-            if (node.nodeType === Node.ELEMENT_NODE) {
-              const element = node as Element;
+            if (isElement(node)) {
+              const element = node;
 
               // Standard loading indicators
               const isLoadingIndicator = FORM_LOADING_INDICATORS.some(selector => {
@@ -806,9 +859,8 @@ function initializeDynamicContentDetection(doc: Document, onNewFormLoaded?: Form
           // Check for significant DOM restructuring (common in SPAs)
           const hasStructuralChanges = addedNodes.length > 5 || removedNodes.length > 5;
           const hasContainerChanges = addedNodes.some(node => {
-            if (node.nodeType === Node.ELEMENT_NODE) {
-              const element = node as Element;
-              return ['DIV', 'SECTION', 'FORM', 'FIELDSET'].includes(element.tagName);
+            if (isElement(node)) {
+              return ['DIV', 'SECTION', 'FORM', 'FIELDSET'].includes(node.tagName);
             }
             return false;
           });
@@ -817,8 +869,8 @@ function initializeDynamicContentDetection(doc: Document, onNewFormLoaded?: Form
         }
 
         // Enhanced attribute change detection
-        if (mutation.type === 'attributes') {
-          const target = mutation.target as Element;
+        if (mutation.type === 'attributes' && isElement(mutation.target)) {
+          const target = mutation.target;
           const attributeName = mutation.attributeName;
 
           // Standard readiness indicators
@@ -1326,7 +1378,9 @@ export function initializeAPIResponseMonitoring(doc: Document, onFormDefinitionL
 
         // Call original handler if it exists
         if (originalOnReadyStateChange) {
-          originalOnReadyStateChange.call(this, null as unknown as Event);
+          // Create a synthetic event for the handler
+          const syntheticEvent = new Event('readystatechange');
+          originalOnReadyStateChange.call(this, syntheticEvent);
         }
       };
 
@@ -1334,7 +1388,9 @@ export function initializeAPIResponseMonitoring(doc: Document, onFormDefinitionL
       this.onload = function () {
         // onreadystatechange will handle the response parsing
         if (originalOnLoad) {
-          originalOnLoad.call(this, null as unknown as ProgressEvent<EventTarget>);
+          // Create a synthetic progress event for the handler
+          const syntheticEvent = new ProgressEvent('load');
+          originalOnLoad.call(this, syntheticEvent);
         }
       };
     }
@@ -1849,35 +1905,185 @@ function processMultiStepContainers(containers: HTMLElement[]): HTMLElement[] {
  * Enhanced form definition data processing
  * Extracts and normalizes form configuration from various API response formats
  */
-interface ProcessedFormDefinition {
-  fields: ProcessedFormField[];
-  steps?: ProcessedFormStep[];
-  validation?: Record<string, unknown>;
-  metadata?: Record<string, unknown>;
-  source: string;
-}
 
-interface ProcessedFormField {
-  id: string;
-  name: string;
-  type: string;
+// Zod schemas for form definition data types
+
+// Validation rule schema for form fields
+const ValidationRuleSchema = z.object({
+  type: z.string().optional(),
+  value: z.union([z.string(), z.number(), z.boolean()]).optional(),
+  message: z.string().optional(),
+  pattern: z.string().optional(),
+  min: z.number().optional(),
+  max: z.number().optional(),
+  minLength: z.number().optional(),
+  maxLength: z.number().optional(),
+  required: z.boolean().optional(),
+});
+type ValidationRule = z.infer<typeof ValidationRuleSchema>;
+
+const ValidationRulesSchema = z.record(
+  z.string(),
+  z.union([ValidationRuleSchema, z.string(), z.number(), z.boolean()]),
+);
+type ValidationRules = z.infer<typeof ValidationRulesSchema>;
+
+// Field option schema
+const FieldOptionSchema = z.object({
+  value: z.union([z.string(), z.number()]).optional(),
+  id: z.union([z.string(), z.number()]).optional(),
+  key: z.string().optional(),
+  label: z.string().optional(),
+  text: z.string().optional(),
+  name: z.string().optional(),
+});
+type FieldOption = z.infer<typeof FieldOptionSchema>;
+
+// Raw field data schema from API
+const RawFieldDataSchema: z.ZodType<{
+  id?: string | number;
+  name?: string;
+  key?: string;
+  type?: string;
+  fieldType?: string;
   label?: string;
+  title?: string;
+  displayName?: string;
   placeholder?: string;
   required?: boolean;
-  options?: Array<{ value: string; label: string }>;
-  validation?: Record<string, unknown>;
-  step?: string | number;
+  isRequired?: boolean;
+  options?: Array<z.infer<typeof FieldOptionSchema> | string>;
+  validation?: z.infer<typeof ValidationRulesSchema>;
   dependencies?: string[];
-  metadata?: Record<string, unknown>;
-}
+}> = z.object({
+  id: z.union([z.string(), z.number()]).optional(),
+  name: z.string().optional(),
+  key: z.string().optional(),
+  type: z.string().optional(),
+  fieldType: z.string().optional(),
+  label: z.string().optional(),
+  title: z.string().optional(),
+  displayName: z.string().optional(),
+  placeholder: z.string().optional(),
+  required: z.boolean().optional(),
+  isRequired: z.boolean().optional(),
+  options: z.array(z.union([FieldOptionSchema, z.string()])).optional(),
+  validation: ValidationRulesSchema.optional(),
+  dependencies: z.array(z.string()).optional(),
+});
+type RawFieldData = z.infer<typeof RawFieldDataSchema>;
 
-interface ProcessedFormStep {
-  id: string | number;
-  name: string;
+// Raw step data schema from API
+const RawStepDataSchema: z.ZodType<{
+  id?: string | number;
+  name?: string;
+  title?: string;
+  key?: string;
   label?: string;
-  fields: string[];
+  fields?: Array<string | z.infer<typeof RawFieldDataSchema>>;
   order?: number;
-  metadata?: Record<string, unknown>;
+}> = z.object({
+  id: z.union([z.string(), z.number()]).optional(),
+  name: z.string().optional(),
+  title: z.string().optional(),
+  key: z.string().optional(),
+  label: z.string().optional(),
+  fields: z.array(z.union([z.string(), RawFieldDataSchema])).optional(),
+  order: z.number().optional(),
+});
+type RawStepData = z.infer<typeof RawStepDataSchema>;
+
+// Processed form field schema
+const ProcessedFormFieldSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  type: z.string(),
+  label: z.string().optional(),
+  placeholder: z.string().optional(),
+  required: z.boolean().optional(),
+  options: z.array(z.object({ value: z.string(), label: z.string() })).optional(),
+  validation: ValidationRulesSchema.optional(),
+  step: z.union([z.string(), z.number()]).optional(),
+  dependencies: z.array(z.string()).optional(),
+  metadata: RawFieldDataSchema.optional(),
+});
+type ProcessedFormField = z.infer<typeof ProcessedFormFieldSchema>;
+
+// Processed form step schema
+const ProcessedFormStepSchema = z.object({
+  id: z.union([z.string(), z.number()]),
+  name: z.string(),
+  label: z.string().optional(),
+  fields: z.array(z.string()),
+  order: z.number().optional(),
+  metadata: RawStepDataSchema.optional(),
+});
+type ProcessedFormStep = z.infer<typeof ProcessedFormStepSchema>;
+
+// Normalized API response schema (recursive, using lazy for self-reference)
+const NormalizedAPIDataSchema: z.ZodType<{
+  fields?: RawFieldData[];
+  schema?: {
+    fields?: RawFieldData[];
+    properties?: Record<string, RawFieldData>;
+  };
+  steps?: RawStepData[];
+  wizard?: {
+    steps?: RawStepData[];
+  };
+  validation?: ValidationRules;
+  rules?: ValidationRules;
+  constraints?: ValidationRules;
+  data?: unknown;
+  result?: unknown;
+  payload?: unknown;
+  pageProps?: unknown;
+  form?: unknown;
+  formConfig?: unknown;
+  formDefinition?: unknown;
+}> = z.object({
+  fields: z.array(RawFieldDataSchema).optional(),
+  schema: z
+    .object({
+      fields: z.array(RawFieldDataSchema).optional(),
+      properties: z.record(z.string(), RawFieldDataSchema).optional(),
+    })
+    .optional(),
+  steps: z.array(RawStepDataSchema).optional(),
+  wizard: z
+    .object({
+      steps: z.array(RawStepDataSchema).optional(),
+    })
+    .optional(),
+  validation: ValidationRulesSchema.optional(),
+  rules: ValidationRulesSchema.optional(),
+  constraints: ValidationRulesSchema.optional(),
+  // Self-referential fields use z.unknown() for simplicity, validated at runtime
+  data: z.unknown().optional(),
+  result: z.unknown().optional(),
+  payload: z.unknown().optional(),
+  pageProps: z.unknown().optional(),
+  form: z.unknown().optional(),
+  formConfig: z.unknown().optional(),
+  formDefinition: z.unknown().optional(),
+});
+type NormalizedAPIData = z.infer<typeof NormalizedAPIDataSchema>;
+
+// Processed form definition schema
+const ProcessedFormDefinitionSchema = z.object({
+  fields: z.array(ProcessedFormFieldSchema),
+  steps: z.array(ProcessedFormStepSchema).optional(),
+  validation: ValidationRulesSchema.optional(),
+  metadata: NormalizedAPIDataSchema.optional(),
+  source: z.string(),
+});
+type ProcessedFormDefinition = z.infer<typeof ProcessedFormDefinitionSchema>;
+
+/**
+ * Type guard for ProcessedFormDefinition using Zod validation
+ */
+function isProcessedFormDefinition(value: unknown): value is ProcessedFormDefinition {
+  return ProcessedFormDefinitionSchema.safeParse(value).success;
 }
 
 function processFormDefinitionData(data: unknown, source: string): ProcessedFormDefinition | null {
@@ -1919,47 +2125,93 @@ function processFormDefinitionData(data: unknown, source: string): ProcessedForm
   }
 }
 
+// Schema for plain objects
+const PlainObjectSchema = z.record(z.string(), z.unknown());
+
+/**
+ * Type guard for objects using Zod validation
+ */
+function isObject(value: unknown): value is Record<string, unknown> {
+  if (value === null || Array.isArray(value)) return false;
+  return PlainObjectSchema.safeParse(value).success;
+}
+
+/**
+ * Type guard for NormalizedAPIData using Zod validation
+ * Checks if the object has any of the expected form definition properties
+ */
+function isNormalizedAPIData(value: unknown): value is NormalizedAPIData {
+  // First check if it's a valid object
+  if (!isObject(value)) {
+    return false;
+  }
+  // Check if it has any known form definition properties or is empty (valid for normalization)
+  const knownProps = ['fields', 'schema', 'steps', 'wizard', 'validation', 'rules', 'constraints'];
+  const hasKnownProps = knownProps.some(prop => prop in value) || Object.keys(value).length === 0;
+  if (!hasKnownProps) return false;
+  // Validate against schema for more strict checking
+  return NormalizedAPIDataSchema.safeParse(value).success;
+}
+
 /**
  * Normalize different API response formats to a common structure
  */
-function normalizeAPIResponse(data: unknown): Record<string, unknown> {
-  if (!data || typeof data !== 'object') {
+function normalizeAPIResponse(data: unknown): NormalizedAPIData {
+  if (!isObject(data)) {
     return {};
   }
 
-  const dataObj = data as Record<string, unknown>;
-
   // Handle common wrapper patterns
-  if (dataObj.data) {
-    return normalizeAPIResponse(dataObj.data);
+  if ('data' in data && isObject(data.data)) {
+    return normalizeAPIResponse(data.data);
   }
 
-  if (dataObj.result) {
-    return normalizeAPIResponse(dataObj.result);
+  if ('result' in data && isObject(data.result)) {
+    return normalizeAPIResponse(data.result);
   }
 
-  if (dataObj.payload) {
-    return normalizeAPIResponse(dataObj.payload);
+  if ('payload' in data && isObject(data.payload)) {
+    return normalizeAPIResponse(data.payload);
   }
 
   // Handle Next.js specific patterns
-  if (dataObj.pageProps) {
-    return normalizeAPIResponse(dataObj.pageProps);
+  if ('pageProps' in data && isObject(data.pageProps)) {
+    return normalizeAPIResponse(data.pageProps);
   }
 
   // Handle nested form configuration
-  if (dataObj.form || dataObj.formConfig || dataObj.formDefinition) {
-    const formData = dataObj.form || dataObj.formConfig || dataObj.formDefinition;
+  const formData = data.form || data.formConfig || data.formDefinition;
+  if (isObject(formData)) {
     return normalizeAPIResponse(formData);
   }
 
-  return dataObj;
+  // Validate and return the normalized data
+  if (isNormalizedAPIData(data)) {
+    return data;
+  }
+
+  // Return empty object if data doesn't match expected structure
+  return {};
+}
+
+/**
+ * Type guard for RawFieldData using Zod validation
+ */
+function isRawFieldData(value: unknown): value is RawFieldData {
+  return RawFieldDataSchema.safeParse(value).success;
+}
+
+/**
+ * Type guard for RawStepData using Zod validation
+ */
+function isRawStepData(value: unknown): value is RawStepData {
+  return RawStepDataSchema.safeParse(value).success;
 }
 
 /**
  * Extract field definitions from normalized data
  */
-function extractFieldsFromData(data: Record<string, unknown>): ProcessedFormField[] {
+function extractFieldsFromData(data: NormalizedAPIData): ProcessedFormField[] {
   const fields: ProcessedFormField[] = [];
 
   // Strategy 1: Direct fields array
@@ -1969,39 +2221,25 @@ function extractFieldsFromData(data: Record<string, unknown>): ProcessedFormFiel
 
   // Strategy 2: Schema-based fields
   if (data.schema && typeof data.schema === 'object') {
-    const schema = data.schema as Record<string, unknown>;
+    const schema = data.schema;
     if (Array.isArray(schema.fields)) {
       fields.push(...processFieldsArray(schema.fields));
     }
     if (schema.properties && typeof schema.properties === 'object') {
-      fields.push(...processSchemaProperties(schema.properties as Record<string, unknown>));
+      fields.push(...processSchemaProperties(schema.properties));
     }
   }
 
   // Strategy 3: Step-based fields
   if (Array.isArray(data.steps)) {
     for (const step of data.steps) {
-      if (step && typeof step === 'object' && Array.isArray((step as Record<string, unknown>).fields)) {
-        const stepFields = processFieldsArray((step as Record<string, unknown>).fields as unknown[]);
+      if (isRawStepData(step) && Array.isArray(step.fields)) {
+        const rawFields = step.fields.filter((f): f is RawFieldData => isRawFieldData(f));
+        const stepFields = processFieldsArray(rawFields);
         stepFields.forEach(field => {
-          field.step = String((step as Record<string, unknown>).id || (step as Record<string, unknown>).name || '');
+          field.step = String(step.id ?? step.name ?? '');
         });
         fields.push(...stepFields);
-      }
-    }
-  }
-
-  // Strategy 4: Flat object keys as fields
-  const potentialFields = Object.keys(data).filter(
-    key => key.includes('field') || key.includes('input') || key.endsWith('_field') || key.startsWith('field_'),
-  );
-
-  for (const key of potentialFields) {
-    const fieldData = data[key];
-    if (fieldData && typeof fieldData === 'object') {
-      const processedField = processFieldDefinition(fieldData as Record<string, unknown>, key);
-      if (processedField) {
-        fields.push(processedField);
       }
     }
   }
@@ -2012,12 +2250,12 @@ function extractFieldsFromData(data: Record<string, unknown>): ProcessedFormFiel
 /**
  * Process an array of field definitions
  */
-function processFieldsArray(fieldsArray: unknown[]): ProcessedFormField[] {
+function processFieldsArray(fieldsArray: RawFieldData[]): ProcessedFormField[] {
   const fields: ProcessedFormField[] = [];
 
   for (const fieldData of fieldsArray) {
-    if (fieldData && typeof fieldData === 'object') {
-      const field = processFieldDefinition(fieldData as Record<string, unknown>);
+    if (isRawFieldData(fieldData)) {
+      const field = processFieldDefinition(fieldData);
       if (field) {
         fields.push(field);
       }
@@ -2030,12 +2268,12 @@ function processFieldsArray(fieldsArray: unknown[]): ProcessedFormField[] {
 /**
  * Process schema properties as field definitions
  */
-function processSchemaProperties(properties: Record<string, unknown>): ProcessedFormField[] {
+function processSchemaProperties(properties: Record<string, RawFieldData>): ProcessedFormField[] {
   const fields: ProcessedFormField[] = [];
 
   for (const [key, property] of Object.entries(properties)) {
-    if (property && typeof property === 'object') {
-      const field = processFieldDefinition(property as Record<string, unknown>, key);
+    if (isRawFieldData(property)) {
+      const field = processFieldDefinition(property, key);
       if (field) {
         fields.push(field);
       }
@@ -2046,34 +2284,40 @@ function processSchemaProperties(properties: Record<string, unknown>): Processed
 }
 
 /**
+ * Type guard for FieldOption using Zod validation
+ */
+function isFieldOption(value: unknown): value is FieldOption {
+  return FieldOptionSchema.safeParse(value).success;
+}
+
+/**
  * Process individual field definition
  */
-function processFieldDefinition(fieldData: Record<string, unknown>, fallbackId?: string): ProcessedFormField | null {
+function processFieldDefinition(fieldData: RawFieldData, fallbackId?: string): ProcessedFormField | null {
   try {
-    const id = (fieldData.id || fieldData.name || fieldData.key || fallbackId) as string;
+    const id = String(fieldData.id ?? fieldData.name ?? fieldData.key ?? fallbackId ?? '');
     if (!id) return null;
 
     const field: ProcessedFormField = {
       id,
-      name: (fieldData.name || id) as string,
-      type: normalizeFieldType((fieldData.type || fieldData.fieldType || 'text') as string),
-      label: (fieldData.label || fieldData.title || fieldData.displayName) as string,
-      placeholder: fieldData.placeholder as string,
+      name: String(fieldData.name ?? id),
+      type: normalizeFieldType(String(fieldData.type ?? fieldData.fieldType ?? 'text')),
+      label: fieldData.label ?? fieldData.title ?? fieldData.displayName,
+      placeholder: fieldData.placeholder,
       required: Boolean(fieldData.required || fieldData.isRequired),
       metadata: fieldData,
     };
 
     // Extract options for select/radio/checkbox fields
     if (fieldData.options && Array.isArray(fieldData.options)) {
-      field.options = fieldData.options.map((option: unknown) => {
+      field.options = fieldData.options.map(option => {
         if (typeof option === 'string') {
           return { value: option, label: option };
         }
-        if (option && typeof option === 'object') {
-          const opt = option as Record<string, unknown>;
+        if (isFieldOption(option)) {
           return {
-            value: (opt.value || opt.id || opt.key) as string,
-            label: (opt.label || opt.text || opt.name || opt.value) as string,
+            value: String(option.value ?? option.id ?? option.key ?? ''),
+            label: String(option.label ?? option.text ?? option.name ?? option.value ?? ''),
           };
         }
         return { value: String(option), label: String(option) };
@@ -2082,7 +2326,7 @@ function processFieldDefinition(fieldData: Record<string, unknown>, fallbackId?:
 
     // Extract validation rules
     if (fieldData.validation && typeof fieldData.validation === 'object') {
-      field.validation = fieldData.validation as Record<string, unknown>;
+      field.validation = fieldData.validation;
     }
 
     // Extract dependencies
@@ -2137,13 +2381,13 @@ function normalizeFieldType(type: string): string {
 /**
  * Extract steps from form definition data
  */
-function extractStepsFromData(data: Record<string, unknown>): ProcessedFormStep[] {
+function extractStepsFromData(data: NormalizedAPIData): ProcessedFormStep[] {
   const steps: ProcessedFormStep[] = [];
 
   if (Array.isArray(data.steps)) {
     for (const stepData of data.steps) {
-      if (stepData && typeof stepData === 'object') {
-        const step = processStepDefinition(stepData as Record<string, unknown>);
+      if (isRawStepData(stepData)) {
+        const step = processStepDefinition(stepData);
         if (step) {
           steps.push(step);
         }
@@ -2153,11 +2397,11 @@ function extractStepsFromData(data: Record<string, unknown>): ProcessedFormStep[
 
   // Also check for wizard/flow configuration
   if (data.wizard && typeof data.wizard === 'object') {
-    const wizard = data.wizard as Record<string, unknown>;
+    const wizard = data.wizard;
     if (Array.isArray(wizard.steps)) {
       for (const stepData of wizard.steps) {
-        if (stepData && typeof stepData === 'object') {
-          const step = processStepDefinition(stepData as Record<string, unknown>);
+        if (isRawStepData(stepData)) {
+          const step = processStepDefinition(stepData);
           if (step) {
             steps.push(step);
           }
@@ -2172,17 +2416,17 @@ function extractStepsFromData(data: Record<string, unknown>): ProcessedFormStep[
 /**
  * Process individual step definition
  */
-function processStepDefinition(stepData: Record<string, unknown>): ProcessedFormStep | null {
+function processStepDefinition(stepData: RawStepData): ProcessedFormStep | null {
   try {
-    const id = stepData.id || stepData.name || stepData.key;
-    if (!id) return null;
+    const id = stepData.id ?? stepData.name ?? stepData.key;
+    if (id === undefined) return null;
 
     const step: ProcessedFormStep = {
-      id: id as string | number,
-      name: (stepData.name || stepData.title || id) as string,
-      label: stepData.label as string,
+      id: id,
+      name: String(stepData.name ?? stepData.title ?? id),
+      label: stepData.label,
       fields: [],
-      order: stepData.order as number,
+      order: stepData.order,
       metadata: stepData,
     };
 
@@ -2190,9 +2434,8 @@ function processStepDefinition(stepData: Record<string, unknown>): ProcessedForm
     if (Array.isArray(stepData.fields)) {
       step.fields = stepData.fields.map(field => {
         if (typeof field === 'string') return field;
-        if (field && typeof field === 'object') {
-          const fieldObj = field as Record<string, unknown>;
-          return (fieldObj.id || fieldObj.name || fieldObj.key) as string;
+        if (isRawFieldData(field)) {
+          return String(field.id ?? field.name ?? field.key ?? '');
         }
         return String(field);
       });
@@ -2208,8 +2451,8 @@ function processStepDefinition(stepData: Record<string, unknown>): ProcessedForm
 /**
  * Extract validation rules from form definition data
  */
-function extractValidationFromData(data: Record<string, unknown>): Record<string, unknown> {
-  const validation: Record<string, unknown> = {};
+function extractValidationFromData(data: NormalizedAPIData): ValidationRules {
+  const validation: ValidationRules = {};
 
   if (data.validation && typeof data.validation === 'object') {
     Object.assign(validation, data.validation);
@@ -2236,11 +2479,14 @@ export function getProcessedFormDefinitions(doc: Document): ProcessedFormDefinit
   const definitions: ProcessedFormDefinition[] = [];
 
   for (const [_url, responseData] of monitor.interceptedResponses) {
-    if (responseData && typeof responseData === 'object') {
-      const data = responseData as { processed?: ProcessedFormDefinition };
-      if (data.processed) {
-        definitions.push(data.processed);
-      }
+    if (
+      responseData &&
+      typeof responseData === 'object' &&
+      hasProperty(responseData, 'processed') &&
+      responseData.processed &&
+      isProcessedFormDefinition(responseData.processed)
+    ) {
+      definitions.push(responseData.processed);
     }
   }
 

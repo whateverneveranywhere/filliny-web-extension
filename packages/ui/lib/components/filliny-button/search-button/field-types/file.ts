@@ -1,6 +1,6 @@
 import { createBaseField } from './utils';
 import { Framework } from '@extension/shared';
-import type { Field } from '@extension/shared';
+import type { Field, FillinyFileInputElement } from '@extension/shared';
 
 // Extend Field type with file-specific properties
 interface FileField extends Field {
@@ -604,9 +604,8 @@ export const updateFileInput = async (
         fileInput.setAttribute('data-filliny-files-size', validFiles.reduce((acc, f) => acc + f.size, 0).toString());
         fileInput.setAttribute('data-filliny-files-types', validFiles.map(f => f.type).join(', '));
 
-        // Store file references for later access
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (fileInput as any).__fillinyFiles = validFiles;
+        // Store file references for later access using a properly typed extension
+        (fileInput as FillinyFileInputElement).__fillinyFiles = validFiles;
 
         console.log(
           `Successfully set ${validFiles.length} files on input:`,
@@ -1439,9 +1438,8 @@ export const detectFileFields = async (
       };
     }
 
-    // Store file upload specific metadata in a custom property (accessible but not part of the base interface)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (field.metadata as any).fileUploadData = {
+    // Store file upload specific metadata - FileFieldMetadata type includes fileUploadData
+    (field.metadata as FileFieldMetadata).fileUploadData = {
       fileInput: fileInput,
       isCustomUpload: isCustomUpload,
       triggerElement: isCustomUpload ? element : fileInput,

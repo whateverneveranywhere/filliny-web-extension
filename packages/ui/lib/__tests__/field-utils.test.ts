@@ -3,13 +3,7 @@
  * Tests event dispatching, visual feedback, element detection, and grouping
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import {
-  createTextInput,
-  createCheckbox,
-  createRadio,
-  createSelect,
-  createFormWithFields,
-} from './setup.js';
+import { createTextInput, createCheckbox, createRadio, createSelect, createFormWithFields } from './setup.js';
 import {
   getStringValue,
   dispatchEvent,

@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import type { StorageEnum } from './index.js';
 
 export type ValueOrUpdateType<D> = D | ((prev: D) => Promise<D> | D);
@@ -44,10 +45,37 @@ export type StorageConfigType<D = string> = {
   };
 };
 
-export interface ThemeStateType {
-  theme: 'light' | 'dark';
-  isLight: boolean;
-}
+// ============================================================================
+// Zod Schemas for Theme Storage
+// ============================================================================
+
+/**
+ * Binary theme schema (light/dark only, no system option)
+ * Compatible with BinaryTheme enum from @extension/shared
+ */
+export const BinaryThemeSchema = z.enum(['light', 'dark']);
+
+/**
+ * Theme state schema
+ */
+export const ThemeStateSchema = z.object({
+  theme: BinaryThemeSchema,
+  isLight: z.boolean(),
+});
+
+// ============================================================================
+// Type Exports (inferred from schemas)
+// ============================================================================
+
+/**
+ * Binary theme type for storage (light/dark only, no system option)
+ */
+export type BinaryThemeType = z.infer<typeof BinaryThemeSchema>;
+
+/**
+ * Theme state type
+ */
+export type ThemeStateType = z.infer<typeof ThemeStateSchema>;
 
 export type ThemeStorageType = BaseStorageType<ThemeStateType> & {
   toggle: () => Promise<void>;

@@ -11,8 +11,9 @@ const mockChrome = {
       addListener: vi.fn(),
       removeListener: vi.fn(),
     },
-    lastError: null,
+    lastError: null as chrome.runtime.LastError | null | undefined,
     getURL: vi.fn((path: string) => `chrome-extension://test/${path}`),
+    id: 'test-extension-id',
   },
   storage: {
     local: {
@@ -45,9 +46,14 @@ const mockChrome = {
       removeListener: vi.fn(),
     },
   },
-};
+} as unknown as typeof chrome;
 
-// @ts-expect-error - Mock chrome global
-globalThis.chrome = mockChrome;
+// Assign mock to globalThis.chrome
+// Using Object.defineProperty to avoid TypeScript's strict typing
+Object.defineProperty(globalThis, 'chrome', {
+  value: mockChrome,
+  writable: true,
+  configurable: true,
+});
 
 export { mockChrome };

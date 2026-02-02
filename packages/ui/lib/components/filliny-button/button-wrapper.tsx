@@ -1,7 +1,7 @@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui';
-import { motion, AnimatePresence } from 'framer-motion';
+import { durations, easings, animationClasses } from '@/lib/animations';
 import type { ReactNode, CSSProperties } from 'react';
-import type React from 'react';
+import type * as React from 'react';
 
 export interface ButtonComponentProps {
   isHovered: boolean;
@@ -16,24 +16,20 @@ export interface ButtonWrapperProps {
   children?: ReactNode;
 }
 
-const ButtonWrapper: React.FC<ButtonWrapperProps> = ({ children, isHovered, isDragging, position, tooltipContent }) => (
-  <AnimatePresence mode="wait">
-    <motion.div
-      style={{ position: 'absolute', willChange: 'transform', ...position }}
-      className="filliny-z-[1000000000001] filliny-p-2"
-      initial={{ x: 0, y: 0 }}
-      animate={{
-        x: isHovered || isDragging ? position.left : 0,
-        y: isHovered || isDragging ? position.top : 0,
-        transition: { duration: 0.3 },
+const ButtonWrapper: React.FC<ButtonWrapperProps> = ({ children, isHovered, isDragging, position, tooltipContent }) => {
+  const isVisible = isHovered || isDragging;
+
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        willChange: 'transform, opacity',
+        ...position,
+        transition: `transform ${durations.slow}ms ${easings.easeOut}, opacity ${durations.slow}ms ${easings.easeOut}`,
       }}
-      exit={{
-        x: 0,
-        y: 0,
-        transition: { duration: 0.3, delay: 0.1 },
-      }}>
+      className="filliny-z-[1000000000001] filliny-p-2">
       <div
-        className={`filliny-transition-opacity ${isHovered || isDragging ? 'filliny-opacity-100' : 'filliny-opacity-0'}`}>
+        className={`${animationClasses.transitionSlow} ${isVisible ? 'filliny-opacity-100' : 'filliny-opacity-0 filliny-pointer-events-none'}`}>
         <TooltipProvider delayDuration={0}>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -45,8 +41,8 @@ const ButtonWrapper: React.FC<ButtonWrapperProps> = ({ children, isHovered, isDr
           </Tooltip>
         </TooltipProvider>
       </div>
-    </motion.div>
-  </AnimatePresence>
-);
+    </div>
+  );
+};
 
 export { ButtonWrapper };

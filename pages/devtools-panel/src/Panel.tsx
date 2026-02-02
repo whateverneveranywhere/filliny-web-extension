@@ -2,7 +2,7 @@ import '@src/Panel.css';
 import { t } from '@extension/i18n';
 import { PROJECT_URL_OBJECT, useStorage, withErrorBoundary, withSuspense } from '@extension/shared';
 import { exampleThemeStorage } from '@extension/storage';
-import { cn, ErrorDisplay, LoadingSpinner } from '@extension/ui';
+import { cn, ErrorDisplay, Loading } from '@extension/ui';
 import type { ComponentPropsWithoutRef } from 'react';
 
 const Panel = () => {
@@ -42,4 +42,4 @@ const ToggleButton = (props: ComponentPropsWithoutRef<'button'>) => {
   );
 };
 
-export default withErrorBoundary(withSuspense(Panel, <LoadingSpinner />), ErrorDisplay);
+export default withErrorBoundary(withSuspense(Panel, <Loading fullScreen />), ErrorDisplay);

@@ -1,4 +1,5 @@
 import deepmerge from 'deepmerge';
+import { z } from 'zod';
 
 /**
  * Gets the global UI styles content
@@ -95,17 +96,30 @@ code {
 }
 `;
 
+// ============================================================================
+// Zod Schemas
+// ============================================================================
+
+/**
+ * Style merge options schema
+ */
+export const StyleMergeOptionsSchema = z.object({
+  /** Whether to merge styles (default: true) */
+  mergeStyles: z.boolean().optional(),
+  /** Whether to put global styles first (default: true) */
+  globalStylesFirst: z.boolean().optional(),
+  /** Custom CSS to add after merging */
+  additionalCSS: z.string().optional(),
+});
+
+// ============================================================================
+// Type Exports (inferred from schemas)
+// ============================================================================
+
 /**
  * Configuration for style merging
  */
-export interface StyleMergeOptions {
-  /** Whether to merge styles (default: true) */
-  mergeStyles?: boolean;
-  /** Whether to put global styles first (default: true) */
-  globalStylesFirst?: boolean;
-  /** Custom CSS to add after merging */
-  additionalCSS?: string;
-}
+export type StyleMergeOptions = z.infer<typeof StyleMergeOptionsSchema>;
 
 /**
  * Merges global UI styles with custom inline CSS

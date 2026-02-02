@@ -1,39 +1,70 @@
 import { apiEndpoints } from './endpoints.js';
-import { MessageType } from '../types/enums.js';
 import { getConfig } from '../utils/index.js';
 import { authStorage } from '@extension/storage';
-import type { z } from 'zod';
+import { z } from 'zod';
 
-interface ApiDefaultError {
-  message: string;
+// ============================================================================
+// Zod Schemas for HTTP Service Types
+// ============================================================================
+
+/**
+ * Schema for default API error response
+ */
+const ApiDefaultErrorSchema = z.object({
+  message: z.string(),
+});
+
+/**
+ * Schema for detailed API error information
+ */
+const ApiErrorDetailsSchema = z.record(z.string(), z.string().optional());
+
+/**
+ * Schema for API error response
+ */
+const ApiErrorResponseSchema = z.object({
+  message: z.string(),
+  code: z.string().optional(),
+  details: ApiErrorDetailsSchema.optional(),
+});
+
+/**
+ * Schema for custom fetch configuration
+ * Note: Extends RequestInit which is a browser API type, so we define
+ * the Zod-inferable properties separately
+ */
+const CustomFetchConfigPropsSchema = z.object({
+  hasToast: z.boolean().optional(),
+  endpoint: z.string().optional(),
+  baseUrl: z.string().optional(),
+  authToken: z.string().optional(),
+  isStream: z.boolean().optional(),
+  /** Request timeout in milliseconds (defaults to 30 seconds) */
+  timeout: z.number().optional(),
+});
+
+// ============================================================================
+// Type Exports (inferred from schemas)
+// ============================================================================
+
+type ApiDefaultError = z.infer<typeof ApiDefaultErrorSchema>;
+type ApiErrorDetails = z.infer<typeof ApiErrorDetailsSchema>;
+type ApiErrorResponse = z.infer<typeof ApiErrorResponseSchema>;
+
+/**
+ * Custom fetch configuration extending RequestInit with additional properties
+ * Note: The schema property uses generic Zod type which cannot be expressed in Zod itself,
+ * so we define the interface extending the inferred type
+ */
+interface CustomFetchConfig<TSchema extends z.ZodType = z.ZodType>
+  extends RequestInit,
+    z.infer<typeof CustomFetchConfigPropsSchema> {
+  /** Optional Zod schema for response validation */
+  schema?: TSchema;
 }
 
 /** Default request timeout in milliseconds (30 seconds) */
 const DEFAULT_TIMEOUT_MS = 30000;
-
-interface CustomFetchConfig<TSchema extends z.ZodType = z.ZodType> extends RequestInit {
-  hasToast?: boolean;
-  endpoint?: string;
-  baseUrl?: string;
-  authToken?: string;
-  isStream?: boolean;
-  /** Optional Zod schema for response validation */
-  schema?: TSchema;
-  /** Request timeout in milliseconds (defaults to 30 seconds) */
-  timeout?: number;
-}
-
-interface ApiErrorDetails {
-  field?: string;
-  reason?: string;
-  [key: string]: string | undefined;
-}
-
-interface ApiErrorResponse {
-  message: string;
-  code?: string;
-  details?: ApiErrorDetails;
-}
 
 class ApiValidationError extends Error {
   constructor(
@@ -145,7 +176,11 @@ class HttpService {
     return this.request<T>(url, { method: 'GET', ...config });
   }
 
-  async post<T, D = Record<string, unknown>>(url: string, data?: D, config?: CustomFetchConfig): Promise<T> {
+  async post<T, D extends object = Record<string, never>>(
+    url: string,
+    data?: D,
+    config?: CustomFetchConfig,
+  ): Promise<T> {
     return this.request<T>(url, {
       method: 'POST',
       body: JSON.stringify(data),
@@ -153,7 +188,11 @@ class HttpService {
     });
   }
 
-  async put<T, D = Record<string, unknown>>(url: string, data?: D, config?: CustomFetchConfig): Promise<T> {
+  async put<T, D extends object = Record<string, never>>(
+    url: string,
+    data?: D,
+    config?: CustomFetchConfig,
+  ): Promise<T> {
     return this.request<T>(url, {
       method: 'PUT',
       body: JSON.stringify(data),
@@ -161,7 +200,11 @@ class HttpService {
     });
   }
 
-  async patch<T, D = Record<string, unknown>>(url: string, data?: D, config?: CustomFetchConfig): Promise<T> {
+  async patch<T, D extends object = Record<string, never>>(
+    url: string,
+    data?: D,
+    config?: CustomFetchConfig,
+  ): Promise<T> {
     return this.request<T>(url, {
       method: 'PATCH',
       body: JSON.stringify(data),
@@ -202,5 +245,15 @@ class HttpService {
 
 const httpService = new HttpService();
 
-export type { ApiDefaultError };
-export { httpService, ApiValidationError, ApiUnauthorizedError, ApiTimeoutError };
+// All exports at end of file to comply with import-x/exports-last
+export type { ApiDefaultError, ApiErrorDetails, ApiErrorResponse, CustomFetchConfig };
+export {
+  httpService,
+  ApiValidationError,
+  ApiUnauthorizedError,
+  ApiTimeoutError,
+  ApiDefaultErrorSchema,
+  ApiErrorDetailsSchema,
+  ApiErrorResponseSchema,
+  CustomFetchConfigPropsSchema,
+};
