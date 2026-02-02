@@ -1,27 +1,24 @@
-import { Button } from "../components";
-import { Drawer } from "../components/Drawer";
-import { RHFShadcnComboBox } from "../components/RHF";
-import FormProvider from "../components/RHF/FormProvider";
-import { ProfileForm } from "@/lib/containers/profile-form";
-import { toast } from "@/lib/hooks/use-toast";
+import { Button } from '../components';
+import { Drawer } from '../components/drawer';
+import { RHFShadcnComboBox } from '../components/rhf';
+import FormProvider from '../components/rhf/FormProvider';
+import { ProfileForm } from '@/lib/containers/profile-form';
+import { toast } from '@/lib/hooks/use-toast';
 import {
+  ProfileSelectorSchema,
   useActiveProfile,
   useBoolean,
   useChangeActiveFillingProfileMutation,
   useDeleteProfileByIdMutation,
   useProfilesListQuery,
-} from "@extension/shared";
-import { profileStrorage } from "@extension/storage";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { Plus } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useForm } from "react-hook-form";
-import { z } from "zod";
-import type { DTOProfileFillingForm } from "@extension/storage";
-
-const schema = z.object({
-  defaultActiveProfileId: z.string(),
-});
+} from '@extension/shared';
+import { profileStorage } from '@extension/storage';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Plus } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useForm } from 'react-hook-form';
+import type { FormValues, ProfileSelectorFormValues } from '@extension/shared';
+import type { DTOProfileFillingForm } from '@extension/storage';
 
 function ProfileSelector() {
   const profileModal = useBoolean();
@@ -33,35 +30,36 @@ function ProfileSelector() {
   const { mutateAsync: deleteProfile, isPending: isDeleting } = useDeleteProfileByIdMutation();
   const { mutateAsync: updateActiveProfile, isPending: isUpdating } = useChangeActiveFillingProfileMutation();
 
-  const methods = useForm({
+  const methods = useForm<ProfileSelectorFormValues>({
     defaultValues: {
-      defaultActiveProfileId: String(activeProfileId || ""),
+      defaultActiveProfileId: String(activeProfileId || ''),
     },
-    resolver: zodResolver(schema),
-    mode: "onChange",
+    resolver: zodResolver(ProfileSelectorSchema),
+    mode: 'onChange',
   });
 
   const { setValue } = methods;
 
   // Memoized handlers
   const handleProfileChange = useCallback(
-    async (nextActiveId: string) => {
-      if (nextActiveId === activeProfileId) return;
+    async (nextActiveIdValue: FormValues) => {
+      const nextActiveId = String(nextActiveIdValue);
+      if (!nextActiveIdValue || nextActiveId === activeProfileId) return;
 
       try {
         await updateActiveProfile({ activeProfileId: nextActiveId });
-        setValue("defaultActiveProfileId", nextActiveId);
+        setValue('defaultActiveProfileId', nextActiveId);
 
         // Find the new active profile from the profiles list
         const newActiveProfile = profiles?.find(profile => String(profile.id) === nextActiveId);
         if (newActiveProfile) {
-          await profileStrorage.setDefaultProfile(newActiveProfile as unknown as DTOProfileFillingForm);
+          await profileStorage.setDefaultProfile(newActiveProfile as unknown as DTOProfileFillingForm);
         }
 
-        toast({ title: "Profile updated successfully" });
+        toast({ title: 'Profile updated successfully' });
       } catch (error) {
         console.error(error);
-        toast({ variant: "destructive", title: "Failed to update profile" });
+        toast({ variant: 'destructive', title: 'Failed to update profile' });
       }
     },
     [activeProfileId, profiles, updateActiveProfile, setValue],
@@ -79,21 +77,21 @@ function ProfileSelector() {
           // Only reset if we don't have any remaining profiles
           const remainingProfiles = profiles.filter(profile => String(profile.id) !== id);
           if (remainingProfiles.length === 0) {
-            await profileStrorage.resetDefaultProfile();
+            await profileStorage.resetDefaultProfile();
           } else {
             const deletedIndex = profiles.findIndex(profile => String(profile.id) === id);
             const newActiveProfile = remainingProfiles[deletedIndex] || remainingProfiles[deletedIndex - 1];
             if (newActiveProfile) {
               await updateActiveProfile({ activeProfileId: String(newActiveProfile.id) });
-              setValue("defaultActiveProfileId", String(newActiveProfile.id));
+              setValue('defaultActiveProfileId', String(newActiveProfile.id));
             }
           }
         }
 
-        toast({ title: "Profile deleted successfully" });
+        toast({ title: 'Profile deleted successfully' });
       } catch (error) {
         console.error(error);
-        toast({ variant: "destructive", title: "Failed to delete profile" });
+        toast({ variant: 'destructive', title: 'Failed to delete profile' });
       }
     },
     [deleteProfile, refetchProfiles, activeProfileId, profiles, updateActiveProfile, setValue],
@@ -126,7 +124,7 @@ function ProfileSelector() {
     if (!activeProfile && profiles?.length) {
       const activeFromApi = profiles.find(item => item.isActive);
       if (activeFromApi) {
-        setValue("defaultActiveProfileId", String(activeFromApi.id));
+        setValue('defaultActiveProfileId', String(activeFromApi.id));
       }
     }
   }, [profiles, activeProfile, setValue]);
@@ -134,7 +132,7 @@ function ProfileSelector() {
   // Add this useEffect to watch for changes in defaultStorageProfile
   useEffect(() => {
     if (activeProfile?.id) {
-      setValue("defaultActiveProfileId", String(activeProfile.id));
+      setValue('defaultActiveProfileId', String(activeProfile.id));
     }
   }, [activeProfile, setValue]);
 
@@ -161,10 +159,10 @@ function ProfileSelector() {
           onDelete={handleDeleteProfile}
           onEdit={handleEditProfile}
           onChange={handleProfileChange}
-          value={methods.watch("defaultActiveProfileId")}
+          value={methods.watch('defaultActiveProfileId')}
           name="defaultActiveProfileId"
           className="filliny-w-full"
-          title={""}
+          title={''}
         />
       </FormProvider>
 
@@ -175,7 +173,7 @@ function ProfileSelector() {
       <Drawer
         hideFooter
         open={profileModal.value}
-        title={editingId ? "Edit Profile" : "New Profile"}
+        title={editingId ? 'Edit Profile' : 'New Profile'}
         onOpenChange={handleDrawerChange}>
         <div className="filliny-h-[70vh] filliny-overflow-y-auto">
           <ProfileForm id={editingId} onFormSubmit={handleFormSubmit} />

@@ -1,20 +1,19 @@
-import { ButtonWrapper } from "./button-wrapper";
-import { DragButton } from "./drag-button";
-import { FillinyVisionButton } from "./filliny-vision-button";
-import { LogoButton } from "./logo-button";
-import { FieldFillManager } from "./search-button/components/FieldFillManager";
-import { SupportRequestButton } from "./support-request-button";
-import { FillinyTestModeFillerButton } from "./test-mode-button";
-import { DndContext, useDraggable } from "@dnd-kit/core";
-import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
-import { CSS } from "@dnd-kit/utilities";
-import { useStorage } from "@extension/shared";
-import { positionStorage, fieldButtonsStorage } from "@extension/storage";
-import { useRef, useState, useEffect } from "react";
-import type { ButtonComponentProps } from "./button-wrapper";
-import type { DragEndEvent } from "@dnd-kit/core";
-import type { CSSProperties } from "react";
-// import { FieldButtonToggle } from "./field-button";
+import { ButtonWrapper } from './button-wrapper';
+import { DragButton } from './drag-button';
+import { FillinyVisionButton } from './filliny-vision-button';
+import { LogoButton } from './logo-button';
+import { FieldFillManager } from './search-button/components/FieldFillManager';
+import { SupportRequestButton } from './support-request-button';
+import { FillinyTestModeFillerButton } from './test-mode-button';
+import { DndContext, useDraggable, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { restrictToVerticalAxis } from '@dnd-kit/modifiers';
+import { CSS } from '@dnd-kit/utilities';
+import { useStorage } from '@extension/shared';
+import { positionStorage, fieldButtonsStorage } from '@extension/storage';
+import { useRef, useState, useEffect } from 'react';
+import type { ButtonComponentProps } from './button-wrapper';
+import type { DragEndEvent } from '@dnd-kit/core';
+import type { CSSProperties } from 'react';
 
 interface ButtonConfig {
   Component: React.FC<ButtonComponentProps>;
@@ -30,25 +29,20 @@ interface Position {
 const buttonComponents: ButtonConfig[] = [
   {
     Component: FillinyTestModeFillerButton,
-    position: { top: "-28px", left: "-8px" },
-    tooltipContent: "Test form filling functionality",
+    position: { top: '-28px', left: '-8px' },
+    tooltipContent: 'Test form filling functionality',
   },
-  { Component: DragButton, position: { top: "15px", left: "-25px" }, tooltipContent: "Drag to reposition the button" },
+  { Component: DragButton, position: { top: '15px', left: '-25px' }, tooltipContent: 'Drag to reposition the button' },
   {
     Component: SupportRequestButton,
-    position: { top: "32px", left: "-8px" },
-    tooltipContent: "Get help or report an issue",
+    position: { top: '32px', left: '-8px' },
+    tooltipContent: 'Get help or report an issue',
   },
   {
     Component: FillinyVisionButton,
-    position: { top: "-10px", left: "-25px" },
-    tooltipContent: "Highlight fillable form fields",
+    position: { top: '-10px', left: '-25px' },
+    tooltipContent: 'Highlight fillable form fields',
   },
-  // {
-  //   Component: FieldButtonToggle,
-  //   position: { top: "49px", left: "-8px" },
-  //   tooltipContent: "Toggle field fill buttons",
-  // },
 ];
 
 const DraggableButton = ({ position }: { position: Position }) => {
@@ -57,15 +51,15 @@ const DraggableButton = ({ position }: { position: Position }) => {
   const dragHandleRef = useRef<HTMLDivElement>(null);
 
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-    id: "filliny-button",
+    id: 'filliny-button',
   });
 
   const style: CSSProperties = {
-    position: "fixed",
+    position: 'fixed',
     top: position.y,
     right: 10,
     transform: CSS.Transform.toString(transform),
-    touchAction: "none",
+    touchAction: 'none',
     zIndex: 1000000000000,
   };
 
@@ -117,11 +111,12 @@ const FillinyButton: React.FC = () => {
   const savedPosition = useStorage(positionStorage);
   const fieldButtonSettings = useStorage(fieldButtonsStorage);
   const [position, setPosition] = useState<Position>(savedPosition);
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
   // Store preference in DOM for easy access by field buttons
   useEffect(() => {
     if (fieldButtonSettings) {
-      document.body.setAttribute("data-filliny-prefer-test-mode", String(fieldButtonSettings.preferTestMode));
+      document.body.setAttribute('data-filliny-prefer-test-mode', String(fieldButtonSettings.preferTestMode));
     }
   }, [fieldButtonSettings]);
 
@@ -142,7 +137,7 @@ const FillinyButton: React.FC = () => {
 
   return (
     <>
-      <DndContext modifiers={[restrictToVerticalAxis]} onDragEnd={handleDragEnd}>
+      <DndContext sensors={sensors} modifiers={[restrictToVerticalAxis]} onDragEnd={handleDragEnd}>
         <DraggableButton position={position} />
       </DndContext>
       {fieldButtonSettings?.enabled && <FieldFillManager />}

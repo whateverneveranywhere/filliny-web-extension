@@ -1,6 +1,6 @@
-import React from "react";
-import { createRoot } from "react-dom/client";
-import type { Root } from "react-dom/client";
+import React from 'react';
+import { createRoot } from 'react-dom/client';
+import type { Root } from 'react-dom/client';
 
 // Error boundary component for safer rendering
 class ErrorBoundary extends React.Component<
@@ -25,8 +25,8 @@ class ErrorBoundary extends React.Component<
       return (
         <div className="filliny-error-boundary">
           <div>Filliny component error occurred</div>
-          {process.env.NODE_ENV === "development" && (
-            <details style={{ marginTop: "4px", fontSize: "10px" }}>
+          {process.env.NODE_ENV === 'development' && (
+            <details style={{ marginTop: '4px', fontSize: '10px' }}>
               <summary>Error details</summary>
               <pre>{this.state.error?.stack}</pre>
             </details>
@@ -83,13 +83,13 @@ export class UnifiedShadowDOMManager {
     }
 
     try {
-      const { css, shadowHostId = "chrome-extension-filliny-all" } = config;
+      const { css, shadowHostId = 'chrome-extension-filliny-all' } = config;
 
       // Find or create the shadow host
       this.shadowHost = document.querySelector(`#${shadowHostId}`) as HTMLElement;
 
       if (!this.shadowHost) {
-        this.shadowHost = document.createElement("div");
+        this.shadowHost = document.createElement('div');
         this.shadowHost.id = shadowHostId;
         this.shadowHost.style.cssText = `
           position: fixed !important;
@@ -107,7 +107,7 @@ export class UnifiedShadowDOMManager {
 
       // Create or get existing shadow root
       if (!this.shadowHost.shadowRoot) {
-        this.shadowRoot = this.shadowHost.attachShadow({ mode: "open" });
+        this.shadowRoot = this.shadowHost.attachShadow({ mode: 'open' });
       } else {
         this.shadowRoot = this.shadowHost.shadowRoot;
       }
@@ -118,17 +118,17 @@ export class UnifiedShadowDOMManager {
       }
 
       // Add a class to the shadow host to help with CSS targeting
-      this.shadowHost.classList.add("filliny-shadow-host");
+      this.shadowHost.classList.add('filliny-shadow-host');
 
       // Inject styles
       await this.injectStyles();
 
       this.isInitialized = true;
-      console.log("✅ Unified Shadow DOM initialized successfully");
+      console.log('✅ Unified Shadow DOM initialized successfully');
 
       return this.shadowRoot;
     } catch (error) {
-      console.error("❌ Failed to initialize unified shadow DOM:", error);
+      console.error('❌ Failed to initialize unified shadow DOM:', error);
       return null;
     }
   }
@@ -140,7 +140,7 @@ export class UnifiedShadowDOMManager {
     if (!this.shadowRoot || !this.injectedCss) return;
 
     // Remove existing styles to avoid duplicates
-    const existingStyles = this.shadowRoot.querySelectorAll("style[data-filliny-styles]");
+    const existingStyles = this.shadowRoot.querySelectorAll('style[data-filliny-styles]');
     existingStyles.forEach(style => style.remove());
 
     // Clear existing adopted stylesheets
@@ -149,13 +149,13 @@ export class UnifiedShadowDOMManager {
     }
 
     // Use the same CSS injection pattern as initAppWithShadow
-    if (navigator.userAgent.includes("Firefox")) {
+    if (navigator.userAgent.includes('Firefox')) {
       /**
        * In the firefox environment, adoptedStyleSheets cannot be used due to the bug
        * @url https://bugzilla.mozilla.org/show_bug.cgi?id=1770592
        */
-      const styleElement = document.createElement("style");
-      styleElement.setAttribute("data-filliny-styles", "true");
+      const styleElement = document.createElement('style');
+      styleElement.setAttribute('data-filliny-styles', 'true');
       styleElement.innerHTML = this.injectedCss;
       this.shadowRoot.appendChild(styleElement);
     } else {
@@ -179,22 +179,22 @@ export class UnifiedShadowDOMManager {
    */
   getContainer(config: ShadowContainerConfig): HTMLElement {
     if (!this.shadowRoot) {
-      throw new Error("Shadow DOM not initialized. Call initialize() first.");
+      throw new Error('Shadow DOM not initialized. Call initialize() first.');
     }
 
     let container = this.containers.get(config.containerId);
 
     if (!container) {
-      container = document.createElement("div");
-      container.className = "filliny-container";
-      container.setAttribute("data-container-id", config.containerId);
+      container = document.createElement('div');
+      container.className = 'filliny-container';
+      container.setAttribute('data-container-id', config.containerId);
 
       if (config.zIndex) {
         container.style.zIndex = config.zIndex.toString();
       }
 
       if (config.isolate) {
-        container.style.isolation = "isolate";
+        container.style.isolation = 'isolate';
       }
 
       this.shadowRoot.appendChild(container);
@@ -286,9 +286,9 @@ export class UnifiedShadowDOMManager {
       this.shadowHost = null;
       this.isInitialized = false;
 
-      console.log("✅ Unified Shadow DOM cleanup completed");
+      console.log('✅ Unified Shadow DOM cleanup completed');
     } catch (error) {
-      console.error("❌ Error during shadow DOM cleanup:", error);
+      console.error('❌ Error during shadow DOM cleanup:', error);
     }
   }
 

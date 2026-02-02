@@ -1,8 +1,8 @@
 import '@src/Options.css';
 import { t } from '@extension/i18n';
-import { PROJECT_URL_OBJECT, useStorage, withErrorBoundary, withSuspense } from '@extension/shared';
+import { PROJECT_URL_OBJECT, useStorage } from '@extension/shared';
 import { exampleThemeStorage } from '@extension/storage';
-import { cn, ErrorDisplay, LoadingSpinner, ToggleButton } from '@extension/ui';
+import { cn, ToggleButton, withPageWrapper } from '@extension/ui';
 
 const Options = () => {
   const { isLight } = useStorage(exampleThemeStorage);
@@ -23,4 +23,4 @@ const Options = () => {
   );
 };
 
-export default withErrorBoundary(withSuspense(Options, <LoadingSpinner />), ErrorDisplay);
+export default withPageWrapper(Options);

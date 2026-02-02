@@ -1,5 +1,5 @@
-import { detectFields } from "./field-types";
-import type { Field } from "@extension/shared";
+import { detectFields } from './field-types';
+import type { Field } from '@extension/shared';
 
 // Central field registry to ensure consistency across all strategies
 export class UnifiedFieldRegistry {
@@ -140,19 +140,19 @@ export class UnifiedFieldRegistry {
     // Radio fields are ALWAYS grouped (even single radios conceptually belong to a group)
     // Checkbox fields are grouped if they have multiple options
     // Select fields are always individual (they handle their own options internally)
-    return !!(field.type === "radio" || (field.type === "checkbox" && field.options && field.options.length > 1));
+    return !!(field.type === 'radio' || (field.type === 'checkbox' && field.options && field.options.length > 1));
   }
 
   private getGroupId(field: Field): string | undefined {
     if (!this.isGroupedField(field)) return undefined;
 
     // For radio fields, use the name attribute or field ID as group identifier
-    if (field.type === "radio") {
+    if (field.type === 'radio') {
       return field.name ? `radio-group-${field.name}` : `radio-group-${field.id}`;
     }
 
     // For checkbox groups, use similar logic
-    if (field.type === "checkbox" && field.options && field.options.length > 1) {
+    if (field.type === 'checkbox' && field.options && field.options.length > 1) {
       return field.name ? `checkbox-group-${field.name}` : `checkbox-group-${field.id}`;
     }
 
@@ -187,7 +187,7 @@ export class UnifiedFieldRegistry {
       const groupInfo: GroupedFieldInfo = {
         groupId,
         containerId: fieldInfo.containerId,
-        groupType: fieldInfo.field.type as "radio" | "checkbox",
+        groupType: fieldInfo.field.type as 'radio' | 'checkbox',
         fields: [fieldInfo],
         options: fieldInfo.field.options || [],
         container: fieldInfo.container,
@@ -214,7 +214,7 @@ export class UnifiedFieldRegistry {
     let processedCount = 0;
     let skippedCount = 0;
 
-    console.log(`🔍 Getting field button data for container: ${containerId || "all"}`);
+    console.log(`🔍 Getting field button data for container: ${containerId || 'all'}`);
 
     // Add individual (non-grouped) fields with enhanced element finding
     const individualFields = this.getIndividualFields(containerId);
@@ -231,7 +231,7 @@ export class UnifiedFieldRegistry {
         if (element) {
           // Update the field info with the found element
           fieldInfo.element = element;
-          element.setAttribute("data-filliny-id", fieldInfo.field.id);
+          element.setAttribute('data-filliny-id', fieldInfo.field.id);
           console.log(`✅ Found element for field ${fieldInfo.field.id} using enhanced search`);
         }
       }
@@ -240,12 +240,12 @@ export class UnifiedFieldRegistry {
         buttonData.push({
           field: fieldInfo.field,
           element: element,
-          type: fieldInfo.isGrouped ? "grouped" : "individual",
+          type: fieldInfo.isGrouped ? 'grouped' : 'individual',
           groupId: fieldInfo.groupId,
         });
         processedCount++;
         console.log(
-          `✅ Added ${fieldInfo.isGrouped ? "grouped" : "individual"} field button: ${fieldInfo.field.id} (${fieldInfo.field.type})`,
+          `✅ Added ${fieldInfo.isGrouped ? 'grouped' : 'individual'} field button: ${fieldInfo.field.id} (${fieldInfo.field.type})`,
         );
       } else {
         skippedCount++;
@@ -287,7 +287,7 @@ export class UnifiedFieldRegistry {
         buttonData.push({
           field: groupInfo.fields[0].field, // Use the first field as representative
           element: buttonElement,
-          type: "grouped",
+          type: 'grouped',
           groupId: groupInfo.groupId,
         });
         processedCount++;
@@ -305,7 +305,7 @@ export class UnifiedFieldRegistry {
     // Enhanced logging for debugging
     const fieldTypes = buttonData.reduce(
       (acc, btn) => {
-        const key = `${btn.field.type}${btn.type === "grouped" ? " (grouped)" : ""}`;
+        const key = `${btn.field.type}${btn.type === 'grouped' ? ' (grouped)' : ''}`;
         acc[key] = (acc[key] || 0) + 1;
         return acc;
       },
@@ -327,19 +327,19 @@ export class UnifiedFieldRegistry {
       () => {
         if (!field.label) return null;
 
-        const labels = Array.from(container.querySelectorAll("label"));
+        const labels = Array.from(container.querySelectorAll('label'));
         for (const label of labels) {
           const labelText = label.textContent?.trim().toLowerCase();
           const fieldLabel = field.label.trim().toLowerCase();
 
           if (labelText && (labelText === fieldLabel || labelText.includes(fieldLabel))) {
-            const forAttr = label.getAttribute("for");
+            const forAttr = label.getAttribute('for');
             if (forAttr) {
               const linkedElement = document.getElementById(forAttr) as HTMLElement;
               if (linkedElement) return linkedElement;
             }
             // Check if label contains a form element
-            const formElement = label.querySelector("input, select, textarea, [contenteditable]");
+            const formElement = label.querySelector('input, select, textarea, [contenteditable]');
             if (formElement) return formElement as HTMLElement;
           }
         }
@@ -360,14 +360,14 @@ export class UnifiedFieldRegistry {
           url: 'input[type="url"]',
           number: 'input[type="number"]',
           date: 'input[type="date"]',
-          "datetime-local": 'input[type="datetime-local"]',
+          'datetime-local': 'input[type="datetime-local"]',
           time: 'input[type="time"]',
           month: 'input[type="month"]',
           week: 'input[type="week"]',
           color: 'input[type="color"]',
           range: 'input[type="range"]',
-          select: "select",
-          textarea: "textarea",
+          select: 'select',
+          textarea: 'textarea',
           checkbox: 'input[type="checkbox"]',
           radio: 'input[type="radio"]',
           file: 'input[type="file"]',
@@ -377,7 +377,7 @@ export class UnifiedFieldRegistry {
         if (selector) {
           const elements = container.querySelectorAll(selector);
           // Return the first element that doesn't already have a data-filliny-id
-          return (Array.from(elements).find(el => !el.hasAttribute("data-filliny-id")) as HTMLElement) || null;
+          return (Array.from(elements).find(el => !el.hasAttribute('data-filliny-id')) as HTMLElement) || null;
         }
         return null;
       },
@@ -394,14 +394,14 @@ export class UnifiedFieldRegistry {
         const selector = ariaSelectors[field.type as keyof typeof ariaSelectors];
         if (selector) {
           const elements = container.querySelectorAll(selector);
-          return (Array.from(elements).find(el => !el.hasAttribute("data-filliny-id")) as HTMLElement) || null;
+          return (Array.from(elements).find(el => !el.hasAttribute('data-filliny-id')) as HTMLElement) || null;
         }
         return null;
       },
 
       // Strategy 6: Find by content editable
       () =>
-        field.type === "text" || field.type === "textarea"
+        field.type === 'text' || field.type === 'textarea'
           ? (container.querySelector('[contenteditable="true"]') as HTMLElement)
           : null,
     ];
@@ -435,7 +435,7 @@ export interface DetectedFieldInfo {
 export interface GroupedFieldInfo {
   groupId: string;
   containerId: string;
-  groupType: "radio" | "checkbox";
+  groupType: 'radio' | 'checkbox';
   fields: DetectedFieldInfo[];
   options: Array<{ value: string; text: string; selected: boolean }>;
   container: HTMLElement;
@@ -454,7 +454,7 @@ export interface DetectedContainerInfo {
 export interface FieldButtonData {
   field: Field;
   element: HTMLElement;
-  type: "individual" | "grouped";
+  type: 'individual' | 'grouped';
   groupId?: string;
 }
 

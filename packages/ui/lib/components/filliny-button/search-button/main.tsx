@@ -1,7 +1,7 @@
-import { FieldFillManager } from "./components/FieldFillManager";
-import { unifiedShadowDOM, injectComponent } from "../../../utils/unified-shadow-dom";
-import { useEffect, useState } from "react";
-import type React from "react";
+import { FieldFillManager } from './components/FieldFillManager';
+import { unifiedShadowDOM, injectComponent } from '../../../utils/unified-shadow-dom';
+import { useEffect, useState } from 'react';
+import type React from 'react';
 
 export interface SearchButtonMainProps {
   css?: string;
@@ -17,19 +17,19 @@ export const SearchButtonMain: React.FC<SearchButtonMainProps> = ({ css }) => {
   useEffect(() => {
     const initializeSearchButton = async () => {
       try {
-        console.log("🚀 Initializing Search Button with unified shadow DOM...");
+        console.log('🚀 Initializing Search Button with unified shadow DOM...');
 
         // Initialize shadow DOM with CSS
         await unifiedShadowDOM.initialize({
           css,
-          shadowHostId: "chrome-extension-filliny-search-button",
+          shadowHostId: 'chrome-extension-filliny-search-button',
         });
 
         setIsInitialized(true);
-        console.log("✅ Search Button initialized successfully");
+        console.log('✅ Search Button initialized successfully');
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : "Unknown error";
-        console.error("❌ Failed to initialize Search Button:", error);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        console.error('❌ Failed to initialize Search Button:', error);
         setInitError(errorMessage);
       }
     };
@@ -42,7 +42,7 @@ export const SearchButtonMain: React.FC<SearchButtonMainProps> = ({ css }) => {
 
   // Show error state if initialization failed
   if (initError) {
-    console.error("Search Button initialization failed:", initError);
+    console.error('Search Button initialization failed:', initError);
     return null; // Silent failure for browser extension
   }
 
@@ -65,9 +65,9 @@ export interface InitializeSearchButtonConfig {
  */
 export const initializeSearchButton = async (config: InitializeSearchButtonConfig = {}): Promise<void> => {
   try {
-    console.log("🔧 Starting search button system initialization...");
+    console.log('🔧 Starting search button system initialization...');
 
-    const { css, shadowHostId = "chrome-extension-filliny-search-button" } = config;
+    const { css, shadowHostId = 'chrome-extension-filliny-search-button' } = config;
 
     // Initialize shadow DOM with CSS first
     await unifiedShadowDOM.initialize({
@@ -77,18 +77,18 @@ export const initializeSearchButton = async (config: InitializeSearchButtonConfi
 
     // Use the unified shadow DOM injection system
     await injectComponent({
-      containerId: "search-button-main",
+      containerId: 'search-button-main',
       component: <SearchButtonMain css={css} />,
       zIndex: 999999,
       isolate: true,
       onError: (error: Error) => {
-        console.error("❌ Search button component error:", error);
+        console.error('❌ Search button component error:', error);
       },
     });
 
-    console.log("✅ Search button system initialization complete");
+    console.log('✅ Search button system initialization complete');
   } catch (error) {
-    console.error("❌ Failed to initialize search button system:", error);
+    console.error('❌ Failed to initialize search button system:', error);
     throw error; // Re-throw to allow caller to handle
   }
 };
@@ -98,10 +98,10 @@ export const initializeSearchButton = async (config: InitializeSearchButtonConfi
  */
 export const cleanupSearchButton = (): void => {
   try {
-    unifiedShadowDOM.cleanupContainer("search-button-main");
-    console.log("✅ Search button system cleanup complete");
+    unifiedShadowDOM.cleanupContainer('search-button-main');
+    console.log('✅ Search button system cleanup complete');
   } catch (error) {
-    console.error("❌ Error cleaning up search button system:", error);
+    console.error('❌ Error cleaning up search button system:', error);
   }
 };
 
@@ -109,6 +109,6 @@ export const cleanupSearchButton = (): void => {
 export default SearchButtonMain;
 
 // Export for legacy compatibility
-export { highlightForms } from "./highlightForms";
-export { handleFormClick } from "./handleFormClick";
-export { handleFieldFill } from "./index";
+export { highlightForms } from './highlightForms';
+export { handleFormClick } from './handleFormClick';
+export { handleFieldFill } from './index';

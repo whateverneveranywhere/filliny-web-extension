@@ -1,35 +1,31 @@
 import type { COLORS } from './const.js';
 import type { TupleToUnion } from 'type-fest';
 
-export type * from 'type-fest';
-export type ColorType = 'success' | 'info' | 'error' | 'warning' | keyof typeof COLORS;
-export type ExcludeValuesFromBaseArrayType<B extends string[], E extends (string | number)[]> = Exclude<
+// Type definitions
+type ColorType = 'success' | 'info' | 'error' | 'warning' | keyof typeof COLORS;
+type ExcludeValuesFromBaseArrayType<B extends string[], E extends (string | number)[]> = Exclude<
   TupleToUnion<B>,
   TupleToUnion<E>
 >[];
-export type ManifestType = chrome.runtime.ManifestV3;
+type ManifestType = chrome.runtime.ManifestV3;
 
 // Types moved from shared-types.ts during merge
-export type ValueOf<T> = T[keyof T];
+type ValueOf<T> = T[keyof T];
 
-export enum WebappEnvs {
-  DEV = 'dev',
-  PREVIEW = 'preview',
-  PROD = 'prod',
-}
+// Note: WebappEnvs is exported from ../types/enums.js (single source of truth)
+// Do NOT re-export here to avoid duplicate exports
 
-export interface FormOption {
+interface FormOption {
   label: string;
   value: string;
 }
-export type FormOptions = FormOption[] | [];
+type FormOptions = FormOption[] | [];
 
-export type FormValues = string | number | null | boolean | undefined;
+type FormValues = string | number | null | boolean | undefined;
 
-export interface GeneralFormProps {
+interface GeneralFormProps {
   className?: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  onChange?: (callback: any) => void;
+  onChange?: (value: FormValues) => void | Promise<void>;
   name: string;
   id?: string;
   title: string;
@@ -40,32 +36,34 @@ export interface GeneralFormProps {
   disabled?: boolean;
 }
 
-export interface TextInputProps extends GeneralFormProps {
+interface TextInputProps extends GeneralFormProps {
   variant: 'text' | 'checkbox' | 'date' | 'switch' | 'number' | 'url' | 'email' | 'textarea';
 }
 
-export interface WithOptionsProps extends GeneralFormProps {
+interface WithOptionsProps extends GeneralFormProps {
   variant: 'radio' | 'select' | 'combobox';
   options: FormOptions;
 }
 
-export interface NavItem extends FormOption {
+interface NavItem extends FormOption {
   href?: string;
   icon?: React.ReactNode;
   children?: NavItem[] | [];
 }
 
-export interface SuccessResponse {
+// Note: SuccessResponse is defined in services/schemas/index.ts
+// This interface is kept for backwards compatibility but may be deprecated
+interface SuccessResponseLegacy {
   message: string;
 }
 
-export interface Step {
+interface Step {
   title: string;
   content: React.ReactNode;
   fields?: string[];
 }
 
-export interface StepperProps {
+interface StepperProps {
   steps: Step[];
   currentStep: number;
   isLoading?: boolean;
@@ -75,7 +73,7 @@ export interface StepperProps {
 }
 
 // Define reusable action types
-export enum BackgroundActions {
+enum BackgroundActions {
   GET_AUTH_TOKEN = 'GET_AUTH_TOKEN',
   AUTH_TOKEN_CHANGED = 'AUTH_TOKEN_CHANGED',
   INVALID_ACTION = 'INVALID_ACTION',
@@ -89,12 +87,12 @@ interface ActionRequest<ActionType, Payload = undefined> {
 }
 
 // Specific request interfaces for each action
-export type GetAuthTokenRequest = ActionRequest<BackgroundActions.GET_AUTH_TOKEN>;
-export type InvalidRequest = ActionRequest<BackgroundActions.INVALID_ACTION>;
-export type AuthTokenChangedRequest = ActionRequest<BackgroundActions.AUTH_TOKEN_CHANGED, GetAuthTokenResponse>;
+type GetAuthTokenRequest = ActionRequest<BackgroundActions.GET_AUTH_TOKEN>;
+type InvalidRequest = ActionRequest<BackgroundActions.INVALID_ACTION>;
+type AuthTokenChangedRequest = ActionRequest<BackgroundActions.AUTH_TOKEN_CHANGED, GetAuthTokenResponse>;
 
 // Union of all valid requests
-export type Request = GetAuthTokenRequest | AuthTokenChangedRequest | InvalidRequest;
+type Request = GetAuthTokenRequest | AuthTokenChangedRequest | InvalidRequest;
 
 // Generic interface for action responses
 interface ActionResponse<SuccessData = undefined, ErrorData = undefined> {
@@ -103,5 +101,15 @@ interface ActionResponse<SuccessData = undefined, ErrorData = undefined> {
 }
 
 // Define specific responses using the generic ActionResponse
-export type GetAuthTokenResponse = ActionResponse<{ token: string | null }>;
-export type ErrorResponse = ActionResponse<undefined, { error: string }>;
+type GetAuthTokenResponse = ActionResponse<{ token: string | null }>;
+type ErrorResponse = ActionResponse<undefined, { error: string }>;
+
+// All exports at end of file to comply with import-x/exports-last
+export type * from 'type-fest';
+export type { ColorType, ExcludeValuesFromBaseArrayType, ManifestType, ValueOf };
+export type { FormOption, FormOptions, FormValues };
+export type { GeneralFormProps, TextInputProps, WithOptionsProps, NavItem };
+export type { SuccessResponseLegacy, Step, StepperProps };
+export { BackgroundActions };
+export type { GetAuthTokenRequest, InvalidRequest, AuthTokenChangedRequest, Request };
+export type { GetAuthTokenResponse, ErrorResponse };

@@ -1,6 +1,4 @@
-export * from "./lib/components";
-export * from "./lib/containers";
-export * from "./lib/providers";
-export * from "./lib/utils";
-export * from "./lib/with-ui";
-export * from "./lib/index";
+// Single source of truth - all exports go through lib/index.ts
+export * from './lib/index';
+// containers is not re-exported from lib/index, so we export it directly
+export * from './lib/containers';

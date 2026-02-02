@@ -1,6 +1,6 @@
 {
   "name": "@extension/shared",
-  "version": "0.5.0",
+  "version": "1.4.0",
   "description": "chrome extension - shared code",
   "type": "module",
   "private": true,
@@ -20,15 +20,23 @@
     "lint:fix": "pnpm lint --fix",
     "format": "prettier . --write --ignore-path ../../.prettierignore",
     "type-check": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
     "postinstall": "pnpm ready"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.90.20",
-    "react-error-boundary": "^6.0.0"
+    "date-fns": "^4.1.0",
+    "react-error-boundary": "^6.0.0",
+    "zod": "^3.24.2"
   },
   "devDependencies": {
     "@extension/storage": "workspace:*",
     "@extension/tsconfig": "workspace:*",
-    "type-fest": "^4.41.0"
+    "@vitest/coverage-v8": "^2.1.0",
+    "jsdom": "^25.0.0",
+    "type-fest": "^4.41.0",
+    "vitest": "^2.1.0"
   }
 }

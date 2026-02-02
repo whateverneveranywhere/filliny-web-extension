@@ -1,14 +1,7 @@
-import {
-  BackgroundActions,
-  useStorage,
-  withErrorBoundary,
-  withSuspense,
-  getConfig,
-  WebappEnvs,
-} from "@extension/shared";
-import { authStorage } from "@extension/storage";
-import { ErrorDisplay, LoadingSpinner, RouterProvider, SigninPage } from "@extension/ui";
-import { useEffect, useState } from "react";
+import { useExtensionAuth, useStorage, getConfig, WebappEnvs } from '@extension/shared';
+import { authStorage } from '@extension/storage';
+import { LoadingSpinner, QueryClientProvider, RouterProvider, SigninPage, withPageWrapper } from '@extension/ui';
+import { useEffect, useState } from 'react';
 
 // Define the type for the config
 interface ConfigInfo {
@@ -19,29 +12,21 @@ interface ConfigInfo {
 
 const HomePage = () => {
   const auth = useStorage(authStorage);
+  const { isLoading } = useExtensionAuth();
   const [configInfo, setConfigInfo] = useState<ConfigInfo | null>(null);
 
-  // In your React component
   useEffect(() => {
-    chrome.runtime.sendMessage({ action: BackgroundActions.GET_AUTH_TOKEN }, response => {
-      if (response && response.success && response.success.token) {
-        authStorage.setToken(response.success.token);
-      } else {
-        console.error("Failed to get auth token:", response);
-      }
-    });
-
     // Get configuration on component mount
     try {
       const config = getConfig();
       // Determine which environment is being used by comparing baseURL
-      let currentEnv = "unknown";
+      let currentEnv = 'unknown';
 
-      if (config.baseURL === "http://localhost:3000") {
+      if (config.baseURL === 'http://localhost:3000') {
         currentEnv = WebappEnvs.DEV;
-      } else if (config.baseURL === "https://dev.filliny-app.pages.dev") {
+      } else if (config.baseURL === 'https://dev.filliny-app.pages.dev') {
         currentEnv = WebappEnvs.PREVIEW;
-      } else if (config.baseURL === "https://filliny.io") {
+      } else if (config.baseURL === 'https://filliny.io') {
         currentEnv = WebappEnvs.PROD;
       }
 
@@ -50,12 +35,14 @@ const HomePage = () => {
         baseURL: config.baseURL,
         cookieName: config.cookieName,
       });
-
-      console.log("Current environment configuration:", config);
     } catch (error) {
-      console.error("Error getting configuration:", error);
+      console.error('Error getting configuration:', error);
     }
   }, []);
+
+  if (isLoading) {
+    return <LoadingSpinner />;
+  }
 
   return (
     <div className="min-h-[300px] w-[350px] p-4">
@@ -83,16 +70,18 @@ const HomePage = () => {
 
       {/* Rest of your app */}
       <div className="mt-4">
-        {auth ? (
-          <>
-            <RouterProvider />
-          </>
-        ) : (
-          <SigninPage />
-        )}
+        <QueryClientProvider>
+          {auth ? (
+            <>
+              <RouterProvider />
+            </>
+          ) : (
+            <SigninPage />
+          )}
+        </QueryClientProvider>
       </div>
     </div>
   );
 };
 
-export default withErrorBoundary(withSuspense(HomePage, <LoadingSpinner />), ErrorDisplay);
+export default withPageWrapper(HomePage);

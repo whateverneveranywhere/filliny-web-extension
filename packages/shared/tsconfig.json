@@ -4,5 +4,6 @@
     "baseUrl": ".",
     "outDir": "dist"
   },
-  "include": ["index.mts", "lib"]
+  "include": ["index.mts", "lib", "src", "vitest.config.ts", "lib/__tests__"],
+  "exclude": ["dist"]
 }

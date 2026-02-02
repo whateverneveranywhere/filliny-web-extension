@@ -1,32 +1,32 @@
 // Modern React components (refactored)
-export * from "./components";
+export * from './components';
 
 // Main initialization
-export { initializeSearchButton, cleanupSearchButton } from "./main";
+export { initializeSearchButton, cleanupSearchButton } from './main';
 
 // Core functionality
-export { handleFieldFill } from "./handleFieldFill";
-export { handleFormClick } from "./handleFormClick";
-export { highlightForms } from "./highlightForms";
+export { handleFieldFill } from './handleFieldFill';
+export { handleFormClick } from './handleFormClick';
+export { highlightForms } from './highlightForms';
 
 // Test mode helpers
-export * from "./testModeHelpers";
+export * from './testModeHelpers';
 
 // Field detection and management
-export { detectFormLikeContainers } from "./detectionHelpers";
-export { unifiedFieldRegistry } from "./unifiedFieldDetection";
+export { detectFormLikeContainers } from './detectionHelpers';
+export { unifiedFieldRegistry } from './unifiedFieldDetection';
 
 // Field types
-export * from "./field-types";
+export * from './field-types';
 
 // Types
-export type * from "./types";
+export type * from './types';
 
 // Utilities (keeping essential ones only)
-export { resetOverlays, addGlowingBorder } from "./overlayUtils";
+export { resetOverlays, addGlowingBorder } from './overlayUtils';
 
 // Field updating
-export { updateField, updateFormFields } from "./fieldUpdaterHelpers";
+export { updateField, updateFormFields } from './fieldUpdaterHelpers';
 
 /**
  * Main API for unified field detection and management

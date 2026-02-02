@@ -1,6 +1,5 @@
 import { t } from '@extension/i18n';
 
-// FIXME: IMPORT SVG ICON INSTEAD OF DEFINING INLINE IT HERE
 const WarningIcon = ({ className }: { className: string }) => (
   <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" className={className}>
     <path

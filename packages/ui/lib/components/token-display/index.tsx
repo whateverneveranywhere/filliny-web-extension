@@ -1,8 +1,8 @@
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger, Loading } from "../ui";
-import { Button } from "../ui/button";
-import { formatToK, getConfig } from "@extension/shared";
-import { RefreshCw } from "lucide-react";
-import { useState, useEffect } from "react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger, Loading } from '../ui';
+import { Button } from '../ui/button';
+import { formatToK, getConfig } from '@extension/shared';
+import { RefreshCw } from 'lucide-react';
+import { useState, useEffect } from 'react';
 
 interface TokenDisplayProps {
   tokens?: number;
@@ -19,7 +19,7 @@ function TokenDisplay({ tokens = 0, onRefresh, isRefetching = false, isLoading =
   const formattedTokens = tokens.toLocaleString();
   const abbreviatedTokens = formatToK(tokens);
   const config = getConfig();
-  console.log("[TokenDisplay] Using URL:", config.baseURL);
+  console.log('[TokenDisplay] Using URL:', config.baseURL);
 
   const handleRefresh = async () => {
     if (isRefetching || isOnCooldown || !onRefresh) return;
@@ -78,7 +78,7 @@ function TokenDisplay({ tokens = 0, onRefresh, isRefetching = false, isLoading =
             href={`${config.baseURL}/pricing?tab=token`}
             target="_blank"
             rel="noopener noreferrer">
-            <Button size={"sm"} variant={"default"} className="filliny-w-full">
+            <Button size={'sm'} variant={'default'} className="filliny-w-full">
               Purchase More Tokens
             </Button>
           </a>

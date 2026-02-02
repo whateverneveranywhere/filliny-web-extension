@@ -1,8 +1,9 @@
-import { useStorage } from "@extension/shared";
-import { fieldButtonsStorage } from "@extension/storage";
-import { useState, useEffect, useRef } from "react";
-import type { ButtonComponentProps } from "../button-wrapper";
-import type React from "react";
+import { cn } from '@/lib/utils';
+import { useStorage } from '@extension/shared';
+import { fieldButtonsStorage } from '@extension/storage';
+import { useState, useEffect, useRef } from 'react';
+import type { ButtonComponentProps } from '../button-wrapper';
+import type React from 'react';
 
 interface ModeDropdownProps {
   isOpen: boolean;
@@ -25,9 +26,9 @@ const ModeDropdown: React.FC<ModeDropdownProps> = ({ isOpen, onClose, position, 
       }
     };
 
-    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener('mousedown', handleClickOutside);
     return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [isOpen, onClose]);
 
@@ -45,7 +46,7 @@ const ModeDropdown: React.FC<ModeDropdownProps> = ({ isOpen, onClose, position, 
       setIsLoading(true);
       await onSelectMode(useTestMode);
     } catch (error) {
-      console.error("Error setting mode preference:", error);
+      console.error('Error setting mode preference:', error);
     } finally {
       setIsLoading(false);
       onClose();
@@ -54,114 +55,64 @@ const ModeDropdown: React.FC<ModeDropdownProps> = ({ isOpen, onClose, position, 
 
   if (!isOpen) return null;
 
-  // Define styles
-  const dropdownStyle: React.CSSProperties = {
-    position: "fixed",
-    top: `${position.top}px`,
-    left: `${position.left}px`,
-    backgroundColor: "white",
-    borderRadius: "6px",
-    boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-    padding: "8px 0",
-    zIndex: 9999999,
-    minWidth: "160px",
-    fontSize: "14px",
-    color: "#111",
-    border: "1px solid rgba(0,0,0,0.08)",
-    fontFamily: "system-ui, -apple-system, sans-serif",
-    maxHeight: "300px",
-    overflowY: "auto",
-  };
+  // Define base classes for dropdown options
+  const optionBaseClasses =
+    'filliny-py-2 filliny-px-3 filliny-cursor-pointer filliny-flex filliny-items-center filliny-w-full filliny-text-left filliny-border-none filliny-bg-transparent filliny-transition-all filliny-duration-200 filliny-ease-in-out';
 
-  const headerStyle: React.CSSProperties = {
-    padding: "4px 12px 8px",
-    fontWeight: "bold",
-    borderBottom: "1px solid #eee",
-    marginBottom: "4px",
-    fontSize: "13px",
-    color: "#4f46e5",
-  };
+  const getOptionClasses = (isActive: boolean) =>
+    cn(
+      optionBaseClasses,
+      isActive ? 'filliny-bg-indigo-50 filliny-font-bold filliny-text-primary' : 'hover:filliny-bg-gray-100',
+    );
 
-  const optionStyle: React.CSSProperties = {
-    padding: "8px 12px",
-    cursor: "pointer",
-    display: "flex",
-    alignItems: "center",
-    width: "100%",
-    textAlign: "left",
-    border: "none",
-    backgroundColor: "transparent",
-    transition: "all 0.2s ease",
-  };
-
-  const hoverStyle = {
-    backgroundColor: "#f3f4f6",
-  };
-
-  const activeStyle = {
-    backgroundColor: "#eef2ff",
-    fontWeight: "bold",
-    color: "#4f46e5",
-  };
-
-  const loadingStyle: React.CSSProperties = {
-    display: "inline-block",
-    width: "14px",
-    height: "14px",
-    borderRadius: "50%",
-    border: "2px solid rgba(79, 70, 229, 0.3)",
-    borderTopColor: "#4f46e5",
-    animation: "filliny-spin 1s linear infinite",
-    marginRight: "8px",
-  };
+  const loadingSpinnerClasses =
+    'filliny-inline-block filliny-w-3.5 filliny-h-3.5 filliny-rounded-full filliny-border-2 filliny-border-primary/30 filliny-border-t-primary filliny-animate-spin filliny-mr-2';
 
   return (
     <div
       ref={dropdownRef}
-      style={dropdownStyle}
+      className={cn(
+        'filliny-fixed filliny-bg-white filliny-rounded-md filliny-shadow-lg',
+        'filliny-py-2 filliny-z-filliny-max filliny-min-w-[160px]',
+        'filliny-text-sm filliny-text-gray-900 filliny-border filliny-border-black/10',
+        'filliny-font-sans filliny-max-h-[300px] filliny-overflow-y-auto',
+      )}
+      style={{ top: `${position.top}px`, left: `${position.left}px` }}
       data-filliny-element="true"
       data-filliny-dropdown="true"
       onClick={handleDropdownClick}
       onKeyDown={e => {
-        if (e.key === "Escape") {
+        if (e.key === 'Escape') {
           e.preventDefault();
           onClose();
         }
       }}
       role="menu"
       tabIndex={0}>
-      <div style={headerStyle}>Default Fill Mode</div>
+      <div
+        className={cn(
+          'filliny-px-3 filliny-pt-1 filliny-pb-2 filliny-font-bold',
+          'filliny-border-b filliny-border-gray-200 filliny-mb-1',
+          'filliny-text-[13px] filliny-text-primary',
+        )}>
+        Default Fill Mode
+      </div>
 
       <button
-        style={{
-          ...optionStyle,
-          ...(preferTestMode ? activeStyle : {}),
-        }}
-        onMouseEnter={e => {
-          if (!preferTestMode) {
-            const target = e.currentTarget;
-            Object.assign(target.style, hoverStyle);
-          }
-        }}
-        onMouseLeave={e => {
-          if (!preferTestMode) {
-            const target = e.currentTarget;
-            Object.assign(target.style, optionStyle);
-          }
-        }}
+        className={getOptionClasses(preferTestMode)}
         onClick={e => handleSelect(true, e)}
         type="button"
         role="menuitem">
-        {isLoading && <span style={loadingStyle} />}
-        <div style={{ display: "flex", alignItems: "center" }}>
+        {isLoading && <span className={loadingSpinnerClasses} />}
+        <div className="filliny-flex filliny-items-center">
           <svg
             width="16"
             height="16"
             viewBox="0 0 24 24"
             fill="none"
-            stroke={preferTestMode ? "#4f46e5" : "currentColor"}
+            stroke="currentColor"
             strokeWidth="2"
-            style={{ marginRight: "8px" }}>
+            className={cn('filliny-mr-2', preferTestMode && 'filliny-text-primary')}>
             <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
             <polyline points="22 4 12 14.01 9 11.01"></polyline>
           </svg>
@@ -170,35 +121,20 @@ const ModeDropdown: React.FC<ModeDropdownProps> = ({ isOpen, onClose, position, 
       </button>
 
       <button
-        style={{
-          ...optionStyle,
-          ...(!preferTestMode ? activeStyle : {}),
-        }}
-        onMouseEnter={e => {
-          if (preferTestMode) {
-            const target = e.currentTarget;
-            Object.assign(target.style, hoverStyle);
-          }
-        }}
-        onMouseLeave={e => {
-          if (preferTestMode) {
-            const target = e.currentTarget;
-            Object.assign(target.style, optionStyle);
-          }
-        }}
+        className={getOptionClasses(!preferTestMode)}
         onClick={e => handleSelect(false, e)}
         type="button"
         role="menuitem">
-        {isLoading && <span style={loadingStyle} />}
-        <div style={{ display: "flex", alignItems: "center" }}>
+        {isLoading && <span className={loadingSpinnerClasses} />}
+        <div className="filliny-flex filliny-items-center">
           <svg
             width="16"
             height="16"
             viewBox="0 0 24 24"
             fill="none"
-            stroke={!preferTestMode ? "#4f46e5" : "currentColor"}
+            stroke="currentColor"
             strokeWidth="2"
-            style={{ marginRight: "8px" }}>
+            className={cn('filliny-mr-2', !preferTestMode && 'filliny-text-primary')}>
             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
           </svg>
           AI Mode
@@ -208,10 +144,7 @@ const ModeDropdown: React.FC<ModeDropdownProps> = ({ isOpen, onClose, position, 
   );
 };
 
-export const FieldButtonToggle: React.FC<ButtonComponentProps> = ({
-  isHovered: _isHovered,
-  isDragging: _isDragging,
-}) => {
+export const FieldButtonToggle: React.FC<ButtonComponentProps> = () => {
   const settings = useStorage(fieldButtonsStorage);
   const [isActive, setIsActive] = useState<boolean>(settings?.enabled ?? true);
   const [isHovered, setIsHovered] = useState(false);
@@ -254,22 +187,7 @@ export const FieldButtonToggle: React.FC<ButtonComponentProps> = ({
     await fieldButtonsStorage.setPreferTestMode(useTestMode);
   };
 
-  // Define the spinner animation style if it doesn't exist
-  useEffect(() => {
-    if (!document.getElementById("filliny-spinner-style")) {
-      const styleEl = document.createElement("style");
-      styleEl.id = "filliny-spinner-style";
-      styleEl.setAttribute("data-filliny-element", "true");
-      styleEl.textContent = `
-        @keyframes filliny-spin {
-          to {
-            transform: rotate(360deg);
-          }
-        }
-      `;
-      document.head.appendChild(styleEl);
-    }
-  }, []);
+  // Note: Spinner animation is now defined globally in global.css as filliny-spin
 
   return (
     <>
@@ -279,24 +197,17 @@ export const FieldButtonToggle: React.FC<ButtonComponentProps> = ({
         onContextMenu={handleRightClick}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
-        title={`${isActive ? "Disable" : "Enable"} field buttons (right-click to set default mode)`}
-        style={{
-          backgroundColor: isActive ? "#4f46e5" : "#6b7280",
-          width: "28px",
-          height: "28px",
-          borderRadius: "50%",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          color: "white",
-          border: "none",
-          cursor: "pointer",
-          boxShadow: "0 2px 4px rgba(0,0,0,0.2)",
-          transition: "all 0.2s ease",
-          outline: "none",
-          transform: isHovered ? "scale(1.1)" : "scale(1)",
-          opacity: 0.95,
-        }}>
+        title={`${isActive ? 'Disable' : 'Enable'} field buttons (right-click to set default mode)`}
+        className={cn(
+          'filliny-w-7 filliny-h-7 filliny-rounded-full',
+          'filliny-flex filliny-items-center filliny-justify-center',
+          'filliny-text-white filliny-border-none filliny-cursor-pointer',
+          'filliny-shadow-md filliny-transition-all filliny-duration-200 filliny-ease-in-out',
+          'filliny-outline-none filliny-opacity-95',
+          'hover:filliny-scale-110',
+          isActive ? 'filliny-bg-primary' : 'filliny-bg-secondary',
+          isHovered && 'filliny-scale-110',
+        )}>
         <svg
           width="16"
           height="16"

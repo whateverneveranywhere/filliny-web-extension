@@ -1,15 +1,15 @@
-import { Logo } from "../components/Logo";
-import { Button } from "../components/ui";
-import { PageLayout } from "../layout";
-import { getConfig } from "@extension/shared";
+import { Logo } from '../components/logo';
+import { Button } from '../components/ui';
+import { PageLayout } from '../layout';
+import { getConfig } from '@extension/shared';
 
 function SigninPage() {
   const config = getConfig();
-  console.log("[SigninPage] Using URL:", config.baseURL);
+  console.log('[SigninPage] Using URL:', config.baseURL);
 
   const handleLoginClick = () => {
-    console.log("[SigninPage] Opening login URL:", `${config.baseURL}/auth/sign-in`);
-    window.open(`${config.baseURL}/auth/sign-in`, "_blank");
+    console.log('[SigninPage] Opening login URL:', `${config.baseURL}/auth/sign-in`);
+    window.open(`${config.baseURL}/auth/sign-in`, '_blank');
   };
 
   return (

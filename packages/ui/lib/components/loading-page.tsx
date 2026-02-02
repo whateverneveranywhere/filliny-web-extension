@@ -1,10 +1,10 @@
-import { motion } from "framer-motion";
+import { motion } from 'framer-motion';
 
 export interface LoadingPageProps {
   message?: string;
 }
 
-export const LoadingPage = ({ message = "Waiting for page to load..." }: LoadingPageProps) => (
+export const LoadingPage = ({ message = 'Waiting for page to load...' }: LoadingPageProps) => (
   <div className="filliny-flex filliny-flex-col filliny-items-center filliny-justify-center filliny-min-h-[200px] filliny-w-full filliny-gap-4">
     <motion.div
       className="filliny-flex filliny-flex-col filliny-items-center filliny-justify-center filliny-gap-4"
@@ -17,7 +17,7 @@ export const LoadingPage = ({ message = "Waiting for page to load..." }: Loading
         transition={{
           duration: 1.5,
           repeat: Infinity,
-          ease: "linear",
+          ease: 'linear',
         }}
       />
       <motion.p

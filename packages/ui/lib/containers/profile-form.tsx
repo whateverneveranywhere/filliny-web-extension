@@ -1,53 +1,32 @@
-import FormProvider from "../components/RHF/FormProvider";
-import { Stepper } from "../components/stepper";
-import { StepperForm1, StepperForm2, StepperForm3 } from "../components/StepperForms";
-import { toast } from "../hooks/use-toast";
-import { cn } from "../utils";
+import FormProvider from '../components/rhf/FormProvider';
+import { Stepper } from '../components/stepper';
+import { StepperForm1, StepperForm2, StepperForm3 } from '../components/stepper-forms';
+import { toast } from '../hooks/use-toast';
+import { cn } from '../utils';
 import {
+  ProfileFormSchema,
   useCreateFillingProfileMutation,
   useEditFillingProfileMutation,
   useFillingProfileById,
-} from "@extension/shared";
-import { profileStrorage } from "@extension/storage";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2 } from "lucide-react";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { useForm } from "react-hook-form";
-import { z } from "zod";
-import type { Step } from "@extension/shared";
-import type { DTOProfileFillingForm } from "@extension/storage";
+} from '@extension/shared';
+import { profileStorage } from '@extension/storage';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Loader2 } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useForm } from 'react-hook-form';
+import type { ProfileFormValues, Step } from '@extension/shared';
+import type { DTOProfileFillingForm } from '@extension/storage';
 
-const profileSchema = z.object({
-  profileName: z.string().min(1, { message: "Profile name is required" }),
-  defaultFillingContext: z.string().min(1, { message: "Default context is required" }),
-  preferences: z.object({
-    isFormal: z.boolean().default(true),
-    isGapFillingAllowed: z.boolean().default(false),
-    toneId: z.string().min(1, { message: "Can't be empty" }),
-    povId: z.string().min(1, { message: "Can't be empty" }),
-  }),
-  fillingWebsites: z
-    .array(
-      z.object({
-        websiteUrl: z.string().url().min(1, { message: "Website URL is required" }),
-        isRootLoad: z.boolean().default(false),
-        fillingContext: z.string().default(""),
-        isNew: z.boolean().optional(),
-      }),
-    )
-    .default([]),
-});
-
-export type ProfileFormTypes = z.infer<typeof profileSchema>;
+export type ProfileFormTypes = ProfileFormValues;
 
 const defaultFormValues: ProfileFormTypes = {
-  profileName: "",
-  defaultFillingContext: "",
+  profileName: '',
+  defaultFillingContext: '',
   preferences: {
     isFormal: true,
     isGapFillingAllowed: false,
-    toneId: "",
-    povId: "",
+    toneId: '',
+    povId: '',
   },
   fillingWebsites: [],
 };
@@ -67,8 +46,8 @@ function ProfileForm({ id, onFormSubmit }: Props) {
 
   const methods = useForm<ProfileFormTypes>({
     defaultValues: defaultFormValues,
-    resolver: zodResolver(profileSchema),
-    mode: "onChange",
+    resolver: zodResolver(ProfileFormSchema),
+    mode: 'onChange',
   });
 
   const { handleSubmit, trigger, reset } = methods;
@@ -109,38 +88,38 @@ function ProfileForm({ id, onFormSubmit }: Props) {
 
       if (isEdit) {
         await editProfile({ id, data: transformedData });
-        toast({ variant: "default", title: "Profile edited successfully" });
+        toast({ variant: 'default', title: 'Profile edited successfully' });
       } else {
         const newProfile = await createProfile({ data: transformedData });
-        await profileStrorage.setDefaultProfile(newProfile);
-        toast({ variant: "default", title: "Profile created successfully" });
+        await profileStorage.setDefaultProfile(newProfile);
+        toast({ variant: 'default', title: 'Profile created successfully' });
       }
 
       onFormSubmit();
       reset();
     } catch (error) {
-      console.error("Error submitting profile:", error);
-      const errorMessage = error instanceof Error ? error.message : "Failed to save profile";
-      toast({ variant: "destructive", title: "Error", description: errorMessage });
+      console.error('Error submitting profile:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to save profile';
+      toast({ variant: 'destructive', title: 'Error', description: errorMessage });
     }
   });
 
   const steps: Step[] = useMemo(
     () => [
       {
-        title: "Websites",
+        title: 'Websites',
         content: <StepperForm1 />,
-        fields: ["fillingWebsites"],
+        fields: ['fillingWebsites'],
       },
       {
-        title: "General details",
+        title: 'General details',
         content: <StepperForm2 />,
-        fields: ["profileName", "defaultFillingContext"],
+        fields: ['profileName', 'defaultFillingContext'],
       },
       {
-        title: "Preferences",
+        title: 'Preferences',
         content: <StepperForm3 />,
-        fields: ["preferences.isFormal", "preferences.isGapFillingAllowed", "preferences.povId", "preferences.toneId"],
+        fields: ['preferences.isFormal', 'preferences.isGapFillingAllowed', 'preferences.povId', 'preferences.toneId'],
       },
     ],
     [],
@@ -163,7 +142,7 @@ function ProfileForm({ id, onFormSubmit }: Props) {
   if (isLoadingEditingItem) {
     return (
       <div className="filliny-flex filliny-size-full filliny-items-center filliny-justify-center filliny-p-20">
-        <Loader2 className={cn("filliny-mr-2 filliny-h-10 filliny-w-10 filliny-animate-spin")} />
+        <Loader2 className={cn('filliny-mr-2 filliny-h-10 filliny-w-10 filliny-animate-spin')} />
       </div>
     );
   }

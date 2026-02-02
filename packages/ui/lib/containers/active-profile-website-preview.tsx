@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import { SingleWebsiteEditModal } from "../components/SingleWebsiteEditModal";
-import { WebsitePreviewCard } from "../components/StepperForms/WebsitePreviewCard";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../components/ui";
+import { SingleWebsiteEditModal } from '../components/SingleWebsiteEditModal';
+import { WebsitePreviewCard } from '../components/stepper-forms/WebsitePreviewCard';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../components/ui';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -12,23 +12,23 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "../components/ui/alert-dialog";
-import { Badge } from "../components/ui/badge";
-import { Button } from "../components/ui/button";
-import { Separator } from "../components/ui/separator";
-import { useToast } from "../components/ui/use-toast";
-import { cn } from "../utils";
-import { usePOVListQuery, useTonesListQuery, useEditFillingProfileMutation } from "@extension/shared";
-import { profileStrorage } from "@extension/storage";
-import { Label } from "@radix-ui/react-label";
-import { Check, X, Info, Pencil, Trash } from "lucide-react";
-import { useState } from "react";
-import type { DTOFillingPrefrences, DTOFillingWebsite, DTOProfileFillingForm } from "@extension/storage";
-import type React from "react";
+} from '../components/ui/alert-dialog';
+import { Badge } from '../components/ui/badge';
+import { Button } from '../components/ui/button';
+import { Separator } from '../components/ui/separator';
+import { useToast } from '../components/ui/use-toast';
+import { cn } from '../utils';
+import { usePOVListQuery, useTonesListQuery, useEditFillingProfileMutation } from '@extension/shared';
+import { profileStorage } from '@extension/storage';
+import { Label } from '@radix-ui/react-label';
+import { Check, X, Info, Pencil, Trash } from 'lucide-react';
+import { useState } from 'react';
+import type { DTOFillingPreferences, DTOFillingWebsite, DTOProfileFillingForm } from '@extension/storage';
+import type React from 'react';
 
 interface Props {
   matchingWebsite: DTOFillingWebsite;
-  preferences: DTOFillingPrefrences;
+  preferences: DTOFillingPreferences;
   profile: DTOProfileFillingForm;
 }
 
@@ -61,13 +61,13 @@ const PreferenceItem = ({ label, value, tooltip }: PreferenceItemProps) => (
 
 const StatusBadge = ({ condition }: { condition: boolean }) => (
   <Badge
-    variant={condition ? "default" : "secondary"}
+    variant={condition ? 'default' : 'secondary'}
     className={cn(
-      "filliny-flex filliny-items-center filliny-gap-2",
-      condition ? "filliny-bg-green-500/10 filliny-text-green-500" : "filliny-bg-red-500/10 filliny-text-red-500",
+      'filliny-flex filliny-items-center filliny-gap-2',
+      condition ? 'filliny-bg-green-500/10 filliny-text-green-500' : 'filliny-bg-red-500/10 filliny-text-red-500',
     )}>
     {condition ? <Check className="filliny-h-3 filliny-w-3" /> : <X className="filliny-h-3 filliny-w-3" />}
-    {condition ? "Enabled" : "Disabled"}
+    {condition ? 'Enabled' : 'Disabled'}
   </Badge>
 );
 
@@ -99,15 +99,15 @@ const ActiveProfileWebsitePreview: React.FC<Props> = ({ matchingWebsite, prefere
         data: updatedProfile,
       });
 
-      await profileStrorage.setDefaultProfile(updatedProfile);
+      await profileStorage.setDefaultProfile(updatedProfile);
 
-      toast({ title: "Website settings updated successfully" });
+      toast({ title: 'Website settings updated successfully' });
     } catch (error) {
-      console.error("Error updating website:", error);
+      console.error('Error updating website:', error);
       toast({
-        variant: "destructive",
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to update website settings",
+        variant: 'destructive',
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to update website settings',
       });
     }
   };
@@ -124,15 +124,15 @@ const ActiveProfileWebsitePreview: React.FC<Props> = ({ matchingWebsite, prefere
         data: updatedProfile,
       });
 
-      await profileStrorage.setDefaultProfile(updatedProfile);
+      await profileStorage.setDefaultProfile(updatedProfile);
 
-      toast({ title: "Website removed from profile successfully" });
+      toast({ title: 'Website removed from profile successfully' });
     } catch (error) {
-      console.error("Error removing website:", error);
+      console.error('Error removing website:', error);
       toast({
-        variant: "destructive",
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to remove website",
+        variant: 'destructive',
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to remove website',
       });
     }
   };
@@ -172,7 +172,7 @@ const ActiveProfileWebsitePreview: React.FC<Props> = ({ matchingWebsite, prefere
               Filling Context
             </Label>
             <p className="filliny-rounded-lg filliny-bg-muted/50 filliny-p-3 filliny-text-sm filliny-break-words">
-              {matchingWebsite.fillingContext || "No context provided"}
+              {matchingWebsite.fillingContext || 'No context provided'}
             </p>
           </div>
 

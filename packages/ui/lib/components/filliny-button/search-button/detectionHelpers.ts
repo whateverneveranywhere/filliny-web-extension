@@ -1,6 +1,30 @@
-import { scoreFormContainerEnhanced } from "./containerDetection";
-import { detectFields, getFormFieldsRobust } from "./field-types";
-import { unifiedFieldRegistry } from "./unifiedFieldDetection";
+import { scoreFormContainerEnhanced } from './containerDetection';
+import { detectFields, getFormFieldsRobust } from './field-types';
+import { unifiedFieldRegistry } from './unifiedFieldDetection';
+import {
+  DetectionPass,
+  DETECTION_DELAYS,
+  DETECTION_PASS_CONFIDENCE,
+  ConfidenceLevel,
+  TIMING_CONSTANTS,
+  createDebugLogger,
+  Framework,
+  detectFrameworkForElement,
+  detectVue,
+  detectReact,
+  detectAngular,
+  detectSvelte,
+  detectQwik,
+  initializeShadowDOMObservation,
+  cleanupShadowDOMObservation,
+  querySelectorAllDeep,
+  isInShadowDOM,
+} from '@extension/shared';
+
+const debug = createDebugLogger('Detection');
+
+// Shadow DOM roots registry for form detection
+const observedShadowRoots = new Set<ShadowRoot>();
 
 // --- Frame Document Utilities ---
 interface DocumentWithObserver extends Document {
@@ -40,7 +64,7 @@ const FORM_LOADING_INDICATORS = [
   // Progressive enhancement
   '[class*="progressive"]',
   '[class*="lazy"]',
-  "[data-defer]",
+  '[data-defer]',
 ];
 
 // API response monitoring interface
@@ -96,9 +120,9 @@ const FORM_DEFINITION_API_PATTERNS = [
 const FORM_READY_INDICATORS = [
   // Interactive elements
   'input:not([type="hidden"])',
-  "select",
-  "textarea",
-  "button:not([disabled])",
+  'select',
+  'textarea',
+  'button:not([disabled])',
   // ARIA form elements
   '[role="textbox"]',
   '[role="combobox"]',
@@ -118,9 +142,30 @@ export const getAllFrameDocuments = (onNewFrameLoaded?: FormDetectionCallback): 
   // Start dynamic content detection for the main document
   initializeDynamicContentDetection(document, onNewFrameLoaded);
 
+  // Initialize Shadow DOM observation for form detection
+  initializeShadowDOMObservation(document, (shadowRoot, host) => {
+    debug.log('🔮 New Shadow DOM detected:', {
+      host: host.tagName,
+      hostId: host.id,
+      hostClass: host.className,
+    });
+
+    // Store the shadow root for later traversal
+    observedShadowRoots.add(shadowRoot);
+
+    // Check if shadow root contains form elements
+    const formElements = shadowRoot.querySelectorAll('form, input, select, textarea, [role="form"]');
+    if (formElements.length > 0) {
+      debug.log(`📋 Shadow DOM contains ${formElements.length} form elements, triggering detection`);
+      if (onNewFrameLoaded) {
+        onNewFrameLoaded(document);
+      }
+    }
+  });
+
   // Start API response monitoring for the main document
   initializeAPIResponseMonitoring(document, () => {
-    console.log("🔄 Form definition API detected, triggering form detection");
+    debug.log('🔄 Form definition API detected, triggering form detection');
     if (onNewFrameLoaded) {
       onNewFrameLoaded(document);
     }
@@ -135,16 +180,16 @@ export const getAllFrameDocuments = (onNewFrameLoaded?: FormDetectionCallback): 
       // Handle loading frames with improved retry mechanism
       if (retryCount < maxRetries && iframe.src) {
         if (iframe.contentDocument === null) {
-          console.debug(`Frame still loading, will retry (${retryCount + 1}/${maxRetries}):`, iframe.src);
+          debug.log(`Frame still loading, will retry (${retryCount + 1}/${maxRetries}):`, iframe.src);
 
           await new Promise(resolve => {
             const loadHandler = () => {
-              iframe.removeEventListener("load", loadHandler);
+              iframe.removeEventListener('load', loadHandler);
               resolve(undefined);
             };
-            iframe.addEventListener("load", loadHandler);
+            iframe.addEventListener('load', loadHandler);
             setTimeout(() => {
-              iframe.removeEventListener("load", loadHandler);
+              iframe.removeEventListener('load', loadHandler);
               resolve(undefined);
             }, retryDelay);
           });
@@ -160,42 +205,42 @@ export const getAllFrameDocuments = (onNewFrameLoaded?: FormDetectionCallback): 
 
         const isSameOrigin =
           iframeUrl.origin === currentOrigin ||
-          iframe.src.startsWith("/") ||
-          iframe.src === "about:blank" ||
-          iframe.src.startsWith("data:") ||
-          iframe.src.startsWith("blob:");
+          iframe.src.startsWith('/') ||
+          iframe.src === 'about:blank' ||
+          iframe.src.startsWith('data:') ||
+          iframe.src.startsWith('blob:');
 
         if (isSameOrigin) {
-          console.debug("Accessing same-origin frame:", iframe.src);
+          debug.log('Accessing same-origin frame:', iframe.src);
           if (iframe.contentDocument) return iframe.contentDocument;
           if (iframe.contentWindow?.document) return iframe.contentWindow.document;
 
-          if (iframe.src.startsWith("data:") || iframe.src.startsWith("blob:")) {
+          if (iframe.src.startsWith('data:') || iframe.src.startsWith('blob:')) {
             await new Promise(resolve => setTimeout(resolve, 100));
             return iframe.contentDocument || iframe.contentWindow?.document || null;
           }
         } else {
-          console.debug("Cross-origin frame detected, cannot access content:", iframe.src);
-          iframe.setAttribute("data-filliny-cross-origin", "true");
+          debug.log('Cross-origin frame detected, cannot access content:', iframe.src);
+          iframe.setAttribute('data-filliny-cross-origin', 'true');
           return null;
         }
       }
 
       if (iframe.srcdoc && iframe.contentDocument) {
-        console.debug("Accessing srcdoc frame");
+        debug.log('Accessing srcdoc frame');
         return iframe.contentDocument;
       }
     } catch (e) {
       const error = e as Error;
-      console.debug("Frame access error:", {
+      debug.log('Frame access error:', {
         src: iframe.src,
         error: error.message,
         retryCount,
         maxRetries,
       });
 
-      if (error.message.includes("cross-origin") || error.message.includes("Permission denied")) {
-        iframe.setAttribute("data-filliny-cross-origin", "true");
+      if (error.message.includes('cross-origin') || error.message.includes('Permission denied')) {
+        iframe.setAttribute('data-filliny-cross-origin', 'true');
         return null;
       }
 
@@ -208,12 +253,12 @@ export const getAllFrameDocuments = (onNewFrameLoaded?: FormDetectionCallback): 
   };
 
   const processIframes = async (doc: Document) => {
-    const iframes = Array.from(doc.getElementsByTagName("iframe"));
+    const iframes = Array.from(doc.getElementsByTagName('iframe'));
     for (const iframe of iframes) {
-      const frameSrc = iframe.src || "about:blank";
+      const frameSrc = iframe.src || 'about:blank';
       if (!processedFrames.has(frameSrc)) {
         processedFrames.add(frameSrc);
-        iframe.addEventListener("load", async () => {
+        iframe.addEventListener('load', async () => {
           const iframeDoc = await tryGetIframeDoc(iframe);
           if (iframeDoc && !docs.includes(iframeDoc)) {
             docs.push(iframeDoc);
@@ -222,7 +267,7 @@ export const getAllFrameDocuments = (onNewFrameLoaded?: FormDetectionCallback): 
 
             // Initialize API monitoring for this iframe too
             initializeAPIResponseMonitoring(iframeDoc, () => {
-              console.log("🔄 Form definition API detected in iframe, triggering form detection");
+              debug.log('🔄 Form definition API detected in iframe, triggering form detection');
               if (onNewFrameLoaded) {
                 onNewFrameLoaded(iframeDoc);
               }
@@ -242,12 +287,12 @@ export const getAllFrameDocuments = (onNewFrameLoaded?: FormDetectionCallback): 
       }
     }
 
-    const objects = Array.from(doc.getElementsByTagName("object"));
+    const objects = Array.from(doc.getElementsByTagName('object'));
     for (const obj of objects) {
       try {
         const objDoc = (obj as HTMLObjectElement & { contentDocument?: Document }).contentDocument;
-        if (objDoc && !processedFrames.has(obj.data || "object")) {
-          processedFrames.add(obj.data || "object");
+        if (objDoc && !processedFrames.has(obj.data || 'object')) {
+          processedFrames.add(obj.data || 'object');
           docs.push(objDoc);
           await processIframes(objDoc);
         }
@@ -260,16 +305,16 @@ export const getAllFrameDocuments = (onNewFrameLoaded?: FormDetectionCallback): 
   const observeNewFrames = (doc: DocumentWithObserver) => {
     const observer = new MutationObserver(async mutations => {
       for (const mutation of mutations) {
-        if (mutation.type === "childList") {
+        if (mutation.type === 'childList') {
           const newIframes = Array.from(mutation.addedNodes).filter(
             (node): node is HTMLIFrameElement => node instanceof HTMLIFrameElement,
           );
 
           for (const iframe of newIframes) {
-            const frameSrc = iframe.src || "about:blank";
+            const frameSrc = iframe.src || 'about:blank';
             if (!processedFrames.has(frameSrc)) {
               processedFrames.add(frameSrc);
-              iframe.addEventListener("load", async () => {
+              iframe.addEventListener('load', async () => {
                 const iframeDoc = await tryGetIframeDoc(iframe);
                 if (iframeDoc && !docs.includes(iframeDoc)) {
                   docs.push(iframeDoc);
@@ -278,7 +323,7 @@ export const getAllFrameDocuments = (onNewFrameLoaded?: FormDetectionCallback): 
 
                   // Initialize API monitoring for this iframe too
                   initializeAPIResponseMonitoring(iframeDoc, () => {
-                    console.log("🔄 Form definition API detected in iframe, triggering form detection");
+                    debug.log('🔄 Form definition API detected in iframe, triggering form detection');
                     if (onNewFrameLoaded) {
                       onNewFrameLoaded(iframeDoc);
                     }
@@ -333,23 +378,42 @@ export const getAllFormContainersFromRegistry = (): HTMLElement[] => unifiedFiel
  * Progressive detection strategy with multiple passes and intelligent timing
  */
 async function performProgressiveDetection(documents: Document[]): Promise<HTMLElement[]> {
-  console.log("🔄 Starting progressive form detection strategy...");
+  debug.log('🔄 Starting progressive form detection strategy...');
 
-  // Remove unused variable
-  // const allCandidates: FormCandidate[] = [];
+  // Use enum-based detection passes for better maintainability
   const detectionPasses = [
-    { name: "immediate", delay: 0, confidence: 0.8 },
-    { name: "fast", delay: 500, confidence: 0.7 },
-    { name: "medium", delay: 1500, confidence: 0.6 },
-    { name: "thorough", delay: 3000, confidence: 0.5 },
-    { name: "final", delay: 5000, confidence: 0.4 },
+    {
+      name: DetectionPass.IMMEDIATE,
+      delay: DETECTION_DELAYS[DetectionPass.IMMEDIATE],
+      confidence: DETECTION_PASS_CONFIDENCE[DetectionPass.IMMEDIATE],
+    },
+    {
+      name: DetectionPass.FAST,
+      delay: DETECTION_DELAYS[DetectionPass.FAST],
+      confidence: DETECTION_PASS_CONFIDENCE[DetectionPass.FAST],
+    },
+    {
+      name: DetectionPass.MEDIUM,
+      delay: DETECTION_DELAYS[DetectionPass.MEDIUM],
+      confidence: DETECTION_PASS_CONFIDENCE[DetectionPass.MEDIUM],
+    },
+    {
+      name: DetectionPass.THOROUGH,
+      delay: DETECTION_DELAYS[DetectionPass.THOROUGH],
+      confidence: DETECTION_PASS_CONFIDENCE[DetectionPass.THOROUGH],
+    },
+    {
+      name: DetectionPass.FINAL,
+      delay: DETECTION_DELAYS[DetectionPass.FINAL],
+      confidence: DETECTION_PASS_CONFIDENCE[DetectionPass.FINAL],
+    },
   ];
 
   let bestResults: HTMLElement[] = [];
   let bestScore = 0;
 
   for (const pass of detectionPasses) {
-    console.log(`🔍 Detection pass: ${pass.name} (delay: ${pass.delay}ms, confidence: ${pass.confidence})`);
+    debug.log(`🔍 Detection pass: ${pass.name} (delay: ${pass.delay}ms, confidence: ${pass.confidence})`);
 
     // Wait for the specified delay
     if (pass.delay > 0) {
@@ -359,7 +423,7 @@ async function performProgressiveDetection(documents: Document[]): Promise<HTMLE
     // Check if API responses have been received
     const hasAPIData = documents.some(doc => hasFormDefinitionAPIsLoaded(doc));
     if (hasAPIData) {
-      console.log("📡 API data detected, proceeding with enhanced detection");
+      debug.log('📡 API data detected, proceeding with enhanced detection');
     }
 
     // Wait for content stability for this pass
@@ -370,28 +434,29 @@ async function performProgressiveDetection(documents: Document[]): Promise<HTMLE
 
     // Calculate overall score for this pass
     const passScore = calculatePassScore(passCandidates);
-    console.log(`📊 Pass ${pass.name} found ${passCandidates.length} containers, score: ${passScore}`);
+    debug.log(`📊 Pass ${pass.name} found ${passCandidates.length} containers, score: ${passScore}`);
 
     // If this pass found significantly better results, use them
     if (passScore > bestScore + 10 || passCandidates.length > bestResults.length * 1.5) {
       bestResults = passCandidates.map(c => c.element);
       bestScore = passScore;
-      console.log(`✅ New best results from ${pass.name} pass: ${bestResults.length} containers`);
+      debug.log(`✅ New best results from ${pass.name} pass: ${bestResults.length} containers`);
     }
 
     // Early termination conditions
     if (shouldTerminateEarly(passCandidates, pass, hasAPIData)) {
-      console.log(`🎯 Early termination after ${pass.name} pass`);
+      debug.log(`🎯 Early termination after ${pass.name} pass`);
       break;
     }
   }
 
-  console.log(`🏁 Progressive detection completed. Final result: ${bestResults.length} containers`);
+  debug.log(`🏁 Progressive detection completed. Final result: ${bestResults.length} containers`);
   return bestResults;
 }
 
 /**
  * Perform a single detection pass with specified confidence threshold
+ * Now includes Shadow DOM support using deep query selectors
  */
 async function performSingleDetectionPass(
   documents: Document[],
@@ -401,14 +466,14 @@ async function performSingleDetectionPass(
 
   for (const doc of documents) {
     try {
-      console.log(`Processing document: ${doc.location?.href || "unknown"}`);
+      debug.log(`Processing document: ${doc.location?.href || 'unknown'}`);
 
-      // Strategy 1: Look for explicit form-related elements
+      // Strategy 1: Look for explicit form-related elements (including Shadow DOM)
       const explicitFormSelectors = [
-        "form",
-        "fieldset",
+        'form',
+        'fieldset',
         '[role="form"]',
-        "[data-form]",
+        '[data-form]',
         "[data-testid*='form']",
         "[data-cy*='form']",
         "[id*='form']",
@@ -418,14 +483,27 @@ async function performSingleDetectionPass(
       const explicitContainers: HTMLElement[] = [];
       for (const selector of explicitFormSelectors) {
         try {
-          const elements = Array.from(doc.querySelectorAll<HTMLElement>(selector));
+          // Use deep query to search within Shadow DOM as well
+          const elements = querySelectorAllDeep<HTMLElement>(selector, doc);
           explicitContainers.push(...elements);
         } catch (e) {
-          console.debug(`Explicit form selector failed: ${selector}`, e);
+          debug.log(`Explicit form selector failed: ${selector}`, e);
         }
       }
 
-      console.log(`Found ${explicitContainers.length} explicit form containers`);
+      // Also search within observed shadow roots directly
+      for (const shadowRoot of observedShadowRoots) {
+        for (const selector of explicitFormSelectors) {
+          try {
+            const elements = Array.from(shadowRoot.querySelectorAll<HTMLElement>(selector));
+            explicitContainers.push(...elements);
+          } catch {
+            // Continue on selector errors
+          }
+        }
+      }
+
+      debug.log(`Found ${explicitContainers.length} explicit form containers`);
 
       // Process explicit containers
       for (const container of explicitContainers) {
@@ -436,7 +514,7 @@ async function performSingleDetectionPass(
 
             // Apply confidence threshold
             if (score >= confidenceThreshold * 100) {
-              console.log(`Explicit container: ${container.tagName}. - Score: ${score}, Fields: ${fields.length}`);
+              debug.log(`Explicit container: ${container.tagName}. - Score: ${score}, Fields: ${fields.length}`);
 
               candidates.push({
                 element: container,
@@ -447,12 +525,12 @@ async function performSingleDetectionPass(
             }
           }
         } catch (error) {
-          console.debug("Error processing explicit container:", error);
+          debug.log('Error processing explicit container:', error);
         }
       }
 
       // Strategy 2: Look for implicit containers with form-like patterns
-      const implicitContainers = Array.from(doc.querySelectorAll<HTMLElement>("div, section, main, article"));
+      const implicitContainers = Array.from(doc.querySelectorAll<HTMLElement>('div, section, main, article'));
 
       for (const container of implicitContainers) {
         try {
@@ -471,11 +549,11 @@ async function performSingleDetectionPass(
             }
           }
         } catch (error) {
-          console.debug("Error processing implicit container:", error);
+          debug.log('Error processing implicit container:', error);
         }
       }
     } catch (error) {
-      console.error("Error in form detection for document:", error);
+      debug.error('Error in form detection for document:', error);
     }
   }
 
@@ -514,7 +592,7 @@ function shouldTerminateEarly(
   hasAPIData: boolean,
 ): boolean {
   // If we have API data and found good results, we can terminate early
-  if (hasAPIData && candidates.length > 0 && pass.name !== "immediate") {
+  if (hasAPIData && candidates.length > 0 && pass.name !== 'immediate') {
     const avgScore = candidates.reduce((sum, c) => sum + c.score, 0) / candidates.length;
     if (avgScore > 70) {
       return true;
@@ -530,7 +608,7 @@ function shouldTerminateEarly(
   }
 
   // If we're past the medium pass and have decent results, consider terminating
-  if (pass.name === "thorough" && candidates.length >= 2) {
+  if (pass.name === 'thorough' && candidates.length >= 2) {
     const avgScore = candidates.reduce((sum, c) => sum + c.score, 0) / candidates.length;
     if (avgScore > 60) {
       return true;
@@ -545,7 +623,7 @@ function shouldTerminateEarly(
  * Now includes universal dynamic content detection, progressive strategy, and multi-step form detection
  */
 export const detectFormLikeContainers = async (): Promise<HTMLElement[]> => {
-  console.log("Starting enhanced form container detection with progressive strategy...");
+  debug.log('Starting enhanced form container detection with progressive strategy...');
 
   const documents = getAllFrameDocuments();
 
@@ -579,50 +657,50 @@ function isInsideCrossOriginIframe(): boolean {
 
 // Remove unused function
 // function showCrossOriginIframeWarning() {
-//   console.warn("🚨 Filliny detected it's running inside a cross-origin iframe. Form detection may be limited.");
+//   debug.warn("🚨 Filliny detected it's running inside a cross-origin iframe. Form detection may be limited.");
 // }
 
 export function openCrossOriginIframeInNewTabAndAlert() {
   if (isInsideCrossOriginIframe()) {
     try {
       const currentUrl = window.location.href;
-      window.open(currentUrl, "_blank");
+      window.open(currentUrl, '_blank');
       alert(
         "This page is embedded in a cross-origin iframe which limits Filliny's functionality. We've opened it in a new tab where Filliny can work properly.",
       );
     } catch (error) {
-      console.error("Could not open page in new tab:", error);
+      debug.error('Could not open page in new tab:', error);
     }
   }
 }
 
 // --- System Diagnostics ---
 export const diagnoseFillinySystem = async (): Promise<void> => {
-  console.group("🔍 Filliny System Diagnostics");
+  debug.group('Filliny System Diagnostics');
 
   try {
-    console.log("Environment:", {
+    debug.log('Environment:', {
       userAgent: navigator.userAgent,
       url: window.location.href,
       isCrossOrigin: isInsideCrossOriginIframe(),
     });
 
     const documents = getAllFrameDocuments();
-    console.log(`📄 Documents found: ${documents.length}`);
+    debug.log(`Documents found: ${documents.length}`);
 
     for (const doc of documents) {
-      const forms = Array.from(doc.querySelectorAll("form"));
-      const inputs = Array.from(doc.querySelectorAll("input, select, textarea"));
-      console.log(`Document ${doc.location?.href || "main"}: ${forms.length} forms, ${inputs.length} inputs`);
+      const forms = Array.from(doc.querySelectorAll('form'));
+      const inputs = Array.from(doc.querySelectorAll('input, select, textarea'));
+      debug.log(`Document ${doc.location?.href || 'main'}: ${forms.length} forms, ${inputs.length} inputs`);
     }
 
     const containers = await detectFormLikeContainers();
-    console.log(`🎯 Form containers detected: ${containers.length}`);
+    debug.log(`Form containers detected: ${containers.length}`);
   } catch (error) {
-    console.error("Diagnostic error:", error);
+    debug.error('Diagnostic error:', error);
   }
 
-  console.groupEnd();
+  debug.groupEnd();
 };
 
 /**
@@ -636,7 +714,7 @@ function initializeDynamicContentDetection(doc: Document, onNewFormLoaded?: Form
 
   let stableStateTimeout: number;
   let lastMutationTime = Date.now();
-  const STABILITY_THRESHOLD = 1000; // ms of no mutations = stable
+  const STABILITY_THRESHOLD = TIMING_CONSTANTS.STABILITY_THRESHOLD; // ms of no mutations = stable
 
   const detector: DynamicContentDetector = {
     observer: new MutationObserver(mutations => {
@@ -651,7 +729,7 @@ function initializeDynamicContentDetection(doc: Document, onNewFormLoaded?: Form
 
       // Enhanced form content change detection
       const hasFormRelevantChanges = mutations.some(mutation => {
-        if (mutation.type === "childList") {
+        if (mutation.type === 'childList') {
           const addedNodes = Array.from(mutation.addedNodes);
           const removedNodes = Array.from(mutation.removedNodes);
 
@@ -730,7 +808,7 @@ function initializeDynamicContentDetection(doc: Document, onNewFormLoaded?: Form
           const hasContainerChanges = addedNodes.some(node => {
             if (node.nodeType === Node.ELEMENT_NODE) {
               const element = node as Element;
-              return ["DIV", "SECTION", "FORM", "FIELDSET"].includes(element.tagName);
+              return ['DIV', 'SECTION', 'FORM', 'FIELDSET'].includes(element.tagName);
             }
             return false;
           });
@@ -739,29 +817,29 @@ function initializeDynamicContentDetection(doc: Document, onNewFormLoaded?: Form
         }
 
         // Enhanced attribute change detection
-        if (mutation.type === "attributes") {
+        if (mutation.type === 'attributes') {
           const target = mutation.target as Element;
           const attributeName = mutation.attributeName;
 
           // Standard readiness indicators
-          if (attributeName === "aria-busy" && target.getAttribute("aria-busy") === "false") {
+          if (attributeName === 'aria-busy' && target.getAttribute('aria-busy') === 'false') {
             return true;
           }
 
-          if (attributeName === "data-loading" && target.getAttribute("data-loading") === "false") {
+          if (attributeName === 'data-loading' && target.getAttribute('data-loading') === 'false') {
             return true;
           }
 
           // Disabled -> enabled transitions
-          if (attributeName === "disabled" && !target.hasAttribute("disabled")) {
+          if (attributeName === 'disabled' && !target.hasAttribute('disabled')) {
             return true;
           }
 
           // Class changes that might indicate form readiness
-          if (attributeName === "class") {
-            const newClasses = target.getAttribute("class") || "";
-            const hasReadyClass = ["loaded", "ready", "initialized", "rendered"].some(cls => newClasses.includes(cls));
-            const removedLoadingClass = ["loading", "skeleton", "pending"].some(cls => !newClasses.includes(cls));
+          if (attributeName === 'class') {
+            const newClasses = target.getAttribute('class') || '';
+            const hasReadyClass = ['loaded', 'ready', 'initialized', 'rendered'].some(cls => newClasses.includes(cls));
+            const removedLoadingClass = ['loading', 'skeleton', 'pending'].some(cls => !newClasses.includes(cls));
 
             if (hasReadyClass || removedLoadingClass) {
               return true;
@@ -769,21 +847,21 @@ function initializeDynamicContentDetection(doc: Document, onNewFormLoaded?: Form
           }
 
           // Style changes that might indicate visibility
-          if (attributeName === "style") {
-            const style = target.getAttribute("style") || "";
-            const becameVisible = !style.includes("display: none") && !style.includes("visibility: hidden");
+          if (attributeName === 'style') {
+            const style = target.getAttribute('style') || '';
+            const becameVisible = !style.includes('display: none') && !style.includes('visibility: hidden');
             if (becameVisible) {
               return true;
             }
           }
 
           // Data attribute changes that might indicate form state
-          if (attributeName?.startsWith("data-")) {
+          if (attributeName?.startsWith('data-')) {
             const dataValue = target.getAttribute(attributeName);
-            if (attributeName.includes("state") && dataValue === "ready") {
+            if (attributeName.includes('state') && dataValue === 'ready') {
               return true;
             }
-            if (attributeName.includes("initialized") && dataValue === "true") {
+            if (attributeName.includes('initialized') && dataValue === 'true') {
               return true;
             }
           }
@@ -794,13 +872,13 @@ function initializeDynamicContentDetection(doc: Document, onNewFormLoaded?: Form
 
       if (hasFormRelevantChanges) {
         detector.confidence = Math.min(1.0, detector.confidence + 0.1);
-        console.log(`📈 Dynamic content detected, confidence: ${detector.confidence.toFixed(2)}`);
+        debug.log(`📈 Dynamic content detected, confidence: ${detector.confidence.toFixed(2)}`);
       }
 
       // Set new stability timeout
       stableStateTimeout = window.setTimeout(() => {
         if (Date.now() - lastMutationTime >= STABILITY_THRESHOLD) {
-          console.log(`🎯 Content stable for ${STABILITY_THRESHOLD}ms, triggering form detection`);
+          debug.log(`🎯 Content stable for ${STABILITY_THRESHOLD}ms, triggering form detection`);
           detector.onStableCallback?.();
           if (onNewFormLoaded) {
             onNewFormLoaded(doc);
@@ -808,7 +886,7 @@ function initializeDynamicContentDetection(doc: Document, onNewFormLoaded?: Form
         }
       }, STABILITY_THRESHOLD);
     }),
-    confidence: 0.5,
+    confidence: ConfidenceLevel.LOW,
     lastDetectionTime: Date.now(),
     stableStateTimeout: 0,
     onStableCallback: undefined,
@@ -819,12 +897,12 @@ function initializeDynamicContentDetection(doc: Document, onNewFormLoaded?: Form
     childList: true,
     subtree: true,
     attributes: true,
-    attributeFilter: ["aria-busy", "data-loading", "disabled", "class"],
+    attributeFilter: ['aria-busy', 'data-loading', 'disabled', 'class'],
   });
 
   dynamicDetectors.set(doc, detector);
 
-  console.log(`🔍 Dynamic content detection initialized for ${doc.location?.href || "document"}`);
+  debug.log(`🔍 Dynamic content detection initialized for ${doc.location?.href || 'document'}`);
 }
 
 /**
@@ -840,7 +918,7 @@ async function waitForContentStability(documents: Document[], maxWaitTime = 5000
 
       // Check if we've exceeded max wait time
       if (now - startTime > maxWaitTime) {
-        console.log(`⏱️ Content stability timeout reached (${maxWaitTime}ms)`);
+        debug.log(`⏱️ Content stability timeout reached (${maxWaitTime}ms)`);
         resolve();
         return;
       }
@@ -855,7 +933,7 @@ async function waitForContentStability(documents: Document[], maxWaitTime = 5000
       });
 
       if (allStable) {
-        console.log(`✅ All documents stable after ${now - startTime}ms`);
+        debug.log(`✅ All documents stable after ${now - startTime}ms`);
         resolve();
       } else {
         setTimeout(checkStability, checkInterval);
@@ -870,7 +948,7 @@ async function waitForContentStability(documents: Document[], maxWaitTime = 5000
  * Enhanced form container detection with universal behavioral analysis
  */
 export const detectUniversalFormContainers = async (): Promise<HTMLElement[]> => {
-  console.log("🔍 Starting universal form container detection...");
+  debug.log('🔍 Starting universal form container detection...');
 
   const candidates: FormCandidate[] = [];
   const documents = getAllFrameDocuments();
@@ -889,7 +967,7 @@ export const detectUniversalFormContainers = async (): Promise<HTMLElement[]> =>
       const visualContainers = await detectVisualFormContainers(doc);
       candidates.push(...visualContainers);
     } catch (error) {
-      console.error(`❌ Error in universal form detection for document:`, error);
+      debug.error(`❌ Error in universal form detection for document:`, error);
     }
   }
 
@@ -898,7 +976,7 @@ export const detectUniversalFormContainers = async (): Promise<HTMLElement[]> =>
     (a, b) => b.score - a.score,
   );
 
-  console.log(`🎯 Universal detection found ${uniqueCandidates.length} form containers`);
+  debug.log(`🎯 Universal detection found ${uniqueCandidates.length} form containers`);
 
   return uniqueCandidates.slice(0, 20).map(c => c.element); // Return top 20
 };
@@ -911,19 +989,19 @@ async function detectSemanticFormContainers(doc: Document): Promise<FormCandidat
 
   // Look for elements with form-related semantic meaning
   const semanticSelectors = [
-    "form",
-    "fieldset",
+    'form',
+    'fieldset',
     '[role="form"]',
     '[role="group"]',
     '[role="region"][aria-labelledby]',
     '[role="region"][aria-label]',
     // Elements with form-indicating attributes
-    "[autocomplete]",
-    "[novalidate]",
-    "[accept-charset]",
+    '[autocomplete]',
+    '[novalidate]',
+    '[accept-charset]',
     // Elements with form-like ARIA relationships
-    "[aria-labelledby]",
-    "[aria-describedby]",
+    '[aria-labelledby]',
+    '[aria-describedby]',
   ];
 
   for (const selector of semanticSelectors) {
@@ -938,12 +1016,12 @@ async function detectSemanticFormContainers(doc: Document): Promise<FormCandidat
             element,
             score: score + 20, // Bonus for semantic meaning
             fieldCount: fields.length,
-            reasons: ["semantic", ...reasons],
+            reasons: ['semantic', ...reasons],
           });
         }
       }
     } catch (error) {
-      console.debug(`Semantic selector failed: ${selector}`, error);
+      debug.log(`Semantic selector failed: ${selector}`, error);
     }
   }
 
@@ -957,13 +1035,13 @@ async function detectBehavioralFormContainers(doc: Document): Promise<FormCandid
   const candidates: FormCandidate[] = [];
 
   // Look for containers with interactive behavior patterns
-  const interactiveElements = Array.from(doc.querySelectorAll<HTMLElement>("*")).filter(el => {
+  const interactiveElements = Array.from(doc.querySelectorAll<HTMLElement>('*')).filter(el => {
     // Check for interactive indicators
-    const hasInteractiveEvents = ["onchange", "oninput", "onsubmit", "onreset", "onfocus", "onblur", "onclick"].some(
+    const hasInteractiveEvents = ['onchange', 'oninput', 'onsubmit', 'onreset', 'onfocus', 'onblur', 'onclick'].some(
       event => el.hasAttribute(event),
     );
 
-    const hasInteractiveAttributes = ["tabindex", "contenteditable", "draggable"].some(attr => el.hasAttribute(attr));
+    const hasInteractiveAttributes = ['tabindex', 'contenteditable', 'draggable'].some(attr => el.hasAttribute(attr));
 
     const hasFormRelatedClasses = el.className
       .toLowerCase()
@@ -999,7 +1077,7 @@ async function detectBehavioralFormContainers(doc: Document): Promise<FormCandid
           element: container,
           score: score + behavioralScore,
           fieldCount: fields.length,
-          reasons: ["behavioral", ...reasons],
+          reasons: ['behavioral', ...reasons],
         });
       }
     }
@@ -1015,7 +1093,7 @@ async function detectVisualFormContainers(doc: Document): Promise<FormCandidate[
   const candidates: FormCandidate[] = [];
 
   // Look for containers with form-like visual patterns
-  const potentialContainers = Array.from(doc.querySelectorAll<HTMLElement>("div, section, article, main, aside, nav"));
+  const potentialContainers = Array.from(doc.querySelectorAll<HTMLElement>('div, section, article, main, aside, nav'));
 
   for (const container of potentialContainers) {
     try {
@@ -1031,11 +1109,11 @@ async function detectVisualFormContainers(doc: Document): Promise<FormCandidate[
           element: container,
           score: score + visualScore,
           fieldCount: fields.length,
-          reasons: ["visual", ...reasons],
+          reasons: ['visual', ...reasons],
         });
       }
     } catch (error) {
-      console.debug("Visual analysis error:", error);
+      debug.log('Visual analysis error:', error);
     }
   }
 
@@ -1100,7 +1178,7 @@ function analyzeVisualFormPattern(_container: HTMLElement, fields: HTMLElement[]
       score += 10;
     }
   } catch (error) {
-    console.debug("Visual pattern analysis error:", error);
+    debug.log('Visual pattern analysis error:', error);
   }
 
   return score;
@@ -1122,9 +1200,12 @@ export function cleanupDynamicContentDetection(doc?: Document): void {
 
     // Also cleanup API monitoring for this document
     cleanupAPIResponseMonitoring(doc);
+
+    // Cleanup Shadow DOM observation for this document
+    cleanupShadowDOMObservation(doc);
   } else {
     // Clean up all detectors
-    for (const [document, detector] of dynamicDetectors) {
+    for (const [, detector] of dynamicDetectors) {
       detector.observer.disconnect();
       if (detector.stableStateTimeout) {
         clearTimeout(detector.stableStateTimeout);
@@ -1134,6 +1215,10 @@ export function cleanupDynamicContentDetection(doc?: Document): void {
 
     // Cleanup all API monitoring
     cleanupAPIResponseMonitoring();
+
+    // Cleanup all Shadow DOM observation
+    cleanupShadowDOMObservation();
+    observedShadowRoots.clear();
   }
 }
 
@@ -1163,7 +1248,7 @@ export function initializeAPIResponseMonitoring(doc: Document, onFormDefinitionL
 
   // Intercept fetch API
   windowObj.fetch = async function (input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
-    const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
 
     try {
       const response = await originalFetch(input, init);
@@ -1177,7 +1262,7 @@ export function initializeAPIResponseMonitoring(doc: Document, onFormDefinitionL
 
         try {
           const data = await clonedResponse.json();
-          console.log(`🔍 Detected form definition API response from: ${url}`);
+          debug.log(`🔍 Detected form definition API response from: ${url}`);
 
           // Enhanced form definition data processing
           const processedData = processFormDefinitionData(data, url);
@@ -1187,17 +1272,17 @@ export function initializeAPIResponseMonitoring(doc: Document, onFormDefinitionL
 
           // Trigger form detection after a short delay to allow DOM updates
           setTimeout(() => {
-            console.log(`📡 Processing form definition data from ${url}`);
+            debug.log(`📡 Processing form definition data from ${url}`);
             monitor.onFormDefinitionLoaded?.(processedData);
           }, 100);
         } catch (parseError) {
-          console.debug("Failed to parse potential form definition response:", parseError);
+          debug.log('Failed to parse potential form definition response:', parseError);
         }
       }
 
       return response;
     } catch (error) {
-      console.debug("Fetch interceptor error:", error);
+      debug.log('Fetch interceptor error:', error);
       return originalFetch(input, init);
     }
   };
@@ -1210,7 +1295,7 @@ export function initializeAPIResponseMonitoring(doc: Document, onFormDefinitionL
     user?: string | null,
     password?: string | null,
   ) {
-    const urlString = typeof url === "string" ? url : url.href;
+    const urlString = typeof url === 'string' ? url : url.href;
     const isFormDefinitionAPI = monitor.formDefinitionPatterns.some(pattern => pattern.test(urlString));
 
     if (isFormDefinitionAPI) {
@@ -1222,7 +1307,7 @@ export function initializeAPIResponseMonitoring(doc: Document, onFormDefinitionL
         if (this.readyState === 4 && this.status >= 200 && this.status < 300) {
           try {
             const responseData = JSON.parse(this.responseText);
-            console.log(`🔍 Detected form definition XHR response from: ${urlString}`);
+            debug.log(`🔍 Detected form definition XHR response from: ${urlString}`);
 
             // Enhanced form definition data processing
             const processedData = processFormDefinitionData(responseData, urlString);
@@ -1231,11 +1316,11 @@ export function initializeAPIResponseMonitoring(doc: Document, onFormDefinitionL
             monitor.interceptedResponses.set(urlString, { raw: responseData, processed: processedData });
 
             setTimeout(() => {
-              console.log(`📡 Processing form definition data from ${urlString}`);
+              debug.log(`📡 Processing form definition data from ${urlString}`);
               monitor.onFormDefinitionLoaded?.(processedData);
             }, 100);
           } catch (parseError) {
-            console.debug("Failed to parse XHR form definition response:", parseError);
+            debug.log('Failed to parse XHR form definition response:', parseError);
           }
         }
 
@@ -1258,7 +1343,7 @@ export function initializeAPIResponseMonitoring(doc: Document, onFormDefinitionL
   };
 
   apiResponseMonitors.set(doc, monitor);
-  console.log(`📡 API response monitoring initialized for ${doc.location?.href || "document"}`);
+  debug.log(`📡 API response monitoring initialized for ${doc.location?.href || 'document'}`);
 }
 
 /**
@@ -1310,11 +1395,11 @@ export function getInterceptedFormDefinitions(doc: Document): Map<string, unknow
  */
 function detectCustomFormComponent(element: Element): boolean {
   const tagName = element.tagName.toLowerCase();
-  const className = element.className?.toLowerCase() || "";
+  const className = element.className?.toLowerCase() || '';
   const dataAttrs = Array.from(element.attributes)
-    .filter(attr => attr.name.startsWith("data-"))
+    .filter(attr => attr.name.startsWith('data-'))
     .map(attr => `${attr.name}=${attr.value}`)
-    .join(" ")
+    .join(' ')
     .toLowerCase();
 
   // Custom component patterns
@@ -1345,54 +1430,65 @@ function detectCustomFormComponent(element: Element): boolean {
 }
 
 /**
- * Detect React/Vue/Angular component mounting patterns
+ * Detect React/Vue/Angular/Svelte/Qwik component mounting patterns
+ * Uses the centralized framework detection module
  */
 function detectFrameworkFormComponent(element: Element): boolean {
-  // Check for React component patterns
-  const hasReactProps =
-    element.hasAttribute("data-reactid") ||
-    element.className?.includes("react-") ||
-    element.querySelector("[data-reactroot]") !== null;
+  // Use centralized framework detection
+  const framework = detectFrameworkForElement(element);
 
-  // Check for Vue component patterns
-  const hasVueProps =
-    element.hasAttribute("v-model") ||
-    element.hasAttribute("v-bind") ||
-    element.className?.includes("vue-") ||
-    element.hasAttribute("data-v-");
+  // Check if it's a known framework
+  const isKnownFramework = framework !== Framework.VANILLA;
 
-  // Check for Angular component patterns
-  const hasAngularProps =
-    element.hasAttribute("ng-model") ||
-    element.hasAttribute("[(ngModel)]") ||
-    element.hasAttribute("formControlName") ||
-    element.className?.includes("ng-");
+  // Also check for React-specific patterns for backward compatibility
+  const hasReactProps = detectReact(element) || element.querySelector('[data-reactroot]') !== null;
+
+  // Check for Vue-specific patterns using centralized detection
+  const hasVueProps = detectVue(element);
+
+  // Check for Angular-specific patterns using centralized detection
+  const hasAngularProps = detectAngular(element);
+
+  // Check for Svelte-specific patterns using centralized detection
+  const hasSvelteProps = detectSvelte(element);
+
+  // Check for Qwik-specific patterns using centralized detection
+  const hasQwikProps = detectQwik(element);
 
   // Check for modern framework indicators
   const hasModernFramework =
-    element.hasAttribute("data-testid") ||
-    element.hasAttribute("data-cy") ||
-    element.hasAttribute("data-automation-id");
+    element.hasAttribute('data-testid') ||
+    element.hasAttribute('data-cy') ||
+    element.hasAttribute('data-automation-id');
 
   // Check if element contains form-like attributes
   const hasFormAttributes =
-    element.hasAttribute("name") ||
-    element.hasAttribute("placeholder") ||
-    element.hasAttribute("required") ||
-    element.hasAttribute("aria-label") ||
-    element.hasAttribute("aria-required");
+    element.hasAttribute('name') ||
+    element.hasAttribute('placeholder') ||
+    element.hasAttribute('required') ||
+    element.hasAttribute('aria-label') ||
+    element.hasAttribute('aria-required');
 
-  return (hasReactProps || hasVueProps || hasAngularProps || hasModernFramework) && hasFormAttributes;
+  return (
+    (isKnownFramework ||
+      hasReactProps ||
+      hasVueProps ||
+      hasAngularProps ||
+      hasSvelteProps ||
+      hasQwikProps ||
+      hasModernFramework) &&
+    hasFormAttributes
+  );
 }
 
 /**
  * Detect job application specific form elements
  */
 function detectJobApplicationElement(element: Element): boolean {
-  const textContent = element.textContent?.toLowerCase() || "";
-  const className = element.className?.toLowerCase() || "";
-  const id = element.id?.toLowerCase() || "";
-  const ariaLabel = element.getAttribute("aria-label")?.toLowerCase() || "";
+  const textContent = element.textContent?.toLowerCase() || '';
+  const className = element.className?.toLowerCase() || '';
+  const id = element.id?.toLowerCase() || '';
+  const ariaLabel = element.getAttribute('aria-label')?.toLowerCase() || '';
 
   const allText = `${textContent} ${className} ${id} ${ariaLabel}`;
 
@@ -1430,7 +1526,7 @@ function detectJobApplicationElement(element: Element): boolean {
  * Detects forms with step-based navigation and handles them appropriately
  */
 async function detectMultiStepFormContainers(documents: Document[]): Promise<HTMLElement[]> {
-  console.log("🔍 Starting multi-step form detection...");
+  debug.log('🔍 Starting multi-step form detection...');
 
   const containers: HTMLElement[] = [];
 
@@ -1455,11 +1551,11 @@ async function detectMultiStepFormContainers(documents: Document[]): Promise<HTM
       const processedContainers = processMultiStepContainers(allStepContainers);
       containers.push(...processedContainers);
     } catch (error) {
-      console.error("Error in multi-step form detection:", error);
+      debug.error('Error in multi-step form detection:', error);
     }
   }
 
-  console.log(`📋 Multi-step detection found ${containers.length} containers`);
+  debug.log(`📋 Multi-step detection found ${containers.length} containers`);
   return containers;
 }
 
@@ -1498,11 +1594,11 @@ function detectStepNavigationElements(doc: Document): HTMLElement[] {
         const container = findMultiStepFormContainer(element);
         if (container && !containers.includes(container)) {
           containers.push(container);
-          console.log(`📍 Found multi-step form via navigation: ${container.tagName}.${container.className}`);
+          debug.log(`📍 Found multi-step form via navigation: ${container.tagName}.${container.className}`);
         }
       }
     } catch (error) {
-      console.debug(`Navigation selector failed: ${selector}`, error);
+      debug.log(`Navigation selector failed: ${selector}`, error);
     }
   }
 
@@ -1520,7 +1616,7 @@ function detectStepContentContainers(doc: Document): HTMLElement[] {
     '[class*="step-content"], [class*="step-body"], [class*="step-panel"]',
     '[class*="wizard-step"], [class*="form-step"]',
     '[role="tabpanel"][class*="step"], [class*="tab-pane"][class*="step"]',
-    "[data-step], [data-step-id], [data-step-name]",
+    '[data-step], [data-step-id], [data-step-name]',
     '[id*="step"], [class*="step-"]:not([class*="stepper"])',
   ];
 
@@ -1535,12 +1631,12 @@ function detectStepContentContainers(doc: Document): HTMLElement[] {
           const container = findMultiStepFormContainer(element);
           if (container && !containers.includes(container)) {
             containers.push(container);
-            console.log(`📍 Found multi-step form via step content: ${container.tagName}.${container.className}`);
+            debug.log(`📍 Found multi-step form via step content: ${container.tagName}.${container.className}`);
           }
         }
       }
     } catch (error) {
-      console.debug(`Step content selector failed: ${selector}`, error);
+      debug.log(`Step content selector failed: ${selector}`, error);
     }
   }
 
@@ -1556,7 +1652,7 @@ function detectWizardPatterns(doc: Document): HTMLElement[] {
   // Look for wizard/flow specific patterns
   const wizardSelectors = [
     '[class*="wizard"], [class*="flow"], [class*="multi-step"]',
-    "[data-wizard], [data-flow], [data-multi-step]",
+    '[data-wizard], [data-flow], [data-multi-step]',
     '[role="application"][class*="form"]',
   ];
 
@@ -1572,12 +1668,12 @@ function detectWizardPatterns(doc: Document): HTMLElement[] {
         if (fields.length > 0 || hasStepNavigation) {
           if (!containers.includes(element)) {
             containers.push(element);
-            console.log(`📍 Found wizard/flow form: ${element.tagName}.${element.className}`);
+            debug.log(`📍 Found wizard/flow form: ${element.tagName}.${element.className}`);
           }
         }
       }
     } catch (error) {
-      console.debug(`Wizard selector failed: ${selector}`, error);
+      debug.log(`Wizard selector failed: ${selector}`, error);
     }
   }
 
@@ -1595,7 +1691,7 @@ function detectProgressIndicators(doc: Document): HTMLElement[] {
     '[role="progressbar"]',
     '[class*="progress"][class*="step"], [class*="step-progress"]',
     '[class*="stepper"], [class*="breadcrumb"][class*="step"]',
-    ".progress-bar, .progress-indicator",
+    '.progress-bar, .progress-indicator',
   ];
 
   for (const selector of progressSelectors) {
@@ -1604,7 +1700,7 @@ function detectProgressIndicators(doc: Document): HTMLElement[] {
 
       for (const element of elements) {
         // Check if progress indicator shows multiple steps
-        const stepTexts = element.textContent || "";
+        const stepTexts = element.textContent || '';
         const hasMultipleSteps =
           /step\s*\d+.*step\s*\d+/i.test(stepTexts) ||
           /\d+.*of.*\d+/i.test(stepTexts) ||
@@ -1614,12 +1710,12 @@ function detectProgressIndicators(doc: Document): HTMLElement[] {
           const container = findMultiStepFormContainer(element);
           if (container && !containers.includes(container)) {
             containers.push(container);
-            console.log(`📍 Found multi-step form via progress indicator: ${container.tagName}.${container.className}`);
+            debug.log(`📍 Found multi-step form via progress indicator: ${container.tagName}.${container.className}`);
           }
         }
       }
     } catch (error) {
-      console.debug(`Progress selector failed: ${selector}`, error);
+      debug.log(`Progress selector failed: ${selector}`, error);
     }
   }
 
@@ -1656,27 +1752,27 @@ function scoreMultiStepContainer(container: HTMLElement): number {
   let score = 0;
 
   // Check for form-related tags
-  if (["FORM", "FIELDSET"].includes(container.tagName)) {
+  if (['FORM', 'FIELDSET'].includes(container.tagName)) {
     score += 20;
   }
 
   // Check for semantic roles
-  const role = container.getAttribute("role");
-  if (role === "form" || role === "application" || role === "region") {
+  const role = container.getAttribute('role');
+  if (role === 'form' || role === 'application' || role === 'region') {
     score += 15;
   }
 
   // Check for multi-step related classes/attributes
   const className = container.className.toLowerCase();
   const hasMultiStepClass = [
-    "wizard",
-    "multi-step",
-    "stepper",
-    "flow",
-    "steps",
-    "form-wizard",
-    "step-form",
-    "application-form",
+    'wizard',
+    'multi-step',
+    'stepper',
+    'flow',
+    'steps',
+    'form-wizard',
+    'step-form',
+    'application-form',
   ].some(cls => className.includes(cls));
 
   if (hasMultiStepClass) {
@@ -1786,11 +1882,11 @@ interface ProcessedFormStep {
 
 function processFormDefinitionData(data: unknown, source: string): ProcessedFormDefinition | null {
   try {
-    if (!data || typeof data !== "object") {
+    if (!data || typeof data !== 'object') {
       return null;
     }
 
-    console.log(`🔍 Processing form definition from ${source}:`, data);
+    debug.log(`🔍 Processing form definition from ${source}:`, data);
 
     const result: ProcessedFormDefinition = {
       fields: [],
@@ -1814,11 +1910,11 @@ function processFormDefinitionData(data: unknown, source: string): ProcessedForm
     // Store original metadata
     result.metadata = normalizedData;
 
-    console.log(`📊 Processed ${result.fields.length} fields and ${result.steps?.length || 0} steps from API response`);
+    debug.log(`📊 Processed ${result.fields.length} fields and ${result.steps?.length || 0} steps from API response`);
 
     return result.fields.length > 0 ? result : null;
   } catch (error) {
-    console.error("Error processing form definition data:", error);
+    debug.error('Error processing form definition data:', error);
     return null;
   }
 }
@@ -1827,7 +1923,7 @@ function processFormDefinitionData(data: unknown, source: string): ProcessedForm
  * Normalize different API response formats to a common structure
  */
 function normalizeAPIResponse(data: unknown): Record<string, unknown> {
-  if (!data || typeof data !== "object") {
+  if (!data || typeof data !== 'object') {
     return {};
   }
 
@@ -1872,12 +1968,12 @@ function extractFieldsFromData(data: Record<string, unknown>): ProcessedFormFiel
   }
 
   // Strategy 2: Schema-based fields
-  if (data.schema && typeof data.schema === "object") {
+  if (data.schema && typeof data.schema === 'object') {
     const schema = data.schema as Record<string, unknown>;
     if (Array.isArray(schema.fields)) {
       fields.push(...processFieldsArray(schema.fields));
     }
-    if (schema.properties && typeof schema.properties === "object") {
+    if (schema.properties && typeof schema.properties === 'object') {
       fields.push(...processSchemaProperties(schema.properties as Record<string, unknown>));
     }
   }
@@ -1885,10 +1981,10 @@ function extractFieldsFromData(data: Record<string, unknown>): ProcessedFormFiel
   // Strategy 3: Step-based fields
   if (Array.isArray(data.steps)) {
     for (const step of data.steps) {
-      if (step && typeof step === "object" && Array.isArray((step as Record<string, unknown>).fields)) {
+      if (step && typeof step === 'object' && Array.isArray((step as Record<string, unknown>).fields)) {
         const stepFields = processFieldsArray((step as Record<string, unknown>).fields as unknown[]);
         stepFields.forEach(field => {
-          field.step = String((step as Record<string, unknown>).id || (step as Record<string, unknown>).name || "");
+          field.step = String((step as Record<string, unknown>).id || (step as Record<string, unknown>).name || '');
         });
         fields.push(...stepFields);
       }
@@ -1897,12 +1993,12 @@ function extractFieldsFromData(data: Record<string, unknown>): ProcessedFormFiel
 
   // Strategy 4: Flat object keys as fields
   const potentialFields = Object.keys(data).filter(
-    key => key.includes("field") || key.includes("input") || key.endsWith("_field") || key.startsWith("field_"),
+    key => key.includes('field') || key.includes('input') || key.endsWith('_field') || key.startsWith('field_'),
   );
 
   for (const key of potentialFields) {
     const fieldData = data[key];
-    if (fieldData && typeof fieldData === "object") {
+    if (fieldData && typeof fieldData === 'object') {
       const processedField = processFieldDefinition(fieldData as Record<string, unknown>, key);
       if (processedField) {
         fields.push(processedField);
@@ -1920,7 +2016,7 @@ function processFieldsArray(fieldsArray: unknown[]): ProcessedFormField[] {
   const fields: ProcessedFormField[] = [];
 
   for (const fieldData of fieldsArray) {
-    if (fieldData && typeof fieldData === "object") {
+    if (fieldData && typeof fieldData === 'object') {
       const field = processFieldDefinition(fieldData as Record<string, unknown>);
       if (field) {
         fields.push(field);
@@ -1938,7 +2034,7 @@ function processSchemaProperties(properties: Record<string, unknown>): Processed
   const fields: ProcessedFormField[] = [];
 
   for (const [key, property] of Object.entries(properties)) {
-    if (property && typeof property === "object") {
+    if (property && typeof property === 'object') {
       const field = processFieldDefinition(property as Record<string, unknown>, key);
       if (field) {
         fields.push(field);
@@ -1960,7 +2056,7 @@ function processFieldDefinition(fieldData: Record<string, unknown>, fallbackId?:
     const field: ProcessedFormField = {
       id,
       name: (fieldData.name || id) as string,
-      type: normalizeFieldType((fieldData.type || fieldData.fieldType || "text") as string),
+      type: normalizeFieldType((fieldData.type || fieldData.fieldType || 'text') as string),
       label: (fieldData.label || fieldData.title || fieldData.displayName) as string,
       placeholder: fieldData.placeholder as string,
       required: Boolean(fieldData.required || fieldData.isRequired),
@@ -1970,10 +2066,10 @@ function processFieldDefinition(fieldData: Record<string, unknown>, fallbackId?:
     // Extract options for select/radio/checkbox fields
     if (fieldData.options && Array.isArray(fieldData.options)) {
       field.options = fieldData.options.map((option: unknown) => {
-        if (typeof option === "string") {
+        if (typeof option === 'string') {
           return { value: option, label: option };
         }
-        if (option && typeof option === "object") {
+        if (option && typeof option === 'object') {
           const opt = option as Record<string, unknown>;
           return {
             value: (opt.value || opt.id || opt.key) as string,
@@ -1985,7 +2081,7 @@ function processFieldDefinition(fieldData: Record<string, unknown>, fallbackId?:
     }
 
     // Extract validation rules
-    if (fieldData.validation && typeof fieldData.validation === "object") {
+    if (fieldData.validation && typeof fieldData.validation === 'object') {
       field.validation = fieldData.validation as Record<string, unknown>;
     }
 
@@ -1996,7 +2092,7 @@ function processFieldDefinition(fieldData: Record<string, unknown>, fallbackId?:
 
     return field;
   } catch (error) {
-    console.debug("Error processing field definition:", error);
+    debug.log('Error processing field definition:', error);
     return null;
   }
 }
@@ -2009,30 +2105,30 @@ function normalizeFieldType(type: string): string {
 
   // Map common variations to standard types
   const typeMap: Record<string, string> = {
-    string: "text",
-    varchar: "text",
-    textarea: "textarea",
-    longtext: "textarea",
-    dropdown: "select",
-    combobox: "select",
-    checkbox: "checkbox",
-    radio: "radio",
-    radiobutton: "radio",
-    file: "file",
-    upload: "file",
-    attachment: "file",
-    date: "date",
-    datetime: "datetime-local",
-    time: "time",
-    number: "number",
-    integer: "number",
-    decimal: "number",
-    email: "email",
-    url: "url",
-    tel: "tel",
-    phone: "tel",
-    password: "password",
-    hidden: "hidden",
+    string: 'text',
+    varchar: 'text',
+    textarea: 'textarea',
+    longtext: 'textarea',
+    dropdown: 'select',
+    combobox: 'select',
+    checkbox: 'checkbox',
+    radio: 'radio',
+    radiobutton: 'radio',
+    file: 'file',
+    upload: 'file',
+    attachment: 'file',
+    date: 'date',
+    datetime: 'datetime-local',
+    time: 'time',
+    number: 'number',
+    integer: 'number',
+    decimal: 'number',
+    email: 'email',
+    url: 'url',
+    tel: 'tel',
+    phone: 'tel',
+    password: 'password',
+    hidden: 'hidden',
   };
 
   return typeMap[normalizedType] || normalizedType;
@@ -2046,7 +2142,7 @@ function extractStepsFromData(data: Record<string, unknown>): ProcessedFormStep[
 
   if (Array.isArray(data.steps)) {
     for (const stepData of data.steps) {
-      if (stepData && typeof stepData === "object") {
+      if (stepData && typeof stepData === 'object') {
         const step = processStepDefinition(stepData as Record<string, unknown>);
         if (step) {
           steps.push(step);
@@ -2056,11 +2152,11 @@ function extractStepsFromData(data: Record<string, unknown>): ProcessedFormStep[
   }
 
   // Also check for wizard/flow configuration
-  if (data.wizard && typeof data.wizard === "object") {
+  if (data.wizard && typeof data.wizard === 'object') {
     const wizard = data.wizard as Record<string, unknown>;
     if (Array.isArray(wizard.steps)) {
       for (const stepData of wizard.steps) {
-        if (stepData && typeof stepData === "object") {
+        if (stepData && typeof stepData === 'object') {
           const step = processStepDefinition(stepData as Record<string, unknown>);
           if (step) {
             steps.push(step);
@@ -2093,8 +2189,8 @@ function processStepDefinition(stepData: Record<string, unknown>): ProcessedForm
     // Extract field IDs/names for this step
     if (Array.isArray(stepData.fields)) {
       step.fields = stepData.fields.map(field => {
-        if (typeof field === "string") return field;
-        if (field && typeof field === "object") {
+        if (typeof field === 'string') return field;
+        if (field && typeof field === 'object') {
           const fieldObj = field as Record<string, unknown>;
           return (fieldObj.id || fieldObj.name || fieldObj.key) as string;
         }
@@ -2104,7 +2200,7 @@ function processStepDefinition(stepData: Record<string, unknown>): ProcessedForm
 
     return step;
   } catch (error) {
-    console.debug("Error processing step definition:", error);
+    debug.log('Error processing step definition:', error);
     return null;
   }
 }
@@ -2115,15 +2211,15 @@ function processStepDefinition(stepData: Record<string, unknown>): ProcessedForm
 function extractValidationFromData(data: Record<string, unknown>): Record<string, unknown> {
   const validation: Record<string, unknown> = {};
 
-  if (data.validation && typeof data.validation === "object") {
+  if (data.validation && typeof data.validation === 'object') {
     Object.assign(validation, data.validation);
   }
 
-  if (data.rules && typeof data.rules === "object") {
+  if (data.rules && typeof data.rules === 'object') {
     Object.assign(validation, data.rules);
   }
 
-  if (data.constraints && typeof data.constraints === "object") {
+  if (data.constraints && typeof data.constraints === 'object') {
     Object.assign(validation, data.constraints);
   }
 
@@ -2140,7 +2236,7 @@ export function getProcessedFormDefinitions(doc: Document): ProcessedFormDefinit
   const definitions: ProcessedFormDefinition[] = [];
 
   for (const [_url, responseData] of monitor.interceptedResponses) {
-    if (responseData && typeof responseData === "object") {
+    if (responseData && typeof responseData === 'object') {
       const data = responseData as { processed?: ProcessedFormDefinition };
       if (data.processed) {
         definitions.push(data.processed);

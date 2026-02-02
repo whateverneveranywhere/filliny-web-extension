@@ -1,8 +1,8 @@
-import { Button } from "../../ui/button";
-import { getConfig } from "@extension/shared";
-import { HelpCircle } from "lucide-react";
-import type { ButtonComponentProps } from "../button-wrapper";
-import type React from "react";
+import { Button } from '../../ui/button';
+import { getConfig } from '@extension/shared';
+import { HelpCircle } from 'lucide-react';
+import type { ButtonComponentProps } from '../button-wrapper';
+import type React from 'react';
 
 const SupportRequestButton: React.FC<ButtonComponentProps> = () => {
   const gatherBugDetails = async () => {
@@ -15,7 +15,7 @@ const SupportRequestButton: React.FC<ButtonComponentProps> = () => {
       const config = getConfig();
 
       // Define the support request path directly
-      const supportRequestPath = "/dashboard/support-request";
+      const supportRequestPath = '/dashboard/support-request';
       const queryString = new URLSearchParams(bugDetails as Record<string, string>).toString();
 
       // Combine base URL with path
@@ -27,8 +27,8 @@ const SupportRequestButton: React.FC<ButtonComponentProps> = () => {
 
   return (
     <Button
-      variant={"default"}
-      size={"icon"}
+      variant={'default'}
+      size={'icon'}
       className="filliny-size-10 filliny-min-h-10 filliny-min-w-10 filliny-overflow-hidden !filliny-rounded-full filliny-text-white"
       onClick={gatherBugDetails}>
       <HelpCircle className="filliny-size-4" />

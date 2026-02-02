@@ -79,7 +79,10 @@ const builds = async ({ srcDir, contentName, rootDir, matchesDir, withTw }: ICon
     return build(config);
   });
 
-// FIXME: USE THIS FOR ALL CONTENT SCRIPTs
+/**
+ * Builds content scripts with optional Tailwind CSS support.
+ * This builder is designed for use with all content script types.
+ */
 export const contentBuilder = async ({
   matchesDir,
   srcDir,

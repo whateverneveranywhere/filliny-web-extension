@@ -1,13 +1,13 @@
 // New unified shadow DOM components
-export { FieldFillButton } from "./FieldFillButton";
-export { FieldFillManager } from "./FieldFillManager";
+export { FieldFillButton } from './FieldFillButton';
+export { FieldFillManager } from './FieldFillManager';
 export {
   FormsOverlayManager,
   createFormOverlay,
   dismissFormOverlay,
   dismissAllFormOverlays,
   isFormOverlayActive,
-} from "./FormsOverlayManager";
+} from './FormsOverlayManager';
 
 // Types
-export type { ComponentInjectionConfig, ShadowContainerConfig } from "../../../../utils/unified-shadow-dom";
+export type { ComponentInjectionConfig, ShadowContainerConfig } from '../../../../utils/unified-shadow-dom';

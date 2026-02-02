@@ -1,4 +1,7 @@
-import { t as t_dev_or_prod } from "./i18n.js";
-import type { t as t_dev } from "./i18n-dev.js";
+import { t as t_dev_or_prod } from './i18n.js';
+import type { MessageKeyType } from './types.js';
 
-export const t = t_dev_or_prod as unknown as typeof t_dev;
+/** Translation function type that works in both dev and production builds */
+type TranslationFn = (key: MessageKeyType, substitutions?: string | string[]) => string;
+
+export const t: TranslationFn = t_dev_or_prod;

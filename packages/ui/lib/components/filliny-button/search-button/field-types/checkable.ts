@@ -1,11 +1,15 @@
-import { createBaseField, getFieldLabel, findRelatedRadioButtons } from "./utils";
-import type { Field } from "@extension/shared";
+import { createBaseField, findRelatedRadioButtons } from './utils';
+import { getFieldLabel } from '../fieldUtils';
+import { createDebugLogger } from '@extension/shared';
+import type { Field } from '@extension/shared';
+
+const debug = createDebugLogger('Checkable');
 
 // Extend Field type with checkable-specific properties
 interface CheckableField extends Field {
   checked?: boolean;
   groupName?: string;
-  groupType?: "radio" | "checkbox";
+  groupType?: 'radio' | 'checkbox';
 }
 
 /**
@@ -18,45 +22,45 @@ export const isValueChecked = (value: unknown): boolean => {
   }
 
   // Direct boolean
-  if (typeof value === "boolean") {
+  if (typeof value === 'boolean') {
     return value;
   }
 
   // Numbers (0 = false, anything else = true)
-  if (typeof value === "number") {
+  if (typeof value === 'number') {
     return value !== 0;
   }
 
   // String representations
-  if (typeof value === "string") {
+  if (typeof value === 'string') {
     const normalized = value.trim().toLowerCase();
 
     // Standard boolean strings
     if (
-      normalized === "true" ||
-      normalized === "yes" ||
-      normalized === "on" ||
-      normalized === "1" ||
-      normalized === "selected" ||
-      normalized === "checked"
+      normalized === 'true' ||
+      normalized === 'yes' ||
+      normalized === 'on' ||
+      normalized === '1' ||
+      normalized === 'selected' ||
+      normalized === 'checked'
     ) {
       return true;
     }
 
     // Standard false strings
     if (
-      normalized === "false" ||
-      normalized === "no" ||
-      normalized === "off" ||
-      normalized === "0" ||
-      normalized === "unselected" ||
-      normalized === "unchecked"
+      normalized === 'false' ||
+      normalized === 'no' ||
+      normalized === 'off' ||
+      normalized === '0' ||
+      normalized === 'unselected' ||
+      normalized === 'unchecked'
     ) {
       return false;
     }
 
     // Any non-empty string that doesn't explicitly indicate false is treated as true
-    return normalized !== "";
+    return normalized !== '';
   }
 
   // Arrays - if there are any items, consider it checked
@@ -84,7 +88,7 @@ export const matchesCheckboxValue = (optionValue: string, targetValue: unknown):
   }
 
   // Handle string comparison
-  if (typeof targetValue === "string") {
+  if (typeof targetValue === 'string') {
     const normalizedOption = optionValue.toLowerCase();
     const normalizedTarget = targetValue.toLowerCase();
 
@@ -94,7 +98,7 @@ export const matchesCheckboxValue = (optionValue: string, targetValue: unknown):
     }
 
     // Split by commas or semicolons for multiple values in a string
-    if (normalizedTarget.includes(",") || normalizedTarget.includes(";")) {
+    if (normalizedTarget.includes(',') || normalizedTarget.includes(';')) {
       const parts = normalizedTarget.split(/[,;]/).map(p => p.trim());
       return parts.includes(normalizedOption);
     }
@@ -110,12 +114,12 @@ export const matchesCheckboxValue = (optionValue: string, targetValue: unknown):
 export const updateCheckable = (element: HTMLElement, checked: boolean): void => {
   try {
     // Handle both native inputs and ARIA-based custom controls
-    if (element instanceof HTMLInputElement && (element.type === "checkbox" || element.type === "radio")) {
+    if (element instanceof HTMLInputElement && (element.type === 'checkbox' || element.type === 'radio')) {
       updateNativeCheckable(element, checked);
     } else if (
-      element.getAttribute("role") === "checkbox" ||
-      element.getAttribute("role") === "radio" ||
-      element.getAttribute("role") === "switch"
+      element.getAttribute('role') === 'checkbox' ||
+      element.getAttribute('role') === 'radio' ||
+      element.getAttribute('role') === 'switch'
     ) {
       updateAriaCheckable(element, checked);
     } else {
@@ -126,12 +130,12 @@ export const updateCheckable = (element: HTMLElement, checked: boolean): void =>
     // If this is a radio button and we're checking it, ensure that other radio buttons in the same group are unchecked
     if (
       checked &&
-      ((element instanceof HTMLInputElement && element.type === "radio") || element.getAttribute("role") === "radio")
+      ((element instanceof HTMLInputElement && element.type === 'radio') || element.getAttribute('role') === 'radio')
     ) {
       updateRelatedRadioButtons(element);
     }
   } catch (error) {
-    console.error("Error updating checkable element:", error);
+    debug.error('Error updating checkable element:', error);
   }
 };
 
@@ -146,10 +150,10 @@ const updateNativeCheckable = (element: HTMLInputElement, checked: boolean): voi
   element.checked = checked;
 
   // Dispatch appropriate events to trigger any event listeners
-  const changeEvent = new Event("change", { bubbles: true });
+  const changeEvent = new Event('change', { bubbles: true });
   element.dispatchEvent(changeEvent);
 
-  const inputEvent = new Event("input", { bubbles: true });
+  const inputEvent = new Event('input', { bubbles: true });
   element.dispatchEvent(inputEvent);
 
   // Trigger click event only if state needs to change
@@ -163,19 +167,19 @@ const updateNativeCheckable = (element: HTMLInputElement, checked: boolean): voi
  */
 const updateAriaCheckable = (element: HTMLElement, checked: boolean): void => {
   // Determine the role
-  const role = element.getAttribute("role");
+  const role = element.getAttribute('role');
 
   // Get the current state
   const currentChecked =
-    role === "switch"
-      ? element.getAttribute("aria-checked") === "true"
-      : element.getAttribute("aria-checked") === "true";
+    role === 'switch'
+      ? element.getAttribute('aria-checked') === 'true'
+      : element.getAttribute('aria-checked') === 'true';
 
   // If already in desired state, return
   if (currentChecked === checked) return;
 
   // Update the ARIA state
-  element.setAttribute("aria-checked", checked ? "true" : "false");
+  element.setAttribute('aria-checked', checked ? 'true' : 'false');
 
   // Look for an actual input that might be controlled by this ARIA element
   const controlledInput = findControlledInput(element);
@@ -189,18 +193,18 @@ const updateAriaCheckable = (element: HTMLElement, checked: boolean): void => {
 
   // Update CSS classes based on common patterns
   if (checked) {
-    element.classList.add("checked", "selected", "active");
-    element.classList.remove("unchecked");
+    element.classList.add('checked', 'selected', 'active');
+    element.classList.remove('unchecked');
   } else {
-    element.classList.remove("checked", "selected", "active");
-    element.classList.add("unchecked");
+    element.classList.remove('checked', 'selected', 'active');
+    element.classList.add('unchecked');
   }
 
   // Dispatch events
-  const changeEvent = new Event("change", { bubbles: true });
+  const changeEvent = new Event('change', { bubbles: true });
   element.dispatchEvent(changeEvent);
 
-  const inputEvent = new Event("input", { bubbles: true });
+  const inputEvent = new Event('input', { bubbles: true });
   element.dispatchEvent(inputEvent);
 };
 
@@ -221,7 +225,7 @@ const findControlledInput = (element: HTMLElement): HTMLInputElement | null => {
   if (siblingInput && siblingInput !== element) return siblingInput;
 
   // 3. Input might be linked by ARIA attributes
-  const controlsId = element.getAttribute("aria-controls");
+  const controlsId = element.getAttribute('aria-controls');
   if (controlsId) {
     const controlledElement = document.getElementById(controlsId);
     if (controlledElement instanceof HTMLInputElement) {
@@ -244,18 +248,18 @@ const findControlledInput = (element: HTMLElement): HTMLInputElement | null => {
 const updateVisualIndicators = (element: HTMLElement, checked: boolean): void => {
   // Update CSS classes based on common patterns
   if (checked) {
-    element.classList.add("checked", "selected", "active");
-    element.classList.remove("unchecked");
+    element.classList.add('checked', 'selected', 'active');
+    element.classList.remove('unchecked');
   } else {
-    element.classList.remove("checked", "selected", "active");
-    element.classList.add("unchecked");
+    element.classList.remove('checked', 'selected', 'active');
+    element.classList.add('unchecked');
   }
 
   // Dispatch events
-  const changeEvent = new Event("change", { bubbles: true });
+  const changeEvent = new Event('change', { bubbles: true });
   element.dispatchEvent(changeEvent);
 
-  const inputEvent = new Event("input", { bubbles: true });
+  const inputEvent = new Event('input', { bubbles: true });
   element.dispatchEvent(inputEvent);
 };
 
@@ -285,11 +289,11 @@ const updateCustomCheckable = (element: HTMLElement, checked: boolean): void => 
   }
 
   // Check for label that might be connected to an input
-  if (!inputFound && element.tagName === "LABEL") {
-    const labelFor = element.getAttribute("for");
+  if (!inputFound && element.tagName === 'LABEL') {
+    const labelFor = element.getAttribute('for');
     if (labelFor) {
       const linkedInput = document.getElementById(labelFor) as HTMLInputElement;
-      if (linkedInput && (linkedInput.type === "checkbox" || linkedInput.type === "radio")) {
+      if (linkedInput && (linkedInput.type === 'checkbox' || linkedInput.type === 'radio')) {
         updateNativeCheckable(linkedInput, checked);
         inputFound = true;
       }
@@ -299,22 +303,22 @@ const updateCustomCheckable = (element: HTMLElement, checked: boolean): void => 
   // If no input found, treat as a custom component
   if (!inputFound) {
     // Set custom data attribute to track state
-    element.setAttribute("data-filliny-checked", checked ? "true" : "false");
+    element.setAttribute('data-filliny-checked', checked ? 'true' : 'false');
 
     // Update classes based on common patterns
     if (checked) {
-      element.classList.add("checked", "selected", "active");
-      element.classList.remove("unchecked");
+      element.classList.add('checked', 'selected', 'active');
+      element.classList.remove('unchecked');
     } else {
-      element.classList.remove("checked", "selected", "active");
-      element.classList.add("unchecked");
+      element.classList.remove('checked', 'selected', 'active');
+      element.classList.add('unchecked');
     }
 
     // Trigger click if needed
     const currentChecked =
-      element.classList.contains("checked") ||
-      element.classList.contains("selected") ||
-      element.classList.contains("active");
+      element.classList.contains('checked') ||
+      element.classList.contains('selected') ||
+      element.classList.contains('active');
 
     if (currentChecked !== checked) {
       element.click();
@@ -337,15 +341,15 @@ const updateRelatedRadioButtons = (element: HTMLElement): void => {
           radio.checked = false;
 
           // Dispatch events
-          const changeEvent = new Event("change", { bubbles: true });
+          const changeEvent = new Event('change', { bubbles: true });
           radio.dispatchEvent(changeEvent);
 
-          const inputEvent = new Event("input", { bubbles: true });
+          const inputEvent = new Event('input', { bubbles: true });
           radio.dispatchEvent(inputEvent);
         }
-      } else if (radio.getAttribute("role") === "radio") {
-        if (radio.getAttribute("aria-checked") === "true") {
-          radio.setAttribute("aria-checked", "false");
+      } else if (radio.getAttribute('role') === 'radio') {
+        if (radio.getAttribute('aria-checked') === 'true') {
+          radio.setAttribute('aria-checked', 'false');
 
           // Update visual indicators
           updateVisualIndicators(radio, false);
@@ -371,12 +375,12 @@ const findCommonContainer = (elements: HTMLElement[]): HTMLElement | null => {
     if (containsAll) {
       // Prefer semantic containers
       if (
-        commonAncestor.tagName.toLowerCase() === "fieldset" ||
-        commonAncestor.getAttribute("role") === "radiogroup" ||
-        commonAncestor.getAttribute("role") === "group" ||
-        commonAncestor.classList.contains("radio-group") ||
-        commonAncestor.classList.contains("checkbox-group") ||
-        commonAncestor.querySelector("legend")
+        commonAncestor.tagName.toLowerCase() === 'fieldset' ||
+        commonAncestor.getAttribute('role') === 'radiogroup' ||
+        commonAncestor.getAttribute('role') === 'group' ||
+        commonAncestor.classList.contains('radio-group') ||
+        commonAncestor.classList.contains('checkbox-group') ||
+        commonAncestor.querySelector('legend')
       ) {
         return commonAncestor;
       }
@@ -405,12 +409,12 @@ export const detectCheckableFields = async (
 
   // Separate elements by type
   const radioElements = elements.filter(
-    el => (el instanceof HTMLInputElement && el.type === "radio") || el.getAttribute("role") === "radio",
+    el => (el instanceof HTMLInputElement && el.type === 'radio') || el.getAttribute('role') === 'radio',
   );
   const checkboxElements = elements.filter(
-    el => (el instanceof HTMLInputElement && el.type === "checkbox") || el.getAttribute("role") === "checkbox",
+    el => (el instanceof HTMLInputElement && el.type === 'checkbox') || el.getAttribute('role') === 'checkbox',
   );
-  const switchElements = elements.filter(el => el.getAttribute("role") === "switch");
+  const switchElements = elements.filter(el => el.getAttribute('role') === 'switch');
 
   console.log(
     `Found ${radioElements.length} radio elements, ${checkboxElements.length} checkbox elements, ${switchElements.length} switch elements`,
@@ -419,16 +423,16 @@ export const detectCheckableFields = async (
   // Process radio buttons as groups
   if (radioElements.length > 0) {
     const radioGroups = await groupRadioElements(radioElements);
-    console.log(`Created ${radioGroups.size} radio groups`);
+    debug.log(`Created ${radioGroups.size} radio groups`);
 
     for (const [groupId, groupElements] of radioGroups.entries()) {
       try {
         const field = await createRadioGroupField(groupElements, baseIndex + fieldIndex, groupId, testMode);
         fields.push(field);
         fieldIndex++;
-        console.log(`Created radio group field: ${field.id} with ${groupElements.length} options`);
+        debug.log(`Created radio group field: ${field.id} with ${groupElements.length} options`);
       } catch (error) {
-        console.error(`Error creating radio group field for ${groupId}:`, error);
+        debug.error(`Error creating radio group field for ${groupId}:`, error);
       }
     }
   }
@@ -436,7 +440,7 @@ export const detectCheckableFields = async (
   // Process checkboxes - can be individual or grouped
   if (checkboxElements.length > 0) {
     const checkboxGroups = await groupCheckboxElements(checkboxElements);
-    console.log(`Created ${checkboxGroups.size} checkbox groups`);
+    debug.log(`Created ${checkboxGroups.size} checkbox groups`);
 
     for (const [groupId, groupElements] of checkboxGroups.entries()) {
       try {
@@ -444,16 +448,16 @@ export const detectCheckableFields = async (
           // Single checkbox
           const field = await createCheckboxField(groupElements[0], baseIndex + fieldIndex, testMode);
           fields.push(field);
-          console.log(`Created single checkbox field: ${field.id}`);
+          debug.log(`Created single checkbox field: ${field.id}`);
         } else {
           // Checkbox group
           const field = await createCheckboxGroupField(groupElements, baseIndex + fieldIndex, groupId, testMode);
           fields.push(field);
-          console.log(`Created checkbox group field: ${field.id} with ${groupElements.length} options`);
+          debug.log(`Created checkbox group field: ${field.id} with ${groupElements.length} options`);
         }
         fieldIndex++;
       } catch (error) {
-        console.error(`Error creating checkbox field for ${groupId}:`, error);
+        debug.error(`Error creating checkbox field for ${groupId}:`, error);
       }
     }
   }
@@ -464,13 +468,13 @@ export const detectCheckableFields = async (
       const field = await createSwitchField(switchElement, baseIndex + fieldIndex, testMode);
       fields.push(field);
       fieldIndex++;
-      console.log(`Created switch field: ${field.id}`);
+      debug.log(`Created switch field: ${field.id}`);
     } catch (error) {
-      console.error(`Error creating switch field:`, error);
+      debug.error(`Error creating switch field:`, error);
     }
   }
 
-  console.log(`Detected ${fields.length} checkable fields total`);
+  debug.log(`Detected ${fields.length} checkable fields total`);
   return fields;
 };
 
@@ -481,7 +485,7 @@ const groupRadioElements = async (elements: HTMLElement[]): Promise<Map<string, 
   const groups = new Map<string, HTMLElement[]>();
   const processed = new Set<HTMLElement>();
 
-  console.log(`Grouping ${elements.length} radio elements using enhanced algorithm`);
+  debug.log(`Grouping ${elements.length} radio elements using enhanced algorithm`);
 
   // Strategy 1: Group by name attribute (most reliable for radio buttons)
   const namedGroups = new Map<string, HTMLElement[]>();
@@ -501,35 +505,35 @@ const groupRadioElements = async (elements: HTMLElement[]): Promise<Map<string, 
     if (groupElements.length >= 1) {
       // Even single radios are part of a group conceptually
       groups.set(`radio-name-${name}`, groupElements);
-      console.log(`Created radio group from name "${name}" with ${groupElements.length} elements`);
+      debug.log(`Created radio group from name "${name}" with ${groupElements.length} elements`);
     }
   }
 
   // Strategy 2: Group remaining elements by semantic containers and proximity
   const unprocessedElements = elements.filter(el => !processed.has(el));
   if (unprocessedElements.length > 0) {
-    console.log(`Processing ${unprocessedElements.length} unnamed radio elements`);
+    debug.log(`Processing ${unprocessedElements.length} unnamed radio elements`);
 
     // First try semantic containers
-    const containerGroups = await groupBySemanticContainers(unprocessedElements, "radio");
+    const containerGroups = await groupBySemanticContainers(unprocessedElements, 'radio');
     for (const [groupId, groupElements] of containerGroups.entries()) {
       groups.set(groupId, groupElements);
       groupElements.forEach(el => processed.add(el));
-      console.log(`Created radio group from container "${groupId}" with ${groupElements.length} elements`);
+      debug.log(`Created radio group from container "${groupId}" with ${groupElements.length} elements`);
     }
 
     // Then handle any remaining elements with proximity-based grouping
     const stillUnprocessed = elements.filter(el => !processed.has(el));
     if (stillUnprocessed.length > 0) {
-      console.log(`Creating individual groups for ${stillUnprocessed.length} remaining radio elements`);
+      debug.log(`Creating individual groups for ${stillUnprocessed.length} remaining radio elements`);
 
       // For radio buttons, even individual ones should be treated as groups
       // This is because radio buttons are conceptually always part of a group
       stillUnprocessed.forEach((element, index) => {
-        const elementId = element.id || element.getAttribute("data-filliny-id") || `radio-${Date.now()}-${index}`;
+        const elementId = element.id || element.getAttribute('data-filliny-id') || `radio-${Date.now()}-${index}`;
         const groupId = `radio-individual-${elementId}`;
         groups.set(groupId, [element]);
-        console.log(`Created individual radio group: ${groupId}`);
+        debug.log(`Created individual radio group: ${groupId}`);
       });
     }
   }
@@ -544,7 +548,7 @@ const groupCheckboxElements = async (elements: HTMLElement[]): Promise<Map<strin
   const groups = new Map<string, HTMLElement[]>();
   const processed = new Set<HTMLElement>();
 
-  console.log(`Grouping ${elements.length} checkbox elements using enhanced algorithm`);
+  debug.log(`Grouping ${elements.length} checkbox elements using enhanced algorithm`);
 
   // Strategy 1: Group by name attribute (only if multiple checkboxes share the same name)
   const namedGroups = new Map<string, HTMLElement[]>();
@@ -563,22 +567,22 @@ const groupCheckboxElements = async (elements: HTMLElement[]): Promise<Map<strin
     if (groupElements.length > 1) {
       groups.set(`checkbox-name-${name}`, groupElements);
       groupElements.forEach(el => processed.add(el));
-      console.log(`Created checkbox group from name "${name}" with ${groupElements.length} elements`);
+      debug.log(`Created checkbox group from name "${name}" with ${groupElements.length} elements`);
     }
   }
 
   // Strategy 2: Group remaining elements by semantic containers
   const unprocessedElements = elements.filter(el => !processed.has(el));
   if (unprocessedElements.length > 0) {
-    console.log(`Processing ${unprocessedElements.length} ungrouped checkbox elements`);
+    debug.log(`Processing ${unprocessedElements.length} ungrouped checkbox elements`);
 
-    const containerGroups = await groupBySemanticContainers(unprocessedElements, "checkbox");
+    const containerGroups = await groupBySemanticContainers(unprocessedElements, 'checkbox');
     for (const [groupId, groupElements] of containerGroups.entries()) {
       if (groupElements.length > 1) {
         // Only group checkboxes if there are multiple in the same semantic container
         groups.set(groupId, groupElements);
         groupElements.forEach(el => processed.add(el));
-        console.log(`Created checkbox group from container "${groupId}" with ${groupElements.length} elements`);
+        debug.log(`Created checkbox group from container "${groupId}" with ${groupElements.length} elements`);
       }
     }
   }
@@ -587,9 +591,9 @@ const groupCheckboxElements = async (elements: HTMLElement[]): Promise<Map<strin
   const stillUnprocessed = elements.filter(el => !processed.has(el));
   for (const element of stillUnprocessed) {
     // Create individual checkbox groups
-    const groupId = `checkbox-individual-${element.id || element.getAttribute("data-filliny-id") || Date.now()}-${Math.random()}`;
+    const groupId = `checkbox-individual-${element.id || element.getAttribute('data-filliny-id') || Date.now()}-${Math.random()}`;
     groups.set(groupId, [element]);
-    console.log(`Created individual checkbox: ${groupId}`);
+    debug.log(`Created individual checkbox: ${groupId}`);
   }
 
   return groups;
@@ -600,7 +604,7 @@ const groupCheckboxElements = async (elements: HTMLElement[]): Promise<Map<strin
  */
 const groupBySemanticContainers = async (
   elements: HTMLElement[],
-  type: "radio" | "checkbox",
+  type: 'radio' | 'checkbox',
 ): Promise<Map<string, HTMLElement[]>> => {
   const groups = new Map<string, HTMLElement[]>();
   const processed = new Set<HTMLElement>();
@@ -609,7 +613,7 @@ const groupBySemanticContainers = async (
   const semanticSelectors = [
     '[role="radiogroup"]', // ARIA radiogroup (highest priority)
     '[role="group"]', // ARIA group
-    "fieldset", // HTML fieldset
+    'fieldset', // HTML fieldset
     '[class*="radio-group" i]', // CSS class patterns (case insensitive)
     '[class*="radiogroup" i]',
     '[class*="checkbox-group" i]',
@@ -618,9 +622,9 @@ const groupBySemanticContainers = async (
     '[class*="optiongroup" i]',
     '[class*="form-group" i]',
     '[class*="field-group" i]',
-    "[data-group]", // Data attributes
-    "[data-radio-group]",
-    "[data-checkbox-group]",
+    '[data-group]', // Data attributes
+    '[data-radio-group]',
+    '[data-checkbox-group]',
   ];
 
   for (const element of elements) {
@@ -646,13 +650,13 @@ const groupBySemanticContainers = async (
       // Find all elements in this container
       const containerElements = elements.filter(el => bestContainer!.contains(el) && !processed.has(el));
 
-      if (containerElements.length >= (type === "radio" ? 1 : 2)) {
+      if (containerElements.length >= (type === 'radio' ? 1 : 2)) {
         // Create group identifier
         const containerId =
           bestContainer.id ||
-          bestContainer.getAttribute("data-group") ||
-          bestContainer.className.split(" ")[0] ||
-          "container";
+          bestContainer.getAttribute('data-group') ||
+          bestContainer.className.split(' ')[0] ||
+          'container';
 
         const groupId = `${type}-semantic-${containerId}-${Date.now()}`;
         groups.set(groupId, containerElements);
@@ -672,7 +676,7 @@ const groupBySemanticContainers = async (
     const proximityGroups = groupByProximity(remainingElements, type);
     for (const [groupId, groupElements] of proximityGroups.entries()) {
       groups.set(groupId, groupElements);
-      console.log(`Created proximity-based ${type} group: ${groupId} with ${groupElements.length} elements`);
+      debug.log(`Created proximity-based ${type} group: ${groupId} with ${groupElements.length} elements`);
     }
   }
 
@@ -685,7 +689,7 @@ const groupBySemanticContainers = async (
 const scoreSemanticContainer = (
   container: HTMLElement,
   allElements: HTMLElement[],
-  type: "radio" | "checkbox",
+  type: 'radio' | 'checkbox',
 ): number => {
   let score = 0;
 
@@ -698,27 +702,27 @@ const scoreSemanticContainer = (
 
   // Bonus for semantic HTML and ARIA
   const tagName = container.tagName.toLowerCase();
-  const role = container.getAttribute("role");
+  const role = container.getAttribute('role');
 
-  if (role === "radiogroup" && type === "radio") score += 50;
-  if (role === "group") score += 30;
-  if (tagName === "fieldset") score += 40;
+  if (role === 'radiogroup' && type === 'radio') score += 50;
+  if (role === 'group') score += 30;
+  if (tagName === 'fieldset') score += 40;
 
   // Bonus for appropriate class names
   const className = container.className.toLowerCase();
   if (className.includes(`${type}-group`)) score += 30;
-  if (className.includes("form-group")) score += 20;
-  if (className.includes("field-group")) score += 20;
+  if (className.includes('form-group')) score += 20;
+  if (className.includes('field-group')) score += 20;
 
   // Bonus for having a label (legend, aria-label, etc.)
   const hasLabel =
-    container.querySelector("legend") ||
-    container.getAttribute("aria-label") ||
-    container.getAttribute("aria-labelledby");
+    container.querySelector('legend') ||
+    container.getAttribute('aria-label') ||
+    container.getAttribute('aria-labelledby');
   if (hasLabel) score += 15;
 
   // Penalty for containing too many other form elements (indicates it's too broad)
-  const otherFormElements = container.querySelectorAll("input, select, textarea").length - containedElements.length;
+  const otherFormElements = container.querySelectorAll('input, select, textarea').length - containedElements.length;
   if (otherFormElements > containedElements.length * 2) {
     score -= 20;
   }
@@ -733,7 +737,7 @@ const scoreSemanticContainer = (
 /**
  * Group elements by proximity when no semantic containers are found
  */
-const groupByProximity = (elements: HTMLElement[], type: "radio" | "checkbox"): Map<string, HTMLElement[]> => {
+const groupByProximity = (elements: HTMLElement[], type: 'radio' | 'checkbox'): Map<string, HTMLElement[]> => {
   const groups = new Map<string, HTMLElement[]>();
 
   if (elements.length <= 1) {
@@ -772,7 +776,7 @@ const groupByProximity = (elements: HTMLElement[], type: "radio" | "checkbox"): 
       }
     }
 
-    if (cluster.length >= (type === "radio" ? 1 : 2)) {
+    if (cluster.length >= (type === 'radio' ? 1 : 2)) {
       clusters.push(cluster);
     }
   }
@@ -808,48 +812,46 @@ const createRadioGroupField = async (
   testMode: boolean,
 ): Promise<CheckableField> => {
   const firstElement = elements[0];
-  const field = (await createBaseField(firstElement, index, "radio", testMode)) as CheckableField;
+  const field = (await createBaseField(firstElement, index, 'radio', testMode)) as CheckableField;
 
   // Set group metadata
   field.groupName = groupId;
-  field.groupType = "radio";
+  field.groupType = 'radio';
 
   // Get group label from container or fieldset
   const container = findCommonContainer(elements);
   if (container) {
-    const legend = container.querySelector("legend");
+    const legend = container.querySelector('legend');
     const groupLabel =
-      legend?.textContent?.trim() || container.getAttribute("aria-label") || container.getAttribute("data-label");
+      legend?.textContent?.trim() || container.getAttribute('aria-label') || container.getAttribute('data-label');
     if (groupLabel) {
       field.label = groupLabel;
     }
   }
 
   // Create options from all radio buttons in the group
-  field.options = await Promise.all(
-    elements.map(async (el, idx) => {
-      const label = await getFieldLabel(el);
-      let value = "";
-      let selected = false;
+  field.options = elements.map((el, idx) => {
+    const label = getFieldLabel(el);
+    let value = '';
+    let selected = false;
 
-      if (el instanceof HTMLInputElement) {
-        value = el.value || `option-${idx}`;
-        selected = el.checked;
-      } else {
-        value = el.getAttribute("value") || el.getAttribute("data-value") || `option-${idx}`;
-        selected = el.getAttribute("aria-checked") === "true";
-      }
+    if (el instanceof HTMLInputElement) {
+      value = el.value || `option-${idx}`;
+      selected = el.checked;
+    } else {
+      value = el.getAttribute('value') || el.getAttribute('data-value') || `option-${idx}`;
+      selected = el.getAttribute('aria-checked') === 'true';
+    }
 
-      // Add filliny-id to each radio button for later reference
-      el.setAttribute("data-filliny-id", `${field.id}-option-${idx}`);
+    // Add filliny-id to each radio button for later reference
+    el.setAttribute('data-filliny-id', `${field.id}-option-${idx}`);
 
-      return {
-        value,
-        text: label || value,
-        selected,
-      };
-    }),
-  );
+    return {
+      value,
+      text: label || value,
+      selected,
+    };
+  });
 
   // Set current value based on selected option
   const selectedOption = field.options.find(opt => opt.selected);
@@ -861,38 +863,38 @@ const createRadioGroupField = async (
   if (testMode && field.options.length > 0) {
     // For gender fields, prefer female option
     const isGenderField =
-      field.label?.toLowerCase().includes("gender") ||
-      field.label?.toLowerCase().includes("sex") ||
-      field.options.some(opt => opt.text.toLowerCase().includes("male") || opt.text.toLowerCase().includes("female"));
+      field.label?.toLowerCase().includes('gender') ||
+      field.label?.toLowerCase().includes('sex') ||
+      field.options.some(opt => opt.text.toLowerCase().includes('male') || opt.text.toLowerCase().includes('female'));
 
     if (isGenderField) {
       const femaleOption = field.options.find(
         opt =>
-          opt.text.toLowerCase().includes("female") ||
-          opt.text.toLowerCase().includes("frau") ||
-          opt.value.toLowerCase() === "f",
+          opt.text.toLowerCase().includes('female') ||
+          opt.text.toLowerCase().includes('frau') ||
+          opt.value.toLowerCase() === 'f',
       );
       field.testValue = femaleOption ? femaleOption.value : field.options[0].value;
     } else {
       // Pick a random non-placeholder option for better test variety
       const validOptions = field.options.filter(
         opt =>
-          !opt.text.toLowerCase().includes("select") &&
-          !opt.text.toLowerCase().includes("choose") &&
-          !opt.text.toLowerCase().includes("pick") &&
-          opt.text !== "" &&
-          opt.value !== "",
+          !opt.text.toLowerCase().includes('select') &&
+          !opt.text.toLowerCase().includes('choose') &&
+          !opt.text.toLowerCase().includes('pick') &&
+          opt.text !== '' &&
+          opt.value !== '',
       );
 
       if (validOptions.length > 0) {
         // Pick a random valid option
         const randomIndex = Math.floor(Math.random() * validOptions.length);
         field.testValue = validOptions[randomIndex].value;
-        console.log(`🎯 Generated random test value for radio group ${field.id}: ${field.testValue}`);
+        debug.log(`🎯 Generated random test value for radio group ${field.id}: ${field.testValue}`);
       } else {
         // Fallback to first option
         field.testValue = field.options[0].value;
-        console.log(`🎯 Using first option as test value for radio group ${field.id}: ${field.testValue}`);
+        debug.log(`🎯 Using first option as test value for radio group ${field.id}: ${field.testValue}`);
       }
     }
   }
@@ -904,20 +906,20 @@ const createRadioGroupField = async (
  * Create a field for a single checkbox
  */
 const createCheckboxField = async (element: HTMLElement, index: number, testMode: boolean): Promise<CheckableField> => {
-  const field = (await createBaseField(element, index, "checkbox", testMode)) as CheckableField;
+  const field = (await createBaseField(element, index, 'checkbox', testMode)) as CheckableField;
 
   // Set current state
   if (element instanceof HTMLInputElement) {
     field.checked = element.checked;
-    field.value = element.checked ? "true" : "false";
+    field.value = element.checked ? 'true' : 'false';
   } else {
-    field.checked = element.getAttribute("aria-checked") === "true";
-    field.value = field.checked ? "true" : "false";
+    field.checked = element.getAttribute('aria-checked') === 'true';
+    field.value = field.checked ? 'true' : 'false';
   }
 
   // Set test value
   if (testMode) {
-    field.testValue = Math.random() > 0.5 ? "true" : "false";
+    field.testValue = Math.random() > 0.5 ? 'true' : 'false';
   }
 
   return field;
@@ -933,48 +935,46 @@ const createCheckboxGroupField = async (
   testMode: boolean,
 ): Promise<CheckableField> => {
   const firstElement = elements[0];
-  const field = (await createBaseField(firstElement, index, "checkbox", testMode)) as CheckableField;
+  const field = (await createBaseField(firstElement, index, 'checkbox', testMode)) as CheckableField;
 
   // Set group metadata
   field.groupName = groupId;
-  field.groupType = "checkbox";
+  field.groupType = 'checkbox';
 
   // Get group label from container
   const container = findCommonContainer(elements);
   if (container) {
-    const legend = container.querySelector("legend");
+    const legend = container.querySelector('legend');
     const groupLabel =
-      legend?.textContent?.trim() || container.getAttribute("aria-label") || container.getAttribute("data-label");
+      legend?.textContent?.trim() || container.getAttribute('aria-label') || container.getAttribute('data-label');
     if (groupLabel) {
       field.label = groupLabel;
     }
   }
 
   // Create options from all checkboxes in the group
-  field.options = await Promise.all(
-    elements.map(async (el, idx) => {
-      const label = await getFieldLabel(el);
-      let value = "";
-      let selected = false;
+  field.options = elements.map((el, idx) => {
+    const label = getFieldLabel(el);
+    let value = '';
+    let selected = false;
 
-      if (el instanceof HTMLInputElement) {
-        value = el.value || `option-${idx}`;
-        selected = el.checked;
-      } else {
-        value = el.getAttribute("value") || el.getAttribute("data-value") || `option-${idx}`;
-        selected = el.getAttribute("aria-checked") === "true";
-      }
+    if (el instanceof HTMLInputElement) {
+      value = el.value || `option-${idx}`;
+      selected = el.checked;
+    } else {
+      value = el.getAttribute('value') || el.getAttribute('data-value') || `option-${idx}`;
+      selected = el.getAttribute('aria-checked') === 'true';
+    }
 
-      // Add filliny-id to each checkbox for later reference
-      el.setAttribute("data-filliny-id", `${field.id}-option-${idx}`);
+    // Add filliny-id to each checkbox for later reference
+    el.setAttribute('data-filliny-id', `${field.id}-option-${idx}`);
 
-      return {
-        value,
-        text: label || value,
-        selected,
-      };
-    }),
-  );
+    return {
+      value,
+      text: label || value,
+      selected,
+    };
+  });
 
   // Set current value as array of selected values
   const selectedValues = field.options.filter(opt => opt.selected).map(opt => opt.value);
@@ -995,15 +995,15 @@ const createCheckboxGroupField = async (
  * Create a field for a switch element
  */
 const createSwitchField = async (element: HTMLElement, index: number, testMode: boolean): Promise<CheckableField> => {
-  const field = (await createBaseField(element, index, "checkbox", testMode)) as CheckableField;
+  const field = (await createBaseField(element, index, 'checkbox', testMode)) as CheckableField;
 
   // Set current state
-  field.checked = element.getAttribute("aria-checked") === "true";
-  field.value = field.checked ? "true" : "false";
+  field.checked = element.getAttribute('aria-checked') === 'true';
+  field.value = field.checked ? 'true' : 'false';
 
   // Set test value
   if (testMode) {
-    field.testValue = Math.random() > 0.5 ? "true" : "false";
+    field.testValue = Math.random() > 0.5 ? 'true' : 'false';
   }
 
   return field;

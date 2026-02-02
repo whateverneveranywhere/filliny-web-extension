@@ -1,15 +1,15 @@
 /**
  * Safely get a string value from potentially complex field values
  */
-import { getFieldLabel as getFieldLabelFromUtils } from "../fieldUtils";
-import type { Field, FieldType } from "@extension/shared";
+import { getFieldLabel } from '../fieldUtils';
+import type { Field, FieldType } from '@extension/shared';
 
 // Track used field IDs to ensure uniqueness
 const usedFieldIds = new Set<string>();
 
 export const getStringValue = (value: unknown): string => {
-  if (value === null || value === undefined) return "";
-  if (Array.isArray(value)) return value.join(",");
+  if (value === null || value === undefined) return '';
+  if (Array.isArray(value)) return value.join(',');
   return String(value);
 };
 
@@ -33,7 +33,7 @@ export const dispatchEvent = (element: HTMLElement, eventName: string): void => 
       // @ts-expect-error - Dynamic property access for event handlers
       element[`on${eventName}`] || element.getAttribute(`on${eventName}`);
 
-    if (typeof reactHandler === "function") {
+    if (typeof reactHandler === 'function') {
       reactHandler.call(element, event);
     }
 
@@ -45,7 +45,7 @@ export const dispatchEvent = (element: HTMLElement, eventName: string): void => 
 
     // For jQuery-based sites
     const windowWithJQuery = window as { jQuery?: unknown };
-    if (typeof windowWithJQuery.jQuery !== "undefined") {
+    if (typeof windowWithJQuery.jQuery !== 'undefined') {
       try {
         // @ts-expect-error - jQuery is not typed
         windowWithJQuery.jQuery(element).trigger(eventName);
@@ -64,16 +64,16 @@ export const dispatchEvent = (element: HTMLElement, eventName: string): void => 
 export const addVisualFeedback = (element: HTMLElement): void => {
   try {
     // First, add a data attribute to mark this field as updated
-    element.setAttribute("data-filliny-updated", "true");
+    element.setAttribute('data-filliny-updated', 'true');
 
     // Create a subtle highlight animation
     const originalBackgroundColor = window.getComputedStyle(element).backgroundColor;
     const originalBoxShadow = window.getComputedStyle(element).boxShadow;
 
     // Add a subtle flash effect that doesn't interfere with the form
-    element.style.transition = "background-color 0.5s ease, box-shadow 0.5s ease";
-    element.style.backgroundColor = "rgba(2, 132, 199, 0.1)"; // Light blue highlight
-    element.style.boxShadow = "0 0 0 2px rgba(2, 132, 199, 0.4)"; // Light blue outline
+    element.style.transition = 'background-color 0.5s ease, box-shadow 0.5s ease';
+    element.style.backgroundColor = 'rgba(2, 132, 199, 0.1)'; // Light blue highlight
+    element.style.boxShadow = '0 0 0 2px rgba(2, 132, 199, 0.4)'; // Light blue outline
 
     // Return to original state after animation
     setTimeout(() => {
@@ -81,15 +81,15 @@ export const addVisualFeedback = (element: HTMLElement): void => {
       element.style.boxShadow = originalBoxShadow;
 
       // Keep a subtle indicator that this field was filled automatically
-      element.style.outline = "1px solid rgba(2, 132, 199, 0.3)";
+      element.style.outline = '1px solid rgba(2, 132, 199, 0.3)';
 
       // Remove transition to prevent animation on future user interactions
       setTimeout(() => {
-        element.style.transition = "";
+        element.style.transition = '';
       }, 500);
     }, 800);
   } catch (error) {
-    console.error("Error adding visual feedback:", error);
+    console.error('Error adding visual feedback:', error);
   }
 };
 
@@ -102,16 +102,16 @@ export const isElementInteractive = (element: HTMLElement): boolean => {
   const style = window.getComputedStyle(element);
 
   // Check if element is visible
-  if (style.display === "none" || style.visibility === "hidden" || style.opacity === "0") {
+  if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') {
     return false;
   }
 
   // Check if element is disabled or read-only
   if (
-    element.hasAttribute("disabled") ||
-    element.hasAttribute("readonly") ||
-    element.getAttribute("aria-disabled") === "true" ||
-    element.getAttribute("aria-readonly") === "true"
+    element.hasAttribute('disabled') ||
+    element.hasAttribute('readonly') ||
+    element.getAttribute('aria-disabled') === 'true' ||
+    element.getAttribute('aria-readonly') === 'true'
   ) {
     return false;
   }
@@ -150,7 +150,7 @@ export const findRelatedRadioButtons = (radioButton: HTMLElement): HTMLElement[]
   }
 
   // Method 2: Find by ARIA attributes
-  if (radioButton.getAttribute("role") === "radio") {
+  if (radioButton.getAttribute('role') === 'radio') {
     // Find the radiogroup container
     const radioGroup = radioButton.closest('[role="radiogroup"]');
     if (radioGroup) {
@@ -163,13 +163,13 @@ export const findRelatedRadioButtons = (radioButton: HTMLElement): HTMLElement[]
   if (related.length === 0) {
     // Look for common patterns in containers
     const possibleContainers = [
-      radioButton.closest("fieldset"),
+      radioButton.closest('fieldset'),
       radioButton.closest('[class*="radio-group"]'),
       radioButton.closest('[class*="radioGroup"]'),
       radioButton.closest('[class*="option-group"]'),
       radioButton.closest('[class*="optionGroup"]'),
-      radioButton.closest("ul"),
-      radioButton.closest("div"),
+      radioButton.closest('ul'),
+      radioButton.closest('div'),
     ].filter(Boolean);
 
     for (const container of possibleContainers) {
@@ -216,7 +216,7 @@ export const findRelatedCheckboxes = (checkbox: HTMLElement): HTMLElement[] => {
   }
 
   // Method 2: Find by ARIA attributes
-  if (checkbox.getAttribute("role") === "checkbox") {
+  if (checkbox.getAttribute('role') === 'checkbox') {
     // Find the checkboxgroup container
     const checkboxGroup = checkbox.closest('[role="group"]');
     if (checkboxGroup) {
@@ -229,13 +229,13 @@ export const findRelatedCheckboxes = (checkbox: HTMLElement): HTMLElement[] => {
   if (related.length === 0) {
     // Look for common patterns in containers
     const possibleContainers = [
-      checkbox.closest("fieldset"),
+      checkbox.closest('fieldset'),
       checkbox.closest('[class*="checkbox-group"]'),
       checkbox.closest('[class*="checkboxGroup"]'),
       checkbox.closest('[class*="option-group"]'),
       checkbox.closest('[class*="optionGroup"]'),
-      checkbox.closest("ul"),
-      checkbox.closest("div"),
+      checkbox.closest('ul'),
+      checkbox.closest('div'),
     ].filter(Boolean);
 
     for (const container of possibleContainers) {
@@ -264,13 +264,13 @@ export const findRelatedCheckboxes = (checkbox: HTMLElement): HTMLElement[] => {
  */
 export const isCustomSelect = (element: HTMLElement): boolean => {
   // Common class patterns for custom select components
-  const selectClassPatterns = ["select", "dropdown", "combobox", "combo-box"];
+  const selectClassPatterns = ['select', 'dropdown', 'combobox', 'combo-box'];
 
   // Check for ARIA roles
   if (
-    element.getAttribute("role") === "combobox" ||
-    element.getAttribute("role") === "listbox" ||
-    element.getAttribute("aria-haspopup") === "listbox"
+    element.getAttribute('role') === 'combobox' ||
+    element.getAttribute('role') === 'listbox' ||
+    element.getAttribute('aria-haspopup') === 'listbox'
   ) {
     return true;
   }
@@ -310,19 +310,19 @@ export const findSelectOptions = (
   }
 
   // Case 2: ARIA Combobox/Listbox
-  if (selectElement.getAttribute("role") === "combobox" || selectElement.getAttribute("role") === "listbox") {
+  if (selectElement.getAttribute('role') === 'combobox' || selectElement.getAttribute('role') === 'listbox') {
     // Find the listbox element
     let listbox = selectElement;
-    if (selectElement.getAttribute("role") === "combobox") {
+    if (selectElement.getAttribute('role') === 'combobox') {
       // If it's a combobox, look for its associated listbox
-      const listboxId = selectElement.getAttribute("aria-controls") || selectElement.getAttribute("aria-owns");
+      const listboxId = selectElement.getAttribute('aria-controls') || selectElement.getAttribute('aria-owns');
       if (listboxId) {
         listbox = document.getElementById(listboxId) as HTMLElement;
       } else {
         // Try to find a listbox within or adjacent to the combobox
         listbox =
           (selectElement.querySelector('[role="listbox"]') as HTMLElement) ||
-          (selectElement.nextElementSibling?.getAttribute("role") === "listbox"
+          (selectElement.nextElementSibling?.getAttribute('role') === 'listbox'
             ? (selectElement.nextElementSibling as HTMLElement)
             : null);
       }
@@ -336,9 +336,9 @@ export const findSelectOptions = (
         options.push({
           element: option,
           value:
-            option.getAttribute("aria-value") || option.getAttribute("data-value") || option.textContent?.trim() || "",
-          text: option.textContent?.trim() || "",
-          selected: option.getAttribute("aria-selected") === "true",
+            option.getAttribute('aria-value') || option.getAttribute('data-value') || option.textContent?.trim() || '',
+          text: option.textContent?.trim() || '',
+          selected: option.getAttribute('aria-selected') === 'true',
         });
       });
     }
@@ -364,15 +364,15 @@ export const findSelectOptions = (
           listItems.forEach(item => {
             const option = item as HTMLElement;
             const isSelected =
-              option.classList.contains("selected") ||
-              option.classList.contains("active") ||
-              option.getAttribute("aria-selected") === "true";
+              option.classList.contains('selected') ||
+              option.classList.contains('active') ||
+              option.getAttribute('aria-selected') === 'true';
 
             options.push({
               element: option,
               value:
-                option.getAttribute("data-value") || option.getAttribute("value") || option.textContent?.trim() || "",
-              text: option.textContent?.trim() || "",
+                option.getAttribute('data-value') || option.getAttribute('value') || option.textContent?.trim() || '',
+              text: option.textContent?.trim() || '',
               selected: isSelected,
             });
           });
@@ -402,21 +402,21 @@ export const simulateTyping = async (element: HTMLElement, value: string): Promi
         // Select all existing text first
         element.select();
       } catch (e) {
-        console.debug("Textarea focus/select error:", e);
+        console.debug('Textarea focus/select error:', e);
       }
     }
 
     // Start composition (for IME-aware applications)
     // Use CustomEvent for composition events with data
     try {
-      const startEvent = new CustomEvent("compositionstart", {
+      const startEvent = new CustomEvent('compositionstart', {
         bubbles: true,
         cancelable: true,
-        detail: { data: "" },
+        detail: { data: '' },
       });
       element.dispatchEvent(startEvent);
     } catch (e) {
-      console.debug("Custom composition event failed:", e);
+      console.debug('Custom composition event failed:', e);
     }
 
     // Make multiple attempts to set the value using different methods
@@ -426,18 +426,18 @@ export const simulateTyping = async (element: HTMLElement, value: string): Promi
 
       // For textareas, immediately dispatch events after setting value
       if (isTextarea) {
-        dispatchEvent(element, "input");
-        dispatchEvent(element, "change");
+        dispatchEvent(element, 'input');
+        dispatchEvent(element, 'change');
 
         // Also try with native event constructors
         try {
-          element.dispatchEvent(new InputEvent("input", { bubbles: true, cancelable: true }));
-          element.dispatchEvent(new Event("change", { bubbles: true, cancelable: true }));
+          element.dispatchEvent(new InputEvent('input', { bubbles: true, cancelable: true }));
+          element.dispatchEvent(new Event('change', { bubbles: true, cancelable: true }));
         } catch (e) {
-          console.debug("Native event creation failed:", e);
+          console.debug('Native event creation failed:', e);
         }
       }
-    } else if ("value" in element) {
+    } else if ('value' in element) {
       (element as { value: string }).value = value;
     } else if (element.isContentEditable) {
       element.textContent = value;
@@ -449,32 +449,32 @@ export const simulateTyping = async (element: HTMLElement, value: string): Promi
         // Clear existing content first
         const selection = window.getSelection();
         if (selection && element.contains(selection.anchorNode)) {
-          document.execCommand("selectAll", false);
-          document.execCommand("delete", false);
-          document.execCommand("insertText", false, value);
+          document.execCommand('selectAll', false);
+          document.execCommand('delete', false);
+          document.execCommand('insertText', false, value);
         }
       }
     } catch (commandError) {
-      console.debug("execCommand method not supported:", commandError);
+      console.debug('execCommand method not supported:', commandError);
     }
 
     // Method 3: For React-style controlled components that monitor specific events
     // Simulate individual keypresses for complex components
-    let previousValue = "";
+    let previousValue = '';
     for (let i = 0; i < value.length; i++) {
       const char = value[i];
       previousValue += char;
 
       // Use CustomEvent for composition update
       try {
-        const updateEvent = new CustomEvent("compositionupdate", {
+        const updateEvent = new CustomEvent('compositionupdate', {
           bubbles: true,
           cancelable: true,
           detail: { data: previousValue },
         });
         element.dispatchEvent(updateEvent);
       } catch (e) {
-        console.debug("Custom composition update event failed:", e);
+        console.debug('Custom composition update event failed:', e);
       }
 
       // Some frameworks listen for keydown/keypress events
@@ -487,29 +487,29 @@ export const simulateTyping = async (element: HTMLElement, value: string): Promi
       };
 
       try {
-        element.dispatchEvent(new KeyboardEvent("keydown", keyEvent));
-        element.dispatchEvent(new KeyboardEvent("keypress", keyEvent));
-        element.dispatchEvent(new KeyboardEvent("keyup", keyEvent));
+        element.dispatchEvent(new KeyboardEvent('keydown', keyEvent));
+        element.dispatchEvent(new KeyboardEvent('keypress', keyEvent));
+        element.dispatchEvent(new KeyboardEvent('keyup', keyEvent));
       } catch (keyError) {
-        console.debug("Keyboard event simulation error:", keyError);
+        console.debug('Keyboard event simulation error:', keyError);
       }
     }
 
     // End composition with CustomEvent
     try {
-      const endEvent = new CustomEvent("compositionend", {
+      const endEvent = new CustomEvent('compositionend', {
         bubbles: true,
         cancelable: true,
         detail: { data: value },
       });
       element.dispatchEvent(endEvent);
     } catch (e) {
-      console.debug("Custom composition end event failed:", e);
+      console.debug('Custom composition end event failed:', e);
     }
 
     // Fire standard events
-    dispatchEvent(element, "input");
-    dispatchEvent(element, "change");
+    dispatchEvent(element, 'input');
+    dispatchEvent(element, 'change');
 
     // Check if value was actually set
     let valueSet = false;
@@ -526,8 +526,8 @@ export const simulateTyping = async (element: HTMLElement, value: string): Promi
         if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
           if (element.value !== value) {
             element.value = value;
-            dispatchEvent(element, "input");
-            dispatchEvent(element, "change");
+            dispatchEvent(element, 'input');
+            dispatchEvent(element, 'change');
           }
         }
       });
@@ -545,7 +545,7 @@ export const simulateTyping = async (element: HTMLElement, value: string): Promi
 
     // No need to wait for auto-resize since we want maximum speed
   } catch (error) {
-    console.error("Error simulating typing:", error);
+    console.error('Error simulating typing:', error);
   } finally {
     // No delay before blurring to maximize speed
     // For textareas, we need to ensure we dispatch blur and focus events
@@ -554,17 +554,17 @@ export const simulateTyping = async (element: HTMLElement, value: string): Promi
       try {
         // Verify the value was set
         if (element.value !== value) {
-          console.log("Textarea value not set correctly, trying final approach");
+          console.log('Textarea value not set correctly, trying final approach');
           element.value = value;
-          dispatchEvent(element, "input");
-          dispatchEvent(element, "change");
+          dispatchEvent(element, 'input');
+          dispatchEvent(element, 'change');
         }
 
         // Some frameworks need blur+focus to detect changes
         element.blur();
         element.focus();
       } catch (e) {
-        console.debug("Textarea finalization error:", e);
+        console.debug('Textarea finalization error:', e);
       }
     } else if (!(element instanceof HTMLTextAreaElement)) {
       element.blur();
@@ -576,7 +576,7 @@ export const simulateTyping = async (element: HTMLElement, value: string): Promi
  * Get an XPath expression that identifies an element
  */
 export const getElementXPath = (element: HTMLElement): string => {
-  if (!element.parentElement) return "";
+  if (!element.parentElement) return '';
   const idx =
     Array.from(element.parentElement.children)
       .filter(child => child.tagName === element.tagName)
@@ -593,10 +593,10 @@ export const generateUniqueSelectors = (element: HTMLElement): string[] => {
   if (element.className) {
     const classSelector = Array.from(element.classList)
       .map(c => `.${CSS.escape(c)}`)
-      .join("");
+      .join('');
     if (classSelector) selectors.push(classSelector);
   }
-  ["name", "type", "role", "aria-label"].forEach(attr => {
+  ['name', 'type', 'role', 'aria-label'].forEach(attr => {
     if (element.hasAttribute(attr)) {
       selectors.push(`[${attr}="${CSS.escape(element.getAttribute(attr)!)}"]`);
     }
@@ -628,30 +628,30 @@ export const createBaseField = async (
   testMode: boolean = false,
 ): Promise<Field> => {
   const fieldId = getUniqueFieldId(index);
-  element.setAttribute("data-filliny-id", fieldId);
+  element.setAttribute('data-filliny-id', fieldId);
   const field: Field = {
     id: fieldId,
     type: type as FieldType,
     xpath: getElementXPath(element),
     uniqueSelectors: generateUniqueSelectors(element),
-    value: "",
+    value: '',
   };
-  field.label = await getFieldLabel(element);
+  field.label = getFieldLabel(element);
   if (testMode) {
     switch (type) {
-      case "text":
-        field.testValue = "Test text";
+      case 'text':
+        field.testValue = 'Test text';
         break;
-      case "email":
-        field.testValue = "test@example.com";
+      case 'email':
+        field.testValue = 'test@example.com';
         break;
-      case "tel":
-        field.testValue = "+1234567890";
+      case 'tel':
+        field.testValue = '+1234567890';
         break;
-      case "select":
+      case 'select':
         break;
-      case "number":
-        field.testValue = "42";
+      case 'number':
+        field.testValue = '42';
         break;
       default:
         field.testValue = `Test ${type}`;
@@ -660,16 +660,13 @@ export const createBaseField = async (
   return field;
 };
 
-// Use the robust implementation from fieldUtils.ts
-export const getFieldLabel = async (element: HTMLElement): Promise<string> => getFieldLabelFromUtils(element);
-
 /**
  * Safely get a string value with fallback
  */
-export const safeGetString = (value: unknown, fallback = ""): string => {
+export const safeGetString = (value: unknown, fallback = ''): string => {
   try {
     if (value === null || value === undefined) return fallback;
-    if (typeof value === "string") return value;
+    if (typeof value === 'string') return value;
     return String(value);
   } catch {
     return fallback;
@@ -679,7 +676,7 @@ export const safeGetString = (value: unknown, fallback = ""): string => {
 /**
  * Safely get lowercase string value
  */
-export const safeGetLowerString = (value: unknown, fallback = ""): string => {
+export const safeGetLowerString = (value: unknown, fallback = ''): string => {
   try {
     const str = safeGetString(value, fallback);
     return str.toLowerCase();

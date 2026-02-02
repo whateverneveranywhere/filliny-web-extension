@@ -1,19 +1,19 @@
 // vite.config.mts
-import { resolve } from "node:path";
-import { withPageConfig } from "file:///Users/avabagherzadeh/Desktop/projects/personal/filliny-web-extension/packages/vite-config/index.mjs";
+import { resolve } from 'node:path';
+import { withPageConfig } from 'file:///Users/avabagherzadeh/Desktop/projects/personal/filliny-web-extension/packages/vite-config/index.mjs';
 var __vite_injected_original_dirname =
-  "/Users/avabagherzadeh/Desktop/projects/personal/filliny-web-extension/pages/new-tab";
+  '/Users/avabagherzadeh/Desktop/projects/personal/filliny-web-extension/pages/new-tab';
 var rootDir = resolve(__vite_injected_original_dirname);
-var srcDir = resolve(rootDir, "src");
+var srcDir = resolve(rootDir, 'src');
 var vite_config_default = withPageConfig({
   resolve: {
     alias: {
-      "@src": srcDir,
+      '@src': srcDir,
     },
   },
-  publicDir: resolve(rootDir, "public"),
+  publicDir: resolve(rootDir, 'public'),
   build: {
-    outDir: resolve(rootDir, "..", "..", "dist", "new-tab"),
+    outDir: resolve(rootDir, '..', '..', 'dist', 'new-tab'),
   },
 });
 export { vite_config_default as default };

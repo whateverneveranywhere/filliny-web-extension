@@ -1,10 +1,10 @@
-import { handleFormClick } from "./handleFormClick";
-import { disableOtherButtons, showLoadingIndicator } from "./overlayUtils";
-import { Button } from "../../ui";
-import { X, Wand2, Loader2 } from "lucide-react";
-import { useState, useEffect, useRef } from "react";
-import type { OverlayPosition } from "./types";
-import type React from "react";
+import { handleFormClick } from './handleFormClick';
+import { disableOtherButtons, showLoadingIndicator } from './overlayUtils';
+import { Button } from '../../ui';
+import { X, Wand2, Loader2 } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import type { OverlayPosition } from './types';
+import type React from 'react';
 
 interface OverlayProps {
   formId: string;
@@ -44,7 +44,7 @@ const FormsOverlay: React.FC<OverlayProps> = ({ formId, initialPosition, onDismi
       }
 
       // Special handling for unified form scenario
-      if (formId === "unified-form") {
+      if (formId === 'unified-form') {
         // Try to find any element that's part of the unified form group
         const unifiedFormMember = document.querySelector('[data-filliny-unified-form-member="unified-form"]');
         if (unifiedFormMember && unifiedFormMember instanceof HTMLElement) {
@@ -99,7 +99,7 @@ const FormsOverlay: React.FC<OverlayProps> = ({ formId, initialPosition, onDismi
       }
 
       console.log(
-        `🎯 FormsOverlay: Using container with ${maxFieldCount} fields: ${bestContainer.tagName}${bestContainer.className ? "." + bestContainer.className : ""}`,
+        `🎯 FormsOverlay: Using container with ${maxFieldCount} fields: ${bestContainer.tagName}${bestContainer.className ? '.' + bestContainer.className : ''}`,
       );
       return bestContainer;
     };
@@ -107,8 +107,8 @@ const FormsOverlay: React.FC<OverlayProps> = ({ formId, initialPosition, onDismi
     const countFormFields = (element: HTMLElement): number => {
       const selectors = [
         'input:not([type="hidden"]):not([type="submit"]):not([type="button"]):not([type="reset"])',
-        "select",
-        "textarea",
+        'select',
+        'textarea',
         '[role="textbox"]',
         '[role="combobox"]',
         '[role="checkbox"]',
@@ -136,7 +136,7 @@ const FormsOverlay: React.FC<OverlayProps> = ({ formId, initialPosition, onDismi
     // Store the form reference for later use
     formRef.current = form;
 
-    console.log(`✅ FormsOverlay: Monitoring form: ${form.tagName}${form.className ? "." + form.className : ""}`);
+    console.log(`✅ FormsOverlay: Monitoring form: ${form.tagName}${form.className ? '.' + form.className : ''}`);
 
     let rafId: number;
     let isUpdating = false;
@@ -271,7 +271,7 @@ const FormsOverlay: React.FC<OverlayProps> = ({ formId, initialPosition, onDismi
           console.debug(`🌎 FormsOverlay: Form far from viewport, using fixed position`);
         }
       } catch (error) {
-        console.error("Error updating overlay position:", error);
+        console.error('Error updating overlay position:', error);
       }
 
       isUpdating = false;
@@ -285,8 +285,8 @@ const FormsOverlay: React.FC<OverlayProps> = ({ formId, initialPosition, onDismi
     };
 
     // Set up event listeners with better throttling
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    document.addEventListener("scroll", handleScroll, { passive: true, capture: true });
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    document.addEventListener('scroll', handleScroll, { passive: true, capture: true });
 
     // Set up resize observer to handle form dimension changes
     const resizeObserver = new ResizeObserver(() => {
@@ -316,8 +316,8 @@ const FormsOverlay: React.FC<OverlayProps> = ({ formId, initialPosition, onDismi
       if (rafId) {
         cancelAnimationFrame(rafId);
       }
-      window.removeEventListener("scroll", handleScroll);
-      document.removeEventListener("scroll", handleScroll, { capture: true });
+      window.removeEventListener('scroll', handleScroll);
+      document.removeEventListener('scroll', handleScroll, { capture: true });
       resizeObserver.disconnect();
       mutationObserver.disconnect();
     };
@@ -329,7 +329,7 @@ const FormsOverlay: React.FC<OverlayProps> = ({ formId, initialPosition, onDismi
     // Check if a field-specific test is already in progress - if so, don't trigger form overlay
     const fieldTestInProgress = document.querySelector('[data-filliny-loading="true"]');
     if (fieldTestInProgress) {
-      console.log("Field test already in progress, not triggering form fill");
+      console.log('Field test already in progress, not triggering form fill');
       onDismiss();
       return;
     }
@@ -359,26 +359,26 @@ const FormsOverlay: React.FC<OverlayProps> = ({ formId, initialPosition, onDismi
       const scrollPosition = window.scrollY + formRect.top - 100;
       window.scrollTo({
         top: Math.max(0, scrollPosition),
-        behavior: "smooth",
+        behavior: 'smooth',
       });
     }
   };
 
   // Enhanced styling to ensure proper overlay coverage
   const overlayStyle = {
-    position: "fixed" as const,
+    position: 'fixed' as const,
     top: `${overlayPosition.top}px`,
     left: `${overlayPosition.left}px`,
     width: `${overlayPosition.width}px`,
     height: `${overlayPosition.height}px`,
     // Ensure the overlay doesn't interfere with form interaction when not active
-    pointerEvents: loading ? ("auto" as const) : ("none" as const),
+    pointerEvents: loading ? ('auto' as const) : ('none' as const),
     // Prevent the overlay from affecting document flow
-    contain: "layout style paint" as const,
+    contain: 'layout style paint' as const,
     // Z-index to ensure it's above form elements but below modals
     zIndex: 10000000,
     // Smooth transitions
-    transition: "all 0.3s ease",
+    transition: 'all 0.3s ease',
   };
 
   // Determine if form is in view to show additional UI elements
@@ -391,21 +391,21 @@ const FormsOverlay: React.FC<OverlayProps> = ({ formId, initialPosition, onDismi
       ref={overlayRef}
       className={`filliny-pointer-events-auto filliny-fixed filliny-flex filliny-items-center filliny-justify-center filliny-transition-all filliny-duration-300 ${
         loading
-          ? "filliny-bg-black/40 filliny-backdrop-blur-sm"
-          : "filliny-rounded-lg filliny-bg-black/30 filliny-backdrop-blur-md hover:filliny-bg-black/40"
+          ? 'filliny-bg-black/40 filliny-backdrop-blur-sm'
+          : 'filliny-rounded-lg filliny-bg-black/30 filliny-backdrop-blur-md hover:filliny-bg-black/40'
       } `}
       style={overlayStyle}
       data-highlight-overlay="true"
       data-form-id={formId}
       onClick={isFormLikelyOutOfView ? handleScrollToForm : undefined}
-      onKeyDown={isFormLikelyOutOfView ? e => e.key === "Enter" && handleScrollToForm() : undefined}
-      role={isFormLikelyOutOfView ? "button" : undefined}
+      onKeyDown={isFormLikelyOutOfView ? e => e.key === 'Enter' && handleScrollToForm() : undefined}
+      role={isFormLikelyOutOfView ? 'button' : undefined}
       tabIndex={isFormLikelyOutOfView ? 0 : undefined}
-      aria-label={isFormLikelyOutOfView ? "Click to scroll to form" : undefined}>
+      aria-label={isFormLikelyOutOfView ? 'Click to scroll to form' : undefined}>
       {loading ? (
         <div
           className="filliny-flex filliny-flex-col filliny-items-center filliny-gap-4 filliny-text-white"
-          style={{ pointerEvents: "auto" }}>
+          style={{ pointerEvents: 'auto' }}>
           <div className="filliny-h-8 filliny-w-8 filliny-animate-spin">
             <Loader2 className="filliny-h-full filliny-w-full" />
           </div>
@@ -418,7 +418,7 @@ const FormsOverlay: React.FC<OverlayProps> = ({ formId, initialPosition, onDismi
         <>
           <div
             className="filliny-fixed filliny-left-1/2 filliny-top-1/2 filliny-z-[10000001] filliny-flex filliny-w-full filliny-max-w-fit filliny--translate-x-1/2 filliny--translate-y-1/2 filliny-flex-col filliny-items-center filliny-gap-3"
-            style={{ pointerEvents: "auto" }}>
+            style={{ pointerEvents: 'auto' }}>
             <Button
               ref={buttonRef}
               loading={loading}
@@ -428,12 +428,12 @@ const FormsOverlay: React.FC<OverlayProps> = ({ formId, initialPosition, onDismi
               variant="default"
               onClick={handleFillClick}>
               <Wand2 className="filliny-h-5 filliny-w-5" />
-              {testMode ? "Test Fill Form" : "Auto-Fill Form"}
+              {testMode ? 'Test Fill Form' : 'Auto-Fill Form'}
             </Button>
             <p className="filliny-text-sm filliny-text-white/80">
               {isFormLikelyOutOfView
-                ? "Click to scroll to form and auto-fill"
-                : `Click to automatically fill out this form with ${testMode ? "test data" : "AI"}`}
+                ? 'Click to scroll to form and auto-fill'
+                : `Click to automatically fill out this form with ${testMode ? 'test data' : 'AI'}`}
             </p>
           </div>
 
@@ -442,7 +442,7 @@ const FormsOverlay: React.FC<OverlayProps> = ({ formId, initialPosition, onDismi
             type="button"
             variant="ghost"
             className="filliny-fixed filliny-right-4 filliny-top-4 filliny-h-8 filliny-w-8 filliny-rounded-full filliny-bg-white/10 filliny-text-white hover:filliny-bg-white/20"
-            style={{ pointerEvents: "auto" }}
+            style={{ pointerEvents: 'auto' }}
             onClick={onDismiss}
             aria-label="Close overlay">
             <X className="filliny-h-4 filliny-w-4" />

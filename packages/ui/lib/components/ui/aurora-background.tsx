@@ -1,5 +1,5 @@
-import { cn } from "@/lib/utils";
-import type { ReactNode } from "react";
+import { cn } from '@/lib/utils';
+import type { ReactNode } from 'react';
 
 interface AuroraBackgroundProps extends React.HTMLProps<HTMLDivElement> {
   children: ReactNode;
@@ -14,7 +14,7 @@ export const AuroraBackground = ({
 }: AuroraBackgroundProps) => (
   <main>
     <div
-      className={cn("transition-bg relative flex h-[100vh] flex-col items-center justify-center bg-black", className)}
+      className={cn('transition-bg relative flex h-[100vh] flex-col items-center justify-center bg-black', className)}
       {...props}>
       <div className="absolute inset-0 overflow-hidden">
         <div

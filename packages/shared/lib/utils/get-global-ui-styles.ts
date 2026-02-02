@@ -1,4 +1,4 @@
-import deepmerge from "deepmerge";
+import deepmerge from 'deepmerge';
 
 /**
  * Gets the global UI styles content
@@ -113,7 +113,7 @@ export interface StyleMergeOptions {
  * However, we use deepmerge for any JavaScript configuration objects if needed
  */
 export const mergeUIStyles = (customInlineCSS: string, options: StyleMergeOptions = {}): string => {
-  const { mergeStyles = true, globalStylesFirst = true, additionalCSS = "" } = options;
+  const { mergeStyles = true, globalStylesFirst = true, additionalCSS = '' } = options;
 
   if (!mergeStyles) {
     return customInlineCSS;
@@ -137,7 +137,7 @@ export const mergeUIStyles = (customInlineCSS: string, options: StyleMergeOption
 export const defaultStyleMergeConfig: StyleMergeOptions = {
   mergeStyles: true,
   globalStylesFirst: true,
-  additionalCSS: "",
+  additionalCSS: '',
 };
 
 /**

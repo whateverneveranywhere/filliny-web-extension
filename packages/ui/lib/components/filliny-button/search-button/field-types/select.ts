@@ -1,12 +1,15 @@
-import { findSelectOptions, isCustomSelect, createBaseField } from "./utils";
-import type { Field } from "@extension/shared";
+import { findSelectOptions, isCustomSelect, createBaseField } from './utils';
+import { createDebugLogger, Framework } from '@extension/shared';
+import type { Field } from '@extension/shared';
+
+const debug = createDebugLogger('Select');
 
 /**
  * Enhanced React Select handler for all React Select variants
  */
 export const handleReactSelect = (element: HTMLElement, normalizedValues: string[]): boolean => {
   try {
-    console.log("🔍 Handling React Select component...", element);
+    debug.log('🔍 Handling React Select component...', element);
 
     // Enhanced React Select detection patterns
     const isReactSelect = detectReactSelectComponent(element);
@@ -15,22 +18,22 @@ export const handleReactSelect = (element: HTMLElement, normalizedValues: string
       return false;
     }
 
-    console.log("✅ Confirmed React Select component detected");
+    debug.log('✅ Confirmed React Select component detected');
 
     // Find the React Select container using multiple strategies
     const selectContainer = findReactSelectContainer(element);
 
     if (!selectContainer) {
-      console.warn("❌ Could not find React Select container");
+      debug.warn('❌ Could not find React Select container');
       return false;
     }
 
-    console.log("🎯 Found React Select container:", selectContainer);
+    debug.log('🎯 Found React Select container:', selectContainer);
 
     // Open the dropdown
     const opened = openReactSelectDropdown(selectContainer);
     if (!opened) {
-      console.warn("❌ Could not open React Select dropdown");
+      debug.warn('❌ Could not open React Select dropdown');
       return false;
     }
 
@@ -41,7 +44,7 @@ export const handleReactSelect = (element: HTMLElement, normalizedValues: string
 
     return true;
   } catch (error) {
-    console.error("❌ Error in handleReactSelect:", error);
+    debug.error('❌ Error in handleReactSelect:', error);
     return false;
   }
 };
@@ -63,7 +66,7 @@ function detectReactSelectComponent(element: HTMLElement): boolean {
   }
 
   // Check for React Select specific attributes
-  if (element.getAttribute("role") === "combobox" && element.className.includes("select")) {
+  if (element.getAttribute('role') === 'combobox' && element.className.includes('select')) {
     return true;
   }
 
@@ -72,7 +75,7 @@ function detectReactSelectComponent(element: HTMLElement): boolean {
   if (form) {
     const hiddenInputs = form.querySelectorAll('input[type="hidden"]');
     for (const input of Array.from(hiddenInputs)) {
-      if (input.getAttribute("name")?.includes("select") || input.getAttribute("id")?.includes("select")) {
+      if (input.getAttribute('name')?.includes('select') || input.getAttribute('id')?.includes('select')) {
         return true;
       }
     }
@@ -87,21 +90,21 @@ function detectReactSelectComponent(element: HTMLElement): boolean {
 function hasReactSelectClasses(element: HTMLElement): boolean {
   const className = element.className.toLowerCase();
   const reactSelectPatterns = [
-    "react-select",
-    "select__control",
-    "select__container",
-    "select__input",
-    "select__value-container",
-    "select__single-value",
-    "select__placeholder",
-    "select__dropdown-indicator",
-    "css-.*-control", // Emotion CSS classes
-    "css-.*-container",
-    "css-.*-valuecontainer",
+    'react-select',
+    'select__control',
+    'select__container',
+    'select__input',
+    'select__value-container',
+    'select__single-value',
+    'select__placeholder',
+    'select__dropdown-indicator',
+    'css-.*-control', // Emotion CSS classes
+    'css-.*-container',
+    'css-.*-valuecontainer',
   ];
 
   return reactSelectPatterns.some(pattern => {
-    if (pattern.includes("css-.*")) {
+    if (pattern.includes('css-.*')) {
       return new RegExp(pattern).test(className);
     }
     return className.includes(pattern);
@@ -116,8 +119,8 @@ function findReactSelectContainer(element: HTMLElement): HTMLElement | null {
   let current: HTMLElement | null = element;
   while (current) {
     if (
-      current.className.includes("react-select") &&
-      (current.className.includes("container") || current.className.includes("control"))
+      current.className.includes('react-select') &&
+      (current.className.includes('container') || current.className.includes('control'))
     ) {
       return current;
     }
@@ -127,7 +130,7 @@ function findReactSelectContainer(element: HTMLElement): HTMLElement | null {
   // Strategy 2: Look for control element
   current = element;
   while (current) {
-    if (current.className.includes("select__control") || current.className.includes("control")) {
+    if (current.className.includes('select__control') || current.className.includes('control')) {
       return current;
     }
     current = current.parentElement;
@@ -186,7 +189,7 @@ function openReactSelectDropdown(container: HTMLElement): boolean {
 
     return false;
   } catch (error) {
-    console.error("Error opening React Select dropdown:", error);
+    debug.error('Error opening React Select dropdown:', error);
     return false;
   }
 }
@@ -202,20 +205,20 @@ function selectReactSelectOption(value: string, originalElement: HTMLElement): v
       '[class*="select__menu"]',
       '[class*="css-"][class*="menu"]',
       '[role="listbox"]',
-      ".react-select__menu-list",
-      ".select__menu-list",
+      '.react-select__menu-list',
+      '.select__menu-list',
     ];
 
     let menu: HTMLElement | null = null;
     for (const selector of menuSelectors) {
       menu = document.querySelector(selector) as HTMLElement;
-      if (menu && window.getComputedStyle(menu).display !== "none") {
+      if (menu && window.getComputedStyle(menu).display !== 'none') {
         break;
       }
     }
 
     if (!menu) {
-      console.warn("Could not find React Select dropdown menu");
+      debug.warn('Could not find React Select dropdown menu');
       return;
     }
 
@@ -237,7 +240,7 @@ function selectReactSelectOption(value: string, originalElement: HTMLElement): v
     }
 
     if (options.length === 0) {
-      console.warn("No options found in React Select dropdown");
+      debug.warn('No options found in React Select dropdown');
       return;
     }
 
@@ -245,25 +248,25 @@ function selectReactSelectOption(value: string, originalElement: HTMLElement): v
     const matchingOption = findMatchingReactSelectOption(options, value);
 
     if (matchingOption) {
-      console.log("🎯 Clicking matching React Select option:", matchingOption.textContent);
+      debug.log('🎯 Clicking matching React Select option:', matchingOption.textContent);
       matchingOption.click();
 
       // Dispatch additional events
-      matchingOption.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
-      matchingOption.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+      matchingOption.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+      matchingOption.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
 
       // Update original element
       if (originalElement instanceof HTMLInputElement) {
         originalElement.value = value;
-        originalElement.dispatchEvent(new Event("change", { bubbles: true }));
+        originalElement.dispatchEvent(new Event('change', { bubbles: true }));
       }
     } else {
-      console.warn("No matching option found for value:", value);
+      debug.warn('No matching option found for value:', value);
       // Close dropdown by clicking outside
       document.body.click();
     }
   } catch (error) {
-    console.error("Error selecting React Select option:", error);
+    debug.error('Error selecting React Select option:', error);
   }
 }
 
@@ -276,7 +279,7 @@ function findMatchingReactSelectOption(options: HTMLElement[], value: string): H
   // Strategy 1: Exact value match
   for (const option of options) {
     const optionValue =
-      option.getAttribute("data-value") || option.getAttribute("value") || option.textContent?.trim() || "";
+      option.getAttribute('data-value') || option.getAttribute('value') || option.textContent?.trim() || '';
 
     if (optionValue.toLowerCase() === normalizedValue) {
       return option;
@@ -285,7 +288,7 @@ function findMatchingReactSelectOption(options: HTMLElement[], value: string): H
 
   // Strategy 2: Text content match
   for (const option of options) {
-    const optionText = option.textContent?.toLowerCase().trim() || "";
+    const optionText = option.textContent?.toLowerCase().trim() || '';
     if (optionText === normalizedValue) {
       return option;
     }
@@ -293,7 +296,7 @@ function findMatchingReactSelectOption(options: HTMLElement[], value: string): H
 
   // Strategy 3: Partial match
   for (const option of options) {
-    const optionText = option.textContent?.toLowerCase().trim() || "";
+    const optionText = option.textContent?.toLowerCase().trim() || '';
     if (optionText.includes(normalizedValue) || normalizedValue.includes(optionText)) {
       return option;
     }
@@ -301,11 +304,11 @@ function findMatchingReactSelectOption(options: HTMLElement[], value: string): H
 
   // Strategy 4: First non-placeholder option
   for (const option of options) {
-    const optionText = option.textContent?.toLowerCase().trim() || "";
+    const optionText = option.textContent?.toLowerCase().trim() || '';
     if (
-      !optionText.includes("select") &&
-      !optionText.includes("choose") &&
-      !optionText.includes("please") &&
+      !optionText.includes('select') &&
+      !optionText.includes('choose') &&
+      !optionText.includes('please') &&
       optionText.length > 0
     ) {
       return option;
@@ -320,7 +323,7 @@ function findMatchingReactSelectOption(options: HTMLElement[], value: string): H
  */
 export const handleMaterialUISelect = (element: HTMLElement, normalizedValues: string[]): boolean => {
   try {
-    console.log("🔍 Handling Material-UI Select component...", element);
+    debug.log('🔍 Handling Material-UI Select component...', element);
 
     // Enhanced Material-UI detection patterns
     const isMaterialUI = detectMaterialUIComponent(element);
@@ -329,22 +332,22 @@ export const handleMaterialUISelect = (element: HTMLElement, normalizedValues: s
       return false;
     }
 
-    console.log("✅ Confirmed Material-UI Select component detected");
+    debug.log('✅ Confirmed Material-UI Select component detected');
 
     // Find the Material-UI select container
     const selectContainer = findMaterialUISelectContainer(element);
 
     if (!selectContainer) {
-      console.warn("❌ Could not find Material-UI Select container");
+      debug.warn('❌ Could not find Material-UI Select container');
       return false;
     }
 
-    console.log("🎯 Found Material-UI Select container:", selectContainer);
+    debug.log('🎯 Found Material-UI Select container:', selectContainer);
 
     // Open the dropdown
     const opened = openMaterialUIDropdown(selectContainer);
     if (!opened) {
-      console.warn("❌ Could not open Material-UI dropdown");
+      debug.warn('❌ Could not open Material-UI dropdown');
       return false;
     }
 
@@ -355,7 +358,7 @@ export const handleMaterialUISelect = (element: HTMLElement, normalizedValues: s
 
     return true;
   } catch (error) {
-    console.error("❌ Error in handleMaterialUISelect:", error);
+    debug.error('❌ Error in handleMaterialUISelect:', error);
     return false;
   }
 };
@@ -377,12 +380,12 @@ function detectMaterialUIComponent(element: HTMLElement): boolean {
   }
 
   // Check for Material-UI specific attributes
-  if (element.getAttribute("role") === "combobox" && element.className.includes("Mui")) {
+  if (element.getAttribute('role') === 'combobox' && element.className.includes('Mui')) {
     return true;
   }
 
   // Check for hidden native select with Material-UI patterns
-  const nativeSelect = element.querySelector("select") || element.parentElement?.querySelector("select");
+  const nativeSelect = element.querySelector('select') || element.parentElement?.querySelector('select');
   if (nativeSelect && hasMaterialUIClasses(nativeSelect.parentElement as HTMLElement)) {
     return true;
   }
@@ -398,22 +401,22 @@ function hasMaterialUIClasses(element: HTMLElement): boolean {
 
   const className = element.className.toLowerCase();
   const materialUIPatterns = [
-    "mui",
-    "muiselect",
-    "muiformcontrol",
-    "muiinputbase",
-    "muiinput",
-    "muioutlinedinput",
-    "muifilledinput",
-    "css-.*-muiselect", // Emotion CSS classes
-    "css-.*-muiinputbase",
-    "css-.*-muiinput",
-    "makeStyles", // Material-UI JSS
-    "withStyles",
+    'mui',
+    'muiselect',
+    'muiformcontrol',
+    'muiinputbase',
+    'muiinput',
+    'muioutlinedinput',
+    'muifilledinput',
+    'css-.*-muiselect', // Emotion CSS classes
+    'css-.*-muiinputbase',
+    'css-.*-muiinput',
+    'makeStyles', // Material-UI JSS
+    'withStyles',
   ];
 
   return materialUIPatterns.some(pattern => {
-    if (pattern.includes("css-.*")) {
+    if (pattern.includes('css-.*')) {
       return new RegExp(pattern).test(className);
     }
     return className.includes(pattern);
@@ -427,7 +430,7 @@ function findMaterialUISelectContainer(element: HTMLElement): HTMLElement | null
   // Strategy 1: Look for FormControl in parent chain
   let current: HTMLElement | null = element;
   while (current) {
-    if (current.className.includes("MuiFormControl") || current.className.includes("MuiSelect")) {
+    if (current.className.includes('MuiFormControl') || current.className.includes('MuiSelect')) {
       return current;
     }
     current = current.parentElement;
@@ -436,7 +439,7 @@ function findMaterialUISelectContainer(element: HTMLElement): HTMLElement | null
   // Strategy 2: Look for InputBase
   current = element;
   while (current) {
-    if (current.className.includes("MuiInputBase") || current.className.includes("MuiInput")) {
+    if (current.className.includes('MuiInputBase') || current.className.includes('MuiInput')) {
       return current;
     }
     current = current.parentElement;
@@ -473,7 +476,7 @@ function openMaterialUIDropdown(container: HTMLElement): boolean {
   try {
     // Try clicking the select element
     const selectElement =
-      container.querySelector('[role="combobox"], [role="button"]') || container.querySelector("input") || container;
+      container.querySelector('[role="combobox"], [role="button"]') || container.querySelector('input') || container;
 
     if (selectElement instanceof HTMLElement) {
       selectElement.click();
@@ -489,7 +492,7 @@ function openMaterialUIDropdown(container: HTMLElement): boolean {
 
     return false;
   } catch (error) {
-    console.error("Error opening Material-UI dropdown:", error);
+    debug.error('Error opening Material-UI dropdown:', error);
     return false;
   }
 }
@@ -512,13 +515,13 @@ function selectMaterialUIOption(value: string, originalElement: HTMLElement): vo
     let menu: HTMLElement | null = null;
     for (const selector of menuSelectors) {
       menu = document.querySelector(selector) as HTMLElement;
-      if (menu && window.getComputedStyle(menu).display !== "none") {
+      if (menu && window.getComputedStyle(menu).display !== 'none') {
         break;
       }
     }
 
     if (!menu) {
-      console.warn("Could not find Material-UI dropdown menu");
+      debug.warn('Could not find Material-UI dropdown menu');
       return;
     }
 
@@ -541,7 +544,7 @@ function selectMaterialUIOption(value: string, originalElement: HTMLElement): vo
     }
 
     if (options.length === 0) {
-      console.warn("No options found in Material-UI dropdown");
+      debug.warn('No options found in Material-UI dropdown');
       return;
     }
 
@@ -549,25 +552,25 @@ function selectMaterialUIOption(value: string, originalElement: HTMLElement): vo
     const matchingOption = findMatchingMaterialUIOption(options, value);
 
     if (matchingOption) {
-      console.log("🎯 Clicking matching Material-UI option:", matchingOption.textContent);
+      debug.log('🎯 Clicking matching Material-UI option:', matchingOption.textContent);
       matchingOption.click();
 
       // Dispatch additional events
-      matchingOption.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
-      matchingOption.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+      matchingOption.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+      matchingOption.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
 
       // Update original element if it's an input
       if (originalElement instanceof HTMLInputElement) {
         originalElement.value = value;
-        originalElement.dispatchEvent(new Event("change", { bubbles: true }));
+        originalElement.dispatchEvent(new Event('change', { bubbles: true }));
       }
     } else {
-      console.warn("No matching option found for value:", value);
+      debug.warn('No matching option found for value:', value);
       // Close dropdown by pressing Escape
-      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     }
   } catch (error) {
-    console.error("Error selecting Material-UI option:", error);
+    debug.error('Error selecting Material-UI option:', error);
   }
 }
 
@@ -580,7 +583,7 @@ function findMatchingMaterialUIOption(options: HTMLElement[], value: string): HT
   // Strategy 1: Exact value match
   for (const option of options) {
     const optionValue =
-      option.getAttribute("data-value") || option.getAttribute("value") || option.textContent?.trim() || "";
+      option.getAttribute('data-value') || option.getAttribute('value') || option.textContent?.trim() || '';
 
     if (optionValue.toLowerCase() === normalizedValue) {
       return option;
@@ -589,7 +592,7 @@ function findMatchingMaterialUIOption(options: HTMLElement[], value: string): HT
 
   // Strategy 2: Text content match
   for (const option of options) {
-    const optionText = option.textContent?.toLowerCase().trim() || "";
+    const optionText = option.textContent?.toLowerCase().trim() || '';
     if (optionText === normalizedValue) {
       return option;
     }
@@ -597,7 +600,7 @@ function findMatchingMaterialUIOption(options: HTMLElement[], value: string): HT
 
   // Strategy 3: Partial match
   for (const option of options) {
-    const optionText = option.textContent?.toLowerCase().trim() || "";
+    const optionText = option.textContent?.toLowerCase().trim() || '';
     if (optionText.includes(normalizedValue) || normalizedValue.includes(optionText)) {
       return option;
     }
@@ -605,11 +608,11 @@ function findMatchingMaterialUIOption(options: HTMLElement[], value: string): HT
 
   // Strategy 4: First non-placeholder option
   for (const option of options) {
-    const optionText = option.textContent?.toLowerCase().trim() || "";
+    const optionText = option.textContent?.toLowerCase().trim() || '';
     if (
-      !optionText.includes("select") &&
-      !optionText.includes("choose") &&
-      !optionText.includes("please") &&
+      !optionText.includes('select') &&
+      !optionText.includes('choose') &&
+      !optionText.includes('please') &&
       optionText.length > 0
     ) {
       return option;
@@ -624,42 +627,42 @@ function findMatchingMaterialUIOption(options: HTMLElement[], value: string): HT
  */
 export const handleTsselect = (element: HTMLSelectElement, normalizedValues: string[]): boolean => {
   try {
-    console.log("Attempting to handle Tsselect component...");
+    debug.log('Attempting to handle Tsselect component...');
 
     // Enhanced check for React-Select components used on Exclaimer careers site
     const isReactSelect =
-      element.classList.contains("react-select__input") ||
-      element.parentElement?.classList.contains("css-1hac4vs-dummyInput") ||
-      !!element.closest(".css-26l3qy-container") ||
+      element.classList.contains('react-select__input') ||
+      element.parentElement?.classList.contains('css-1hac4vs-dummyInput') ||
+      !!element.closest('.css-26l3qy-container') ||
       !!element.closest('[class*="react-select"]') ||
-      element.getAttribute("role") === "combobox" ||
-      element.getAttribute("id")?.includes("application_form");
+      element.getAttribute('role') === 'combobox' ||
+      element.getAttribute('id')?.includes('application_form');
 
     if (isReactSelect) {
-      console.log("Detected React-Select component...", element.id);
+      debug.log('Detected React-Select component...', element.id);
 
       // Look for both visible and hidden select elements
       // Exclaimer careers site uses a hidden native select with specific classes
-      const elementId = element.id || "";
-      const fieldNumber = elementId.match(/field-(\d+)/)?.[1] || "";
+      const elementId = element.id || '';
+      const fieldNumber = elementId.match(/field-(\d+)/)?.[1] || '';
 
       // Try multiple strategies to find associated hidden selects
       const possibleHiddenSelect = document.querySelector(
         `select.hide-at-sm-block[id$="field-${fieldNumber}"], ` +
-          `select[id$="${elementId.split("_").pop()}"], ` +
-          `select[data-filliny-id="${element.getAttribute("data-filliny-id")}"]`,
+          `select[id$="${elementId.split('_').pop()}"], ` +
+          `select[data-filliny-id="${element.getAttribute('data-filliny-id')}"]`,
       ) as HTMLSelectElement;
 
       if (possibleHiddenSelect) {
-        console.log("Found associated hidden select:", possibleHiddenSelect.id);
+        debug.log('Found associated hidden select:', possibleHiddenSelect.id);
 
         // Try updating the hidden select directly
         try {
           possibleHiddenSelect.value = normalizedValues[0];
-          possibleHiddenSelect.dispatchEvent(new Event("change", { bubbles: true }));
-          console.log("Updated hidden select value to", normalizedValues[0]);
+          possibleHiddenSelect.dispatchEvent(new Event('change', { bubbles: true }));
+          debug.log('Updated hidden select value to', normalizedValues[0]);
         } catch (e) {
-          console.warn("Could not update hidden select:", e);
+          debug.warn('Could not update hidden select:', e);
         }
       }
 
@@ -671,9 +674,9 @@ export const handleTsselect = (element: HTMLSelectElement, normalizedValues: str
 
       // Approach 2: Find through related element IDs
       if (!selectContainer && elementId) {
-        const relatedId = elementId.replace("input", "control");
+        const relatedId = elementId.replace('input', 'control');
         selectContainer = document.querySelector(
-          `[id="${relatedId}"], [id*="${elementId.split("_")[0]}"][class*="container"]`,
+          `[id="${relatedId}"], [id*="${elementId.split('_')[0]}"][class*="container"]`,
         ) as HTMLElement;
       }
 
@@ -704,8 +707,8 @@ export const handleTsselect = (element: HTMLSelectElement, normalizedValues: str
         let currentElement = element.parentElement;
         while (currentElement && !selectContainer) {
           if (
-            currentElement.classList.contains("react-select__control") ||
-            currentElement.classList.toString().includes("react-select")
+            currentElement.classList.contains('react-select__control') ||
+            currentElement.classList.toString().includes('react-select')
           ) {
             selectContainer = currentElement;
           }
@@ -714,20 +717,20 @@ export const handleTsselect = (element: HTMLSelectElement, normalizedValues: str
       }
 
       if (!selectContainer) {
-        console.warn("Could not find React-Select container to click");
+        debug.warn('Could not find React-Select container to click');
         return false;
       }
 
-      console.log("Found select container:", selectContainer);
+      debug.log('Found select container:', selectContainer);
 
       // Click to open the dropdown
       selectContainer.click();
-      console.log("Clicked on select container to open dropdown");
+      debug.log('Clicked on select container to open dropdown');
 
       // Process dropdown immediately rather than using setTimeout
       const optionSelectors = [
-        ".react-select__menu .react-select__option",
-        ".css-26l3qy-menu .css-4ljt47-option",
+        '.react-select__menu .react-select__option',
+        '.css-26l3qy-menu .css-4ljt47-option',
         '[class*="react-select__menu"] [class*="react-select__option"]',
         '[class*="select__menu"] [class*="select__option"]',
         '[class*="select-dropdown"] [class*="select-option"]',
@@ -746,28 +749,28 @@ export const handleTsselect = (element: HTMLSelectElement, normalizedValues: str
       }
 
       if (options.length === 0) {
-        console.log("No dropdown options found for React-Select");
+        debug.log('No dropdown options found for React-Select');
         document.body.click(); // Close dropdown
         return true;
       }
 
       // Get the value we're looking for
       const valueToFind = normalizedValues[0];
-      console.log("Looking for option matching:", valueToFind);
+      debug.log('Looking for option matching:', valueToFind);
 
       // First try to match numeric IDs exactly - this is critical for Exclaimer forms
       let matchedOption: Element | null = null;
 
       // For numeric IDs, prioritize exact matching
       if (/^\d+$/.test(valueToFind)) {
-        console.log("Detected numeric ID, using exact matching strategy");
+        debug.log('Detected numeric ID, using exact matching strategy');
 
         // Strategy 1: Match by data-value attribute
         for (const option of options) {
-          const dataValue = option.getAttribute("data-value");
+          const dataValue = option.getAttribute('data-value');
           if (dataValue === valueToFind) {
             matchedOption = option;
-            console.log("Found exact data-value match:", dataValue);
+            debug.log('Found exact data-value match:', dataValue);
             break;
           }
         }
@@ -775,10 +778,10 @@ export const handleTsselect = (element: HTMLSelectElement, normalizedValues: str
         // Strategy 2: Match by value attribute
         if (!matchedOption) {
           for (const option of options) {
-            const optValue = option.getAttribute("value");
+            const optValue = option.getAttribute('value');
             if (optValue === valueToFind) {
               matchedOption = option;
-              console.log("Found exact value attribute match:", optValue);
+              debug.log('Found exact value attribute match:', optValue);
               break;
             }
           }
@@ -787,11 +790,11 @@ export const handleTsselect = (element: HTMLSelectElement, normalizedValues: str
         // Strategy 3: Try to match by option text (some implementations show ID in text)
         if (!matchedOption) {
           for (const option of options) {
-            const optText = option.textContent?.trim() || "";
+            const optText = option.textContent?.trim() || '';
             // Check if text contains our numeric ID
             if (optText === valueToFind || optText.includes(valueToFind)) {
               matchedOption = option;
-              console.log("Found text match containing ID:", optText);
+              debug.log('Found text match containing ID:', optText);
               break;
             }
           }
@@ -800,14 +803,14 @@ export const handleTsselect = (element: HTMLSelectElement, normalizedValues: str
 
       // If numeric matching didn't work, try text-based matching
       if (!matchedOption) {
-        console.log("Trying text-based matching strategies");
+        debug.log('Trying text-based matching strategies');
 
         // Try exact match
         for (const option of options) {
-          const optionText = option.textContent?.toLowerCase().trim() || "";
+          const optionText = option.textContent?.toLowerCase().trim() || '';
           if (optionText === valueToFind.toLowerCase()) {
             matchedOption = option;
-            console.log("Found exact text match:", optionText);
+            debug.log('Found exact text match:', optionText);
             break;
           }
         }
@@ -815,10 +818,10 @@ export const handleTsselect = (element: HTMLSelectElement, normalizedValues: str
         // Try partial match
         if (!matchedOption) {
           for (const option of options) {
-            const optionText = option.textContent?.toLowerCase().trim() || "";
+            const optionText = option.textContent?.toLowerCase().trim() || '';
             if (optionText.includes(valueToFind.toLowerCase()) || valueToFind.toLowerCase().includes(optionText)) {
               matchedOption = option;
-              console.log("Found partial text match:", optionText);
+              debug.log('Found partial text match:', optionText);
               break;
             }
           }
@@ -827,26 +830,26 @@ export const handleTsselect = (element: HTMLSelectElement, normalizedValues: str
 
       // If still no match, use fuzzy matching or select first non-placeholder
       if (!matchedOption && options.length > 0) {
-        console.log("No exact match found, using alternative selection strategies");
+        debug.log('No exact match found, using alternative selection strategies');
 
         // Skip placeholder options
         const nonPlaceholders = Array.from(options).filter(opt => {
-          const text = opt.textContent?.toLowerCase().trim() || "";
-          return !text.includes("select") && !text.includes("choose") && !text.includes("please") && text !== "";
+          const text = opt.textContent?.toLowerCase().trim() || '';
+          return !text.includes('select') && !text.includes('choose') && !text.includes('please') && text !== '';
         });
 
         if (nonPlaceholders.length > 0) {
           matchedOption = nonPlaceholders[0];
-          console.log("Using first non-placeholder option:", matchedOption.textContent);
+          debug.log('Using first non-placeholder option:', matchedOption.textContent);
         } else {
           matchedOption = options[0];
-          console.log("Using first available option:", options[0].textContent);
+          debug.log('Using first available option:', options[0].textContent);
         }
       }
 
       if (matchedOption) {
         // Click the matched option
-        console.log("Clicking on matched option:", matchedOption.textContent);
+        debug.log('Clicking on matched option:', matchedOption.textContent);
 
         try {
           // Click and dispatch events immediately without timeouts
@@ -854,11 +857,11 @@ export const handleTsselect = (element: HTMLSelectElement, normalizedValues: str
 
           // Dispatch additional events for React handlers
           // Some React components need these specific events
-          const mouseDownEvent = new MouseEvent("mousedown", { bubbles: true });
+          const mouseDownEvent = new MouseEvent('mousedown', { bubbles: true });
           matchedOption?.dispatchEvent(mouseDownEvent);
 
           // Dispatch events to both the option and the original element
-          const changeEvent = new Event("change", { bubbles: true });
+          const changeEvent = new Event('change', { bubbles: true });
           element.dispatchEvent(changeEvent);
 
           // Also try to update any hidden inputs
@@ -868,16 +871,16 @@ export const handleTsselect = (element: HTMLSelectElement, normalizedValues: str
 
           if (hiddenInput instanceof HTMLInputElement) {
             hiddenInput.value = valueToFind;
-            hiddenInput.dispatchEvent(new Event("input", { bubbles: true }));
-            hiddenInput.dispatchEvent(new Event("change", { bubbles: true }));
+            hiddenInput.dispatchEvent(new Event('input', { bubbles: true }));
+            hiddenInput.dispatchEvent(new Event('change', { bubbles: true }));
           }
 
-          console.log("Successfully triggered events on the selected option");
+          debug.log('Successfully triggered events on the selected option');
         } catch (e) {
-          console.warn("Error clicking option:", e);
+          debug.warn('Error clicking option:', e);
         }
       } else {
-        console.log("No matching option found");
+        debug.log('No matching option found');
         document.body.click(); // Close dropdown
       }
 
@@ -886,7 +889,7 @@ export const handleTsselect = (element: HTMLSelectElement, normalizedValues: str
 
     return false;
   } catch (error) {
-    console.error("Error in handleTsselect:", error);
+    debug.error('Error in handleTsselect:', error);
     return false;
   }
 };
@@ -902,19 +905,19 @@ export const updateSelect = (element: HTMLElement, value: string | string[] | un
 
     // 1. Try React Select first (most common modern pattern)
     if (handleReactSelect(element, normalizedValues)) {
-      console.log("✅ Successfully handled as React Select");
+      debug.log('✅ Successfully handled as React Select');
       return;
     }
 
     // 2. Try Material-UI Select
     if (handleMaterialUISelect(element, normalizedValues)) {
-      console.log("✅ Successfully handled as Material-UI Select");
+      debug.log('✅ Successfully handled as Material-UI Select');
       return;
     }
 
     // 3. Try specialized Tsselect handler (for career sites)
     if (element instanceof HTMLSelectElement && handleTsselect(element, normalizedValues)) {
-      console.log("✅ Successfully handled as Tsselect");
+      debug.log('✅ Successfully handled as Tsselect');
       return;
     }
 
@@ -925,7 +928,7 @@ export const updateSelect = (element: HTMLElement, value: string | string[] | un
     }
 
     // 5. ARIA combobox/listbox elements
-    if (element.getAttribute("role") === "combobox" || element.getAttribute("role") === "listbox") {
+    if (element.getAttribute('role') === 'combobox' || element.getAttribute('role') === 'listbox') {
       updateAriaSelect(element, value);
       return;
     }
@@ -943,9 +946,9 @@ export const updateSelect = (element: HTMLElement, value: string | string[] | un
       return;
     }
 
-    console.warn("Could not determine how to update this select-like element:", element);
+    debug.warn('Could not determine how to update this select-like element:', element);
   } catch (error) {
-    console.error("Error updating select element:", error);
+    debug.error('Error updating select element:', error);
   }
 };
 
@@ -957,7 +960,7 @@ const normalizeSelectValue = (value: string | string[] | unknown): string[] => {
     return [];
   }
 
-  if (typeof value === "string") {
+  if (typeof value === 'string') {
     return [value];
   }
 
@@ -966,12 +969,12 @@ const normalizeSelectValue = (value: string | string[] | unknown): string[] => {
   }
 
   // Handle boolean values explicitly
-  if (typeof value === "boolean") {
-    return [value ? "true" : "false"];
+  if (typeof value === 'boolean') {
+    return [value ? 'true' : 'false'];
   }
 
   // Handle numeric values explicitly - keep as exact strings
-  if (typeof value === "number") {
+  if (typeof value === 'number') {
     return [String(value)];
   }
 
@@ -998,8 +1001,8 @@ const isValueMatch = (optionValue: string, targetValue: string): boolean => {
 
   // Handle boolean-like values
   const booleanEquivalents = {
-    true: ["1", "yes", "y", "on", "selected", "checked"],
-    false: ["0", "no", "n", "off", "unselected", "unchecked"],
+    true: ['1', 'yes', 'y', 'on', 'selected', 'checked'],
+    false: ['0', 'no', 'n', 'off', 'unselected', 'unchecked'],
   };
 
   // Check if option is a boolean-equivalent of target
@@ -1022,7 +1025,7 @@ const updateStandardSelect = (element: HTMLSelectElement, value: string | string
   const valueArray = normalizeSelectValue(value);
 
   // For empty values, select the first option
-  if (valueArray.length === 0 || valueArray[0] === "") {
+  if (valueArray.length === 0 || valueArray[0] === '') {
     // Only select first option if it's not a placeholder
     const firstOption = element.options[0];
     if (firstOption && !isPlaceholderOption(firstOption)) {
@@ -1069,7 +1072,7 @@ const updateStandardSelect = (element: HTMLSelectElement, value: string | string
       if (option.disabled || isPlaceholderOption(option)) continue;
 
       // Use text content if no exact value match
-      const optionText = option.textContent?.trim() || "";
+      const optionText = option.textContent?.trim() || '';
 
       if (valueArray.some(val => isValueMatch(optionText, val))) {
         option.selected = true;
@@ -1108,7 +1111,7 @@ const updateAriaSelect = (element: HTMLElement, value: string | string[] | unkno
 
   // No options found
   if (options.length === 0) {
-    console.warn("No options found for ARIA select:", element);
+    debug.warn('No options found for ARIA select:', element);
     return;
   }
 
@@ -1117,8 +1120,8 @@ const updateAriaSelect = (element: HTMLElement, value: string | string[] | unkno
   for (const option of options) {
     if (valueArray.some(val => isValueMatch(option.value, val))) {
       // Select this option
-      if (option.element.getAttribute("role") === "option") {
-        option.element.setAttribute("aria-selected", "true");
+      if (option.element.getAttribute('role') === 'option') {
+        option.element.setAttribute('aria-selected', 'true');
         // Update any visible representation of the selection
         updateSelectDisplay(element, option.text);
       }
@@ -1133,8 +1136,8 @@ const updateAriaSelect = (element: HTMLElement, value: string | string[] | unkno
     for (const option of options) {
       if (valueArray.some(val => isValueMatch(option.text, String(val)))) {
         // Select this option
-        if (option.element.getAttribute("role") === "option") {
-          option.element.setAttribute("aria-selected", "true");
+        if (option.element.getAttribute('role') === 'option') {
+          option.element.setAttribute('aria-selected', 'true');
           // Update any visible representation of the selection
           updateSelectDisplay(element, option.text);
         }
@@ -1166,7 +1169,7 @@ const updateCustomSelect = (element: HTMLElement, value: string | string[] | unk
   if (valueArray.length === 0) return;
 
   // Try to find an associated native select element that might be hidden
-  const nativeSelect = element.querySelector("select");
+  const nativeSelect = element.querySelector('select');
   if (nativeSelect instanceof HTMLSelectElement) {
     updateStandardSelect(nativeSelect, value);
     // Update the visible display element too
@@ -1174,7 +1177,7 @@ const updateCustomSelect = (element: HTMLElement, value: string | string[] | unk
     if (displayEl instanceof HTMLElement) {
       const selectedOptions = Array.from(nativeSelect.selectedOptions);
       if (selectedOptions.length > 0) {
-        displayEl.textContent = selectedOptions.map(opt => opt.textContent).join(", ");
+        displayEl.textContent = selectedOptions.map(opt => opt.textContent).join(', ');
       }
     }
     return;
@@ -1194,14 +1197,14 @@ const updateCustomSelect = (element: HTMLElement, value: string | string[] | unk
     // Try to find and click the matching option
     let optionClicked = false;
     for (const option of dropdownOptions) {
-      const optionText = option.textContent?.trim() || "";
-      const optionValue = option.getAttribute("data-value") || optionText;
+      const optionText = option.textContent?.trim() || '';
+      const optionValue = option.getAttribute('data-value') || optionText;
 
       // Check for a match
       if (
         valueArray.some(
           val =>
-            typeof val === "string" &&
+            typeof val === 'string' &&
             (optionValue.toLowerCase() === val.toLowerCase() || optionText.toLowerCase().includes(val.toLowerCase())),
         )
       ) {
@@ -1225,17 +1228,17 @@ const updateCustomSelect = (element: HTMLElement, value: string | string[] | unk
 const findDropdownOptions = (): HTMLElement[] => {
   // Common dropdown container selectors
   const containerSelectors = [
-    ".dropdown-menu",
-    ".select-dropdown",
-    ".select-options",
-    ".options-list",
+    '.dropdown-menu',
+    '.select-dropdown',
+    '.select-options',
+    '.options-list',
     '[role="listbox"]',
     '[role="menu"]',
-    ".MuiMenu-list",
-    ".ant-select-dropdown",
-    ".select__menu",
-    ".v-menu__content",
-    ".ui.dropdown.active",
+    '.MuiMenu-list',
+    '.ant-select-dropdown',
+    '.select__menu',
+    '.v-menu__content',
+    '.ui.dropdown.active',
   ];
 
   const options: HTMLElement[] = [];
@@ -1247,7 +1250,7 @@ const findDropdownOptions = (): HTMLElement[] => {
       // Check if the container is visible
       if (container instanceof HTMLElement) {
         const style = window.getComputedStyle(container);
-        if (style.display !== "none" && style.visibility !== "hidden") {
+        if (style.display !== 'none' && style.visibility !== 'hidden') {
           // Find option elements within this container
           const containerOptions = container.querySelectorAll(
             'li, [role="option"], .dropdown-item, .select-option, [class*="option"], .item',
@@ -1276,7 +1279,7 @@ const updateSelectDisplay = (element: HTMLElement, text: string): void => {
     element.querySelector('[class*="selected-value"]'),
     element.querySelector('[class*="value"]'),
     element.querySelector('[class*="display"]'),
-    element.querySelector("span, div"),
+    element.querySelector('span, div'),
   ].filter(Boolean);
 
   // Update the first display element found
@@ -1293,8 +1296,8 @@ const updateSelectDisplay = (element: HTMLElement, text: string): void => {
  */
 const findAssociatedSelectElement = (element: HTMLElement): HTMLElement | null => {
   // Check if element is a label that points to a select
-  if (element.tagName === "LABEL") {
-    const forAttribute = element.getAttribute("for");
+  if (element.tagName === 'LABEL') {
+    const forAttribute = element.getAttribute('for');
     if (forAttribute) {
       const linkedElement = document.getElementById(forAttribute);
       if (linkedElement instanceof HTMLSelectElement) {
@@ -1335,18 +1338,18 @@ const findAssociatedSelectElement = (element: HTMLElement): HTMLElement | null =
 const isPlaceholderOption = (option: HTMLOptionElement): boolean => {
   // Check common placeholder attributes
   if (option.disabled && option.selected) return true;
-  if (option.value === "" || option.value === "-1") return true;
+  if (option.value === '' || option.value === '-1') return true;
 
   // Check common placeholder text patterns
-  const text = option.textContent?.toLowerCase() || "";
+  const text = option.textContent?.toLowerCase() || '';
   return (
-    text.includes("select") ||
-    text.includes("choose") ||
-    text === "please select" ||
-    text === "-- select --" ||
-    text.includes("pick an option") ||
-    text === "" ||
-    text === "-"
+    text.includes('select') ||
+    text.includes('choose') ||
+    text === 'please select' ||
+    text === '-- select --' ||
+    text.includes('pick an option') ||
+    text === '' ||
+    text === '-'
   );
 };
 
@@ -1355,10 +1358,10 @@ const isPlaceholderOption = (option: HTMLOptionElement): boolean => {
  */
 const dispatchSelectEvents = (element: HTMLSelectElement): void => {
   // Create and dispatch events
-  const changeEvent = new Event("change", { bubbles: true });
+  const changeEvent = new Event('change', { bubbles: true });
   element.dispatchEvent(changeEvent);
 
-  const inputEvent = new Event("input", { bubbles: true });
+  const inputEvent = new Event('input', { bubbles: true });
   element.dispatchEvent(inputEvent);
 };
 
@@ -1383,57 +1386,57 @@ export const detectSelectFields = async (
     }
 
     // Strategy 2: ARIA-based select elements
-    const role = element.getAttribute("role");
-    if (role === "combobox" || role === "listbox") {
+    const role = element.getAttribute('role');
+    if (role === 'combobox' || role === 'listbox') {
       return true;
     }
 
     // Strategy 3: Popular select libraries and frameworks
     const className = element.className.toLowerCase();
     if (
-      className.includes("select2-container") ||
-      className.includes("chosen-container") ||
-      className.includes("selectize-control") ||
-      className.includes("react-select") ||
-      className.includes("vue-select") ||
-      className.includes("ng-select") ||
+      className.includes('select2-container') ||
+      className.includes('chosen-container') ||
+      className.includes('selectize-control') ||
+      className.includes('react-select') ||
+      className.includes('vue-select') ||
+      className.includes('ng-select') ||
       // Material-UI patterns
-      className.includes("muiselect") ||
-      className.includes("muiformcontrol") ||
-      className.includes("muiinputbase") ||
+      className.includes('muiselect') ||
+      className.includes('muiformcontrol') ||
+      className.includes('muiinputbase') ||
       // Ant Design patterns
-      className.includes("ant-select") ||
-      className.includes("antd-select") ||
+      className.includes('ant-select') ||
+      className.includes('antd-select') ||
       // Chakra UI patterns
-      className.includes("chakra-select") ||
+      className.includes('chakra-select') ||
       // Bootstrap patterns
-      className.includes("form-select") ||
-      className.includes("form-control") ||
+      className.includes('form-select') ||
+      className.includes('form-control') ||
       // Generic modern patterns
-      (className.includes("css-") && (className.includes("select") || className.includes("input"))) ||
+      (className.includes('css-') && (className.includes('select') || className.includes('input'))) ||
       // Job application specific patterns
-      className.includes("application-select") ||
-      className.includes("job-select") ||
-      className.includes("candidate-select")
+      className.includes('application-select') ||
+      className.includes('job-select') ||
+      className.includes('candidate-select')
     ) {
       return true;
     }
 
     // Strategy 4: Custom select patterns
     const hasSelectPattern =
-      className.includes("select") ||
-      className.includes("dropdown") ||
-      className.includes("picker") ||
-      element.getAttribute("data-select") !== null ||
-      element.getAttribute("data-dropdown") !== null;
+      className.includes('select') ||
+      className.includes('dropdown') ||
+      className.includes('picker') ||
+      element.getAttribute('data-select') !== null ||
+      element.getAttribute('data-dropdown') !== null;
 
     // Must also have some interactive indicators
     const hasInteractiveIndicators =
-      element.hasAttribute("tabindex") ||
-      element.hasAttribute("onclick") ||
-      element.hasAttribute("onchange") ||
-      element.getAttribute("aria-expanded") !== null ||
-      element.getAttribute("aria-haspopup") !== null;
+      element.hasAttribute('tabindex') ||
+      element.hasAttribute('onclick') ||
+      element.hasAttribute('onchange') ||
+      element.getAttribute('aria-expanded') !== null ||
+      element.getAttribute('aria-haspopup') !== null;
 
     return hasSelectPattern && hasInteractiveIndicators;
   });
@@ -1446,9 +1449,9 @@ export const detectSelectFields = async (
     try {
       // Skip disabled/hidden elements
       if (
-        element.hasAttribute("disabled") ||
-        element.hasAttribute("readonly") ||
-        element.getAttribute("aria-hidden") === "true"
+        element.hasAttribute('disabled') ||
+        element.hasAttribute('readonly') ||
+        element.getAttribute('aria-hidden') === 'true'
       ) {
         console.log(`⏭️ Skipping disabled/readonly select element`);
         continue;
@@ -1456,25 +1459,25 @@ export const detectSelectFields = async (
 
       // Enhanced visibility check
       const style = window.getComputedStyle(element);
-      if (style.display === "none" || (style.visibility === "hidden" && style.opacity === "0")) {
+      if (style.display === 'none' || (style.visibility === 'hidden' && style.opacity === '0')) {
         console.log(`⏭️ Skipping hidden select element`);
         continue;
       }
 
       // Create the field
-      const field = await createBaseField(element, baseIndex + i, "select", testMode);
+      const field = await createBaseField(element, baseIndex + i, 'select', testMode);
 
       // Detect if it's a multi-select
       let isMultiple = false;
       if (element instanceof HTMLSelectElement) {
         isMultiple = element.multiple;
       } else {
-        isMultiple = element.getAttribute("aria-multiselectable") === "true" || element.hasAttribute("multiple");
+        isMultiple = element.getAttribute('aria-multiselectable') === 'true' || element.hasAttribute('multiple');
       }
 
       // Enhanced option detection based on element type
       let options: Array<{ value: string; text: string; selected: boolean }> = [];
-      let currentValue: string | string[] = "";
+      let currentValue: string | string[] = '';
 
       if (element instanceof HTMLSelectElement) {
         // Standard HTML select - get options directly
@@ -1487,7 +1490,7 @@ export const detectSelectFields = async (
         currentValue = isMultiple ? Array.from(element.selectedOptions).map(opt => opt.value) : element.value;
 
         field.metadata = {
-          framework: "vanilla",
+          framework: Framework.VANILLA,
           visibility: { isVisible: true },
           isMultiple,
         };
@@ -1501,7 +1504,7 @@ export const detectSelectFields = async (
           ? selectedOptions.map(opt => opt.value)
           : selectedOptions.length > 0
             ? selectedOptions[0].value
-            : "";
+            : '';
 
         // Try to detect the framework
         const framework = detectSelectFramework(element);
@@ -1524,20 +1527,20 @@ export const detectSelectFields = async (
           const value = opt.value.trim();
 
           // Skip empty values
-          if (!value || value === "") return false;
+          if (!value || value === '') return false;
 
           // Skip common placeholder patterns
           if (
-            text.includes("select") ||
-            text.includes("choose") ||
-            text.includes("pick") ||
-            text.includes("please") ||
-            text.includes("--") ||
-            text.includes("...") ||
-            text === "none" ||
-            text === "n/a" ||
-            value === "0" ||
-            value === "-1"
+            text.includes('select') ||
+            text.includes('choose') ||
+            text.includes('pick') ||
+            text.includes('please') ||
+            text.includes('--') ||
+            text.includes('...') ||
+            text === 'none' ||
+            text === 'n/a' ||
+            value === '0' ||
+            value === '-1'
           ) {
             return false;
           }
@@ -1585,35 +1588,35 @@ export const detectSelectFields = async (
 /**
  * Detect framework for select element
  */
-const detectSelectFramework = (element: HTMLElement): "react" | "angular" | "vue" | "vanilla" | "select2" => {
+const detectSelectFramework = (element: HTMLElement): Framework => {
   // Check for Select2
   if (
-    element.classList.contains("select2-container") ||
-    element.classList.contains("select2-focusser") ||
-    element.closest(".select2-container")
+    element.classList.contains('select2-container') ||
+    element.classList.contains('select2-focusser') ||
+    element.closest('.select2-container')
   ) {
-    return "select2";
+    return Framework.SELECT2;
   }
 
   // Check for React
-  const reactKey = Object.keys(element).find(key => key.startsWith("__react") || key.startsWith("_reactProps"));
-  if (reactKey) return "react";
+  const reactKey = Object.keys(element).find(key => key.startsWith('__react') || key.startsWith('_reactProps'));
+  if (reactKey) return Framework.REACT;
 
   // Check for Angular
   if (
-    element.hasAttribute("ng-model") ||
-    element.hasAttribute("[(ngModel)]") ||
-    element.hasAttribute("formControlName")
+    element.hasAttribute('ng-model') ||
+    element.hasAttribute('[(ngModel)]') ||
+    element.hasAttribute('formControlName')
   ) {
-    return "angular";
+    return Framework.ANGULAR;
   }
 
   // Check for Vue
-  if (element.hasAttribute("v-model") || "__vue__" in element) {
-    return "vue";
+  if (element.hasAttribute('v-model') || '__vue__' in element) {
+    return Framework.VUE;
   }
 
-  return "vanilla";
+  return Framework.VANILLA;
 };
 
 /**
@@ -1626,8 +1629,8 @@ const detectDynamicSelectOptions = async (
 
   try {
     // For Select2, look for the actual select element
-    if (element.classList.contains("select2-container")) {
-      const selectId = element.getAttribute("id")?.replace("s2id_", "");
+    if (element.classList.contains('select2-container')) {
+      const selectId = element.getAttribute('id')?.replace('s2id_', '');
       if (selectId) {
         const actualSelect = document.getElementById(selectId) as HTMLSelectElement;
         if (actualSelect && actualSelect instanceof HTMLSelectElement) {
@@ -1641,16 +1644,16 @@ const detectDynamicSelectOptions = async (
     }
 
     // Check for aria relationships
-    const listId = element.getAttribute("aria-controls") || element.getAttribute("aria-owns");
+    const listId = element.getAttribute('aria-controls') || element.getAttribute('aria-owns');
     if (listId) {
       const listbox = document.getElementById(listId);
       if (listbox) {
         const listOptions = Array.from(listbox.querySelectorAll('[role="option"]'));
         if (listOptions.length > 0) {
           return listOptions.map(opt => ({
-            value: opt.getAttribute("data-value") || opt.getAttribute("value") || opt.textContent?.trim() || "",
-            text: opt.textContent?.trim() || "",
-            selected: opt.getAttribute("aria-selected") === "true" || opt.hasAttribute("selected"),
+            value: opt.getAttribute('data-value') || opt.getAttribute('value') || opt.textContent?.trim() || '',
+            text: opt.textContent?.trim() || '',
+            selected: opt.getAttribute('aria-selected') === 'true' || opt.hasAttribute('selected'),
           }));
         }
       }
@@ -1660,12 +1663,12 @@ const detectDynamicSelectOptions = async (
     const optionElements = element.querySelectorAll('option, [role="option"]');
     if (optionElements.length > 0) {
       return Array.from(optionElements).map(opt => ({
-        value: opt.getAttribute("value") || opt.textContent?.trim() || "",
-        text: opt.textContent?.trim() || "",
+        value: opt.getAttribute('value') || opt.textContent?.trim() || '',
+        text: opt.textContent?.trim() || '',
         selected:
           opt instanceof HTMLOptionElement
             ? opt.selected
-            : opt.getAttribute("aria-selected") === "true" || opt.hasAttribute("selected"),
+            : opt.getAttribute('aria-selected') === 'true' || opt.hasAttribute('selected'),
       }));
     }
 
@@ -1678,8 +1681,8 @@ const detectDynamicSelectOptions = async (
           if (Array.isArray(parsed)) {
             const parsedOptions = parsed
               .map(item => ({
-                value: String(item.value || item.id || ""),
-                text: String(item.label || item.text || item.name || ""),
+                value: String(item.value || item.id || ''),
+                text: String(item.label || item.text || item.name || ''),
                 selected: Boolean(item.selected),
               }))
               .filter(opt => opt.value || opt.text);
@@ -1694,7 +1697,7 @@ const detectDynamicSelectOptions = async (
       }
     }
   } catch (error) {
-    console.warn("Error detecting select options:", error);
+    debug.warn('Error detecting select options:', error);
   }
 
   return options;

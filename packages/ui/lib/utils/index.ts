@@ -1,20 +1,9 @@
-// Shadow DOM injection utilities
-export {
-  ShadowInjectionManager,
-  shadowInjectionManager,
-  initShadowDOM,
-  getShadowRoot,
-  getPortalContainer,
-  injectIntoShadow,
-  cleanupShadowInjection,
-  waitForHydrationSafe,
-} from "./shadow-injection";
-
 // Unified Shadow DOM utilities
 export {
   UnifiedShadowDOMManager,
   unifiedShadowDOM,
   initializeShadowDOM,
+  getShadowRoot,
   getContainer,
   injectComponent,
   cleanupContainer,
@@ -25,4 +14,4 @@ export {
   type ShadowContainerConfig,
   type ComponentInjectionConfig,
   type ShadowDOMInitConfig,
-} from "./unified-shadow-dom";
+} from './unified-shadow-dom';

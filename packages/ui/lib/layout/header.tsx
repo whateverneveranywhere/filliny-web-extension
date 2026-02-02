@@ -1,11 +1,11 @@
-import { ProfileSelector } from "./profile-selector";
-import { TokenDisplay } from "../components";
-import { Logo } from "../components/Logo";
-import { getConfig, useDashboardOverview } from "@extension/shared";
+import { ProfileSelector } from './profile-selector';
+import { TokenDisplay } from '../components';
+import { Logo } from '../components/logo';
+import { getConfig, useDashboardOverview } from '@extension/shared';
 
 const config = getConfig();
 // Dashboard path for the dashboard route
-const dashboardPath = "/dashboard";
+const dashboardPath = '/dashboard';
 
 function Header() {
   const { data, refetch, isRefetching, isLoading } = useDashboardOverview();

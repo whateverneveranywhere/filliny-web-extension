@@ -1,13 +1,60 @@
-import { getAllFormContainersFromRegistry } from "./detectionHelpers";
-import { processChunks, updateFormFields } from "./fieldUpdaterHelpers";
-import { highlightForms } from "./highlightForms";
-import { disableOtherButtons, resetOverlays, showLoadingIndicator } from "./overlayUtils";
-import { runTestModeFill } from "./testModeHelpers";
-import { unifiedFieldRegistry } from "./unifiedFieldDetection";
-import { aiFillService, getMatchingWebsite } from "@extension/shared";
-import { profileStrorage } from "@extension/storage";
-import type { Field } from "@extension/shared";
-import type { DTOProfileFillingForm } from "@extension/storage";
+import { getAllFormContainersFromRegistry } from './detectionHelpers';
+import { processChunks, updateFormFields, ErrorCategory, FieldUpdateError } from './fieldUpdaterHelpers';
+import { highlightForms } from './highlightForms';
+import { disableOtherButtons, resetOverlays, showLoadingIndicator } from './overlayUtils';
+import { runTestModeFill } from './testModeHelpers';
+import { unifiedFieldRegistry } from './unifiedFieldDetection';
+import { aiFillService, getMatchingWebsite, createDebugLogger } from '@extension/shared';
+import { profileStorage } from '@extension/storage';
+import type { FormUpdateResults } from './fieldUpdaterHelpers';
+import type { Field } from '@extension/shared';
+import type { DTOProfileFillingForm } from '@extension/storage';
+
+const debug = createDebugLogger('FormClick');
+
+/**
+ * Default timeout for form fill operations
+ */
+const FORM_FILL_TIMEOUT = 60000;
+
+/**
+ * Get user-friendly error message based on error category
+ */
+const getUserErrorMessage = (results: FormUpdateResults): string => {
+  if (results.errors.length === 0) {
+    return 'Unknown error occurred while filling the form.';
+  }
+
+  // Categorize errors
+  const categories = results.errors.reduce(
+    (acc, error) => {
+      acc[error.category] = (acc[error.category] || 0) + 1;
+      return acc;
+    },
+    {} as Record<ErrorCategory, number>,
+  );
+
+  // Build user message based on most common error categories
+  const messages: string[] = [];
+
+  if (categories[ErrorCategory.ELEMENT_NOT_FOUND]) {
+    messages.push(`${categories[ErrorCategory.ELEMENT_NOT_FOUND]} field(s) could not be found`);
+  }
+  if (categories[ErrorCategory.TIMEOUT]) {
+    messages.push(`${categories[ErrorCategory.TIMEOUT]} field(s) timed out`);
+  }
+  if (categories[ErrorCategory.NETWORK_ERROR]) {
+    messages.push('Network error occurred');
+  }
+  if (categories[ErrorCategory.VERIFICATION_FAILED]) {
+    messages.push(`${categories[ErrorCategory.VERIFICATION_FAILED]} field(s) could not be verified`);
+  }
+  if (categories[ErrorCategory.UPDATE_FAILED]) {
+    messages.push(`${categories[ErrorCategory.UPDATE_FAILED]} field(s) failed to update`);
+  }
+
+  return messages.length > 0 ? messages.join(', ') + '.' : 'Some fields failed to fill.';
+};
 
 /**
  * Handle form click event
@@ -31,7 +78,7 @@ export const handleFormClick = async (
         event.nativeEvent.preventDefault?.();
       }
     } catch (eventError) {
-      console.debug("Error handling event propagation:", eventError);
+      console.debug('Error handling event propagation:', eventError);
     }
   }
 
@@ -41,28 +88,43 @@ export const handleFormClick = async (
   const formContainers = getAllFormContainersFromRegistry();
 
   if (formContainers.length === 0) {
-    alert("No forms found. Please try again.");
+    alert('No forms found. Please try again.');
     try {
       resetOverlays();
       // Re-run detection if no containers were found in the registry
       highlightForms({ visionOnly: false });
     } catch (resetError) {
-      console.error("Error resetting overlays:", resetError);
+      console.error('Error resetting overlays:', resetError);
     }
     return;
   }
 
-  console.log(
-    `🎯 Processing ${formContainers.length} form containers from registry:`,
-    formContainers.map(c => `${c.tagName}${c.className ? "." + c.className : ""}`),
+  debug.log(
+    `Processing ${formContainers.length} form containers from registry:`,
+    formContainers.map(c => `${c.tagName}${c.className ? '.' + c.className : ''}`),
   );
 
   try {
     disableOtherButtons(formId);
     showLoadingIndicator(formId);
   } catch (uiError) {
-    console.debug("Error updating UI indicators:", uiError);
+    debug.log('Error updating UI indicators:', uiError);
   }
+
+  // Track cleanup functions
+  let messageHandler: ((message: { type: string; data?: string; error?: string }) => void) | null = null;
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+  const cleanup = (): void => {
+    if (messageHandler) {
+      chrome.runtime.onMessage.removeListener(messageHandler);
+      messageHandler = null;
+    }
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+      timeoutId = null;
+    }
+  };
 
   try {
     const startTime = performance.now();
@@ -71,15 +133,12 @@ export const handleFormClick = async (
     const fields = unifiedFieldRegistry.getAllFields();
 
     if (fields.length === 0) {
-      alert("Unable to detect form fields in any container. Please refresh the page and try again.");
+      alert('Unable to detect form fields in any container. Please refresh the page and try again.');
       return;
     }
 
-    console.log("Form Click: Detected fields from registry:", fields.length);
-    console.log(
-      `%c⏱ Field retrieval from registry took: ${((performance.now() - startTime) / 1000).toFixed(2)}s`,
-      "background: #059669; color: white; padding: 4px 8px; border-radius: 4px; font-size: 14px; font-weight: bold;",
-    );
+    debug.log('Form Click: Detected fields from registry:', fields.length);
+    debug.log(`Field retrieval from registry took: ${((performance.now() - startTime) / 1000).toFixed(2)}s`);
 
     if (testMode) {
       // Use the new centralized test mode handler
@@ -88,82 +147,107 @@ export const handleFormClick = async (
     }
 
     // Only execute API call logic if not in test mode
-    try {
-      const [defaultProfile] = await Promise.all([profileStrorage.get()]);
-      const visitingUrl = window.location.href;
-      const matchingWebsite = getMatchingWebsite(
-        (defaultProfile as DTOProfileFillingForm).fillingWebsites,
-        visitingUrl,
+    const [defaultProfile] = await Promise.all([profileStorage.get()]);
+    const visitingUrl = window.location.href;
+    const matchingWebsite = getMatchingWebsite((defaultProfile as DTOProfileFillingForm).fillingWebsites, visitingUrl);
+
+    // Create promise control for streaming
+    let streamResolve: () => void;
+    let streamReject: (error: Error) => void;
+    const streamPromise = new Promise<void>((resolve, reject) => {
+      streamResolve = resolve;
+      streamReject = reject;
+    });
+
+    // Set up overall timeout for the operation
+    timeoutId = setTimeout(() => {
+      cleanup();
+      streamReject(
+        new FieldUpdateError(
+          `Form fill operation timed out after ${FORM_FILL_TIMEOUT}ms`,
+          ErrorCategory.TIMEOUT,
+          'form',
+        ),
       );
+    }, FORM_FILL_TIMEOUT);
 
-      // Set up message listener for streaming response
-      const streamPromise = new Promise<void>((resolve, reject) => {
-        const messageHandler = (message: { type: string; data?: string; error?: string }) => {
+    // Set up message listener for streaming response
+    messageHandler = (message: { type: string; data?: string; error?: string }) => {
+      try {
+        if (message.type === 'STREAM_CHUNK' && message.data) {
           try {
-            if (message.type === "STREAM_CHUNK" && message.data) {
-              try {
-                processChunks(message.data, fields);
-              } catch (error) {
-                console.error("Form Click: Error processing chunk:", error);
-                // Don't reject here, continue processing other chunks
-              }
-            } else if (message.type === "STREAM_DONE") {
-              chrome.runtime.onMessage.removeListener(messageHandler);
-              resolve();
-            } else if (message.type === "STREAM_ERROR") {
-              console.error("Form Click: Stream error:", message.error);
-              chrome.runtime.onMessage.removeListener(messageHandler);
-              reject(new Error(message.error || "Stream error"));
-            }
-          } catch (messageError) {
-            console.error("Error handling stream message:", messageError);
+            processChunks(message.data, fields);
+          } catch (error) {
+            debug.error('Form Click: Error processing chunk:', error);
+            // Don't reject here, continue processing other chunks
           }
-        };
-
-        chrome.runtime.onMessage.addListener(messageHandler);
-      });
-
-      // Make the API call
-      const response = await aiFillService({
-        contextText: matchingWebsite?.fillingContext || defaultProfile?.defaultFillingContext || "",
-        formData: fields,
-        websiteUrl: visitingUrl,
-        preferences: defaultProfile?.preferences,
-      });
-
-      if (response instanceof ReadableStream) {
-        // Wait for all streaming chunks to be processed
-        await streamPromise;
-      } else if (response.data) {
-        await updateFormFields(response.data, false);
-      } else {
-        console.error("Form Click: Invalid response format:", response);
-        throw new Error("Invalid response format from API");
+        } else if (message.type === 'STREAM_DONE') {
+          debug.log('Stream processing complete');
+          streamResolve();
+        } else if (message.type === 'STREAM_ERROR') {
+          debug.error('Form Click: Stream error:', message.error);
+          streamReject(new FieldUpdateError(message.error || 'Stream error', ErrorCategory.NETWORK_ERROR, 'form'));
+        }
+      } catch (messageError) {
+        debug.error('Error handling stream message:', messageError);
       }
-    } catch (apiError) {
-      console.error("Form Click: Error in API call:", apiError);
-      throw apiError; // Re-throw to be handled by outer catch
+    };
+
+    chrome.runtime.onMessage.addListener(messageHandler);
+
+    // Make the API call
+    const response = await aiFillService({
+      contextText: matchingWebsite?.fillingContext || defaultProfile?.defaultFillingContext || '',
+      formData: fields,
+      websiteUrl: visitingUrl,
+      preferences: defaultProfile?.preferences,
+    });
+
+    let updateResults: FormUpdateResults | null = null;
+
+    if (response instanceof ReadableStream) {
+      // Wait for all streaming chunks to be processed
+      await streamPromise;
+    } else if (response.data) {
+      updateResults = await updateFormFields(response.data, false);
+
+      // Check for partial failures
+      if (updateResults.failed > 0 && updateResults.successful > 0) {
+        const message = `Form partially filled: ${updateResults.successful} field(s) succeeded, ${updateResults.failed} failed. ${getUserErrorMessage(updateResults)}`;
+        debug.warn(message);
+        // Show a non-blocking notification for partial success
+        console.warn(message);
+      } else if (updateResults.failed > 0 && updateResults.successful === 0) {
+        throw new FieldUpdateError(getUserErrorMessage(updateResults), ErrorCategory.UPDATE_FAILED, 'form');
+      }
+    } else {
+      debug.error('Form Click: Invalid response format:', response);
+      throw new FieldUpdateError('Invalid response format from API', ErrorCategory.NETWORK_ERROR, 'form');
     }
   } catch (error) {
-    console.error("Form Click: Error processing AI fill service:", error);
+    cleanup();
+    debug.error('Form Click: Error processing AI fill service:', error);
+
     const errorMessage =
-      error instanceof Error
+      error instanceof FieldUpdateError
         ? error.message
-        : typeof error === "object"
-          ? JSON.stringify(error)
-          : "Unknown error occurred";
+        : error instanceof Error
+          ? error.message
+          : typeof error === 'object'
+            ? JSON.stringify(error)
+            : 'Unknown error occurred';
     alert(`Failed to fill form: ${errorMessage}`);
   } finally {
+    // Ensure cleanup happens in finally block
+    cleanup();
+
     try {
-      console.log(
-        `%c⏱ Total process took: ${((performance.now() - totalStartTime) / 1000).toFixed(2)}s`,
-        "background: #059669; color: white; padding: 4px 8px; border-radius: 4px; font-size: 14px; font-weight: bold;",
-      );
+      debug.log(`Total process took: ${((performance.now() - totalStartTime) / 1000).toFixed(2)}s`);
       resetOverlays();
       // Notify the field manager to re-detect everything to prevent stale state
-      document.dispatchEvent(new CustomEvent("filliny:bulkFillComplete"));
+      document.dispatchEvent(new CustomEvent('filliny:bulkFillComplete'));
     } catch (finallyError) {
-      console.error("Error in finally block:", finallyError);
+      debug.error('Error in finally block:', finallyError);
     }
   }
 };
@@ -172,16 +256,16 @@ export const handleFormClick = async (
  * Find all form containers on the page
  */
 const findAllFormContainers = (): HTMLElement[] => {
-  console.log("🔍 Looking for all form containers on page");
+  console.log('🔍 Looking for all form containers on page');
 
   const containers: HTMLElement[] = [];
 
   // Strategy 1: Find all containers with form IDs
-  const formIdContainers = Array.from(document.querySelectorAll<HTMLElement>("[data-form-id]"));
+  const formIdContainers = Array.from(document.querySelectorAll<HTMLElement>('[data-form-id]'));
   containers.push(...formIdContainers);
 
   // Strategy 2: Find semantic form containers
-  const semanticSelectors = ["form", '[role="form"]', "[data-filliny-form-container]", "[data-form]", "fieldset"];
+  const semanticSelectors = ['form', '[role="form"]', '[data-filliny-form-container]', '[data-form]', 'fieldset'];
 
   for (const selector of semanticSelectors) {
     try {
@@ -197,7 +281,7 @@ const findAllFormContainers = (): HTMLElement[] => {
   }
 
   // Strategy 3: Find containers with significant form fields
-  const potentialContainers = Array.from(document.querySelectorAll<HTMLElement>("div, section, main, article"));
+  const potentialContainers = Array.from(document.querySelectorAll<HTMLElement>('div, section, main, article'));
   for (const container of potentialContainers) {
     const fieldCount = detectFormFieldsInElement(container).length;
     if (fieldCount >= 2 && !containers.includes(container)) {
@@ -266,13 +350,13 @@ const findFormContainer = (formId: string): HTMLElement | null => {
 
   // Strategy 3: Fallback to any form-like container
   const fallbackSelectors = [
-    "form",
-    "[data-filliny-form-container]",
+    'form',
+    '[data-filliny-form-container]',
     "[role='form']",
-    "[data-form]",
-    ".form",
-    ".form-container",
-    ".form-wrapper",
+    '[data-form]',
+    '.form',
+    '.form-container',
+    '.form-wrapper',
   ];
 
   for (const selector of fallbackSelectors) {
@@ -296,7 +380,7 @@ const findFormContainer = (formId: string): HTMLElement | null => {
  * Validate and potentially expand a form container to ensure we have the outermost wrapper
  */
 const validateAndExpandFormContainer = (element: HTMLElement): HTMLElement => {
-  console.log(`🔍 Validating form container: ${element.tagName}${element.className ? "." + element.className : ""}`);
+  console.log(`🔍 Validating form container: ${element.tagName}${element.className ? '.' + element.className : ''}`);
 
   // First, detect all form fields within this element
   const fieldsInElement = detectFormFieldsInElement(element);
@@ -316,7 +400,7 @@ const validateAndExpandFormContainer = (element: HTMLElement): HTMLElement => {
   let parent = element.parentElement;
   while (parent && parent !== document.body) {
     // Don't go beyond certain boundary elements
-    if (parent.tagName === "BODY" || parent.tagName === "HTML") {
+    if (parent.tagName === 'BODY' || parent.tagName === 'HTML') {
       break;
     }
 
@@ -326,7 +410,7 @@ const validateAndExpandFormContainer = (element: HTMLElement): HTMLElement => {
     // If parent has more fields, it might be a better container
     if (fieldsInParent.length > maxFieldCount) {
       console.log(
-        `🔍 Parent ${parent.tagName}${parent.className ? "." + parent.className : ""} has ${fieldsInParent.length} fields (more than ${maxFieldCount})`,
+        `🔍 Parent ${parent.tagName}${parent.className ? '.' + parent.className : ''} has ${fieldsInParent.length} fields (more than ${maxFieldCount})`,
       );
 
       // Additional validation: make sure this isn't too broad
@@ -350,10 +434,10 @@ const validateAndExpandFormContainer = (element: HTMLElement): HTMLElement => {
   let semanticParent = bestContainer.parentElement;
   while (semanticParent && semanticParent !== document.body) {
     if (
-      semanticParent.tagName === "FORM" ||
-      semanticParent.getAttribute("role") === "form" ||
-      semanticParent.hasAttribute("data-form") ||
-      semanticParent.className.toLowerCase().includes("form")
+      semanticParent.tagName === 'FORM' ||
+      semanticParent.getAttribute('role') === 'form' ||
+      semanticParent.hasAttribute('data-form') ||
+      semanticParent.className.toLowerCase().includes('form')
     ) {
       const semanticFields = detectFormFieldsInElement(semanticParent);
       if (semanticFields.length >= maxFieldCount * 0.8) {
@@ -367,7 +451,7 @@ const validateAndExpandFormContainer = (element: HTMLElement): HTMLElement => {
   }
 
   console.log(
-    `🎯 Final container choice: ${bestContainer.tagName}${bestContainer.className ? "." + bestContainer.className : ""} with ${maxFieldCount} fields`,
+    `🎯 Final container choice: ${bestContainer.tagName}${bestContainer.className ? '.' + bestContainer.className : ''} with ${maxFieldCount} fields`,
   );
   return bestContainer;
 };
@@ -378,8 +462,8 @@ const validateAndExpandFormContainer = (element: HTMLElement): HTMLElement => {
 const detectFormFieldsInElement = (element: HTMLElement): HTMLElement[] => {
   const fieldSelectors = [
     'input:not([type="hidden"]):not([type="submit"]):not([type="button"]):not([type="reset"])',
-    "select",
-    "textarea",
+    'select',
+    'textarea',
     '[role="textbox"]',
     '[role="combobox"]',
     '[role="checkbox"]',
@@ -395,7 +479,7 @@ const detectFormFieldsInElement = (element: HTMLElement): HTMLElement[] => {
       elements.forEach(el => {
         // Basic visibility check
         const style = window.getComputedStyle(el);
-        if (style.display !== "none" && style.visibility !== "hidden") {
+        if (style.display !== 'none' && style.visibility !== 'hidden') {
           fields.push(el);
         }
       });
@@ -413,7 +497,7 @@ const detectFormFieldsInElement = (element: HTMLElement): HTMLElement[] => {
  */
 const simulateStreamingForTestMode = async (fields: Field[]): Promise<void> => {
   // Process all fields at once for instant updates in test mode
-  console.log("Test mode: Processing all fields instantly");
+  console.log('Test mode: Processing all fields instantly');
   await updateFormFields(fields, true);
-  console.log("Test mode: All fields processed");
+  console.log('Test mode: All fields processed');
 };

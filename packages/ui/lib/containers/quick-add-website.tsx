@@ -1,8 +1,8 @@
-import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, UpgradeBanner } from "../components";
-import { WebsitePreviewCard } from "../components/StepperForms/WebsitePreviewCard";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../components/ui/tooltip";
-import { useActiveTabUrl } from "@extension/shared";
-import { Plus } from "lucide-react";
+import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, UpgradeBanner } from '../components';
+import { WebsitePreviewCard } from '../components/stepper-forms/WebsitePreviewCard';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../components/ui/tooltip';
+import { useActiveTabUrl } from '@extension/shared';
+import { Plus } from 'lucide-react';
 
 interface Props {
   onQuickAdd: () => void;
@@ -16,13 +16,13 @@ function QuickAddWebsiteToProfile({ onQuickAdd, isLoading, currentPlan, maxWebsi
   const isDisabled = websitesCount >= maxWebsites;
   const tooltipText = isDisabled
     ? `You've reached the maximum number of websites (${maxWebsites}) allowed for your ${currentPlan} plan`
-    : "Add this website to your profile";
+    : 'Add this website to your profile';
   const { activeTabUrl, isLoading: isLoadingUrl, isValid } = useActiveTabUrl();
 
   const button = (
     <Button
       size="icon"
-      variant={isDisabled ? "ghost" : "default"}
+      variant={isDisabled ? 'ghost' : 'default'}
       onClick={onQuickAdd}
       disabled={isDisabled || isLoading || !isValid}
       className="filliny-transition-all hover:filliny-scale-105">
@@ -36,7 +36,7 @@ function QuickAddWebsiteToProfile({ onQuickAdd, isLoading, currentPlan, maxWebsi
 
       <Card className="filliny-w-full">
         <CardHeader>
-          <CardTitle>Want Filliny here?</CardTitle>{" "}
+          <CardTitle>Want Filliny here?</CardTitle>{' '}
           <CardDescription>
             Quickly add this website to your active profile to enable Filliny's form-filling capabilities.
           </CardDescription>

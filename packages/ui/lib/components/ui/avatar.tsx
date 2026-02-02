@@ -1,6 +1,6 @@
-import { cn } from "@/lib/utils";
-import * as AvatarPrimitive from "@radix-ui/react-avatar";
-import * as React from "react";
+import { cn } from '@/lib/utils';
+import * as AvatarPrimitive from '@radix-ui/react-avatar';
+import * as React from 'react';
 
 const Avatar = React.forwardRef<
   React.ElementRef<typeof AvatarPrimitive.Root>,
@@ -9,7 +9,7 @@ const Avatar = React.forwardRef<
   <AvatarPrimitive.Root
     ref={ref}
     className={cn(
-      "filliny-relative filliny-flex filliny-h-10 filliny-w-10 filliny-shrink-0 filliny-overflow-hidden filliny-rounded-full",
+      'filliny-relative filliny-flex filliny-h-10 filliny-w-10 filliny-shrink-0 filliny-overflow-hidden filliny-rounded-full',
       className,
     )}
     {...props}
@@ -23,7 +23,7 @@ const AvatarImage = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <AvatarPrimitive.Image
     ref={ref}
-    className={cn("filliny-aspect-square filliny-h-full filliny-w-full", className)}
+    className={cn('filliny-aspect-square filliny-h-full filliny-w-full', className)}
     {...props}
   />
 ));
@@ -36,7 +36,7 @@ const AvatarFallback = React.forwardRef<
   <AvatarPrimitive.Fallback
     ref={ref}
     className={cn(
-      "filliny-flex filliny-h-full filliny-w-full filliny-items-center filliny-justify-center filliny-rounded-full filliny-bg-muted",
+      'filliny-flex filliny-h-full filliny-w-full filliny-items-center filliny-justify-center filliny-rounded-full filliny-bg-muted',
       className,
     )}
     {...props}

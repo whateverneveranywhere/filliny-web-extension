@@ -1,18 +1,18 @@
-import { detectFormLikeContainers, openCrossOriginIframeInNewTabAndAlert } from "./detectionHelpers";
-import { FormsOverlay } from "./FormsOverlay";
-import { addGlowingBorder, findOrCreateShadowContainer, getFormPosition } from "./overlayUtils";
-import { unifiedFieldRegistry } from "./unifiedFieldDetection";
-import { createRoot } from "react-dom/client";
-import type { HighlightFormsOptions } from "./types";
+import { detectFormLikeContainers, openCrossOriginIframeInNewTabAndAlert } from './detectionHelpers';
+import { FormsOverlay } from './FormsOverlay';
+import { addGlowingBorder, findOrCreateShadowContainer, getFormPosition } from './overlayUtils';
+import { unifiedFieldRegistry } from './unifiedFieldDetection';
+import { createRoot } from 'react-dom/client';
+import type { HighlightFormsOptions } from './types';
 
 export const highlightForms = async ({
   visionOnly = false,
   testMode = false,
 }: HighlightFormsOptions): Promise<void> => {
-  const shadowRoot = document.querySelector("#chrome-extension-filliny-all")?.shadowRoot;
+  const shadowRoot = document.querySelector('#chrome-extension-filliny-all')?.shadowRoot;
 
   if (!shadowRoot) {
-    console.error("No shadow root found");
+    console.error('No shadow root found');
     return;
   }
 
@@ -45,10 +45,10 @@ export const highlightForms = async ({
     // Remove all existing overlays
     const existingOverlays = Array.from(overlaysContainer.querySelectorAll('[id^="overlay-"]'));
     existingOverlays.forEach(overlay => {
-      const formId = overlay.id.replace("overlay-", "");
+      const formId = overlay.id.replace('overlay-', '');
       const form = document.querySelector(`[data-form-id="${formId}"]`) as HTMLElement;
       if (form) {
-        form.classList.remove("filliny-pointer-events-none");
+        form.classList.remove('filliny-pointer-events-none');
         delete form.dataset.fillinyOverlayActive;
         delete form.dataset.formId;
       }
@@ -56,13 +56,13 @@ export const highlightForms = async ({
     });
 
     // Remove all existing highlights
-    const highlightedForms = Array.from(document.querySelectorAll("[data-filliny-highlighted]"));
+    const highlightedForms = Array.from(document.querySelectorAll('[data-filliny-highlighted]'));
     for (const form of highlightedForms) {
       await removeFormHighlights(form as HTMLElement);
     }
 
     // Remove all per-field buttons to prevent stale references
-    const fieldButtonContainers = document.querySelectorAll(".filliny-field-button-container");
+    const fieldButtonContainers = document.querySelectorAll('.filliny-field-button-container');
     fieldButtonContainers.forEach(container => container.remove());
   };
 
@@ -76,7 +76,7 @@ export const highlightForms = async ({
       const style = window.getComputedStyle(form);
       const rect = form.getBoundingClientRect();
 
-      if (style.display === "none" || style.visibility === "hidden") {
+      if (style.display === 'none' || style.visibility === 'hidden') {
         return false;
       }
 
@@ -149,7 +149,7 @@ const createUnifiedFormOverlay = async (
   overlaysContainer: HTMLDivElement,
   testMode: boolean,
 ): Promise<void> => {
-  const unifiedFormId = "unified-form";
+  const unifiedFormId = 'unified-form';
 
   if (overlaysContainer.querySelector(`#overlay-${unifiedFormId}`)) {
     console.warn(`An unified overlay is already active.`);
@@ -164,25 +164,25 @@ const createUnifiedFormOverlay = async (
     }) || forms[0];
 
   console.log(
-    `🎯 Using primary form for overlay positioning: ${primaryForm.tagName}${primaryForm.className ? "." + primaryForm.className : ""}`,
+    `🎯 Using primary form for overlay positioning: ${primaryForm.tagName}${primaryForm.className ? '.' + primaryForm.className : ''}`,
   );
 
   // Mark this primary form with the unified form ID to ensure it can be found
   primaryForm.dataset.formId = unifiedFormId;
 
   // Also add a specific data attribute that FormsOverlay can look for
-  primaryForm.setAttribute("data-filliny-unified-form", "true");
+  primaryForm.setAttribute('data-filliny-unified-form', 'true');
 
   // Create container without affecting any form layout
-  const formOverlayContainer = document.createElement("div");
+  const formOverlayContainer = document.createElement('div');
   formOverlayContainer.id = `overlay-${unifiedFormId}`;
-  formOverlayContainer.className = "filliny-pointer-events-auto filliny-relative filliny-w-full filliny-h-full";
+  formOverlayContainer.className = 'filliny-pointer-events-auto filliny-relative filliny-w-full filliny-h-full';
 
   // Ensure the overlay container doesn't affect document flow
-  formOverlayContainer.style.position = "absolute";
-  formOverlayContainer.style.top = "0";
-  formOverlayContainer.style.left = "0";
-  formOverlayContainer.style.pointerEvents = "none";
+  formOverlayContainer.style.position = 'absolute';
+  formOverlayContainer.style.top = '0';
+  formOverlayContainer.style.left = '0';
+  formOverlayContainer.style.pointerEvents = 'none';
 
   // Get initial position based on the primary form
   const initialPosition = getFormPosition(primaryForm);
@@ -195,7 +195,7 @@ const createUnifiedFormOverlay = async (
     // Make sure each form has the appropriate data attributes set
     if (index === 0) {
       // Primary form already has the unified ID set above
-      form.dataset.fillinyPrimaryForm = "true";
+      form.dataset.fillinyPrimaryForm = 'true';
     } else {
       // Secondary forms get tagged as part of the unified form group
       form.dataset.fillinyUnifiedFormMember = unifiedFormId;
@@ -214,15 +214,15 @@ const createUnifiedFormOverlay = async (
             });
 
             if (wasVisible !== isAnyFormVisible) {
-              overlay.style.visibility = isAnyFormVisible ? "visible" : "hidden";
-              overlay.style.opacity = isAnyFormVisible ? "1" : "0";
+              overlay.style.visibility = isAnyFormVisible ? 'visible' : 'hidden';
+              overlay.style.opacity = isAnyFormVisible ? '1' : '0';
             }
           }
         });
       },
       {
         threshold: [0, 0.1, 0.5],
-        rootMargin: "50px",
+        rootMargin: '50px',
       },
     );
 
@@ -245,7 +245,7 @@ const createUnifiedFormOverlay = async (
       // Clean up all forms state without affecting layout
       requestAnimationFrame(() => {
         forms.forEach(form => {
-          form.classList.remove("filliny-pointer-events-none");
+          form.classList.remove('filliny-pointer-events-none');
           delete form.dataset.fillinyOverlayActive;
         });
       });
@@ -259,7 +259,7 @@ const createUnifiedFormOverlay = async (
     requestAnimationFrame(() => {
       // Mark all forms as having overlay
       forms.forEach(form => {
-        form.dataset.fillinyOverlayActive = "true";
+        form.dataset.fillinyOverlayActive = 'true';
       });
 
       // Scroll to the first visible form
@@ -271,7 +271,7 @@ const createUnifiedFormOverlay = async (
           const scrollPosition = window.scrollY + primaryFormRect.top - 200;
           window.scrollTo({
             top: Math.max(0, scrollPosition),
-            behavior: "smooth",
+            behavior: 'smooth',
           });
         }
       });
@@ -294,19 +294,19 @@ const createFormOverlay = (
   // Find the outermost form container for better overlay coverage
   const outermostContainer = findOutermostFormContainer(form);
   console.log(
-    `🎯 Using ${outermostContainer === form ? "original" : "outermost"} container for overlay: ${outermostContainer.tagName}${outermostContainer.className ? "." + outermostContainer.className : ""}`,
+    `🎯 Using ${outermostContainer === form ? 'original' : 'outermost'} container for overlay: ${outermostContainer.tagName}${outermostContainer.className ? '.' + outermostContainer.className : ''}`,
   );
 
   // Create container without affecting the form layout
-  const formOverlayContainer = document.createElement("div");
+  const formOverlayContainer = document.createElement('div');
   formOverlayContainer.id = `overlay-${formId}`;
-  formOverlayContainer.className = "filliny-pointer-events-auto filliny-relative filliny-w-full filliny-h-full";
+  formOverlayContainer.className = 'filliny-pointer-events-auto filliny-relative filliny-w-full filliny-h-full';
 
   // Ensure the overlay container doesn't affect document flow
-  formOverlayContainer.style.position = "absolute";
-  formOverlayContainer.style.top = "0";
-  formOverlayContainer.style.left = "0";
-  formOverlayContainer.style.pointerEvents = "none";
+  formOverlayContainer.style.position = 'absolute';
+  formOverlayContainer.style.top = '0';
+  formOverlayContainer.style.left = '0';
+  formOverlayContainer.style.pointerEvents = 'none';
 
   // Get initial position based on the outermost container for better coverage
   const initialPosition = getFormPosition(outermostContainer);
@@ -319,15 +319,15 @@ const createFormOverlay = (
         if (overlay) {
           // Show/hide overlay based on form visibility, but don't hide the first form
           if (!isFirstForm) {
-            overlay.style.visibility = entry.isIntersecting ? "visible" : "hidden";
-            overlay.style.opacity = entry.isIntersecting ? "1" : "0";
+            overlay.style.visibility = entry.isIntersecting ? 'visible' : 'hidden';
+            overlay.style.opacity = entry.isIntersecting ? '1' : '0';
           }
         }
       });
     },
     {
       threshold: [0, 0.1, 0.5], // Multiple thresholds for smoother transitions
-      rootMargin: "50px", // Show overlay slightly before form comes into view
+      rootMargin: '50px', // Show overlay slightly before form comes into view
     },
   );
 
@@ -348,7 +348,7 @@ const createFormOverlay = (
 
       // Clean up form state without affecting layout
       requestAnimationFrame(() => {
-        form.classList.remove("filliny-pointer-events-none");
+        form.classList.remove('filliny-pointer-events-none');
         delete form.dataset.fillinyOverlayActive;
         delete form.dataset.formId;
       });
@@ -361,7 +361,7 @@ const createFormOverlay = (
     // Apply form state changes and scroll handling after everything is rendered
     requestAnimationFrame(() => {
       // Mark form as having overlay, but don't disable pointer events unless necessary
-      form.dataset.fillinyOverlayActive = "true";
+      form.dataset.fillinyOverlayActive = 'true';
 
       // Only disable pointer events during active filling to prevent accidental interactions
       // This will be handled by the overlay component itself
@@ -376,7 +376,7 @@ const createFormOverlay = (
             const scrollPosition = window.scrollY + formRect.top - 200;
             window.scrollTo({
               top: Math.max(0, scrollPosition),
-              behavior: "smooth",
+              behavior: 'smooth',
             });
           }
         }
@@ -390,7 +390,7 @@ const highlightFormFields = async (form: HTMLElement, isFirstForm: boolean = fal
     // Find the container ID for this form in the unified registry
     const containerId = findContainerIdForForm(form);
     if (!containerId) {
-      console.warn("Could not find container ID for form highlighting");
+      console.warn('Could not find container ID for form highlighting');
       return;
     }
 
@@ -400,8 +400,8 @@ const highlightFormFields = async (form: HTMLElement, isFirstForm: boolean = fal
 
     fieldButtons.forEach(buttonData => {
       if (buttonData.element) {
-        addGlowingBorder(buttonData.element, "black");
-        buttonData.element.dataset.fillinyHighlighted = "true";
+        addGlowingBorder(buttonData.element, 'black');
+        buttonData.element.dataset.fillinyHighlighted = 'true';
         highlightedElements.push(buttonData.element);
       }
     });
@@ -416,7 +416,7 @@ const highlightFormFields = async (form: HTMLElement, isFirstForm: boolean = fal
           const scrollPosition = window.scrollY + formRect.top - 200;
           window.scrollTo({
             top: Math.max(0, scrollPosition),
-            behavior: "smooth",
+            behavior: 'smooth',
           });
         }
       });
@@ -424,7 +424,7 @@ const highlightFormFields = async (form: HTMLElement, isFirstForm: boolean = fal
 
     console.log(`Highlighted ${highlightedElements.length} fields in form`);
   } catch (error) {
-    console.error("Error highlighting form fields:", error);
+    console.error('Error highlighting form fields:', error);
   }
 };
 
@@ -499,8 +499,8 @@ const findOutermostFormContainer = (form: HTMLElement): HTMLElement => {
 const countFormFieldsInElement = (element: HTMLElement): number => {
   const fieldSelectors = [
     'input:not([type="hidden"]):not([type="submit"]):not([type="button"]):not([type="reset"])',
-    "select",
-    "textarea",
+    'select',
+    'textarea',
     '[role="textbox"]',
     '[role="combobox"]',
     '[role="checkbox"]',
@@ -523,12 +523,12 @@ const countFormFieldsInElement = (element: HTMLElement): number => {
 const isSemanticFormContainer = (element: HTMLElement): boolean => {
   const tagName = element.tagName.toLowerCase();
   const className = element.className.toLowerCase();
-  const role = element.getAttribute("role");
+  const role = element.getAttribute('role');
 
   // Check for semantic indicators
-  const semanticTags = ["form", "fieldset"];
-  const semanticRoles = ["form", "group"];
-  const semanticClasses = ["form", "form-container", "form-wrapper", "form-body", "form-content"];
+  const semanticTags = ['form', 'fieldset'];
+  const semanticRoles = ['form', 'group'];
+  const semanticClasses = ['form', 'form-container', 'form-wrapper', 'form-body', 'form-content'];
 
   return (
     semanticTags.includes(tagName) ||
@@ -559,7 +559,7 @@ const removeFormHighlights = async (form: HTMLElement): Promise<void> => {
     // Find the container ID for this form
     const containerId = findContainerIdForForm(form);
     if (!containerId) {
-      console.warn("Could not find container ID for form highlight removal");
+      console.warn('Could not find container ID for form highlight removal');
       return;
     }
 
@@ -567,12 +567,12 @@ const removeFormHighlights = async (form: HTMLElement): Promise<void> => {
     const fieldButtons = unifiedFieldRegistry.getFieldButtonsData(containerId);
     fieldButtons.forEach(buttonData => {
       if (buttonData.element && buttonData.element.dataset.fillinyHighlighted) {
-        buttonData.element.style.removeProperty("box-shadow");
+        buttonData.element.style.removeProperty('box-shadow');
         delete buttonData.element.dataset.fillinyHighlighted;
       }
     });
     delete form.dataset.fillinyHighlighted;
   } catch (error) {
-    console.error("Error removing form highlights:", error);
+    console.error('Error removing form highlights:', error);
   }
 };

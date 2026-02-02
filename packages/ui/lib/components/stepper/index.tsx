@@ -1,6 +1,6 @@
-import { Button } from "../ui/button";
-import React from "react";
-import type { StepperProps } from "@extension/shared";
+import { Button } from '../ui/button';
+import React from 'react';
+import type { StepperProps } from '@extension/shared';
 
 function Stepper({ steps, handleNext, handlePrev, handleFinish, isLoading, currentStep }: StepperProps) {
   const nextStep = async () => {
@@ -25,8 +25,8 @@ function Stepper({ steps, handleNext, handlePrev, handleFinish, isLoading, curre
             key={index}
             className={`filliny-flex-1 filliny-py-2 filliny-text-center ${
               index === currentStep
-                ? "filliny-font-bold filliny-text-blue-500"
-                : "filliny-font-light filliny-text-gray-500"
+                ? 'filliny-font-bold filliny-text-blue-500'
+                : 'filliny-font-light filliny-text-gray-500'
             }`}>
             {step.title}
           </div>

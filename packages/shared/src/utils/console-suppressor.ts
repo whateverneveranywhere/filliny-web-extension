@@ -10,15 +10,15 @@
  */
 export const isProduction = (): boolean => {
   // Check for Node.js environment
-  if (typeof process !== "undefined" && process.env) {
-    return process.env.NODE_ENV === "production";
+  if (typeof process !== 'undefined' && process.env) {
+    return process.env.NODE_ENV === 'production';
   }
 
   // Check for Vite environment (browser)
-  if (typeof import.meta !== "undefined") {
+  if (typeof import.meta !== 'undefined') {
     try {
       // @ts-expect-error - Vite specific property that TypeScript doesn't know about
-      return import.meta.env.VITE_WEBAPP_ENV === "prod" || import.meta.env.MODE === "production";
+      return import.meta.env.VITE_WEBAPP_ENV === 'prod' || import.meta.env.MODE === 'production';
     } catch {
       // If import.meta.env is not available
       return false;
@@ -49,7 +49,7 @@ const createConsoleProxy = (): Console => {
       // you could return the original method here instead of noOp
 
       // Return noOp for all methods to completely silence the console
-      if (typeof target[prop as keyof Console] === "function") {
+      if (typeof target[prop as keyof Console] === 'function') {
         return noOp;
       }
 
@@ -65,7 +65,7 @@ const createConsoleProxy = (): Console => {
 export const suppressConsoleInProduction = (): void => {
   if (isProduction()) {
     // Replace the global console with our proxy in a way that works with TypeScript
-    Object.defineProperty(window, "console", {
+    Object.defineProperty(window, 'console', {
       value: createConsoleProxy(),
       writable: false,
       configurable: true,
@@ -74,7 +74,7 @@ export const suppressConsoleInProduction = (): void => {
 };
 
 // Auto-execute when imported
-if (typeof window !== "undefined") {
+if (typeof window !== 'undefined') {
   suppressConsoleInProduction();
 }
 

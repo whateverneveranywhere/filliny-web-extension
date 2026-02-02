@@ -1,1 +1,1 @@
-export * from "./fieldButtonsStorage.js";
+export * from './fieldButtonsStorage.js';

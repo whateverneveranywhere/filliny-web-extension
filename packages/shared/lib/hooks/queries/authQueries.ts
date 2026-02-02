@@ -1,26 +1,20 @@
-import { authHealthCheckService } from "../../services/api/Auth/index.js";
-import { authStorage } from "@extension/storage";
-import { useQuery } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { authHealthCheckService } from '../../services/api/Auth/index.js';
+import { authStorage } from '@extension/storage';
+import { useQuery } from '@tanstack/react-query';
 
-export const useAuthHealthCheckQuery = () => {
-  const queryResult = useQuery({
-    queryKey: ["healthCheck"],
+export const useAuthHealthCheckQuery = () =>
+  useQuery({
+    queryKey: ['healthCheck'],
     queryFn: authHealthCheckService,
     // Add caching configuration to prevent excessive health check requests
     staleTime: 10 * 60 * 1000, // 10 minutes
     gcTime: 15 * 60 * 1000, // 15 minutes
     refetchOnWindowFocus: false,
     refetchOnMount: false,
+    meta: {
+      onError: () => {
+        authStorage.deleteToken();
+        console.error('Auth health check failed. Token deleted.');
+      },
+    },
   });
-
-  // Handle error by deleting the token if there is an error
-  useEffect(() => {
-    if (queryResult.isError) {
-      authStorage.deleteToken();
-      console.error("Auth health check failed. Token deleted.");
-    }
-  }, [queryResult.isError]);
-
-  return queryResult;
-};

@@ -1,5 +1,5 @@
-import React from "react";
-import { createPortal } from "react-dom";
+import React from 'react';
+import { createPortal } from 'react-dom';
 
 interface ShadowPortalProps {
   /**
@@ -27,17 +27,17 @@ interface ShadowPortalProps {
  */
 export const ShadowPortal: React.FC<ShadowPortalProps> = ({
   children,
-  containerId = "shadow-portal-container",
+  containerId = 'shadow-portal-container',
   zIndex,
 }) => {
   // Find the Shadow DOM root element
-  const shadowHost = React.useMemo(() => document.querySelector("#chrome-extension-filliny-all"), []);
+  const shadowHost = React.useMemo(() => document.querySelector('#chrome-extension-filliny-all'), []);
 
   const shadowRoot = React.useMemo(() => shadowHost?.shadowRoot, [shadowHost]);
 
   // If no shadow root is found, return null (or render in place as fallback)
   if (!shadowRoot) {
-    console.error("ShadowPortal: No shadow root found. Components may not display correctly.");
+    console.error('ShadowPortal: No shadow root found. Components may not display correctly.');
     return <>{children}</>;
   }
 
@@ -45,10 +45,10 @@ export const ShadowPortal: React.FC<ShadowPortalProps> = ({
   let container = shadowRoot.querySelector<HTMLDivElement>(`#${containerId}`);
 
   if (!container) {
-    container = document.createElement("div");
+    container = document.createElement('div');
     container.id = containerId;
-    container.setAttribute("data-shadow-portal", "true");
-    container.style.position = "relative";
+    container.setAttribute('data-shadow-portal', 'true');
+    container.style.position = 'relative';
     if (zIndex) {
       container.style.zIndex = zIndex.toString();
     }
@@ -65,7 +65,7 @@ export const ShadowPortal: React.FC<ShadowPortalProps> = ({
  */
 export function withShadowPortal<P extends object>(
   Component: React.ComponentType<P>,
-  portalProps?: Omit<ShadowPortalProps, "children">,
+  portalProps?: Omit<ShadowPortalProps, 'children'>,
 ) {
   return (props: P) => (
     <ShadowPortal {...portalProps}>

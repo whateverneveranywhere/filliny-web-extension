@@ -1,17 +1,16 @@
-import { FieldFillButton } from "./FieldFillButton";
-import { handleFieldFill } from "../";
-import { detectFormLikeContainers } from "../detectionHelpers";
-import { runTestModeFill } from "../testModeHelpers";
-import { unifiedFieldRegistry } from "../unifiedFieldDetection";
-import { useEffect, useState, useCallback, useRef } from "react";
-import type { FieldButtonData } from "../unifiedFieldDetection";
-import type { Field } from "@extension/shared";
-import type React from "react";
+import { FieldFillButton } from './FieldFillButton';
+import { handleFieldFill } from '../';
+import { detectFormLikeContainers } from '../detectionHelpers';
+import { runTestModeFill } from '../testModeHelpers';
+import { unifiedFieldRegistry } from '../unifiedFieldDetection';
+import { useEffect, useState, useCallback, useRef } from 'react';
+import type { FieldButtonData } from '../unifiedFieldDetection';
+import type { Field } from '@extension/shared';
+import type React from 'react';
 
 const MAX_DETECT_ATTEMPTS = 5;
 const RETRY_DELAY = 1000;
 const MUTATION_DEBOUNCE_DELAY = 1000;
-const LATE_RETRY_DELAY = 5000;
 
 const isFormField = (node: Node): boolean => {
   if (!(node instanceof HTMLElement)) return false;
@@ -20,12 +19,12 @@ const isFormField = (node: Node): boolean => {
     node instanceof HTMLInputElement ||
     node instanceof HTMLSelectElement ||
     node instanceof HTMLTextAreaElement ||
-    node.getAttribute("role") === "textbox" ||
-    node.getAttribute("role") === "combobox" ||
-    node.getAttribute("role") === "checkbox" ||
-    node.getAttribute("role") === "radio" ||
-    node.getAttribute("role") === "switch" ||
-    node.hasAttribute("contenteditable")
+    node.getAttribute('role') === 'textbox' ||
+    node.getAttribute('role') === 'combobox' ||
+    node.getAttribute('role') === 'checkbox' ||
+    node.getAttribute('role') === 'radio' ||
+    node.getAttribute('role') === 'switch' ||
+    node.hasAttribute('contenteditable')
   );
 };
 
@@ -47,20 +46,20 @@ export const FieldFillManager: React.FC = () => {
   const isElementVisibleAndInteractive = useCallback((element: HTMLElement): boolean => {
     try {
       // Skip if element is disabled or readonly
-      if (element.hasAttribute("disabled") || element.hasAttribute("readonly")) {
+      if (element.hasAttribute('disabled') || element.hasAttribute('readonly')) {
         return false;
       }
 
       // Skip if element is hidden
       const style = window.getComputedStyle(element);
-      if (style.display === "none" || style.visibility === "hidden") {
+      if (style.display === 'none' || style.visibility === 'hidden') {
         return false;
       }
 
       // Check if element has dimensions or is a functional radio/checkbox
       const rect = element.getBoundingClientRect();
       const isCheckableInput =
-        element instanceof HTMLInputElement && (element.type === "checkbox" || element.type === "radio");
+        element instanceof HTMLInputElement && (element.type === 'checkbox' || element.type === 'radio');
 
       // Allow checkable inputs even if they have zero dimensions (they might be custom styled)
       if (!isCheckableInput && (rect.width === 0 || rect.height === 0)) {
@@ -68,7 +67,7 @@ export const FieldFillManager: React.FC = () => {
       }
 
       // Skip if element is marked as decorative
-      if (element.getAttribute("aria-hidden") === "true" || element.getAttribute("role") === "presentation") {
+      if (element.getAttribute('aria-hidden') === 'true' || element.getAttribute('role') === 'presentation') {
         return false;
       }
 
@@ -79,7 +78,7 @@ export const FieldFillManager: React.FC = () => {
 
       return true;
     } catch (error) {
-      console.debug("Error checking element visibility:", error);
+      console.debug('Error checking element visibility:', error);
       return false;
     }
   }, []);
@@ -87,7 +86,7 @@ export const FieldFillManager: React.FC = () => {
   // Enhanced field detection using unified registry
   const detectAllFields = useCallback(async () => {
     try {
-      console.log("🔍 FieldFillManager: Starting unified field detection...");
+      console.log('🔍 FieldFillManager: Starting unified field detection...');
 
       // Clear previous registry data
       unifiedFieldRegistry.clear();
@@ -97,7 +96,7 @@ export const FieldFillManager: React.FC = () => {
       console.log(`📋 Found ${formContainers.length} form containers`);
 
       if (formContainers.length === 0) {
-        console.log("⚠️ No form containers found, using document body as fallback");
+        console.log('⚠️ No form containers found, using document body as fallback');
         formContainers.push(document.body);
       }
 
@@ -110,7 +109,7 @@ export const FieldFillManager: React.FC = () => {
 
         try {
           console.log(
-            `🔍 Registering container ${i + 1}/${formContainers.length}: ${container.tagName}${container.className ? "." + container.className : ""}`,
+            `🔍 Registering container ${i + 1}/${formContainers.length}: ${container.tagName}${container.className ? '.' + container.className : ''}`,
           );
           const containerInfo = await unifiedFieldRegistry.registerContainer(container, containerId);
           console.log(`📋 Container ${containerId} registered with ${containerInfo.totalFieldCount} total fields`);
@@ -160,7 +159,7 @@ export const FieldFillManager: React.FC = () => {
         setTimeout(detectAllFields, RETRY_DELAY);
       }
     } catch (error) {
-      console.error("❌ Error in unified field detection:", error);
+      console.error('❌ Error in unified field detection:', error);
     }
   }, [isElementVisibleAndInteractive]);
 
@@ -177,10 +176,10 @@ export const FieldFillManager: React.FC = () => {
         });
       };
 
-      if (document.readyState === "complete" || document.readyState === "interactive") {
+      if (document.readyState === 'complete' || document.readyState === 'interactive') {
         handleDOMReady();
       } else {
-        window.addEventListener("DOMContentLoaded", handleDOMReady, { once: true });
+        window.addEventListener('DOMContentLoaded', handleDOMReady, { once: true });
       }
     }
 
@@ -189,17 +188,17 @@ export const FieldFillManager: React.FC = () => {
 
     const observer = new MutationObserver(mutations => {
       // If filling is in progress, ignore mutations to prevent re-renders
-      if (document.body.dataset.fillinyUpdating === "true") {
-        console.log("MutationObserver: Skipping detection, update in progress.");
+      if (document.body.dataset.fillinyUpdating === 'true') {
+        console.log('MutationObserver: Skipping detection, update in progress.');
         return;
       }
 
       // Check if mutations are relevant
       const isRelevantMutation = mutations.some(mutation => {
-        if (mutation.type === "attributes") {
-          return mutation.attributeName !== "data-filliny-id" && mutation.attributeName !== "style";
+        if (mutation.type === 'attributes') {
+          return mutation.attributeName !== 'data-filliny-id' && mutation.attributeName !== 'style';
         }
-        if (mutation.type === "childList") {
+        if (mutation.type === 'childList') {
           return (
             Array.from(mutation.addedNodes).some(isFormField) || Array.from(mutation.removedNodes).some(isFormField)
           );
@@ -217,27 +216,27 @@ export const FieldFillManager: React.FC = () => {
       childList: true,
       subtree: true,
       attributes: true,
-      attributeFilter: ["style", "class", "disabled", "readonly", "type"],
+      attributeFilter: ['style', 'class', 'disabled', 'readonly', 'type'],
     });
 
     // Set up an event listener to re-run detection after a bulk fill
     const handleBulkFillComplete = () => {
-      console.log("🚀 FieldFillManager: Bulk fill complete, re-running detection...");
+      console.log('🚀 FieldFillManager: Bulk fill complete, re-running detection...');
       debouncedDetectFields();
     };
 
-    document.addEventListener("filliny:bulkFillComplete", handleBulkFillComplete);
+    document.addEventListener('filliny:bulkFillComplete', handleBulkFillComplete);
 
     return () => {
       observer.disconnect();
-      document.removeEventListener("filliny:bulkFillComplete", handleBulkFillComplete);
+      document.removeEventListener('filliny:bulkFillComplete', handleBulkFillComplete);
     };
   }, [detectAllFields, isInitialDetectionDone]);
 
   // Handle field fill
   const handleFillField = useCallback(async (field: Field, useTestMode: boolean = false) => {
     try {
-      console.log(`🎯 Filling field: ${field.id} (${field.type}) in ${useTestMode ? "test" : "AI"} mode`);
+      console.log(`🎯 Filling field: ${field.id} (${field.type}) in ${useTestMode ? 'test' : 'AI'} mode`);
 
       if (useTestMode) {
         // Use the new centralized test mode handler for a single field
@@ -256,7 +255,7 @@ export const FieldFillManager: React.FC = () => {
     () => () => {
       // Cleanup any remaining filliny elements
       document.querySelectorAll('[data-filliny-element="true"]').forEach(element => {
-        if (element.getAttribute("data-filliny-element") === "true" && element.tagName === "BUTTON") {
+        if (element.getAttribute('data-filliny-element') === 'true' && element.tagName === 'BUTTON') {
           element.remove();
         }
       });

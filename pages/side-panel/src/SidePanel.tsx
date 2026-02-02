@@ -1,36 +1,17 @@
-import { BackgroundActions, clearUserStorage, useStorage, withErrorBoundary, withSuspense } from '@extension/shared';
+import { useExtensionAuth, useStorage } from '@extension/shared';
 import { authStorage } from '@extension/storage';
-import { ErrorDisplay, LoadingSpinner, RouterProvider, SigninPage } from '@extension/ui';
-import { useEffect } from 'react';
+import { LoadingSpinner, QueryClientProvider, RouterProvider, SigninPage, withPageWrapper } from '@extension/ui';
 
 const HomePage = () => {
   const auth = useStorage(authStorage);
+  const { isLoading } = useExtensionAuth();
 
-  useEffect(() => {
-    // Initial auth check
-    chrome.runtime.sendMessage({ action: BackgroundActions.GET_AUTH_TOKEN }, response => {
-      if (response && response.success && response.success.token) {
-        authStorage.setToken(response.success.token);
-      } else {
-        clearUserStorage();
-      }
-    });
-
-    // Listen for auth token changes
-    chrome.runtime.onMessage.addListener(message => {
-      if (message.action === BackgroundActions.AUTH_TOKEN_CHANGED) {
-        const token = message.payload?.success?.token;
-        if (token) {
-          authStorage.setToken(token);
-        } else {
-          clearUserStorage();
-        }
-      }
-    });
-  }, []);
+  if (isLoading) {
+    return <LoadingSpinner />;
+  }
 
   return (
-    <>
+    <QueryClientProvider>
       {auth ? (
         <>
           <RouterProvider />
@@ -38,8 +19,8 @@ const HomePage = () => {
       ) : (
         <SigninPage />
       )}
-    </>
+    </QueryClientProvider>
   );
 };
 
-export default withErrorBoundary(withSuspense(HomePage, <LoadingSpinner />), ErrorDisplay);
+export default withPageWrapper(HomePage);

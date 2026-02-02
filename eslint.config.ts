@@ -1,11 +1,12 @@
 import { fixupConfigRules } from '@eslint/compat';
 import { FlatCompat } from '@eslint/eslintrc';
 import js from '@eslint/js';
+import tanstackQuery from '@tanstack/eslint-plugin-query';
 import { flatConfigs as importXFlatConfig } from 'eslint-plugin-import-x';
 import jsxA11y from 'eslint-plugin-jsx-a11y';
 import eslintPluginPrettierRecommended from 'eslint-plugin-prettier/recommended';
 import reactPlugin from 'eslint-plugin-react';
-import { browser, es2020, node } from 'globals';
+import globals from 'globals';
 import { config, configs as tsConfigs, parser as tsParser } from 'typescript-eslint';
 import type { FixupConfigArray } from '@eslint/compat';
 
@@ -18,6 +19,8 @@ export default config(
   importXFlatConfig.typescript,
   eslintPluginPrettierRecommended,
   ...fixupConfigRules(new FlatCompat().extends('plugin:react-hooks/recommended') as FixupConfigArray),
+  // TanStack Query plugin for React Query best practices
+  ...tanstackQuery.configs['flat/recommended'],
   {
     files: ['**/*.{ts,tsx}'],
     ...reactPlugin.configs.flat.recommended,
@@ -25,7 +28,18 @@ export default config(
   },
   // Custom config
   {
-    ignores: ['**/build/**', '**/dist/**', '**/node_modules/**', 'chrome-extension/manifest.js', '**/*/pdf.worker.*'],
+    ignores: [
+      '**/build/**',
+      '**/dist/**',
+      '**/node_modules/**',
+      'chrome-extension/manifest.js',
+      '**/*/pdf.worker.*',
+      '**/*.timestamp-*',
+      '**/__tests__/**',
+      '**/vitest.config.ts',
+      '**/*.test.ts',
+      '**/*.spec.ts',
+    ],
   },
   {
     files: ['**/*.{ts,tsx}'],
@@ -38,9 +52,9 @@ export default config(
         projectService: true,
       },
       globals: {
-        ...browser,
-        ...es2020,
-        ...node,
+        ...globals.browser,
+        ...globals.es2020,
+        ...globals.node,
         chrome: 'readonly',
       },
     },
@@ -102,6 +116,14 @@ export default config(
     files: ['**/packages/shared/**/*.ts'],
     rules: {
       'no-restricted-imports': 'off',
+    },
+  },
+  // Test files - relaxed rules
+  {
+    files: ['**/__tests__/**/*.ts', '**/*.test.ts', '**/*.spec.ts'],
+    rules: {
+      'import-x/exports-last': 'off',
+      'func-style': 'off',
     },
   },
 );

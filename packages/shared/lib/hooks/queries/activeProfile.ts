@@ -1,18 +1,18 @@
-import { useProfilesListQuery, useFillingProfileById } from "./profileQueries.js";
-import { useStorage } from "../../hooks/index.js";
-import { profileStrorage } from "@extension/storage";
-import { useMemo } from "react";
-import type { DTOFillingProfileItem } from "@extension/storage";
+import { useProfilesListQuery, useFillingProfileById } from './profileQueries.js';
+import { useStorage } from '../../hooks/index.js';
+import { profileStorage } from '@extension/storage';
+import { useMemo } from 'react';
+import type { DTOFillingProfileItem } from '@extension/storage';
 
 export const useActiveProfile = () => {
-  const defaultStorageProfile = useStorage(profileStrorage);
+  const defaultStorageProfile = useStorage(profileStorage);
   const { data: profiles } = useProfilesListQuery();
 
   const activeProfileId = useMemo(
     () =>
       defaultStorageProfile?.id?.toString() ||
       profiles?.find((item: DTOFillingProfileItem) => item.isActive)?.id?.toString() ||
-      "",
+      '',
     [profiles, defaultStorageProfile],
   );
 

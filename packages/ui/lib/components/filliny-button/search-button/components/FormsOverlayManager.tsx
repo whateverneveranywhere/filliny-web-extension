@@ -1,8 +1,8 @@
-import { unifiedShadowDOM } from "../../../../utils/unified-shadow-dom";
-import { FormsOverlay } from "../FormsOverlay";
-import React from "react";
-import type { ComponentInjectionConfig } from "../../../../utils/unified-shadow-dom";
-import type { OverlayPosition } from "../types";
+import { unifiedShadowDOM } from '../../../../utils/unified-shadow-dom';
+import { FormsOverlay } from '../FormsOverlay';
+import React from 'react';
+import type { ComponentInjectionConfig } from '../../../../utils/unified-shadow-dom';
+import type { OverlayPosition } from '../types';
 
 interface FormsOverlayManagerConfig {
   formId: string;
@@ -24,13 +24,13 @@ export class FormsOverlayManager {
     try {
       // Validate inputs
       if (!config.formId) {
-        throw new Error("formId is required");
+        throw new Error('formId is required');
       }
       if (!config.initialPosition) {
-        throw new Error("initialPosition is required");
+        throw new Error('initialPosition is required');
       }
-      if (typeof config.onDismiss !== "function") {
-        throw new Error("onDismiss callback is required");
+      if (typeof config.onDismiss !== 'function') {
+        throw new Error('onDismiss callback is required');
       }
 
       // Ensure shadow DOM is initialized
@@ -97,7 +97,7 @@ export class FormsOverlayManager {
    */
   static dismissOverlay(formId: string): void {
     if (!formId) {
-      console.warn("Cannot dismiss overlay: formId is required");
+      console.warn('Cannot dismiss overlay: formId is required');
       return;
     }
 
@@ -122,7 +122,7 @@ export class FormsOverlayManager {
     const overlayIds = Array.from(this.activeOverlays.keys());
 
     if (overlayIds.length === 0) {
-      console.log("No active overlays to dismiss");
+      console.log('No active overlays to dismiss');
       return;
     }
 
@@ -164,9 +164,9 @@ export class FormsOverlayManager {
     try {
       this.dismissAllOverlays();
       this.activeOverlays.clear();
-      console.log("✅ FormsOverlayManager cleanup completed");
+      console.log('✅ FormsOverlayManager cleanup completed');
     } catch (error) {
-      console.error("❌ Error during FormsOverlayManager cleanup:", error);
+      console.error('❌ Error during FormsOverlayManager cleanup:', error);
     }
   }
 }

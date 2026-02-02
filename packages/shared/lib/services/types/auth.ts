@@ -1,28 +1,9 @@
-export interface AuthHealthCheck {
-  status: "success" | "error";
+/**
+ * Auth types - these are re-exported from the centralized schemas
+ *
+ * IMPORTANT: All types should be inferred from Zod schemas in @extension/shared/lib/services/schemas
+ * This file re-exports the types for backwards compatibility
+ */
 
-  user: {
-    id: string;
-    name: string;
-    email: string;
-    emailVerified: null;
-    image: string;
-    formFillingsCredit: number;
-    phone: string;
-  };
-  limitations: {
-    plan?: null | {
-      id: number;
-      planName: string;
-      maxFillingProfiles: number;
-      maxWebsitesPerProfile: number;
-      extraFeatures: string;
-      isOnSale: boolean;
-      afterSalePrice: string | null;
-      currentPrice: string;
-      stripePaymentLink: string;
-    };
-    maxFillingProfiles: number;
-    maxWebsitesPerProfile: number;
-  };
-}
+// Re-export types from centralized schemas
+export type { AuthHealthCheckResponse as AuthHealthCheck } from '../schemas/index.js';

@@ -1,6 +1,6 @@
-import { createStorage } from "../base/base.js";
-import { StorageEnum } from "../base/enums.js";
-import type { BaseStorageType } from "../base/types.js";
+import { createStorage } from '../base/base.js';
+import { StorageEnum } from '../base/enums.js';
+import type { BaseStorageType } from '../base/types.js';
 
 // Interface for field button settings
 export interface FieldButtonSettings {
@@ -24,7 +24,7 @@ type FieldButtonsStorage = BaseStorageType<FieldButtonSettings> & {
 };
 
 // Create the base storage
-const storage = createStorage<FieldButtonSettings>("field-buttons-settings", defaultSettings, {
+const storage = createStorage<FieldButtonSettings>('field-buttons-settings', defaultSettings, {
   storageEnum: StorageEnum.Local,
   liveUpdate: true,
 });

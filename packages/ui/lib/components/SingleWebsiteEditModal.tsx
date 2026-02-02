@@ -1,21 +1,12 @@
-import { WebsiteFormFields } from "./StepperForms/StepperForm1";
-import { Button } from "./ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
-import { zodResolver } from "@hookform/resolvers/zod";
-import React from "react";
-import { useForm, FormProvider } from "react-hook-form";
-import { z } from "zod";
-import type { DTOFillingWebsite, DTOProfileFillingForm } from "@extension/storage";
-
-const websiteSchema = z.object({
-  fillingWebsites: z.array(
-    z.object({
-      websiteUrl: z.string().url().min(1, { message: "Website URL is required" }),
-      isRootLoad: z.boolean().default(false),
-      fillingContext: z.string().default(""),
-    }),
-  ),
-});
+import { WebsiteFormFields } from './stepper-forms/StepperForm1';
+import { Button } from './ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
+import { WebsiteEditSchema } from '@extension/shared';
+import { zodResolver } from '@hookform/resolvers/zod';
+import React from 'react';
+import { useForm, FormProvider } from 'react-hook-form';
+import type { WebsiteEditFormValues } from '@extension/shared';
+import type { DTOFillingWebsite, DTOProfileFillingForm } from '@extension/storage';
 
 interface Props {
   open: boolean;
@@ -26,11 +17,12 @@ interface Props {
 }
 
 export function SingleWebsiteEditModal({ open, onOpenChange, website, onSubmit }: Props) {
-  const methods = useForm({
+  const methods = useForm<WebsiteEditFormValues>({
     defaultValues: {
       fillingWebsites: [website],
     },
-    resolver: zodResolver(websiteSchema),
+    resolver: zodResolver(WebsiteEditSchema),
+    mode: 'onChange',
   });
 
   const handleSubmit = methods.handleSubmit(async data => {
