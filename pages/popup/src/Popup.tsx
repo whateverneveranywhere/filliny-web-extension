@@ -38,8 +38,8 @@ const Popup = () => {
   };
 
   return (
-    <div className={cn('App', isLight ? 'bg-slate-50' : 'bg-gray-800')}>
-      <header className={cn('App-header', isLight ? 'text-gray-900' : 'text-gray-100')}>
+    <div className={cn('App', isLight ? 'filliny-bg-secondary' : 'filliny-bg-background')}>
+      <header className={cn('App-header', isLight ? 'filliny-text-foreground' : 'filliny-text-foreground')}>
         <button onClick={goGithubSite}>
           <img src={chrome.runtime.getURL(logo)} className="App-logo" alt="logo" />
         </button>
@@ -48,8 +48,8 @@ const Popup = () => {
         </p>
         <button
           className={cn(
-            'mt-4 rounded px-4 py-1 font-bold shadow hover:scale-105',
-            isLight ? 'bg-blue-200 text-black' : 'bg-gray-700 text-white',
+            'filliny-mt-4 filliny-rounded filliny-px-4 filliny-py-1 filliny-font-bold filliny-shadow hover:filliny-scale-105',
+            isLight ? 'filliny-bg-primary filliny-text-primary-foreground' : 'filliny-bg-secondary filliny-text-secondary-foreground',
           )}
           onClick={injectContentScript}>
           {t('injectButton')}

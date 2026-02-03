@@ -22,7 +22,7 @@
 }
 
 code {
-  background: oklch(from var(--muted) l c h / 50%);
+  background: oklch(var(--muted) / 50%);
   border-radius: var(--radius-sm);
   padding: 0.2rem 0.5rem;
 }

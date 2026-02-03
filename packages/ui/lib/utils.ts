@@ -1,6 +1,8 @@
 import { clsx } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+import { extendTailwindMerge } from 'tailwind-merge';
 import type { ClassValue } from 'clsx';
+
+const twMerge = extendTailwindMerge({ prefix: 'filliny-' });
 
 export const cn = (...inputs: ClassValue[]) => twMerge(clsx(inputs));
 

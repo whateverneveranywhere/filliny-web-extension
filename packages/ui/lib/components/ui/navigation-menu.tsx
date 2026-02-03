@@ -66,7 +66,7 @@ const NavigationMenuContent = React.forwardRef<
   <NavigationMenuPrimitive.Content
     ref={ref}
     className={cn(
-      'filliny-left-0 filliny-top-0 filliny-w-full data-[motion^=from-]:filliny-animate-in data-[motion^=to-]:filliny-animate-out data-[motion^=from-]:filliny-fade-in data-[motion^=to-]:filliny-fade-out data-[motion=from-end]:filliny-slide-in-from-right-52 data-[motion=from-start]:filliny-slide-in-from-left-52 data-[motion=to-end]:filliny-slide-out-to-right-52 data-[motion=to-start]:filliny-slide-out-to-left-52 md:filliny-absolute md:filliny-w-auto filliny-',
+      'filliny-left-0 filliny-top-0 filliny-w-full data-[motion^=from-]:filliny-animate-in data-[motion^=to-]:filliny-animate-out data-[motion^=from-]:filliny-fade-in data-[motion^=to-]:filliny-fade-out data-[motion=from-end]:filliny-slide-in-from-right-52 data-[motion=from-start]:filliny-slide-in-from-left-52 data-[motion=to-end]:filliny-slide-out-to-right-52 data-[motion=to-start]:filliny-slide-out-to-left-52 md:filliny-absolute md:filliny-w-auto',
       className,
     )}
     {...props}

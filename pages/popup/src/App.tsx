@@ -45,22 +45,22 @@ const HomePage = () => {
   }
 
   return (
-    <div className="min-h-[300px] w-[350px] p-4">
-      <h1 className="mb-4 text-xl font-bold">Filliny</h1>
+    <div className="filliny-min-h-[300px] filliny-w-[350px] filliny-p-4">
+      <h1 className="filliny-mb-4 filliny-text-xl filliny-font-bold">Filliny</h1>
 
       {/* Debug info */}
-      <div className="mt-4 rounded-md bg-gray-100 p-2 text-sm dark:bg-slate-800">
-        <h2 className="mb-2 font-semibold">Environment Configuration:</h2>
+      <div className="filliny-mt-4 filliny-rounded-md filliny-bg-muted filliny-p-2 filliny-text-sm">
+        <h2 className="filliny-mb-2 filliny-font-semibold">Environment Configuration:</h2>
         {configInfo ? (
-          <ul className="space-y-1">
+          <ul className="filliny-space-y-1">
             <li>
-              <span className="font-medium">Environment:</span> {configInfo.env}
+              <span className="filliny-font-medium">Environment:</span> {configInfo.env}
             </li>
             <li>
-              <span className="font-medium">Base URL:</span> {configInfo.baseURL}
+              <span className="filliny-font-medium">Base URL:</span> {configInfo.baseURL}
             </li>
             <li>
-              <span className="font-medium">Cookie Name:</span> {configInfo.cookieName}
+              <span className="filliny-font-medium">Cookie Name:</span> {configInfo.cookieName}
             </li>
           </ul>
         ) : (
@@ -69,7 +69,7 @@ const HomePage = () => {
       </div>
 
       {/* Rest of your app */}
-      <div className="mt-4">
+      <div className="filliny-mt-4">
         <QueryClientProvider>
           {auth ? (
             <>

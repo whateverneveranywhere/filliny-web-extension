@@ -5,26 +5,28 @@
 @tailwind utilities;
 
 /* shadcn/ui theme variables - aligned with webapp design system */
-:root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.141 0.005 285.823);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.141 0.005 285.823);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.141 0.005 285.823);
-  --primary: oklch(0.45 0.18 260);
-  --primary-foreground: oklch(0.96 0.01 260);
-  --secondary: oklch(0.967 0.001 286.375);
-  --secondary-foreground: oklch(0.21 0.006 285.885);
-  --muted: oklch(0.967 0.001 286.375);
-  --muted-foreground: oklch(0.552 0.016 285.938);
-  --accent: oklch(0.967 0.001 286.375);
-  --accent-foreground: oklch(0.21 0.006 285.885);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.96 0.01 0);
-  --border: oklch(0.92 0.004 286.32);
-  --input: oklch(0.92 0.004 286.32);
-  --ring: oklch(0.705 0.015 286.067);
+/* :host is needed for Shadow DOM (content-ui), :root for normal pages */
+:root, :host {
+  /* Color values are oklch channels only (L C H) - oklch() wrapper is added by Tailwind config */
+  --background: 1 0 0;
+  --foreground: 0.141 0.005 285.823;
+  --card: 1 0 0;
+  --card-foreground: 0.141 0.005 285.823;
+  --popover: 1 0 0;
+  --popover-foreground: 0.141 0.005 285.823;
+  --primary: 0.45 0.18 260;
+  --primary-foreground: 0.96 0.01 260;
+  --secondary: 0.967 0.001 286.375;
+  --secondary-foreground: 0.21 0.006 285.885;
+  --muted: 0.967 0.001 286.375;
+  --muted-foreground: 0.552 0.016 285.938;
+  --accent: 0.967 0.001 286.375;
+  --accent-foreground: 0.21 0.006 285.885;
+  --destructive: 0.577 0.245 27.325;
+  --destructive-foreground: 0.96 0.01 0;
+  --border: 0.92 0.004 286.32;
+  --input: 0.92 0.004 286.32;
+  --ring: 0.705 0.015 286.067;
   --radius: 0.625rem;
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
@@ -33,70 +35,71 @@
   --radius-2xl: calc(var(--radius) + 8px);
   --radius-3xl: calc(var(--radius) + 12px);
   --radius-4xl: calc(var(--radius) + 16px);
-  --chart-1: oklch(0.79 0.1 260);
-  --chart-2: oklch(0.68 0.14 260);
-  --chart-3: oklch(0.59 0.16 260);
-  --chart-4: oklch(0.45 0.18 260);
-  --chart-5: oklch(0.4 0.16 260);
-  --success: oklch(0.52 0.17 160);
-  --success-foreground: oklch(1 0 0);
-  --warning: oklch(0.75 0.18 70);
-  --warning-foreground: oklch(0.15 0 0);
-  --info: oklch(0.55 0.2 260);
-  --info-foreground: oklch(1 0 0);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.141 0.005 285.823);
-  --sidebar-primary: oklch(0.45 0.18 260);
-  --sidebar-primary-foreground: oklch(0.96 0.01 260);
-  --sidebar-accent: oklch(0.967 0.001 286.375);
-  --sidebar-accent-foreground: oklch(0.21 0.006 285.885);
-  --sidebar-border: oklch(0.92 0.004 286.32);
-  --sidebar-ring: oklch(0.705 0.015 286.067);
+  --chart-1: 0.79 0.1 260;
+  --chart-2: 0.68 0.14 260;
+  --chart-3: 0.59 0.16 260;
+  --chart-4: 0.45 0.18 260;
+  --chart-5: 0.4 0.16 260;
+  --success: 0.52 0.17 160;
+  --success-foreground: 1 0 0;
+  --warning: 0.75 0.18 70;
+  --warning-foreground: 0.15 0 0;
+  --info: 0.55 0.2 260;
+  --info-foreground: 1 0 0;
+  --sidebar: 0.985 0 0;
+  --sidebar-foreground: 0.141 0.005 285.823;
+  --sidebar-primary: 0.45 0.18 260;
+  --sidebar-primary-foreground: 0.96 0.01 260;
+  --sidebar-accent: 0.967 0.001 286.375;
+  --sidebar-accent-foreground: 0.21 0.006 285.885;
+  --sidebar-border: 0.92 0.004 286.32;
+  --sidebar-ring: 0.705 0.015 286.067;
 }
 
 /* Dark mode theme variables - aligned with webapp design system */
+/* Color values are oklch channels only (L C H) - oklch() wrapper is added by Tailwind config */
 .dark {
-  --background: oklch(0.14 0 0);
-  --foreground: oklch(0.9 0 0);
-  --card: oklch(0.22 0.005 260);
-  --card-foreground: oklch(0.9 0 0);
-  --popover: oklch(0.24 0.005 260);
-  --popover-foreground: oklch(0.9 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.3 0 0);
-  --secondary-foreground: oklch(0.9 0 0);
-  --muted: oklch(0.26 0 0);
-  --muted-foreground: oklch(0.7 0 0);
-  --accent: oklch(0.35 0 0);
-  --accent-foreground: oklch(0.9 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --destructive-foreground: oklch(0.96 0.01 0);
-  --border: oklch(0.45 0 0 / 80%);
-  --input: oklch(0.35 0 0);
-  --ring: oklch(0.65 0 0);
-  --success: oklch(0.696 0.17 162.48);
-  --success-foreground: oklch(0.15 0 0);
-  --warning: oklch(0.769 0.188 70.08);
-  --warning-foreground: oklch(0.15 0 0);
-  --info: oklch(0.488 0.243 264.376);
-  --info-foreground: oklch(1 0 0);
-  --sidebar: oklch(0.22 0 0);
-  --sidebar-foreground: oklch(0.87 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.87 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.87 0 0);
-  --sidebar-border: oklch(0.4 0 0 / 60%);
-  --sidebar-ring: oklch(0.65 0 0);
+  --background: 0.14 0 0;
+  --foreground: 0.9 0 0;
+  --card: 0.22 0.005 260;
+  --card-foreground: 0.9 0 0;
+  --popover: 0.24 0.005 260;
+  --popover-foreground: 0.9 0 0;
+  --primary: 0.922 0 0;
+  --primary-foreground: 0.205 0 0;
+  --secondary: 0.3 0 0;
+  --secondary-foreground: 0.9 0 0;
+  --muted: 0.26 0 0;
+  --muted-foreground: 0.7 0 0;
+  --accent: 0.35 0 0;
+  --accent-foreground: 0.9 0 0;
+  --destructive: 0.704 0.191 22.216;
+  --destructive-foreground: 0.96 0.01 0;
+  --border: 0.388 0 0;
+  --input: 0.35 0 0;
+  --ring: 0.65 0 0;
+  --success: 0.696 0.17 162.48;
+  --success-foreground: 0.15 0 0;
+  --warning: 0.769 0.188 70.08;
+  --warning-foreground: 0.15 0 0;
+  --info: 0.488 0.243 264.376;
+  --info-foreground: 1 0 0;
+  --sidebar: 0.22 0 0;
+  --sidebar-foreground: 0.87 0 0;
+  --sidebar-primary: 0.488 0.243 264.376;
+  --sidebar-primary-foreground: 0.87 0 0;
+  --sidebar-accent: 0.269 0 0;
+  --sidebar-accent-foreground: 0.87 0 0;
+  --sidebar-border: 0.328 0 0;
+  --sidebar-ring: 0.65 0 0;
 }
 
 body {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
-  background-color: var(--background);
-  color: var(--foreground);
+  background-color: oklch(var(--background));
+  color: oklch(var(--foreground));
 
   font-family:
     'Inter',
@@ -122,7 +125,7 @@ code {
 
 /* Base Layer Styles */
 * {
-  border-color: var(--border);
+  border-color: oklch(var(--border));
 }
 
 button:not([disabled]),
@@ -210,7 +213,7 @@ button:not([disabled]),
    ============================================================================ */
 
 /* Base animation variables */
-:root {
+:root, :host {
   --filliny-animate-duration: 150ms;
   --filliny-animate-delay: 0ms;
   --filliny-animate-timing: cubic-bezier(0.4, 0, 0.2, 1);

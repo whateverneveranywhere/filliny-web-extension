@@ -92,7 +92,7 @@ const WebsitePreviewCard = ({
                   <div
                     className={cn(
                       'filliny-flex filliny-items-center filliny-gap-2 filliny-w-full filliny-flex-nowrap',
-                      isValidURL && 'filliny-cursor-pointer filliny-hover:filliny-text-primary',
+                      isValidURL && 'filliny-cursor-pointer hover:filliny-text-primary',
                     )}
                     onClick={handleVisitWebsite}>
                     <span className="filliny-truncate filliny-text-sm filliny-font-medium">
@@ -122,7 +122,7 @@ const WebsitePreviewCard = ({
                     size="icon"
                     variant="ghost"
                     onClick={() => setIsExpanded(!isExpanded)}
-                    className="filliny-hover:filliny-bg-muted filliny-h-8 filliny-w-8">
+                    className="hover:filliny-bg-muted filliny-h-8 filliny-w-8">
                     {isExpanded ? (
                       <ChevronUp className="filliny-h-4 filliny-w-4" />
                     ) : (
@@ -136,7 +136,7 @@ const WebsitePreviewCard = ({
                     size="icon"
                     variant="ghost"
                     onClick={onRemove}
-                    className="filliny-hover:filliny-bg-destructive/10 filliny-hover:filliny-text-destructive filliny-h-8 filliny-w-8 filliny-text-destructive">
+                    className="hover:filliny-bg-destructive/10 hover:filliny-text-destructive filliny-h-8 filliny-w-8 filliny-text-destructive">
                     <Trash className="filliny-h-4 filliny-w-4" />
                   </Button>
                 )}
