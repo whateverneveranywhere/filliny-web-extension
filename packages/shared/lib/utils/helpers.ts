@@ -107,7 +107,9 @@ const config: Record<WebappEnvs, ConfigEntry> = {
   dev: {
     cookieName: 'filliny.session_token',
     baseURL: 'http://localhost:5173',
-    apiURL: 'http://localhost:8787/api/v1',
+    // Use web app as proxy - Vite proxies /api/* to localhost:8787
+    apiURL: 'http://localhost:5173/api/v1',
+    // Cookie origin is still the API server where Better Auth sets cookies
     apiOrigin: 'http://localhost:8787',
     webappEnv: WebappEnvs.DEV,
   },
@@ -134,10 +136,25 @@ const handleGetAuthToken = (
   // Use apiOrigin for cookie lookup - cookies are set by the API server, not the web app
   const getFromConfig = { url: envConfig.apiOrigin, name: envConfig.cookieName };
 
-  console.log('[Auth] Looking for cookie:', getFromConfig);
+  console.log(
+    '[Auth] Looking for cookie:',
+    `name="${getFromConfig.name}" url="${getFromConfig.url}"`,
+  );
 
   chrome.cookies.get(getFromConfig, cookie => {
-    console.log('[Auth] Cookie result:', cookie ? 'Found' : 'Not found', cookie);
+    if (cookie) {
+      console.log(
+        '[Auth] Cookie found:',
+        `name="${cookie.name}", domain="${cookie.domain}", secure=${cookie.secure}, httpOnly=${cookie.httpOnly}`,
+        `value="${cookie.value.substring(0, 30)}..."`,
+      );
+    } else {
+      console.warn(
+        '[Auth] Cookie NOT found for:',
+        `name="${getFromConfig.name}" at "${getFromConfig.url}"`,
+      );
+    }
+
     sendResponse({
       success: { token: cookie ? cookie.value : null },
     });
@@ -273,7 +290,30 @@ const handleAuthTokenChanged = (
       name: envConfig.cookieName,
     },
     cookie => {
+      if (chrome.runtime.lastError) {
+        console.error(
+          '[Auth] Error getting cookie after token change:',
+          chrome.runtime.lastError.message,
+        );
+        sendResponse({
+          success: { token: null },
+        });
+        return;
+      }
+
       const token = cookie ? cookie.value : null;
+
+      if (cookie) {
+        console.log(
+          '[Auth] Token changed, new token:',
+          `${token?.substring(0, 30)}...`,
+        );
+      } else {
+        console.warn(
+          '[Auth] Token removed/expired for cookie:',
+          envConfig.cookieName,
+        );
+      }
 
       // Send response back
       sendResponse({
@@ -328,7 +368,10 @@ const setupAuthTokenListener = () => {
   // Use apiOrigin for cookie monitoring - that's where Better Auth sets cookies
   const apiHostname = new URL(envConfig.apiOrigin).hostname;
 
-  console.log('[Auth] Setting up cookie listener for:', apiHostname, envConfig.cookieName);
+  console.log(
+    '[Auth] Setting up cookie listener for:',
+    `hostname="${apiHostname}" cookieName="${envConfig.cookieName}"`,
+  );
 
   // Listen for changes to the specific cookie
   // Cookie domain may include leading dot for cross-subdomain cookies (e.g., '.filliny.com')
@@ -343,17 +386,69 @@ const setupAuthTokenListener = () => {
       cookie.domain === `.${apiHostname.split('.').slice(-2).join('.')}`;
 
     if (domainMatches && cookie.name === envConfig.cookieName) {
-      console.log('[Auth] Cookie changed:', cookie.name, changeInfo.removed ? 'removed' : 'set');
-      // Handle the cookie change
+      console.log(
+        '[Auth] Cookie changed:',
+        `name="${cookie.name}" domain="${cookie.domain}" action="${changeInfo.removed ? 'removed' : 'set'}"`,
+      );
+
+      // Broadcast the change to all extension contexts so UI can update
       handleGetAuthToken(envConfig, response => {
-        // Broadcast the change to all extension contexts
-        chrome.runtime.sendMessage({
-          action: BackgroundActions.AUTH_TOKEN_CHANGED,
-          payload: response,
-        });
+        try {
+          chrome.runtime.sendMessage(
+            {
+              action: BackgroundActions.AUTH_TOKEN_CHANGED,
+              payload: response,
+            },
+            () => {
+              if (chrome.runtime.lastError) {
+                console.warn(
+                  '[Auth] Failed to broadcast token change:',
+                  chrome.runtime.lastError.message,
+                );
+              } else {
+                console.log('[Auth] Token change broadcasted successfully');
+              }
+            },
+          );
+        } catch (error) {
+          console.error(
+            '[Auth] Error broadcasting token change:',
+            error instanceof Error ? error.message : 'Unknown error',
+          );
+        }
       });
     }
   });
+};
+
+// Check auth state from cookie on startup (no storage needed)
+const syncAuthTokenFromCookie = () => {
+  const envConfig = getConfig();
+
+  chrome.cookies.get(
+    { url: envConfig.apiOrigin, name: envConfig.cookieName },
+    cookie => {
+      if (chrome.runtime.lastError) {
+        console.error(
+          '[Auth] Error syncing auth token on startup:',
+          chrome.runtime.lastError.message,
+        );
+        return;
+      }
+
+      if (cookie && cookie.value) {
+        console.log(
+          '[Auth] Session cookie found on startup:',
+          `name="${cookie.name}" domain="${cookie.domain}" value="${cookie.value.substring(0, 30)}..."`,
+        );
+      } else {
+        console.warn(
+          '[Auth] No session cookie found on startup for:',
+          `name="${envConfig.cookieName}" at "${envConfig.apiOrigin}"`,
+        );
+      }
+    },
+  );
 };
 
 const clearUserStorage = () => {
@@ -377,6 +472,7 @@ export {
   handleAction,
   getCurrentVistingUrl,
   setupAuthTokenListener,
+  syncAuthTokenFromCookie,
   clearUserStorage,
   excludeValuesFromBaseArray,
   sleep,

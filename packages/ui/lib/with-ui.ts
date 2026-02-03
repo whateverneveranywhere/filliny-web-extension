@@ -97,14 +97,14 @@ export const withUI = (tailwindConfig: Config): Config =>
               from: { height: 'var(--radix-collapsible-content-height)', opacity: '1' },
               to: { height: '0', opacity: '0' },
             },
-            'enter': {
+            enter: {
               from: {
                 opacity: 'var(--filliny-enter-opacity, 1)',
                 transform:
                   'translate3d(var(--filliny-enter-translate-x, 0), var(--filliny-enter-translate-y, 0), 0) scale3d(var(--filliny-enter-scale, 1), var(--filliny-enter-scale, 1), var(--filliny-enter-scale, 1)) rotate(var(--filliny-enter-rotate, 0))',
               },
             },
-            'exit': {
+            exit: {
               to: {
                 opacity: 'var(--filliny-exit-opacity, 1)',
                 transform:
@@ -117,8 +117,8 @@ export const withUI = (tailwindConfig: Config): Config =>
             'accordion-up': 'accordion-up 0.2s ease-out forwards',
             'collapsible-down': 'collapsible-down 0.25s cubic-bezier(0.32, 0.72, 0, 1) forwards',
             'collapsible-up': 'collapsible-up 0.2s cubic-bezier(0.4, 0, 1, 1) forwards',
-            'in': 'enter var(--filliny-animate-duration, 150ms) var(--filliny-animate-timing, cubic-bezier(0.4, 0, 0.2, 1))',
-            'out': 'exit var(--filliny-animate-duration, 150ms) var(--filliny-animate-timing, cubic-bezier(0.4, 0, 0.2, 1))',
+            in: 'enter var(--filliny-animate-duration, 150ms) var(--filliny-animate-timing, cubic-bezier(0.4, 0, 0.2, 1))',
+            out: 'exit var(--filliny-animate-duration, 150ms) var(--filliny-animate-timing, cubic-bezier(0.4, 0, 0.2, 1))',
           },
         },
       },

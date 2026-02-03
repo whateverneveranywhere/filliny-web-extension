@@ -1,12 +1,11 @@
 import { RecommendedWebsites } from './RecommendedWebsites';
 import { WebsiteFormFields } from './WebsiteFormFields';
 import { WebsitePreviewCard } from './WebsitePreviewCard';
-import { UpgradeBanner } from '../alerts';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui';
 import { Button } from '../ui/button';
 import { ScrollArea, ScrollBar } from '../ui/scroll-area';
-import { usePlanLimits } from '@extension/shared';
-import { Plus } from 'lucide-react';
+import { getConfig, usePlanLimits } from '@extension/shared';
+import { ExternalLink, Plus } from 'lucide-react';
 import { useCallback } from 'react';
 import { useFieldArray, useFormContext } from 'react-hook-form';
 import type { ProfileFormTypes } from '@/lib/containers/profile-form';
@@ -17,8 +16,9 @@ const StepperForm1 = () => {
     control,
     name: 'fillingWebsites',
   });
-  const { currentPlan, maxWebsites, hasReachedLimit } = usePlanLimits();
-  const websitesReachedLimit = hasReachedLimit(fields.length);
+  const { currentPlan, maxWebsites, hasReachedWebsiteLimit } = usePlanLimits();
+  const websitesReachedLimit = hasReachedWebsiteLimit(fields.length);
+  const config = getConfig();
 
   const handleAdd = useCallback(() => {
     if (websitesReachedLimit) return;
@@ -49,17 +49,14 @@ const StepperForm1 = () => {
 
   return (
     <div className="filliny-flex filliny-flex-col filliny-gap-4">
-      {websitesReachedLimit && <UpgradeBanner />}
-
       <ScrollArea className="filliny-w-full">
-        <div className="filliny-flex filliny-items-center filliny-gap-2 filliny-pb-3">
-          <span className="filliny-whitespace-nowrap filliny-font-medium">Recommended websites:</span>
+        <div className="filliny-flex filliny-items-center filliny-gap-2 filliny-pb-2">
           <RecommendedWebsites onWebsiteSelect={handleWebsiteSelect} hasReachedLimit={websitesReachedLimit} />
         </div>
         <ScrollBar orientation="horizontal" />
       </ScrollArea>
 
-      <div className="filliny-space-y-3">
+      <div className="filliny-flex filliny-flex-col filliny-gap-3">
         {fields.map(
           (item, index) =>
             latestWebsiteValues && (
@@ -75,30 +72,46 @@ const StepperForm1 = () => {
         )}
       </div>
 
-      <TooltipProvider delayDuration={200}>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <div className="filliny-w-full">
-              <Button
-                className="filliny-mt-2 filliny-w-full"
-                onClick={handleAdd}
-                variant="outline"
-                disabled={websitesReachedLimit}>
-                <Plus className="filliny-mr-2 filliny-h-4 filliny-w-4" />
-                Add Website {fields.length > 0 && `(${fields.length}/${maxWebsites})`}
-              </Button>
-            </div>
-          </TooltipTrigger>
-          {websitesReachedLimit && (
-            <TooltipContent className="filliny-max-w-xs filliny-p-3">
-              <p className="filliny-text-sm">
-                You've reached the maximum number of websites for your {currentPlan} plan. Upgrade to add more websites
-                and unlock additional features.
-              </p>
-            </TooltipContent>
-          )}
-        </Tooltip>
-      </TooltipProvider>
+      <div className="filliny-flex filliny-flex-col filliny-items-center filliny-gap-2">
+        <TooltipProvider delayDuration={200}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="filliny-w-full">
+                <Button
+                  className="filliny-w-full"
+                  onClick={handleAdd}
+                  variant="outline"
+                  disabled={websitesReachedLimit}>
+                  <Plus className="filliny-mr-2 filliny-h-4 filliny-w-4" />
+                  Add Website {fields.length > 0 && `(${fields.length}/${maxWebsites})`}
+                </Button>
+              </div>
+            </TooltipTrigger>
+            {websitesReachedLimit && (
+              <TooltipContent className="filliny-max-w-xs filliny-p-3">
+                <p className="filliny-text-sm">
+                  You've reached the maximum number of websites for your {currentPlan} plan. Upgrade to add more
+                  websites and unlock additional features.
+                </p>
+              </TooltipContent>
+            )}
+          </Tooltip>
+        </TooltipProvider>
+
+        {websitesReachedLimit && (
+          <p className="filliny-text-xs filliny-text-muted-foreground">
+            {currentPlan} plan limit reached.{' '}
+            <a
+              href={`${config.baseURL}/pricing`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="filliny-inline-flex filliny-items-center filliny-gap-1 filliny-text-warning filliny-underline filliny-underline-offset-2 hover:filliny-text-warning/80">
+              Upgrade
+              <ExternalLink className="filliny-h-3 filliny-w-3" />
+            </a>
+          </p>
+        )}
+      </div>
     </div>
   );
 };

@@ -1,21 +1,20 @@
+import { authStorage } from '@extension/storage';
 import { MessageType } from '../../../types/enums.js';
 import { getConfig } from '../../../utils/helpers.js';
 import { apiEndpoints } from '../../endpoints.js';
 import type { DTOFillPayload, Field } from '../../schemas/index.js';
 
-const {
-  version,
-  auth: {
-    ai: { AIFill },
-  },
-  // auth: { healthCheck },
-} = apiEndpoints;
+const { ai } = apiEndpoints;
 
 export const aiFillService = async (
   fillPayLoad: DTOFillPayload,
 ): Promise<{ data: Field[] } | ReadableStream<Uint8Array>> => {
   const config = getConfig();
-  const fullUrl = `${config.baseURL}${version}${AIFill}`;
+  // Use apiURL which already includes /api/v1, then append the endpoint path
+  const fullUrl = `${config.apiURL}${ai.fill}`;
+
+  // Get auth token for API request
+  const authToken = await authStorage.getWithFallback();
 
   const response = await chrome.runtime.sendMessage({
     type: MessageType.API_REQUEST,
@@ -25,6 +24,7 @@ export const aiFillService = async (
       body: JSON.stringify(fillPayLoad),
       headers: {
         'Content-Type': 'application/json',
+        ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
       },
       isStream: true,
     },

@@ -1,8 +1,10 @@
-import { getConfig, handleAction, setupAuthTokenListener, WebappEnvs, MessageType } from '@extension/shared';
+import { getConfig, handleAction, setupAuthTokenListener, syncAuthTokenFromCookie, WebappEnvs, MessageType } from '@extension/shared';
 import 'webextension-polyfill';
 
 // Add this near the top of the file, after imports
 setupAuthTokenListener();
+// Sync auth token from cookie to storage on startup
+syncAuthTokenFromCookie();
 
 // Track extension pinning status
 let isExtensionPinned = false;

@@ -1,6 +1,12 @@
 import { processChunks, updateFieldWithRetry, ErrorCategory, FieldUpdateError } from './fieldUpdaterHelpers';
 import { unifiedFieldRegistry } from './unifiedFieldDetection';
-import { aiFillService, getMatchingWebsite, createDebugLogger } from '@extension/shared';
+import {
+  aiFillService,
+  getMatchingWebsite,
+  createDebugLogger,
+  ApiQuotaExceededError,
+  getConfig,
+} from '@extension/shared';
 import { profileStorage } from '@extension/storage';
 import type { FieldUpdateResult, FormUpdateResults } from './fieldUpdaterHelpers';
 import type { Field } from '@extension/shared';
@@ -216,6 +222,39 @@ export const handleFieldFill = async (field: Field): Promise<FieldUpdateResult> 
     return { success: true, fieldId: field.id, retryCount: updateResult?.totalRetries };
   } catch (error) {
     cleanup();
+
+    // Handle quota exceeded errors specially
+    if (error instanceof ApiQuotaExceededError) {
+      const config = getConfig();
+      const pricingUrl = `${config.baseURL}/pricing`;
+
+      debug.error('Quota exceeded:', error.message);
+
+      // Show user-friendly error on the field
+      const quotaMessage =
+        error.errorType === 'no_free_forms'
+          ? 'No free forms remaining. Subscribe to continue.'
+          : 'No tokens remaining. Purchase more tokens.';
+
+      showErrorFeedback(element, quotaMessage);
+      restoreStyles(5000);
+
+      // Prompt user to subscribe
+      if (error.shouldPromptSubscription) {
+        const shouldRedirect = confirm(
+          `${error.message}\n\nWould you like to subscribe to Pro for unlimited form filling?`,
+        );
+        if (shouldRedirect) {
+          window.open(pricingUrl, '_blank');
+        }
+      }
+
+      return {
+        success: false,
+        fieldId: field.id,
+        error: new FieldUpdateError(quotaMessage, ErrorCategory.NETWORK_ERROR, field.id),
+      };
+    }
 
     const fieldError =
       error instanceof FieldUpdateError

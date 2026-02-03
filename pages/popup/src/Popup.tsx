@@ -49,7 +49,9 @@ const Popup = () => {
         <button
           className={cn(
             'filliny-mt-4 filliny-rounded filliny-px-4 filliny-py-1 filliny-font-bold filliny-shadow hover:filliny-scale-105',
-            isLight ? 'filliny-bg-primary filliny-text-primary-foreground' : 'filliny-bg-secondary filliny-text-secondary-foreground',
+            isLight
+              ? 'filliny-bg-primary filliny-text-primary-foreground'
+              : 'filliny-bg-secondary filliny-text-secondary-foreground',
           )}
           onClick={injectContentScript}>
           {t('injectButton')}

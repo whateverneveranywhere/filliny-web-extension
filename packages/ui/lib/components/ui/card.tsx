@@ -5,7 +5,7 @@ const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElemen
   <div
     ref={ref}
     className={cn(
-      'filliny-flex filliny-flex-col filliny-gap-3 filliny-rounded-lg filliny-border filliny-bg-card/95 filliny-backdrop-blur-sm filliny-py-3 filliny-text-card-foreground filliny-shadow-md',
+      'filliny-flex filliny-flex-col filliny-gap-4 filliny-rounded-xl filliny-border filliny-border-border filliny-bg-card filliny-p-4 filliny-text-card-foreground filliny-shadow-sm',
       className,
     )}
     {...props}
@@ -17,7 +17,7 @@ const CardHeader = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDiv
   ({ className, ...props }, ref) => (
     <div
       ref={ref}
-      className={cn('filliny-grid filliny-auto-rows-min filliny-items-start filliny-gap-2 filliny-px-4', className)}
+      className={cn('filliny-grid filliny-auto-rows-min filliny-items-start filliny-gap-1.5', className)}
       {...props}
     />
   ),
@@ -29,7 +29,7 @@ const CardTitle = React.forwardRef<HTMLParagraphElement, React.HTMLAttributes<HT
     // eslint-disable-next-line jsx-a11y/heading-has-content
     <h3
       ref={ref}
-      className={cn('filliny-text-base filliny-font-semibold filliny-leading-snug filliny-tracking-tight', className)}
+      className={cn('filliny-font-semibold filliny-leading-none filliny-tracking-tight', className)}
       {...props}
     />
   ),
@@ -48,13 +48,17 @@ const CardDescription = React.forwardRef<HTMLParagraphElement, React.HTMLAttribu
 CardDescription.displayName = 'CardDescription';
 
 const CardContent = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
-  ({ className, ...props }, ref) => <div ref={ref} className={cn('filliny-px-4', className)} {...props} />,
+  ({ className, ...props }, ref) => <div ref={ref} className={cn(className)} {...props} />,
 );
 CardContent.displayName = 'CardContent';
 
 const CardFooter = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
   ({ className, ...props }, ref) => (
-    <div ref={ref} className={cn('filliny-flex filliny-items-center filliny-px-4', className)} {...props} />
+    <div
+      ref={ref}
+      className={cn('filliny-flex filliny-items-center [.filliny-border-t]:filliny-pt-4', className)}
+      {...props}
+    />
   ),
 );
 CardFooter.displayName = 'CardFooter';

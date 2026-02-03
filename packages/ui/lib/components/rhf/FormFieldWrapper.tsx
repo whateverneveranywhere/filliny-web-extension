@@ -105,7 +105,7 @@ const FormFieldWrapper = <T extends FieldValues = FieldValues>({
               itemClassName,
             )}>
             {mergedLayout.showLabel && title && (
-              <div className={isHorizontal ? 'filliny-space-y-0.5' : undefined}>
+              <div className={isHorizontal ? 'filliny-flex-1 filliny-space-y-0.5' : undefined}>
                 <FormLabel className={isHorizontal ? 'filliny-text-base' : undefined}>
                   {title}
                   {required && <span className="filliny-text-destructive filliny-ml-1">*</span>}
@@ -116,7 +116,7 @@ const FormFieldWrapper = <T extends FieldValues = FieldValues>({
               </div>
             )}
             <FormControl>
-              <div className={cn('filliny-w-full', className)}>
+              <div className={cn(!isHorizontal && 'filliny-w-full', className)}>
                 {children({ field, fieldState, handleChange, getValue })}
               </div>
             </FormControl>

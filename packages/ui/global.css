@@ -8,7 +8,7 @@
 /* :host is needed for Shadow DOM (content-ui), :root for normal pages */
 :root, :host {
   /* Color values are oklch channels only (L C H) - oklch() wrapper is added by Tailwind config */
-  --background: 1 0 0;
+  --background: 0.985 0.002 260;
   --foreground: 0.141 0.005 285.823;
   --card: 1 0 0;
   --card-foreground: 0.141 0.005 285.823;
@@ -59,25 +59,30 @@
 /* Dark mode theme variables - aligned with webapp design system */
 /* Color values are oklch channels only (L C H) - oklch() wrapper is added by Tailwind config */
 .dark {
-  --background: 0.14 0 0;
+  --background: 0.12 0 0;
   --foreground: 0.9 0 0;
-  --card: 0.22 0.005 260;
+  --card: 0.18 0.005 260;
   --card-foreground: 0.9 0 0;
-  --popover: 0.24 0.005 260;
-  --popover-foreground: 0.9 0 0;
+  --popover: 0.22 0 0;
+  --popover-foreground: 0.87 0 0;
   --primary: 0.922 0 0;
   --primary-foreground: 0.205 0 0;
-  --secondary: 0.3 0 0;
-  --secondary-foreground: 0.9 0 0;
-  --muted: 0.26 0 0;
-  --muted-foreground: 0.7 0 0;
-  --accent: 0.35 0 0;
-  --accent-foreground: 0.9 0 0;
+  --secondary: 0.269 0 0;
+  --secondary-foreground: 0.87 0 0;
+  --muted: 0.269 0 0;
+  --muted-foreground: 0.75 0 0;
+  --accent: 0.269 0 0;
+  --accent-foreground: 0.87 0 0;
   --destructive: 0.704 0.191 22.216;
   --destructive-foreground: 0.96 0.01 0;
-  --border: 0.388 0 0;
-  --input: 0.35 0 0;
+  --border: 0.288 0 0;
+  --input: 0.351 0 0;
   --ring: 0.65 0 0;
+  --chart-1: 0.488 0.243 264.376;
+  --chart-2: 0.696 0.17 162.48;
+  --chart-3: 0.769 0.188 70.08;
+  --chart-4: 0.627 0.265 303.9;
+  --chart-5: 0.645 0.246 16.439;
   --success: 0.696 0.17 162.48;
   --success-foreground: 0.15 0 0;
   --warning: 0.769 0.188 70.08;
@@ -90,7 +95,7 @@
   --sidebar-primary-foreground: 0.87 0 0;
   --sidebar-accent: 0.269 0 0;
   --sidebar-accent-foreground: 0.87 0 0;
-  --sidebar-border: 0.328 0 0;
+  --sidebar-border: 0.288 0 0;
   --sidebar-ring: 0.65 0 0;
 }
 

@@ -4,7 +4,13 @@ import { highlightForms } from './highlightForms';
 import { disableOtherButtons, resetOverlays, showLoadingIndicator } from './overlayUtils';
 import { runTestModeFill } from './testModeHelpers';
 import { unifiedFieldRegistry } from './unifiedFieldDetection';
-import { aiFillService, getMatchingWebsite, createDebugLogger } from '@extension/shared';
+import {
+  aiFillService,
+  getMatchingWebsite,
+  createDebugLogger,
+  ApiQuotaExceededError,
+  getConfig,
+} from '@extension/shared';
 import { profileStorage } from '@extension/storage';
 import type { FormUpdateResults } from './fieldUpdaterHelpers';
 import type { Field } from '@extension/shared';
@@ -227,6 +233,24 @@ export const handleFormClick = async (
   } catch (error) {
     cleanup();
     debug.error('Form Click: Error processing AI fill service:', error);
+
+    // Handle quota exceeded errors specially
+    if (error instanceof ApiQuotaExceededError) {
+      const config = getConfig();
+      const pricingUrl = `${config.baseURL}/pricing`;
+
+      if (error.shouldPromptSubscription) {
+        const shouldRedirect = confirm(
+          `${error.message}\n\nWould you like to subscribe to Pro for unlimited form filling?`,
+        );
+        if (shouldRedirect) {
+          window.open(pricingUrl, '_blank');
+        }
+      } else {
+        alert(`${error.message}\n\nPlease upgrade your subscription at ${pricingUrl}`);
+      }
+      return;
+    }
 
     const errorMessage =
       error instanceof FieldUpdateError

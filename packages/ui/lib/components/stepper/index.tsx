@@ -17,31 +17,37 @@ const Stepper = ({ steps, handleNext, handlePrev, handleFinish, isLoading, curre
   };
 
   return (
-    <div className="filliny-flex filliny-h-full filliny-flex-col filliny-justify-between">
-      <div className="filliny-mb-4 filliny-flex filliny-justify-between">
+    <div className="filliny-flex filliny-h-full filliny-flex-col">
+      <div className="filliny-flex filliny-border-b filliny-border-border">
         {steps.map((step, index) => (
           <div
             key={index}
-            className={`filliny-flex-1 filliny-py-2 filliny-text-center ${
+            className={`filliny-flex-1 filliny-py-2.5 filliny-text-center filliny-text-sm ${
               index === currentStep
-                ? 'filliny-font-semibold filliny-text-primary'
+                ? 'filliny-font-semibold filliny-text-primary filliny-border-b-2 filliny-border-primary'
                 : 'filliny-font-normal filliny-text-muted-foreground'
             }`}>
             {step.title}
           </div>
         ))}
       </div>
-      <div className="filliny-mb-4 filliny-flex-1 filliny-overflow-auto filliny-p-2">{steps[currentStep].content}</div>
-      <div className="filliny-flex filliny-justify-between">
-        <Button variant="secondary" type="button" onClick={prevStep} disabled={currentStep === 0}>
+      <div className="filliny-flex-1 filliny-overflow-auto filliny-px-4 filliny-py-4">{steps[currentStep].content}</div>
+      <div className="filliny-flex filliny-items-center filliny-justify-between filliny-border-t filliny-border-border filliny-px-4 filliny-py-4">
+        <Button variant="outline" size="sm" type="button" onClick={prevStep} disabled={currentStep === 0}>
           Prev
         </Button>
         {currentStep === steps.length - 1 ? (
-          <Button variant="default" type="button" disabled={isLoading} loading={isLoading} onClick={handleFinish}>
+          <Button
+            variant="default"
+            size="sm"
+            type="button"
+            disabled={isLoading}
+            loading={isLoading}
+            onClick={handleFinish}>
             Finish
           </Button>
         ) : (
-          <Button variant="default" type="button" onClick={nextStep}>
+          <Button variant="default" size="sm" type="button" onClick={nextStep}>
             Next
           </Button>
         )}

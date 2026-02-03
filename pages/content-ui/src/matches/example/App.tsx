@@ -8,11 +8,12 @@ export default function App() {
   }, []);
 
   return (
-    <div className="flex items-center justify-between gap-2 rounded bg-blue-100 px-2 py-1">
-      <div className="flex gap-1 text-xs text-blue-500">
-        Edit <strong className="text-blue-700">pages/content-ui/src/matches/example/App.tsx</strong> and save to reload.
+    <div className="filliny-flex filliny-items-center filliny-justify-between filliny-gap-2 filliny-rounded filliny-bg-blue-100 filliny-px-2 filliny-py-1">
+      <div className="filliny-flex filliny-gap-1 filliny-text-xs filliny-text-blue-500">
+        Edit <strong className="filliny-text-blue-700">pages/content-ui/src/matches/example/App.tsx</strong> and save to
+        reload.
       </div>
-      <ToggleButton className={'mt-0'}>{t('toggleTheme')}</ToggleButton>
+      <ToggleButton className={'filliny-mt-0'}>{t('toggleTheme')}</ToggleButton>
     </div>
   );
 }

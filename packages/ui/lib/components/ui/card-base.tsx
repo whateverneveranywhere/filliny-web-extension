@@ -4,16 +4,16 @@ import * as React from 'react';
 import type { VariantProps } from 'class-variance-authority';
 
 const cardBaseVariants = cva(
-  'filliny-rounded-xl filliny-border filliny-bg-card/95 filliny-backdrop-blur-sm filliny-text-card-foreground',
+  'filliny-rounded-xl filliny-border filliny-border-border filliny-bg-card filliny-text-card-foreground',
   {
     variants: {
       variant: {
-        default: 'filliny-p-3 filliny-shadow-md',
-        feature: 'filliny-p-3 filliny-shadow-md hover:filliny-shadow-lg filliny-transition-shadow',
-        step: 'filliny-p-3 filliny-shadow-sm',
+        default: 'filliny-p-4 filliny-shadow-sm',
+        feature: 'filliny-p-4 filliny-shadow-sm hover:filliny-shadow-md filliny-transition-all filliny-duration-200',
+        step: 'filliny-p-4 filliny-shadow-sm',
       },
       hover: {
-        true: 'hover:filliny-bg-accent/50 filliny-transition-colors filliny-cursor-pointer',
+        true: 'hover:filliny-bg-accent/30 hover:filliny-shadow-md filliny-transition-all filliny-duration-200 filliny-cursor-pointer',
         false: '',
       },
     },
@@ -65,7 +65,7 @@ const CardBaseTitle = React.forwardRef<HTMLHeadingElement, CardBaseTitleProps>(
   ({ className, children, ...props }, ref) => (
     <h3
       ref={ref}
-      className={cn('filliny-text-base filliny-font-semibold filliny-leading-snug filliny-text-foreground', className)}
+      className={cn('filliny-font-semibold filliny-leading-none filliny-text-foreground', className)}
       {...props}>
       {children}
     </h3>

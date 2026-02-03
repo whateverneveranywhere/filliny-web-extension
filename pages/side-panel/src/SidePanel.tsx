@@ -1,10 +1,8 @@
-import { useExtensionAuth, useStorage } from '@extension/shared';
-import { authStorage } from '@extension/storage';
+import { useExtensionAuth } from '@extension/shared';
 import { Loading, QueryClientProvider, RouterProvider, SigninPage, withPageWrapper } from '@extension/ui';
 
 const HomePage = () => {
-  const auth = useStorage(authStorage);
-  const { isLoading } = useExtensionAuth();
+  const { isLoading, isAuthenticated } = useExtensionAuth();
 
   if (isLoading) {
     return <Loading fullScreen />;
@@ -12,10 +10,8 @@ const HomePage = () => {
 
   return (
     <QueryClientProvider>
-      {auth ? (
-        <>
-          <RouterProvider />
-        </>
+      {isAuthenticated ? (
+        <RouterProvider />
       ) : (
         <SigninPage />
       )}

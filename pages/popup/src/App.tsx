@@ -1,5 +1,4 @@
-import { useExtensionAuth, useStorage, getConfig, WebappEnvs } from '@extension/shared';
-import { authStorage } from '@extension/storage';
+import { useExtensionAuth, getConfig, WebappEnvs } from '@extension/shared';
 import { Loading, QueryClientProvider, RouterProvider, SigninPage, withPageWrapper } from '@extension/ui';
 import { useEffect, useState } from 'react';
 
@@ -11,8 +10,7 @@ interface ConfigInfo {
 }
 
 const HomePage = () => {
-  const auth = useStorage(authStorage);
-  const { isLoading } = useExtensionAuth();
+  const { isLoading, isAuthenticated } = useExtensionAuth();
   const [configInfo, setConfigInfo] = useState<ConfigInfo | null>(null);
 
   useEffect(() => {
@@ -71,10 +69,8 @@ const HomePage = () => {
       {/* Rest of your app */}
       <div className="filliny-mt-4">
         <QueryClientProvider>
-          {auth ? (
-            <>
-              <RouterProvider />
-            </>
+          {isAuthenticated ? (
+            <RouterProvider />
           ) : (
             <SigninPage />
           )}

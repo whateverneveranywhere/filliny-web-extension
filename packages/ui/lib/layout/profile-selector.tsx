@@ -1,4 +1,3 @@
-import { Button } from '../components';
 import { Drawer } from '../components/drawer';
 import { RHFShadcnComboBox } from '../components/rhf';
 import FormProvider from '../components/rhf/FormProvider';
@@ -14,7 +13,6 @@ import {
 } from '@extension/shared';
 import { profileStorage } from '@extension/storage';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Plus } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import type { FormValues, ProfileSelectorFormValues } from '@extension/shared';
@@ -119,12 +117,24 @@ const ProfileSelector = () => {
     profileModal.onFalse();
   }, [profileModal]);
 
-  // Initialize default profile if needed
+  // Initialize default profile - auto-select first profile if none is active
+  // Note: Only sets form value, does NOT trigger API mutation to avoid page refresh
   useEffect(() => {
     if (!activeProfile && profiles?.length) {
+      // First try to find an active profile from API
       const activeFromApi = profiles.find(item => item.isActive);
       if (activeFromApi) {
         setValue('defaultActiveProfileId', String(activeFromApi.id));
+        // Also set it in storage (no API call)
+        profileStorage.setDefaultProfile(activeFromApi as unknown as DTOProfileFillingForm);
+      } else {
+        // If no active profile, just pre-select the first one in the form
+        // The user will trigger the actual selection when they interact
+        const firstProfile = profiles[0];
+        if (firstProfile) {
+          setValue('defaultActiveProfileId', String(firstProfile.id));
+          profileStorage.setDefaultProfile(firstProfile as unknown as DTOProfileFillingForm);
+        }
       }
     }
   }, [profiles, activeProfile, setValue]);
@@ -149,15 +159,17 @@ const ProfileSelector = () => {
   );
 
   return (
-    <div className="filliny-flex filliny-w-full filliny-max-w-xl filliny-items-center filliny-gap-2">
+    <div className="filliny-flex filliny-w-full filliny-max-w-md filliny-items-center">
       <FormProvider methods={methods}>
         <RHFShadcnComboBox
-          placeholder="Select or search profile"
+          placeholder="Select profile or create one"
+          emptyPlaceholder="Create a new profile"
           disabled={isDisabled}
           loading={isLoaderVisible}
           options={profileOptions}
           onDelete={handleDeleteProfile}
           onEdit={handleEditProfile}
+          onCreate={profileModal.onTrue}
           onChange={handleProfileChange}
           value={methods.watch('defaultActiveProfileId')}
           name="defaultActiveProfileId"
@@ -165,10 +177,6 @@ const ProfileSelector = () => {
           title={''}
         />
       </FormProvider>
-
-      <Button variant="default" size="sm" onClick={profileModal.onTrue} className="filliny-h-9 filliny-w-9 filliny-p-0">
-        <Plus className="filliny-h-4 filliny-w-4" />
-      </Button>
 
       <Drawer
         hideFooter

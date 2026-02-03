@@ -1,6 +1,6 @@
 import { ActiveProfileWebsitePreview } from './active-profile-website-preview';
 import { QuickAddWebsiteToProfile } from './quick-add-website';
-import { Loading, NoTokensAlert } from '../components';
+import { Loading, NoTokensAlert, CreditsFooterWarning } from '../components';
 import { useToast } from '../hooks/use-toast';
 import { PageLayout } from '../layout';
 import {
@@ -12,7 +12,7 @@ import {
   usePlanLimits,
 } from '@extension/shared';
 import { profileStorage } from '@extension/storage';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import type { DTOProfileFillingForm } from '@extension/storage';
 
 const useProfileManagement = (url: string) => {
@@ -34,10 +34,10 @@ const useProfileManagement = (url: string) => {
     }
   }, [activeProfile, profiles]);
 
-  const { currentPlan, maxWebsites, hasReachedLimit } = usePlanLimits();
+  const { currentPlan, maxWebsites, hasReachedWebsiteLimit } = usePlanLimits();
 
   const handleQuickAdd = async () => {
-    if (hasReachedLimit(activeProfile?.fillingWebsites?.length || 0)) return;
+    if (hasReachedWebsiteLimit(activeProfile?.fillingWebsites?.length || 0)) return;
 
     try {
       if (!activeProfile || !profiles?.length) {
@@ -94,13 +94,14 @@ const useProfileManagement = (url: string) => {
     isLoading,
     currentPlan,
     maxWebsites,
-    hasReachedLimit,
+    hasReachedWebsiteLimit,
   };
 };
 
 const HomePage = () => {
-  const { data: dashboardOverview, isLoading: isLoadingOverview } = useDashboardOverview();
+  const { isLoading: isLoadingOverview } = useDashboardOverview();
   const { activeProfile } = useActiveProfile();
+  const { canFillForms, isPro, freeFormsRemaining, tokensRemaining } = usePlanLimits();
   const {
     activeTabUrl,
     isLoading: isLoadingUrl,
@@ -113,6 +114,21 @@ const HomePage = () => {
 
   const { handleQuickAdd, isLoading: isProfileLoading, currentPlan, maxWebsites } = useProfileManagement(activeTabUrl);
 
+  // Footer with credit warnings - only show when user has some credits but running low
+  const footerContent = useMemo(() => {
+    // If user can fill forms, show the warning in footer when running low
+    if (canFillForms) {
+      return (
+        <CreditsFooterWarning
+          freeFormsRemaining={freeFormsRemaining}
+          tokensRemaining={tokensRemaining}
+          isPro={isPro}
+        />
+      );
+    }
+    return null;
+  }, [canFillForms, freeFormsRemaining, tokensRemaining, isPro]);
+
   if (isLoadingUrl || isLoadingOverview || isProfileLoading) {
     return (
       <PageLayout>
@@ -122,12 +138,9 @@ const HomePage = () => {
   }
 
   return (
-    <PageLayout>
+    <PageLayout footer={footerContent}>
       <>
-        <div className="filliny-flex filliny-min-h-[200px] filliny-w-full filliny-flex-col filliny-gap-4">
-          {/* Token Status */}
-          {dashboardOverview?.remainingTokens === 0 && <NoTokensAlert />}
-
+        <div className="filliny-flex filliny-flex-1 filliny-w-full filliny-flex-col filliny-gap-4">
           {isUrlValid ? (
             matchingWebsite && activeProfile ? (
               <ActiveProfileWebsitePreview
@@ -150,6 +163,9 @@ const HomePage = () => {
           ) : (
             <Loading variant="page" size="xl" message="Waiting for the page to fully load..." />
           )}
+
+          {/* Token/Free Forms exhausted - warning at bottom */}
+          {!canFillForms && <NoTokensAlert isPro={isPro} />}
         </div>
       </>
     </PageLayout>

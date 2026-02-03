@@ -52,6 +52,8 @@ const isValidUrl = (url: string): boolean => UrlSchema.safeParse(url).success;
 
 /**
  * Plan schema for subscription information
+ * NOTE: This schema is kept for backwards compatibility but may be deprecated
+ * as the new pricing model uses LimitationsSchema directly
  */
 const PlanSchema = z.object({
   id: z.number(),
@@ -67,31 +69,42 @@ const PlanSchema = z.object({
 
 /**
  * User schema for authenticated user information
+ * Updated to match the API's AuthHealthUserSchema
  */
 const UserSchema = z.object({
   id: z.string(),
-  name: z.string(),
   email: z.string(),
-  emailVerified: z.null(),
-  image: z.string(),
-  formFillingsCredit: z.number(),
-  phone: z.string(),
+  name: z.string().nullable(),
+  image: z.string().nullable(),
+  phone: z.string().nullable(),
+  emailVerified: z.string().nullable(),
+  stripeCustomerId: z.string().nullable().optional(),
+  createdAt: z.string().optional(),
+  updatedAt: z.string().optional(),
 });
 
 /**
  * Limitations schema for user plan limitations
+ * Updated to match the new pricing model from API
+ *
+ * Pricing Model:
+ * - Free tier: 5 free form fills, 1 profile, 3 websites per profile
+ * - Pro tier: $29/month, 50M tokens, 100 profiles, 500 websites per profile
  */
 const LimitationsSchema = z.object({
-  plan: PlanSchema.nullable().optional(),
   maxFillingProfiles: z.number(),
   maxWebsitesPerProfile: z.number(),
+  tokensRemaining: z.number(),
+  freeFormsRemaining: z.number().optional(), // Only for free tier users
+  isProSubscriber: z.boolean().optional(), // True if user has Pro subscription
 });
 
 /**
  * Auth health check response schema
+ * Matches the API's AuthHealthDataSchema
  */
 const AuthHealthCheckSchema = z.object({
-  status: z.enum(['success', 'error']),
+  status: z.literal('success'),
   user: UserSchema,
   limitations: LimitationsSchema,
 });
@@ -102,12 +115,17 @@ const AuthHealthCheckSchema = z.object({
 
 /**
  * Dashboard overview response schema
+ *
+ * For free users: remainingTokens = 0, freeFormsRemaining >= 0
+ * For Pro users: remainingTokens > 0, freeFormsRemaining = undefined
  */
 const DTOOverviewSchema = z.object({
   aiHistoryCount: z.number(),
   fillingProfilesCount: z.number(),
   fillingWebsitesCount: z.number(),
   remainingTokens: z.number(),
+  freeFormsRemaining: z.number().optional(), // Only for free tier users
+  isProSubscriber: z.boolean().optional(), // True if user has Pro subscription
 });
 
 // ============================================================================
@@ -550,6 +568,50 @@ const ProfileSelectorSchema = z.object({
 });
 
 // ============================================================================
+// User Status Schema (derived from Limitations for UI convenience)
+// ============================================================================
+
+/**
+ * UserStatus schema - combines limitations data with computed properties
+ * Used by UI components to determine what features are available
+ *
+ * Pricing Model:
+ * - Free tier: 5 free form fills, 1 profile, 3 websites per profile
+ * - Pro tier: $29/month, 50M tokens, 100 profiles, 500 websites per profile
+ *
+ * isPro is computed based on: isProSubscriber flag OR tokensRemaining > 0
+ */
+const UserStatusSchema = z.object({
+  tokensRemaining: z.number(),
+  freeFormsRemaining: z.number().optional(), // Only for free tier users
+  maxProfiles: z.number(),
+  maxWebsitesPerProfile: z.number(),
+  isPro: z.boolean(),
+});
+
+/**
+ * Helper to compute isPro status from limitations
+ * A user is considered Pro if they have the isProSubscriber flag OR tokens remaining
+ */
+const computeIsPro = (limitations: {
+  tokensRemaining: number;
+  isProSubscriber?: boolean;
+  maxFillingProfiles: number;
+}): boolean =>
+  // User is Pro if they have explicit subscription flag, tokens, or subscription-level limits
+  limitations.isProSubscriber === true || limitations.tokensRemaining > 0 || limitations.maxFillingProfiles > 1;
+/**
+ * Transform AuthHealthCheckResponse limitations into UserStatus
+ */
+const toUserStatus = (limitations: Limitations): UserStatus => ({
+  tokensRemaining: limitations.tokensRemaining,
+  freeFormsRemaining: limitations.freeFormsRemaining,
+  maxProfiles: limitations.maxFillingProfiles,
+  maxWebsitesPerProfile: limitations.maxWebsitesPerProfile,
+  isPro: computeIsPro(limitations),
+});
+
+// ============================================================================
 // Type Exports (inferred from schemas)
 // ============================================================================
 
@@ -558,6 +620,7 @@ type Plan = z.infer<typeof PlanSchema>;
 type User = z.infer<typeof UserSchema>;
 type Limitations = z.infer<typeof LimitationsSchema>;
 type AuthHealthCheckResponse = z.infer<typeof AuthHealthCheckSchema>;
+type UserStatus = z.infer<typeof UserStatusSchema>;
 
 // Dashboard types
 type DTOOverviewResponse = z.infer<typeof DTOOverviewSchema>;
@@ -616,7 +679,10 @@ type FillingWebsiteFormItem = z.infer<typeof FillingWebsiteFormItemSchema>;
 export { UrlSchema, isValidUrl };
 
 // Auth Schemas
-export { PlanSchema, UserSchema, LimitationsSchema, AuthHealthCheckSchema };
+export { PlanSchema, UserSchema, LimitationsSchema, AuthHealthCheckSchema, UserStatusSchema };
+
+// User Status Helpers
+export { computeIsPro, toUserStatus };
 
 // Dashboard Schemas
 export { DTOOverviewSchema };
@@ -674,6 +740,7 @@ export type {
   User,
   Limitations,
   AuthHealthCheckResponse,
+  UserStatus,
   DTOOverviewResponse,
   DTOFillingProfileItem,
   DTOFillingProfileItemResponse,

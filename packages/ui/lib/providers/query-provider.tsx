@@ -19,8 +19,19 @@ const QueryClientProvider = (props: Props) => {
             gcTime: 10 * 60 * 1000, // 10 minutes
             // Disable automatic refetching on window focus which can cause issues in browser extensions
             refetchOnWindowFocus: false,
-            // Retry failed queries but with more reasonable settings
-            retry: 2,
+            // Don't retry on 401/403 errors (auth failures shouldn't be retried)
+            // Only retry on network errors or 5xx server errors
+            retry: (failureCount, error) => {
+              // Don't retry on auth errors or client errors
+              if (error && typeof error === 'object' && 'status' in error) {
+                const status = (error as { status: number }).status;
+                if (status >= 400 && status < 500) {
+                  return false;
+                }
+              }
+              // For network/server errors, retry up to 2 times
+              return failureCount < 2;
+            },
             retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 30000),
           },
         },

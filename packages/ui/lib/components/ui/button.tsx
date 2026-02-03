@@ -6,7 +6,7 @@ import * as React from 'react';
 import type { VariantProps } from 'class-variance-authority';
 
 const buttonVariants = cva(
-  'filliny-inline-flex filliny-items-center filliny-justify-center filliny-gap-2 filliny-whitespace-nowrap filliny-rounded-md filliny-text-sm filliny-font-medium filliny-ring-offset-background filliny-transition-colors focus-visible:filliny-outline-none focus-visible:filliny-ring-1 focus-visible:filliny-ring-ring disabled:filliny-pointer-events-none disabled:filliny-opacity-50 [&_svg]:filliny-pointer-events-none [&_svg]:filliny-size-4 [&_svg]:filliny-shrink-0',
+  'filliny-inline-flex filliny-items-center filliny-justify-center filliny-gap-2 filliny-whitespace-nowrap filliny-rounded-lg filliny-text-sm filliny-font-medium filliny-ring-offset-background filliny-transition-all filliny-duration-200 focus-visible:filliny-outline-none focus-visible:filliny-ring-2 focus-visible:filliny-ring-ring focus-visible:filliny-ring-offset-2 disabled:filliny-pointer-events-none disabled:filliny-opacity-50 [&_svg]:filliny-pointer-events-none [&_svg:not([class*=size-])]:filliny-size-4 [&_svg]:filliny-shrink-0',
   {
     variants: {
       variant: {
@@ -14,7 +14,7 @@ const buttonVariants = cva(
         destructive:
           'filliny-bg-destructive filliny-text-destructive-foreground filliny-shadow-sm hover:filliny-bg-destructive/90',
         outline:
-          'filliny-border filliny-border-input filliny-bg-background/80 filliny-shadow-sm hover:filliny-bg-accent hover:filliny-text-accent-foreground',
+          'filliny-border filliny-border-input filliny-bg-background filliny-shadow-sm hover:filliny-bg-accent hover:filliny-text-accent-foreground',
         secondary:
           'filliny-bg-secondary filliny-text-secondary-foreground filliny-shadow-sm hover:filliny-bg-secondary/80',
         ghost: 'filliny-text-muted-foreground hover:filliny-bg-accent hover:filliny-text-accent-foreground',
@@ -25,7 +25,7 @@ const buttonVariants = cva(
       size: {
         default: 'filliny-h-10 filliny-px-4 filliny-py-2',
         sm: 'filliny-h-9 filliny-rounded-md filliny-px-3 filliny-py-1.5',
-        lg: 'filliny-h-12 filliny-rounded-md filliny-px-8 filliny-py-2.5',
+        lg: 'filliny-h-12 filliny-rounded-lg filliny-px-8',
         icon: 'filliny-h-10 filliny-w-10',
       },
     },

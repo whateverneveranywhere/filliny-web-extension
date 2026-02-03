@@ -45,10 +45,10 @@ const Drawer = (props: Props) => {
       <DrawerContent>
         <div className="filliny-mx-auto filliny-w-full">
           <DrawerHeader>
-            <DrawerTitle className="filliny-text-center">{title}</DrawerTitle>
+            <DrawerTitle>{title}</DrawerTitle>
             {description && <DrawerDescription>{description}</DrawerDescription>}{' '}
           </DrawerHeader>
-          <div className="filliny-p-2">{children}</div>
+          <div>{children}</div>
           {!hideFooter && (
             <DrawerFooter>
               <Button loading={isLoading} disabled={isSubmitDisabled || isLoading} type="submit" onClick={onConfirm}>

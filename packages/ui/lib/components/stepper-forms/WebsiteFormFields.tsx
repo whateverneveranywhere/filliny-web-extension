@@ -1,4 +1,4 @@
-import { RHFShadcnCheckbox, RHFShadcnTextField, RHFShadcnFileDrop } from '../rhf';
+import { RHFShadcnSwitch, RHFShadcnTextField, RHFShadcnFileDrop } from '../rhf';
 import { getConfig } from '@extension/shared';
 
 // Get base URL for example placeholder
@@ -20,7 +20,7 @@ export const WebsiteFormFields = ({ index }: WebsiteFormFieldsProps) => (
       name={`fillingWebsites[${index}].websiteUrl`}
       title="Website's URL"
     />
-    <RHFShadcnCheckbox
+    <RHFShadcnSwitch
       name={`fillingWebsites[${index}].isRootLoad`}
       title="Load it in the entire website instead of the exact given URL"
     />

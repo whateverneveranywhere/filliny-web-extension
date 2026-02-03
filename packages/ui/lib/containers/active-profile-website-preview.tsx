@@ -144,7 +144,7 @@ const ActiveProfileWebsitePreview: React.FC<Props> = ({ matchingWebsite, prefere
         isRootLoad={isRootLoad}
         hideExpandTrigger
         defaultExpanded
-        className="filliny-bg-card/50 filliny-backdrop-blur"
+        className=""
         actions={
           <div className="filliny-flex filliny-gap-2">
             <Button
@@ -165,9 +165,9 @@ const ActiveProfileWebsitePreview: React.FC<Props> = ({ matchingWebsite, prefere
             </Button>
           </div>
         }>
-        <div className="filliny-space-y-4">
+        <div className="filliny-flex filliny-flex-col filliny-gap-4">
           {/* Context Section */}
-          <div className="filliny-space-y-2">
+          <div className="filliny-flex filliny-flex-col filliny-gap-1.5">
             <Label className="filliny-text-sm filliny-font-semibold filliny-text-muted-foreground">
               Filling Context
             </Label>
@@ -176,10 +176,10 @@ const ActiveProfileWebsitePreview: React.FC<Props> = ({ matchingWebsite, prefere
             </p>
           </div>
 
-          <Separator className="filliny-my-4" />
+          <Separator />
 
           {/* Preferences Section */}
-          <div className="filliny-space-y-1">
+          <div className="filliny-flex filliny-flex-col filliny-gap-1">
             <PreferenceItem
               label="Root Load"
               value={<StatusBadge condition={matchingWebsite.isRootLoad} />}

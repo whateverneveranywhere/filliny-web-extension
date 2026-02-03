@@ -2,7 +2,6 @@
 /* eslint-disable jsx-a11y/click-events-have-key-events */
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui';
 import { Button } from '../ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Skeleton } from '../ui/skeleton';
 import { animationClasses } from '@/lib/animations';
 import { cn } from '@/lib/utils';
@@ -56,101 +55,105 @@ const WebsitePreviewCard = ({
   };
 
   return (
-    <Card
+    <div
       className={cn(
-        'filliny-w-full filliny-bg-muted/30 hover:filliny-shadow-md',
+        'filliny-flex filliny-w-full filliny-flex-col filliny-rounded-lg filliny-border filliny-border-border filliny-bg-card filliny-text-card-foreground',
         animationClasses.transition,
         className,
       )}>
-      <CardHeader className="filliny-w-full filliny-space-y-0 filliny-p-3">
-        <CardTitle className="filliny-flex filliny-w-full filliny-items-center filliny-gap-3">
-          {/* Favicon Section */}
-          <div className="filliny-shrink-0">
-            {isLoading ? (
-              <Skeleton className="filliny-h-10 filliny-w-10 filliny-rounded-md" />
-            ) : isValidURL && !faviconError ? (
-              <img
-                src={getFaviconUrl(websiteURL)}
-                alt="Website favicon"
-                width={40}
-                height={40}
-                className="filliny-rounded-md filliny-object-contain"
-                onError={() => setFaviconError(true)}
-              />
-            ) : (
-              <div className="filliny-flex filliny-h-10 filliny-w-10 filliny-items-center filliny-justify-center filliny-rounded-md filliny-bg-muted">
-                <Globe className="filliny-h-6 filliny-w-6 filliny-text-muted-foreground" />
-              </div>
-            )}
-          </div>
+      <div className="filliny-flex filliny-w-full filliny-items-center filliny-gap-2.5 filliny-p-2.5">
+        {/* Favicon Section */}
+        <div className="filliny-shrink-0">
+          {isLoading ? (
+            <Skeleton className="filliny-h-7 filliny-w-7 filliny-rounded-md" />
+          ) : isValidURL && !faviconError ? (
+            <img
+              src={getFaviconUrl(websiteURL)}
+              alt="Website favicon"
+              width={28}
+              height={28}
+              className="filliny-rounded-md filliny-object-contain"
+              onError={() => setFaviconError(true)}
+            />
+          ) : (
+            <div className="filliny-flex filliny-h-7 filliny-w-7 filliny-items-center filliny-justify-center filliny-rounded-md filliny-bg-muted">
+              <Globe className="filliny-h-4 filliny-w-4 filliny-text-muted-foreground" />
+            </div>
+          )}
+        </div>
 
-          {/* URL Section with better truncation */}
-          <div className="filliny-flex filliny-min-w-0 filliny-flex-1">
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div
-                    className={cn(
-                      'filliny-flex filliny-items-center filliny-gap-2 filliny-w-full filliny-flex-nowrap',
-                      isValidURL && 'filliny-cursor-pointer hover:filliny-text-primary',
-                    )}
-                    onClick={handleVisitWebsite}>
-                    <span className="filliny-truncate filliny-text-sm filliny-font-medium">
-                      {formattedURL || 'Enter website URL'}
-                    </span>
-                    {isValidURL && (
-                      <ExternalLink className="filliny-h-4 filliny-w-4 filliny-shrink-0 filliny-text-muted-foreground" />
-                    )}
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent side="top">
-                  <p className="filliny-text-sm">{isValidURL ? websiteURL : 'No valid URL provided'}</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          </div>
+        {/* URL Section with better truncation */}
+        <div className="filliny-flex filliny-min-w-0 filliny-flex-1">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div
+                  className={cn(
+                    'filliny-flex filliny-items-center filliny-gap-2 filliny-w-full filliny-flex-nowrap',
+                    isValidURL && 'filliny-cursor-pointer hover:filliny-text-primary',
+                  )}
+                  onClick={handleVisitWebsite}>
+                  <span className="filliny-truncate filliny-text-sm filliny-font-medium">
+                    {formattedURL || 'Enter website URL'}
+                  </span>
+                  {isValidURL && (
+                    <ExternalLink className="filliny-h-4 filliny-w-4 filliny-shrink-0 filliny-text-muted-foreground" />
+                  )}
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                <p className="filliny-text-sm">{isValidURL ? websiteURL : 'No valid URL provided'}</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
 
-          {/* Actions Section */}
-          <div className="filliny-flex filliny-shrink-0 filliny-items-center filliny-gap-2">
-            {isLoading ? (
-              <Loader2 className="filliny-h-5 filliny-w-5 filliny-animate-spin filliny-text-muted-foreground" />
-            ) : (
-              <>
-                {!hideExpandTrigger && children && (
-                  <Button
-                    type="button"
-                    size="icon"
-                    variant="ghost"
-                    onClick={() => setIsExpanded(!isExpanded)}
-                    className="hover:filliny-bg-muted filliny-h-8 filliny-w-8">
-                    {isExpanded ? (
-                      <ChevronUp className="filliny-h-4 filliny-w-4" />
-                    ) : (
-                      <ChevronDown className="filliny-h-4 filliny-w-4" />
-                    )}
-                  </Button>
-                )}
-                {onRemove && (
-                  <Button
-                    type="button"
-                    size="icon"
-                    variant="ghost"
-                    onClick={onRemove}
-                    className="hover:filliny-bg-destructive/10 hover:filliny-text-destructive filliny-h-8 filliny-w-8 filliny-text-destructive">
-                    <Trash className="filliny-h-4 filliny-w-4" />
-                  </Button>
-                )}
-                {actions}
-              </>
-            )}
-          </div>
-        </CardTitle>
-      </CardHeader>
+        {/* Actions Section */}
+        <div className="filliny-flex filliny-shrink-0 filliny-items-center filliny-gap-2">
+          {isLoading ? (
+            <Loader2 className="filliny-h-5 filliny-w-5 filliny-animate-spin filliny-text-muted-foreground" />
+          ) : (
+            <>
+              {!hideExpandTrigger && children && (
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => setIsExpanded(!isExpanded)}
+                  className="hover:filliny-bg-muted filliny-h-8 filliny-w-8">
+                  {isExpanded ? (
+                    <ChevronUp className="filliny-h-4 filliny-w-4" />
+                  ) : (
+                    <ChevronDown className="filliny-h-4 filliny-w-4" />
+                  )}
+                </Button>
+              )}
+              {onRemove && (
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  onClick={onRemove}
+                  className="hover:filliny-bg-destructive/10 hover:filliny-text-destructive filliny-h-8 filliny-w-8 filliny-text-destructive">
+                  <Trash className="filliny-h-4 filliny-w-4" />
+                </Button>
+              )}
+              {actions}
+            </>
+          )}
+        </div>
+      </div>
 
       {isExpanded && children && (
-        <CardContent className={cn('filliny-p-4 filliny-pt-0', animationClasses.slideInTop)}>{children}</CardContent>
+        <div
+          className={cn(
+            'filliny-border-t filliny-border-border filliny-px-2.5 filliny-py-2.5',
+            animationClasses.slideInTop,
+          )}>
+          {children}
+        </div>
       )}
-    </Card>
+    </div>
   );
 };
 

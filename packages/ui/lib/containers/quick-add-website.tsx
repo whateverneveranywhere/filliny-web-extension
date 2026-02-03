@@ -1,4 +1,4 @@
-import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, UpgradeBanner } from '../components';
+import { Button, UpgradeBanner } from '../components';
 import { WebsitePreviewCard } from '../components/stepper-forms/WebsitePreviewCard';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../components/ui/tooltip';
 import { useActiveTabUrl } from '@extension/shared';
@@ -25,46 +25,49 @@ const QuickAddWebsiteToProfile = ({ onQuickAdd, isLoading, currentPlan, maxWebsi
       variant={isDisabled ? 'ghost' : 'default'}
       onClick={onQuickAdd}
       disabled={isDisabled || isLoading || !isValid}
-      className="filliny-transition-all hover:filliny-scale-105">
-      <Plus />
+      className="filliny-h-8 filliny-w-8 filliny-transition-all hover:filliny-scale-105">
+      <Plus className="filliny-h-4 filliny-w-4" />
     </Button>
   );
 
   return (
-    <div className="filliny-flex filliny-w-full filliny-flex-col filliny-items-center filliny-justify-center filliny-gap-4">
-      {isDisabled && <UpgradeBanner />}
+    <div className="filliny-flex filliny-w-full filliny-flex-1 filliny-flex-col">
+      {/* Top section: Quick add */}
+      <div className="filliny-flex filliny-flex-col filliny-gap-3">
+        <div className="filliny-flex filliny-flex-col filliny-gap-1.5">
+          <h3 className="filliny-text-base filliny-font-semibold filliny-leading-none filliny-text-foreground">
+            Want Filliny here?
+          </h3>
+          <p className="filliny-text-sm filliny-text-muted-foreground">
+            Add this website to your active profile to enable form-filling.
+          </p>
+        </div>
 
-      <Card className="filliny-w-full">
-        <CardHeader>
-          <CardTitle>Want Filliny here?</CardTitle>{' '}
-          <CardDescription>
-            Quickly add this website to your active profile to enable Filliny's form-filling capabilities.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="filliny-space-y-4">
-            <WebsitePreviewCard
-              websiteURL={activeTabUrl}
-              isRootLoad
-              hideExpandTrigger
-              isLoading={isLoading || isLoadingUrl}
-              actions={
-                <TooltipProvider>
-                  <Tooltip delayDuration={200}>
-                    <TooltipTrigger>{button}</TooltipTrigger>
-                    <TooltipContent className="filliny-max-w-xs">{tooltipText}</TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              }
-            />
-            {isLoadingUrl && (
-              <p className="filliny-text-center filliny-text-sm filliny-text-muted-foreground">
-                Loading website information...
-              </p>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+        <WebsitePreviewCard
+          websiteURL={activeTabUrl}
+          isRootLoad
+          hideExpandTrigger
+          isLoading={isLoading || isLoadingUrl}
+          actions={
+            <TooltipProvider>
+              <Tooltip delayDuration={200}>
+                <TooltipTrigger>{button}</TooltipTrigger>
+                <TooltipContent className="filliny-max-w-xs">{tooltipText}</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          }
+        />
+        {isLoadingUrl && (
+          <p className="filliny-text-sm filliny-text-muted-foreground">Loading website information...</p>
+        )}
+      </div>
+
+      {/* Bottom section: Upgrade banner pushed to bottom */}
+      {isDisabled && (
+        <div className="filliny-mt-auto filliny-pt-4">
+          <UpgradeBanner />
+        </div>
+      )}
     </div>
   );
 };

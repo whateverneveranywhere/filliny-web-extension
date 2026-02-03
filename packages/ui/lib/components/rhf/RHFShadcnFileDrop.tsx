@@ -102,7 +102,7 @@ const RHFShadcnFileDrop = ({
   return (
     <div className="filliny-space-y-2">
       {title && (
-        <label className="filliny-text-sm filliny-font-medium filliny-leading-none filliny-peer-disabled:filliny-cursor-not-allowed filliny-peer-disabled:filliny-opacity-70">
+        <label className="filliny-text-sm filliny-font-medium filliny-leading-none peer-disabled:filliny-cursor-not-allowed peer-disabled:filliny-opacity-70">
           {title}
         </label>
       )}

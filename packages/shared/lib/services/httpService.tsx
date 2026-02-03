@@ -1,4 +1,3 @@
-import { apiEndpoints } from './endpoints.js';
 import { getConfig } from '../utils/index.js';
 import { authStorage } from '@extension/storage';
 import { z } from 'zod';
@@ -93,14 +92,52 @@ class ApiTimeoutError extends Error {
   }
 }
 
-const config = getConfig();
+/**
+ * Error type for quota/limit exceeded responses (403 Forbidden)
+ * Used when user has no tokens or free forms remaining
+ */
+class ApiQuotaExceededError extends Error {
+  constructor(
+    message: string,
+    public readonly errorType: 'no_tokens' | 'no_free_forms' | 'limit_exceeded',
+  ) {
+    super(message);
+    this.name = 'ApiQuotaExceededError';
+  }
+
+  /**
+   * Check if user should be prompted to subscribe
+   */
+  get shouldPromptSubscription(): boolean {
+    return this.errorType === 'no_tokens' || this.errorType === 'no_free_forms';
+  }
+}
+
+/**
+ * Detect quota error type from error message
+ */
+const detectQuotaErrorType = (message: string): 'no_tokens' | 'no_free_forms' | 'limit_exceeded' | null => {
+  const lowerMessage = message.toLowerCase();
+  if (lowerMessage.includes('no tokens') || lowerMessage.includes('insufficient tokens')) {
+    return 'no_tokens';
+  }
+  if (lowerMessage.includes('no free forms') || lowerMessage.includes('free forms remaining')) {
+    return 'no_free_forms';
+  }
+  if (lowerMessage.includes('limit') || lowerMessage.includes('subscribe')) {
+    return 'limit_exceeded';
+  }
+  return null;
+};
+
+const appConfig = getConfig();
 
 class HttpService {
-  private baseUrl: string;
+  private apiUrl: string;
 
-  constructor(baseUrl?: string) {
-    // Use the API URL from config, not the web app URL
-    this.baseUrl = baseUrl || config.apiURL || '';
+  constructor(apiUrl?: string) {
+    // Use the API URL from config which already includes /api/v1
+    this.apiUrl = apiUrl || appConfig.apiURL || '';
   }
 
   private async request<T>(url: string, config?: CustomFetchConfig): Promise<T> {
@@ -112,15 +149,26 @@ class HttpService {
       // Use getWithFallback to check both stored token and bearer token from web app
       const authToken = config?.authToken || (await authStorage.getWithFallback()) || '';
       const headers = new Headers(config?.headers || {});
-      const finalBaseUrl = config?.baseUrl || this.baseUrl;
+      const finalApiUrl = config?.baseUrl || this.apiUrl;
+
+      console.log('[HTTP Service] Auth token received:', authToken ? `${authToken.substring(0, 20)}...` : 'empty');
 
       if (authToken) {
         headers.set('Authorization', `Bearer ${authToken}`);
+        console.log('[HTTP Service] Authorization header set');
+      } else {
+        console.log('[HTTP Service] No auth token - skipping Authorization header');
       }
 
       headers.set('Content-Type', 'application/json');
 
-      const response = await fetch(`${finalBaseUrl}${url}`, {
+      // apiUrl already includes /api/v1, so just append the endpoint path
+      // Handle absolute URLs separately
+      const fullUrl = url.startsWith('http')
+        ? url
+        : `${finalApiUrl}${url}`;
+
+      const response = await fetch(fullUrl, {
         ...config,
         headers,
         signal: controller.signal,
@@ -130,13 +178,33 @@ class HttpService {
         const errorData: ApiErrorResponse = await response.json();
         const requestStatus = response.status;
 
-        if (requestStatus === 401 || requestStatus === 403) {
+        if (requestStatus === 401) {
           // Clear stored auth token on unauthorized responses
           await authStorage.set('');
-          throw new ApiUnauthorizedError(
-            errorData.message || 'Unauthorized: Please log in again',
-            requestStatus as 401 | 403,
-          );
+
+          // Notify the extension that auth is invalid (only in extension context)
+          if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+            try {
+              chrome.runtime.sendMessage({
+                action: 'AUTH_TOKEN_CHANGED',
+                payload: { success: { token: null } },
+              });
+            } catch {
+              // Ignore errors - this is best effort notification
+            }
+          }
+
+          throw new ApiUnauthorizedError(errorData.message || 'Unauthorized: Please log in again', 401);
+        }
+
+        if (requestStatus === 403) {
+          // Check if this is a quota/limit error
+          const quotaErrorType = detectQuotaErrorType(errorData.message || '');
+          if (quotaErrorType) {
+            throw new ApiQuotaExceededError(errorData.message || 'Quota exceeded', quotaErrorType);
+          }
+          // Otherwise treat as authorization error
+          throw new ApiUnauthorizedError(errorData.message || 'Forbidden: Access denied', 403);
         }
 
         throw new Error(errorData.message || 'An unexpected error occurred');
@@ -221,7 +289,7 @@ class HttpService {
   async requestViaBackground<T>(url: string, config?: CustomFetchConfig): Promise<T> {
     const message = {
       type: 'API_REQUEST',
-      url: `${config?.baseUrl || this.baseUrl}${url}`,
+      url: `${config?.baseUrl || this.apiUrl}${url}`,
       options: {
         ...config,
         headers: {
@@ -254,6 +322,8 @@ export {
   ApiValidationError,
   ApiUnauthorizedError,
   ApiTimeoutError,
+  ApiQuotaExceededError,
+  detectQuotaErrorType,
   ApiDefaultErrorSchema,
   ApiErrorDetailsSchema,
   ApiErrorResponseSchema,

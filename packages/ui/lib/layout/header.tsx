@@ -1,7 +1,7 @@
 import { ProfileSelector } from './profile-selector';
 import { TokenDisplay } from '../components';
 import { Logo } from '../components/logo';
-import { getConfig, useDashboardOverview } from '@extension/shared';
+import { getConfig, useDashboardOverview, usePlanLimits } from '@extension/shared';
 
 const config = getConfig();
 // Dashboard path for the dashboard route
@@ -9,35 +9,37 @@ const dashboardPath = '/dashboard';
 
 const Header = () => {
   const { data, refetch, isRefetching, isLoading } = useDashboardOverview();
+  const { isPro, freeFormsRemaining } = usePlanLimits();
 
   const handleRefresh = async () => {
     await refetch();
   };
 
   return (
-    <header className="filliny-sticky filliny-top-0 filliny-z-50 filliny-w-full filliny-border-b filliny-border-border filliny-bg-background/95 filliny-backdrop-blur supports-[backdrop-filter]:filliny-bg-background/60">
-      <div className="filliny-flex filliny-h-12 filliny-items-center filliny-justify-between filliny-px-3">
-        {/* Left section - 1/5 width */}
-        <div className="filliny-flex filliny-w-1/5 filliny-items-center filliny-gap-4">
+    <header className="filliny-sticky filliny-top-0 filliny-z-50 filliny-w-full filliny-border-b filliny-border-border filliny-bg-background">
+      <div className="filliny-flex filliny-h-14 filliny-items-center filliny-gap-3 filliny-px-4">
+        <div className="filliny-shrink-0">
           <TokenDisplay
             tokens={data?.remainingTokens || 0}
+            freeFormsRemaining={freeFormsRemaining}
+            isPro={isPro}
             onRefresh={handleRefresh}
             isRefetching={isRefetching}
             isLoading={isLoading}
           />
         </div>
 
-        {/* Center section - 3/5 width */}
-        <div className="filliny-flex filliny-w-3/5 filliny-items-center filliny-justify-center">
+        <div className="filliny-flex filliny-min-w-0 filliny-flex-1 filliny-justify-center">
           <ProfileSelector />
         </div>
 
-        {/* Right section - 1/5 width */}
-        <div className="filliny-flex filliny-w-1/5 filliny-items-center filliny-justify-end filliny-gap-3">
-          <a href={`${config.baseURL}${dashboardPath}`} target="_blank" rel="noopener noreferrer">
-            <Logo width={40} height={40} />
-          </a>
-        </div>
+        <a
+          className="filliny-shrink-0"
+          href={`${config.baseURL}${dashboardPath}`}
+          target="_blank"
+          rel="noopener noreferrer">
+          <Logo width={24} height={24} />
+        </a>
       </div>
     </header>
   );
