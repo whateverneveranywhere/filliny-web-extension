@@ -56,9 +56,14 @@ const WebsitePreviewCard = ({
   };
 
   return (
-    <Card className={cn('w-full hover:shadow-md', animationClasses.transition, className)}>
-      <CardHeader className="filliny-w-full filliny-space-y-0 !filliny-p-2">
-        <CardTitle className="filliny-flex filliny-w-full filliny-items-center filliny-gap-4 !filliny-p-1">
+    <Card
+      className={cn(
+        'filliny-w-full filliny-bg-muted/30 hover:filliny-shadow-md',
+        animationClasses.transition,
+        className,
+      )}>
+      <CardHeader className="filliny-w-full filliny-space-y-0 filliny-p-3">
+        <CardTitle className="filliny-flex filliny-w-full filliny-items-center filliny-gap-3">
           {/* Favicon Section */}
           <div className="filliny-shrink-0">
             {isLoading ? (
@@ -143,7 +148,7 @@ const WebsitePreviewCard = ({
       </CardHeader>
 
       {isExpanded && children && (
-        <CardContent className={cn('p-4 pt-0', animationClasses.slideInTop)}>{children}</CardContent>
+        <CardContent className={cn('filliny-p-4 filliny-pt-0', animationClasses.slideInTop)}>{children}</CardContent>
       )}
     </Card>
   );

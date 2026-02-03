@@ -172,6 +172,69 @@ chrome.runtime.onMessageExternal.addListener((request, sender, sendResponse) => 
     return true;
   }
 
+  // Handle bearer token set from web app (after sign-in)
+  if (request.type === MessageType.SET_BEARER_TOKEN && request.token) {
+    // Verify the sender is from a trusted origin
+    const configToUse = getConfig();
+    const trustedOrigins = [
+      configToUse.baseURL,
+      'https://filliny.io',
+      'https://filliny.com',
+      'https://www.filliny.io',
+      'https://www.filliny.com',
+      'https://preview.filliny.com',
+      'http://localhost:5173',
+      'http://localhost:5174',
+    ];
+
+    const senderOrigin = sender.origin || sender.url?.split('/').slice(0, 3).join('/');
+    if (senderOrigin && trustedOrigins.some(origin => senderOrigin.startsWith(origin.replace(/\/$/, '')))) {
+      // Store the token in extension storage
+      chrome.storage.local.set({ bearer_token: request.token }, () => {
+        if (chrome.runtime.lastError) {
+          console.error('[Background] Failed to store bearer token:', chrome.runtime.lastError);
+          sendResponse({ success: false, error: chrome.runtime.lastError.message });
+        } else {
+          console.log('[Background] Bearer token stored successfully');
+          sendResponse({ success: true });
+
+          // Broadcast to all extension contexts
+          chrome.runtime.sendMessage({
+            type: MessageType.SET_BEARER_TOKEN,
+            token: request.token,
+          });
+        }
+      });
+      return true; // Keep message channel open for async response
+    } else {
+      console.warn('[Background] Rejected bearer token from untrusted origin:', senderOrigin);
+      sendResponse({ success: false, error: 'Untrusted origin' });
+      return true;
+    }
+  }
+
+  // Handle bearer token clear (logout from web app)
+  if (request.type === MessageType.CLEAR_BEARER_TOKEN) {
+    chrome.storage.local.remove('bearer_token', () => {
+      console.log('[Background] Bearer token cleared');
+      sendResponse({ success: true });
+
+      // Broadcast to all extension contexts
+      chrome.runtime.sendMessage({
+        type: MessageType.CLEAR_BEARER_TOKEN,
+      });
+    });
+    return true;
+  }
+
+  // Handle get bearer token request
+  if (request.type === MessageType.GET_BEARER_TOKEN) {
+    chrome.storage.local.get('bearer_token', result => {
+      sendResponse({ token: result.bearer_token || null });
+    });
+    return true;
+  }
+
   return false;
 });
 

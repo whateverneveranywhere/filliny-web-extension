@@ -3,23 +3,26 @@ import { cva } from 'class-variance-authority';
 import * as React from 'react';
 import type { VariantProps } from 'class-variance-authority';
 
-const cardBaseVariants = cva('filliny-rounded-xl filliny-border filliny-bg-card filliny-text-card-foreground', {
-  variants: {
-    variant: {
-      default: 'filliny-p-6 filliny-shadow-sm',
-      feature: 'filliny-p-6 filliny-shadow-sm hover:filliny-shadow-md filliny-transition-shadow',
-      step: 'filliny-p-6',
+const cardBaseVariants = cva(
+  'filliny-rounded-xl filliny-border filliny-bg-card/95 filliny-backdrop-blur-sm filliny-text-card-foreground',
+  {
+    variants: {
+      variant: {
+        default: 'filliny-p-3 filliny-shadow-md',
+        feature: 'filliny-p-3 filliny-shadow-md hover:filliny-shadow-lg filliny-transition-shadow',
+        step: 'filliny-p-3 filliny-shadow-sm',
+      },
+      hover: {
+        true: 'hover:filliny-bg-accent/50 filliny-transition-colors filliny-cursor-pointer',
+        false: '',
+      },
     },
-    hover: {
-      true: 'hover:filliny-bg-accent/50 filliny-transition-colors filliny-cursor-pointer',
-      false: '',
+    defaultVariants: {
+      variant: 'default',
+      hover: false,
     },
   },
-  defaultVariants: {
-    variant: 'default',
-    hover: false,
-  },
-});
+);
 
 interface CardBaseProps extends React.HTMLAttributes<HTMLDivElement>, VariantProps<typeof cardBaseVariants> {}
 
@@ -60,7 +63,10 @@ interface CardBaseTitleProps extends React.HTMLAttributes<HTMLHeadingElement> {
 
 const CardBaseTitle = React.forwardRef<HTMLHeadingElement, CardBaseTitleProps>(
   ({ className, children, ...props }, ref) => (
-    <h3 ref={ref} className={cn('filliny-text-lg filliny-font-semibold filliny-text-foreground', className)} {...props}>
+    <h3
+      ref={ref}
+      className={cn('filliny-text-base filliny-font-semibold filliny-leading-snug filliny-text-foreground', className)}
+      {...props}>
       {children}
     </h3>
   ),

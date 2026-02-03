@@ -23,6 +23,6 @@
 
 code {
   background: oklch(from var(--muted) l c h / 50%);
-  border-radius: 0.25rem;
+  border-radius: var(--radius-sm);
   padding: 0.2rem 0.5rem;
 }

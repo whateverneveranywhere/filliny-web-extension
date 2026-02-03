@@ -15,8 +15,8 @@ const Header = () => {
   };
 
   return (
-    <header className="filliny-sticky filliny-top-0 filliny-z-50 filliny-w-full filliny-bg-background/95 filliny-backdrop-blur supports-[backdrop-filter]:filliny-bg-background/60">
-      <div className="filliny-flex filliny-h-14 filliny-items-center filliny-justify-between">
+    <header className="filliny-sticky filliny-top-0 filliny-z-50 filliny-w-full filliny-border-b filliny-border-border filliny-bg-background/95 filliny-backdrop-blur supports-[backdrop-filter]:filliny-bg-background/60">
+      <div className="filliny-flex filliny-h-12 filliny-items-center filliny-justify-between filliny-px-3">
         {/* Left section - 1/5 width */}
         <div className="filliny-flex filliny-w-1/5 filliny-items-center filliny-gap-4">
           <TokenDisplay

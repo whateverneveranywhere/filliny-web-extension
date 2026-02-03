@@ -3,7 +3,7 @@ import * as React from 'react';
 
 const Table = React.forwardRef<HTMLTableElement, React.HTMLAttributes<HTMLTableElement>>(
   ({ className, ...props }, ref) => (
-    <div className={`filliny-relative filliny-w-full filliny-overflow-auto filliny-rounded-xl filliny-bg-white`}>
+    <div className={`filliny-relative filliny-w-full filliny-overflow-auto filliny-rounded-xl filliny-bg-background`}>
       <table ref={ref} className={cn('filliny-w-full filliny-caption-bottom filliny-text-sm', className)} {...props} />
     </div>
   ),

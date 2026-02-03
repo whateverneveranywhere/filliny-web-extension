@@ -11,10 +11,10 @@ const RecordFormButton: React.FC<ButtonComponentProps> = () => {
     <Button
       variant={'default'}
       size={'icon'}
-      className="filliny-size-9 filliny-rounded-full filliny-bg-black filliny-text-white hover:filliny-bg-black"
+      className="filliny-size-9 filliny-rounded-full filliny-bg-primary filliny-text-primary-foreground hover:filliny-bg-primary/90"
       onClick={() => highlightForms({ visionOnly: true })}
       disabled={!isDOMReady}>
-      <div className="filliny-size-4 filliny-rounded-full filliny-bg-red-500" />
+      <div className="filliny-size-4 filliny-rounded-full filliny-bg-destructive" />
     </Button>
   );
 };

@@ -17,14 +17,16 @@ interface OverlayProps {
  */
 const LoadingState: React.FC = () => (
   <div
-    className="filliny-flex filliny-flex-col filliny-items-center filliny-gap-4 filliny-text-white"
+    className="filliny-flex filliny-flex-col filliny-items-center filliny-gap-4 filliny-text-primary-foreground"
     style={{ pointerEvents: 'auto' }}>
     <div className="filliny-h-8 filliny-w-8 filliny-animate-spin">
       <Loader2 className="filliny-h-full filliny-w-full" />
     </div>
     <div className="filliny-text-center">
       <p className="filliny-text-lg filliny-font-semibold">Filling Your Form</p>
-      <p className="filliny-text-sm filliny-text-white/80">AI is intelligently completing your form fields...</p>
+      <p className="filliny-text-sm filliny-text-primary-foreground/80">
+        AI is intelligently completing your form fields...
+      </p>
     </div>
   </div>
 );
@@ -64,7 +66,7 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
         <Wand2 className="filliny-h-5 filliny-w-5" />
         {testMode ? 'Test Fill Form' : 'Auto-Fill Form'}
       </Button>
-      <p className="filliny-text-sm filliny-text-white/80">
+      <p className="filliny-text-sm filliny-text-primary-foreground/80">
         {isFormLikelyOutOfView
           ? 'Click to scroll to form and auto-fill'
           : `Click to automatically fill out this form with ${testMode ? 'test data' : 'AI'}`}
@@ -75,7 +77,7 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
       size="icon"
       type="button"
       variant="ghost"
-      className="filliny-fixed filliny-right-4 filliny-top-4 filliny-h-8 filliny-w-8 filliny-rounded-full filliny-bg-white/10 filliny-text-white hover:filliny-bg-white/20"
+      className="filliny-fixed filliny-right-4 filliny-top-4 filliny-h-8 filliny-w-8 filliny-rounded-full filliny-bg-muted/30 filliny-text-primary-foreground hover:filliny-bg-muted/50"
       style={{ pointerEvents: 'auto' }}
       onClick={onDismiss}
       aria-label="Close overlay">
@@ -123,8 +125,8 @@ const OverlayContainer: React.FC<OverlayContainerProps> = ({
       ref={overlayRef}
       className={`filliny-pointer-events-auto filliny-fixed filliny-flex filliny-items-center filliny-justify-center filliny-transition-all filliny-duration-300 ${
         loading
-          ? 'filliny-bg-black/40 filliny-backdrop-blur-sm'
-          : 'filliny-rounded-lg filliny-bg-black/30 filliny-backdrop-blur-md hover:filliny-bg-black/40'
+          ? 'filliny-bg-foreground/40 filliny-backdrop-blur-sm'
+          : 'filliny-rounded-lg filliny-bg-foreground/30 filliny-backdrop-blur-md hover:filliny-bg-foreground/40'
       } `}
       style={overlayStyle}
       data-highlight-overlay="true"

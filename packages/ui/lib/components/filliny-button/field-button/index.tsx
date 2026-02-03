@@ -63,11 +63,11 @@ export const FieldButtonToggle: React.FC<ButtonComponentProps> = () => {
         className={cn(
           'filliny-w-7 filliny-h-7 filliny-rounded-full',
           'filliny-flex filliny-items-center filliny-justify-center',
-          'filliny-text-white filliny-border-none filliny-cursor-pointer',
+          'filliny-text-primary-foreground filliny-border-none filliny-cursor-pointer',
           'filliny-shadow-md filliny-transition-all filliny-duration-200 filliny-ease-in-out',
           'filliny-outline-none filliny-opacity-95',
           'hover:filliny-scale-110',
-          isActive ? 'filliny-bg-primary' : 'filliny-bg-secondary',
+          isActive ? 'filliny-bg-primary' : 'filliny-bg-secondary filliny-text-secondary-foreground',
           isHovered && 'filliny-scale-110',
         )}>
         <svg

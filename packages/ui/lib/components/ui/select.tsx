@@ -16,7 +16,7 @@ const SelectTrigger = React.forwardRef<
   <SelectPrimitive.Trigger
     ref={ref}
     className={cn(
-      'filliny-flex filliny-h-10 filliny-w-full filliny-items-center filliny-justify-between filliny-rounded-md filliny-border filliny-border-input filliny-bg-background filliny-px-3 filliny-py-2 filliny-text-sm filliny-ring-offset-background placeholder:filliny-text-muted-foreground focus:filliny-outline-none focus:filliny-ring-2 focus:filliny-ring-ring focus:filliny-ring-offset-2 disabled:filliny-cursor-not-allowed disabled:filliny-opacity-50 [&>span]:filliny-line-clamp-1',
+      'filliny-flex filliny-h-10 filliny-w-full filliny-items-center filliny-justify-between filliny-rounded-md filliny-border filliny-border-input filliny-bg-card/90 filliny-backdrop-blur-sm filliny-px-3 filliny-py-2 filliny-text-sm filliny-ring-offset-background placeholder:filliny-text-muted-foreground focus:filliny-outline-none focus:filliny-ring-2 focus:filliny-ring-ring focus:filliny-ring-offset-2 disabled:filliny-cursor-not-allowed disabled:filliny-opacity-50 [&>span]:filliny-line-clamp-1',
       className,
     )}
     {...props}>
@@ -68,9 +68,9 @@ const SelectContent = React.forwardRef<
     <SelectPrimitive.Content
       ref={ref}
       className={cn(
-        'filliny-relative filliny-z-50 filliny-max-h-96 filliny-min-w-[8rem] filliny-overflow-hidden filliny-rounded-md filliny-border filliny-bg-popover filliny-text-popover-foreground filliny-shadow-md data-[state=open]:filliny-animate-in data-[state=closed]:filliny-animate-out data-[state=closed]:filliny-fade-out-0 data-[state=open]:filliny-fade-in-0 data-[state=closed]:filliny-zoom-out-95 data-[state=open]:filliny-zoom-in-95 data-[side=bottom]:filliny-slide-in-from-top-2 data-[side=left]:filliny-slide-in-from-right-2 data-[side=right]:filliny-slide-in-from-left-2 data-[side=top]:filliny-slide-in-from-bottom-2',
+        'filliny-relative filliny-z-50 filliny-max-h-96 filliny-min-w-[8rem] filliny-overflow-hidden filliny-rounded-md filliny-border filliny-bg-popover/95 filliny-backdrop-blur-sm filliny-text-popover-foreground filliny-shadow-lg data-[state=open]:filliny-animate-in data-[state=closed]:filliny-animate-out data-[state=closed]:filliny-fade-out-0 data-[state=open]:filliny-fade-in-0 data-[state=closed]:filliny-zoom-out-95 data-[state=open]:filliny-zoom-in-95 data-[side=bottom]:filliny-slide-in-from-top-2 data-[side=left]:filliny-slide-in-from-right-2 data-[side=right]:filliny-slide-in-from-left-2 data-[side=top]:filliny-slide-in-from-bottom-2',
         position === 'popper' &&
-          'data-[side=bottom]:filliny-translate-y-1 data-[side=left]:filliny-translate-x-1 data-[side=right]:filliny-translate-x-1 data-[side=top]:filliny-translate-y-1',
+          'data-[side=bottom]:filliny-translate-y-1 data-[side=left]:filliny--translate-x-1 data-[side=right]:filliny-translate-x-1 data-[side=top]:filliny--translate-y-1',
         className,
       )}
       position={position}
@@ -109,7 +109,7 @@ const SelectItem = React.forwardRef<
   <SelectPrimitive.Item
     ref={ref}
     className={cn(
-      'filliny-relative filliny-flex filliny-w-full filliny-cursor-default filliny-select-none filliny-items-center filliny-rounded-sm filliny-py-1.5 filliny-pl-8 filliny-pr-2 filliny-text-sm filliny-outline-none focus:filliny-bg-accent focus:filliny-text-accent-foreground data-[disabled]:filliny-pointer-events-none data-[disabled]:filliny-opacity-50',
+      'filliny-relative filliny-flex filliny-w-full filliny-cursor-default filliny-select-none filliny-items-center filliny-rounded-sm filliny-py-1.5 filliny-pl-8 filliny-pr-2 filliny-text-sm filliny-outline-none hover:filliny-bg-accent/70 focus:filliny-bg-accent focus:filliny-text-accent-foreground data-[disabled]:filliny-pointer-events-none data-[disabled]:filliny-opacity-50',
       className,
     )}
     {...props}>

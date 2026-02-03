@@ -12,8 +12,8 @@ export const FillinyTestModeFillerButton = () => {
       variant="default"
       onClick={() => highlightForms({ visionOnly: false, testMode: true })}
       disabled={!isDOMReady}
-      className={cn(iconButtonClasses, 'filliny-text-white')}>
-      <TestTube className="filliny-size-4 filliny-text-white" />
+      className={cn(iconButtonClasses, 'filliny-text-primary-foreground')}>
+      <TestTube className="filliny-size-4" />
     </Button>
   );
 };

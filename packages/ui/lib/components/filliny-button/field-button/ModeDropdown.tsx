@@ -65,7 +65,7 @@ export const ModeDropdown: React.FC<ModeDropdownProps> = ({
   const getOptionClasses = (isActive: boolean) =>
     cn(
       optionBaseClasses,
-      isActive ? 'filliny-bg-indigo-50 filliny-font-bold filliny-text-primary' : 'hover:filliny-bg-gray-100',
+      isActive ? 'filliny-bg-primary/10 filliny-font-bold filliny-text-primary' : 'hover:filliny-bg-muted',
     );
 
   const loadingSpinnerClasses =
@@ -75,9 +75,9 @@ export const ModeDropdown: React.FC<ModeDropdownProps> = ({
     <div
       ref={dropdownRef}
       className={cn(
-        'filliny-fixed filliny-bg-white filliny-rounded-md filliny-shadow-lg',
+        'filliny-fixed filliny-bg-popover filliny-rounded-md filliny-shadow-lg',
         'filliny-py-2 filliny-z-filliny-max filliny-min-w-[160px]',
-        'filliny-text-sm filliny-text-gray-900 filliny-border filliny-border-black/10',
+        'filliny-text-sm filliny-text-popover-foreground filliny-border filliny-border-border',
         'filliny-font-sans filliny-max-h-[300px] filliny-overflow-y-auto',
       )}
       style={{ top: `${position.top}px`, left: `${position.left}px` }}
@@ -95,7 +95,7 @@ export const ModeDropdown: React.FC<ModeDropdownProps> = ({
       <div
         className={cn(
           'filliny-px-3 filliny-pt-1 filliny-pb-2 filliny-font-bold',
-          'filliny-border-b filliny-border-gray-200 filliny-mb-1',
+          'filliny-border-b filliny-border-border filliny-mb-1',
           'filliny-text-[13px] filliny-text-primary',
         )}>
         Default Fill Mode

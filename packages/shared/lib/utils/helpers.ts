@@ -58,7 +58,12 @@ const getMatchingWebsite = (websites: DTOProfileFillingForm['fillingWebsites'], 
 // Interface for config entries
 interface ConfigEntry {
   cookieName: string;
+  /** Web app URL for redirects and links */
   baseURL: string;
+  /** API URL for making requests */
+  apiURL: string;
+  /** API origin (without path) - where cookies are set */
+  apiOrigin: string;
   webappEnv: WebappEnvs;
 }
 
@@ -94,31 +99,45 @@ interface ViteImportMeta {
 }
 
 // Typed config object
+// Cookie names must match Better Auth's cookiePrefix in main app (cookiePrefix: 'filliny')
+// Better Auth uses underscore in cookie names: {prefix}.session_token
+// Dev uses non-secure cookies, preview/prod use __Secure- prefix
+// IMPORTANT: Cookies are set by the API server (apiOrigin), not the web app (baseURL)
 const config: Record<WebappEnvs, ConfigEntry> = {
   dev: {
-    cookieName: 'authjs.session-token',
+    cookieName: 'filliny.session_token',
     baseURL: 'http://localhost:5173',
+    apiURL: 'http://localhost:8787/api/v1',
+    apiOrigin: 'http://localhost:8787',
     webappEnv: WebappEnvs.DEV,
   },
   preview: {
-    cookieName: '__Secure-authjs.session-token',
-    baseURL: 'https://dev.filliny-app.pages.dev',
+    cookieName: '__Secure-filliny.session_token',
+    baseURL: 'https://preview.filliny.com',
+    apiURL: 'https://api-preview.filliny.com/api/v1',
+    apiOrigin: 'https://api-preview.filliny.com',
     webappEnv: WebappEnvs.PREVIEW,
   },
   prod: {
-    cookieName: '__Secure-authjs.session-token',
+    cookieName: '__Secure-filliny.session_token',
     baseURL: 'https://filliny.io',
+    apiURL: 'https://api.filliny.com/api/v1',
+    apiOrigin: 'https://api.filliny.com',
     webappEnv: WebappEnvs.PROD,
   },
 };
 
 const handleGetAuthToken = (
-  envConfig: { baseURL: string; cookieName: string },
+  envConfig: { apiOrigin: string; cookieName: string },
   sendResponse: (response: GetAuthTokenResponse) => void,
 ) => {
-  const getFromConfig = { url: envConfig.baseURL, name: envConfig.cookieName };
+  // Use apiOrigin for cookie lookup - cookies are set by the API server, not the web app
+  const getFromConfig = { url: envConfig.apiOrigin, name: envConfig.cookieName };
+
+  console.log('[Auth] Looking for cookie:', getFromConfig);
 
   chrome.cookies.get(getFromConfig, cookie => {
+    console.log('[Auth] Cookie result:', cookie ? 'Found' : 'Not found', cookie);
     sendResponse({
       success: { token: cookie ? cookie.value : null },
     });
@@ -247,10 +266,10 @@ const handleAuthTokenChanged = (
   envConfig: ReturnType<typeof getConfig>,
   sendResponse: (response: GetAuthTokenResponse) => void,
 ) => {
-  // Get auth token from cookie
+  // Get auth token from cookie - use apiOrigin where cookies are set
   chrome.cookies.get(
     {
-      url: envConfig.baseURL,
+      url: envConfig.apiOrigin,
       name: envConfig.cookieName,
     },
     cookie => {
@@ -306,12 +325,25 @@ const getCurrentVistingUrl = (): Promise<string> =>
 // Add a new function to listen for cookie changes
 const setupAuthTokenListener = () => {
   const envConfig = getConfig();
+  // Use apiOrigin for cookie monitoring - that's where Better Auth sets cookies
+  const apiHostname = new URL(envConfig.apiOrigin).hostname;
+
+  console.log('[Auth] Setting up cookie listener for:', apiHostname, envConfig.cookieName);
 
   // Listen for changes to the specific cookie
+  // Cookie domain may include leading dot for cross-subdomain cookies (e.g., '.filliny.com')
   chrome.cookies.onChanged.addListener(changeInfo => {
     const { cookie } = changeInfo;
+    const cookieDomain = cookie.domain.startsWith('.') ? cookie.domain.slice(1) : cookie.domain;
 
-    if (cookie.domain === new URL(envConfig.baseURL).hostname && cookie.name === envConfig.cookieName) {
+    // Match cookie if domain matches or if it's a subdomain cookie for .filliny.com
+    const domainMatches =
+      cookieDomain === apiHostname ||
+      apiHostname.endsWith(cookieDomain) ||
+      cookie.domain === `.${apiHostname.split('.').slice(-2).join('.')}`;
+
+    if (domainMatches && cookie.name === envConfig.cookieName) {
+      console.log('[Auth] Cookie changed:', cookie.name, changeInfo.removed ? 'removed' : 'set');
       // Handle the cookie change
       handleGetAuthToken(envConfig, response => {
         // Broadcast the change to all extension contexts

@@ -13,7 +13,7 @@ const FillinyVisionButton: React.FC<ButtonComponentProps> = () => {
     <Button
       variant="default"
       size="icon"
-      className={cn(iconButtonClasses, 'filliny-text-white')}
+      className={cn(iconButtonClasses, 'filliny-text-primary-foreground')}
       onClick={() => highlightForms({ visionOnly: true })}
       disabled={!isDOMReady}>
       <Eye className="filliny-size-4" />

@@ -4,27 +4,27 @@
 @tailwind components;
 @tailwind utilities;
 
-/* shadcn/ui theme variables - neutral base color */
+/* shadcn/ui theme variables - aligned with webapp design system */
 :root {
   --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
+  --foreground: oklch(0.141 0.005 285.823);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
+  --card-foreground: oklch(0.141 0.005 285.823);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
+  --popover-foreground: oklch(0.141 0.005 285.823);
   --primary: oklch(0.45 0.18 260);
   --primary-foreground: oklch(0.96 0.01 260);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.967 0.001 286.375);
+  --secondary-foreground: oklch(0.21 0.006 285.885);
+  --muted: oklch(0.967 0.001 286.375);
+  --muted-foreground: oklch(0.552 0.016 285.938);
+  --accent: oklch(0.967 0.001 286.375);
+  --accent-foreground: oklch(0.21 0.006 285.885);
   --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --destructive-foreground: oklch(0.96 0.01 0);
+  --border: oklch(0.92 0.004 286.32);
+  --input: oklch(0.92 0.004 286.32);
+  --ring: oklch(0.705 0.015 286.067);
   --radius: 0.625rem;
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
@@ -33,11 +33,11 @@
   --radius-2xl: calc(var(--radius) + 8px);
   --radius-3xl: calc(var(--radius) + 12px);
   --radius-4xl: calc(var(--radius) + 16px);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
+  --chart-1: oklch(0.79 0.1 260);
+  --chart-2: oklch(0.68 0.14 260);
+  --chart-3: oklch(0.59 0.16 260);
+  --chart-4: oklch(0.45 0.18 260);
+  --chart-5: oklch(0.4 0.16 260);
   --success: oklch(0.52 0.17 160);
   --success-foreground: oklch(1 0 0);
   --warning: oklch(0.75 0.18 70);
@@ -54,27 +54,27 @@
   --sidebar-ring: oklch(0.705 0.015 286.067);
 }
 
-/* Dark mode theme variables */
+/* Dark mode theme variables - aligned with webapp design system */
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
+  --background: oklch(0.14 0 0);
+  --foreground: oklch(0.9 0 0);
+  --card: oklch(0.22 0.005 260);
+  --card-foreground: oklch(0.9 0 0);
+  --popover: oklch(0.24 0.005 260);
+  --popover-foreground: oklch(0.9 0 0);
   --primary: oklch(0.922 0 0);
   --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.371 0 0);
-  --accent-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.3 0 0);
+  --secondary-foreground: oklch(0.9 0 0);
+  --muted: oklch(0.26 0 0);
+  --muted-foreground: oklch(0.7 0 0);
+  --accent: oklch(0.35 0 0);
+  --accent-foreground: oklch(0.9 0 0);
   --destructive: oklch(0.704 0.191 22.216);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+  --destructive-foreground: oklch(0.96 0.01 0);
+  --border: oklch(0.45 0 0 / 80%);
+  --input: oklch(0.35 0 0);
+  --ring: oklch(0.65 0 0);
   --success: oklch(0.696 0.17 162.48);
   --success-foreground: oklch(0.15 0 0);
   --warning: oklch(0.769 0.188 70.08);
@@ -132,12 +132,13 @@ button:not([disabled]),
 
 /* Background Patterns */
 .bg-dot-pattern {
-  background-image: radial-gradient(circle, oklch(0.5 0 0 / 15%) 1px, transparent 1px);
+  background-image: radial-gradient(circle, oklch(0.5 0 0 / 20%) 1.5px, transparent 1.5px);
   background-size: 24px 24px;
+  background-position: 0 0;
 }
 
 .dark .bg-dot-pattern {
-  background-image: radial-gradient(circle, oklch(0.6 0 0 / 12%) 1px, transparent 1px);
+  background-image: radial-gradient(circle, oklch(0.7 0 0 / 15%) 1.5px, transparent 1.5px);
 }
 
 .bg-grid-pattern {
@@ -201,4 +202,350 @@ button:not([disabled]),
 
 .filliny-animate-spin {
   animation: filliny-spin 1s linear infinite;
+}
+
+/* ============================================================================
+   ANIMATION UTILITIES (compatible with tailwindcss-animate)
+   These provide CSS animations for shadcn/ui components
+   ============================================================================ */
+
+/* Base animation variables */
+:root {
+  --filliny-animate-duration: 150ms;
+  --filliny-animate-delay: 0ms;
+  --filliny-animate-timing: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Enter/Exit animation keyframes */
+@keyframes filliny-enter {
+  from {
+    opacity: var(--filliny-enter-opacity, 1);
+    transform: translate3d(var(--filliny-enter-translate-x, 0), var(--filliny-enter-translate-y, 0), 0)
+      scale3d(var(--filliny-enter-scale, 1), var(--filliny-enter-scale, 1), var(--filliny-enter-scale, 1))
+      rotate(var(--filliny-enter-rotate, 0));
+  }
+}
+
+@keyframes filliny-exit {
+  to {
+    opacity: var(--filliny-exit-opacity, 1);
+    transform: translate3d(var(--filliny-exit-translate-x, 0), var(--filliny-exit-translate-y, 0), 0)
+      scale3d(var(--filliny-exit-scale, 1), var(--filliny-exit-scale, 1), var(--filliny-exit-scale, 1))
+      rotate(var(--filliny-exit-rotate, 0));
+  }
+}
+
+/* Animation base classes */
+.filliny-animate-in {
+  animation-name: filliny-enter;
+  animation-duration: var(--filliny-animate-duration);
+  animation-timing-function: var(--filliny-animate-timing);
+  --filliny-enter-opacity: 0;
+  --filliny-enter-scale: 1;
+  --filliny-enter-rotate: 0;
+  --filliny-enter-translate-x: 0;
+  --filliny-enter-translate-y: 0;
+}
+
+.filliny-animate-out {
+  animation-name: filliny-exit;
+  animation-duration: var(--filliny-animate-duration);
+  animation-timing-function: var(--filliny-animate-timing);
+  --filliny-exit-opacity: 0;
+  --filliny-exit-scale: 1;
+  --filliny-exit-rotate: 0;
+  --filliny-exit-translate-x: 0;
+  --filliny-exit-translate-y: 0;
+}
+
+/* Fade modifiers */
+.filliny-fade-in {
+  --filliny-enter-opacity: 0;
+}
+.filliny-fade-in-0 {
+  --filliny-enter-opacity: 0;
+}
+.filliny-fade-in-50 {
+  --filliny-enter-opacity: 0.5;
+}
+.filliny-fade-out {
+  --filliny-exit-opacity: 0;
+}
+.filliny-fade-out-0 {
+  --filliny-exit-opacity: 0;
+}
+
+/* Zoom modifiers */
+.filliny-zoom-in {
+  --filliny-enter-scale: 0;
+}
+.filliny-zoom-in-0 {
+  --filliny-enter-scale: 0;
+}
+.filliny-zoom-in-50 {
+  --filliny-enter-scale: 0.5;
+}
+.filliny-zoom-in-75 {
+  --filliny-enter-scale: 0.75;
+}
+.filliny-zoom-in-90 {
+  --filliny-enter-scale: 0.9;
+}
+.filliny-zoom-in-95 {
+  --filliny-enter-scale: 0.95;
+}
+.filliny-zoom-out {
+  --filliny-exit-scale: 0;
+}
+.filliny-zoom-out-0 {
+  --filliny-exit-scale: 0;
+}
+.filliny-zoom-out-50 {
+  --filliny-exit-scale: 0.5;
+}
+.filliny-zoom-out-75 {
+  --filliny-exit-scale: 0.75;
+}
+.filliny-zoom-out-90 {
+  --filliny-exit-scale: 0.9;
+}
+.filliny-zoom-out-95 {
+  --filliny-exit-scale: 0.95;
+}
+
+/* Slide modifiers */
+.filliny-slide-in-from-top {
+  --filliny-enter-translate-y: -100%;
+}
+.filliny-slide-in-from-top-1 {
+  --filliny-enter-translate-y: -0.25rem;
+}
+.filliny-slide-in-from-top-2 {
+  --filliny-enter-translate-y: -0.5rem;
+}
+.filliny-slide-in-from-top-4 {
+  --filliny-enter-translate-y: -1rem;
+}
+.filliny-slide-in-from-bottom {
+  --filliny-enter-translate-y: 100%;
+}
+.filliny-slide-in-from-bottom-1 {
+  --filliny-enter-translate-y: 0.25rem;
+}
+.filliny-slide-in-from-bottom-2 {
+  --filliny-enter-translate-y: 0.5rem;
+}
+.filliny-slide-in-from-bottom-4 {
+  --filliny-enter-translate-y: 1rem;
+}
+.filliny-slide-in-from-left {
+  --filliny-enter-translate-x: -100%;
+}
+.filliny-slide-in-from-left-1 {
+  --filliny-enter-translate-x: -0.25rem;
+}
+.filliny-slide-in-from-left-2 {
+  --filliny-enter-translate-x: -0.5rem;
+}
+.filliny-slide-in-from-left-4 {
+  --filliny-enter-translate-x: -1rem;
+}
+.filliny-slide-in-from-right {
+  --filliny-enter-translate-x: 100%;
+}
+.filliny-slide-in-from-right-1 {
+  --filliny-enter-translate-x: 0.25rem;
+}
+.filliny-slide-in-from-right-2 {
+  --filliny-enter-translate-x: 0.5rem;
+}
+.filliny-slide-in-from-right-4 {
+  --filliny-enter-translate-x: 1rem;
+}
+
+.filliny-slide-out-to-top {
+  --filliny-exit-translate-y: -100%;
+}
+.filliny-slide-out-to-top-2 {
+  --filliny-exit-translate-y: -0.5rem;
+}
+.filliny-slide-out-to-bottom {
+  --filliny-exit-translate-y: 100%;
+}
+.filliny-slide-out-to-bottom-2 {
+  --filliny-exit-translate-y: 0.5rem;
+}
+.filliny-slide-out-to-left {
+  --filliny-exit-translate-x: -100%;
+}
+.filliny-slide-out-to-left-2 {
+  --filliny-exit-translate-x: -0.5rem;
+}
+.filliny-slide-out-to-right {
+  --filliny-exit-translate-x: 100%;
+}
+.filliny-slide-out-to-right-2 {
+  --filliny-exit-translate-x: 0.5rem;
+}
+
+/* Duration modifiers */
+.filliny-duration-75 {
+  --filliny-animate-duration: 75ms;
+}
+.filliny-duration-100 {
+  --filliny-animate-duration: 100ms;
+}
+.filliny-duration-150 {
+  --filliny-animate-duration: 150ms;
+}
+.filliny-duration-200 {
+  --filliny-animate-duration: 200ms;
+}
+.filliny-duration-300 {
+  --filliny-animate-duration: 300ms;
+}
+.filliny-duration-500 {
+  --filliny-animate-duration: 500ms;
+}
+
+/* Accordion animations */
+@keyframes filliny-accordion-down {
+  from {
+    height: 0;
+    opacity: 0;
+  }
+  to {
+    height: var(--radix-accordion-content-height);
+    opacity: 1;
+  }
+}
+
+@keyframes filliny-accordion-up {
+  from {
+    height: var(--radix-accordion-content-height);
+    opacity: 1;
+  }
+  to {
+    height: 0;
+    opacity: 0;
+  }
+}
+
+.filliny-animate-accordion-down {
+  animation: filliny-accordion-down 0.2s ease-out forwards;
+}
+
+.filliny-animate-accordion-up {
+  animation: filliny-accordion-up 0.2s ease-out forwards;
+}
+
+/* Collapsible animations */
+@keyframes filliny-collapsible-down {
+  from {
+    height: 0;
+    opacity: 0;
+  }
+  to {
+    height: var(--radix-collapsible-content-height);
+    opacity: 1;
+  }
+}
+
+@keyframes filliny-collapsible-up {
+  from {
+    height: var(--radix-collapsible-content-height);
+    opacity: 1;
+  }
+  to {
+    height: 0;
+    opacity: 0;
+  }
+}
+
+.filliny-animate-collapsible-down {
+  animation: filliny-collapsible-down 0.25s cubic-bezier(0.32, 0.72, 0, 1) forwards;
+}
+
+.filliny-animate-collapsible-up {
+  animation: filliny-collapsible-up 0.2s cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
+/* Percentage-based slide modifiers for dialogs */
+.filliny-slide-in-from-left-1\/2 {
+  --filliny-enter-translate-x: -50%;
+}
+.filliny-slide-in-from-top-\[48\%\] {
+  --filliny-enter-translate-y: -48%;
+}
+.filliny-slide-out-to-left-1\/2 {
+  --filliny-exit-translate-x: -50%;
+}
+.filliny-slide-out-to-top-\[48\%\] {
+  --filliny-exit-translate-y: -48%;
+}
+
+/* Pulse animation */
+@keyframes filliny-pulse {
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.filliny-animate-pulse {
+  animation: filliny-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Bounce animation */
+@keyframes filliny-bounce {
+  0%,
+  100% {
+    transform: translateY(-25%);
+    animation-timing-function: cubic-bezier(0.8, 0, 1, 1);
+  }
+  50% {
+    transform: none;
+    animation-timing-function: cubic-bezier(0, 0, 0.2, 1);
+  }
+}
+
+.filliny-animate-bounce {
+  animation: filliny-bounce 1s infinite;
+}
+
+/* Ping animation */
+@keyframes filliny-ping {
+  75%,
+  100% {
+    transform: scale(2);
+    opacity: 0;
+  }
+}
+
+.filliny-animate-ping {
+  animation: filliny-ping 1s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+/* Additional fade modifiers for toast */
+.filliny-fade-out-80 {
+  --filliny-exit-opacity: 0.8;
+}
+
+/* Full slide modifiers for toast animations */
+.filliny-slide-in-from-top-full {
+  --filliny-enter-translate-y: -100%;
+}
+.filliny-slide-in-from-bottom-full {
+  --filliny-enter-translate-y: 100%;
+}
+.filliny-slide-out-to-right-full {
+  --filliny-exit-translate-x: 100%;
+}
+.filliny-slide-out-to-left-full {
+  --filliny-exit-translate-x: -100%;
+}
+.filliny-slide-out-to-top-full {
+  --filliny-exit-translate-y: -100%;
+}
+.filliny-slide-out-to-bottom-full {
+  --filliny-exit-translate-y: 100%;
 }

@@ -30,7 +30,7 @@ const SupportRequestButton: React.FC<ButtonComponentProps> = () => {
     <Button
       variant="default"
       size="icon"
-      className={cn(iconButtonClasses, 'filliny-text-white')}
+      className={cn(iconButtonClasses, 'filliny-text-primary-foreground')}
       onClick={gatherBugDetails}>
       <HelpCircle className="filliny-size-4" />
     </Button>

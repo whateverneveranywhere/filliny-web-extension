@@ -94,6 +94,7 @@ const manifest = {
   externally_connectable: {
     matches: [
       'https://*.filliny.io/*', // Production domain
+      'https://*.filliny.com/*', // Production & preview domains (filliny.io redirects to filliny.com)
       ...(env === WebappEnvs.DEV ? ['http://localhost:*/*'] : []), // Local development only in DEV
     ],
   },

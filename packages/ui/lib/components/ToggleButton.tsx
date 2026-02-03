@@ -48,9 +48,7 @@ export const ToggleButton = ({
       size={size}
       className={cn(
         'filliny-mt-4 filliny-font-bold filliny-shadow hover:filliny-scale-105',
-        isLight
-          ? 'filliny-border-black filliny-bg-white filliny-text-black'
-          : 'filliny-border-white filliny-bg-black filliny-text-white',
+        'filliny-border-border filliny-bg-background filliny-text-foreground',
         className,
       )}
       onClick={handleClick}

@@ -293,6 +293,12 @@ export enum MessageType {
   STREAM_ERROR = 'STREAM_ERROR',
   /** Extension was installed notification */
   EXTENSION_INSTALLED = 'EXTENSION_INSTALLED',
+  /** Bearer token received from web app */
+  SET_BEARER_TOKEN = 'SET_BEARER_TOKEN',
+  /** Request to get current bearer token */
+  GET_BEARER_TOKEN = 'GET_BEARER_TOKEN',
+  /** Clear bearer token (logout) */
+  CLEAR_BEARER_TOKEN = 'CLEAR_BEARER_TOKEN',
 }
 
 // NOTE: Framework is exported from utils/frameworkDetection.ts (single source of truth)

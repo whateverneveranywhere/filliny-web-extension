@@ -99,7 +99,8 @@ class HttpService {
   private baseUrl: string;
 
   constructor(baseUrl?: string) {
-    this.baseUrl = baseUrl || `${config.baseURL}${apiEndpoints.version}` || '';
+    // Use the API URL from config, not the web app URL
+    this.baseUrl = baseUrl || config.apiURL || '';
   }
 
   private async request<T>(url: string, config?: CustomFetchConfig): Promise<T> {
@@ -108,7 +109,8 @@ class HttpService {
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
-      const authToken = config?.authToken || (await authStorage.get()) || '';
+      // Use getWithFallback to check both stored token and bearer token from web app
+      const authToken = config?.authToken || (await authStorage.getWithFallback()) || '';
       const headers = new Headers(config?.headers || {});
       const finalBaseUrl = config?.baseUrl || this.baseUrl;
 

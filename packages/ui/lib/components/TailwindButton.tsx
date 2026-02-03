@@ -1,6 +1,6 @@
 import { Button } from './ui/button';
 import { cn } from '../utils';
-import { BinaryTheme } from '@extension/shared';
+import type { BinaryTheme } from '@extension/shared';
 import type { ComponentPropsWithoutRef } from 'react';
 
 /**
@@ -30,7 +30,7 @@ export const TailwindButton = ({ theme, className, children, ...props }: TWButto
     variant="ghost"
     className={cn(
       'filliny-py-1 filliny-px-4 filliny-rounded filliny-shadow hover:filliny-scale-105',
-      theme === BinaryTheme.LIGHT ? 'filliny-bg-white filliny-text-black' : 'filliny-bg-black filliny-text-white',
+      'filliny-bg-background filliny-text-foreground',
       className,
     )}
     {...props}>
