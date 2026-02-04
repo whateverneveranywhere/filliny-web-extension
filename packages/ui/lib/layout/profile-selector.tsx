@@ -20,6 +20,7 @@ import {
 } from '../components/ui';
 import { ProfileForm } from '../containers/profile-form';
 import { toast } from '../hooks/use-toast';
+import { cn } from '@/lib/utils';
 import {
   useActiveProfile,
   useBoolean,
@@ -28,10 +29,9 @@ import {
   useProfilesListQuery,
 } from '@extension/shared';
 import { profileStorage } from '@extension/storage';
-import { cn } from '@/lib/utils';
 import { Check, ChevronDown, Edit, Loader2, Plus, Trash2, User } from 'lucide-react';
 import { useCallback, useRef, useState } from 'react';
-import type { DTOProfileFillingForm } from '@extension/storage';
+import type { DTOFillingProfileItem, DTOProfileFillingForm } from '@extension/storage';
 
 const ProfileSelector = () => {
   const profileModal = useBoolean();
@@ -43,7 +43,15 @@ const ProfileSelector = () => {
 
   const { activeProfileId, activeProfile } = useActiveProfile();
   // Queries and Mutations
-  const { data: profiles, isLoading, isFetching } = useProfilesListQuery();
+  const {
+    data: profiles,
+    isLoading,
+    isFetching,
+  } = useProfilesListQuery() as {
+    data: DTOFillingProfileItem[] | undefined;
+    isLoading: boolean;
+    isFetching: boolean;
+  };
   const { mutateAsync: deleteProfile, isPending: isDeleting } = useDeleteProfileByIdMutation();
   const { mutateAsync: updateActiveProfile, isPending: isUpdating } = useChangeActiveFillingProfileMutation();
 
