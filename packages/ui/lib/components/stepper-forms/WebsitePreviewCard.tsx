@@ -57,11 +57,11 @@ const WebsitePreviewCard = ({
   return (
     <div
       className={cn(
-        'filliny-flex filliny-w-full filliny-flex-col filliny-rounded-lg filliny-border filliny-border-border filliny-bg-card filliny-text-card-foreground',
+        'filliny-flex filliny-w-full filliny-min-w-0 filliny-flex-col filliny-overflow-hidden filliny-rounded-lg filliny-border filliny-border-border filliny-bg-card filliny-text-card-foreground filliny-transition-all filliny-duration-200 hover:filliny-border-primary/20 hover:filliny-shadow-md',
         animationClasses.transition,
         className,
       )}>
-      <div className="filliny-flex filliny-w-full filliny-items-center filliny-gap-2.5 filliny-p-2.5">
+      <div className="filliny-flex filliny-w-full filliny-min-w-0 filliny-items-center filliny-gap-2 filliny-p-2.5">
         {/* Favicon Section */}
         <div className="filliny-shrink-0">
           {isLoading ? (
@@ -82,34 +82,39 @@ const WebsitePreviewCard = ({
           )}
         </div>
 
-        {/* URL Section with better truncation */}
-        <div className="filliny-flex filliny-min-w-0 filliny-flex-1">
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div
-                  className={cn(
-                    'filliny-flex filliny-items-center filliny-gap-2 filliny-w-full filliny-flex-nowrap',
-                    isValidURL && 'filliny-cursor-pointer hover:filliny-text-primary',
-                  )}
-                  onClick={handleVisitWebsite}>
-                  <span className="filliny-truncate filliny-text-sm filliny-font-medium">
-                    {formattedURL || 'Enter website URL'}
-                  </span>
-                  {isValidURL && (
-                    <ExternalLink className="filliny-h-4 filliny-w-4 filliny-shrink-0 filliny-text-muted-foreground" />
-                  )}
-                </div>
-              </TooltipTrigger>
-              <TooltipContent side="top">
-                <p className="filliny-text-sm">{isValidURL ? websiteURL : 'No valid URL provided'}</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        </div>
+        {/* URL Section - truncates aggressively */}
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div
+                className={cn(
+                  'filliny-flex filliny-min-w-0 filliny-flex-1 filliny-items-center filliny-gap-1 filliny-overflow-hidden',
+                  isValidURL && 'filliny-cursor-pointer hover:filliny-text-primary',
+                )}
+                onClick={handleVisitWebsite}>
+                <span className="filliny-truncate filliny-text-sm filliny-font-medium">
+                  {formattedURL || 'Enter website URL'}
+                </span>
+                {isValidURL && (
+                  <ExternalLink className="filliny-h-3 filliny-w-3 filliny-shrink-0 filliny-text-muted-foreground" />
+                )}
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="filliny-max-w-xs">
+              <div className="filliny-flex filliny-flex-col filliny-gap-1">
+                <p className="filliny-break-all filliny-text-sm">{isValidURL ? websiteURL : 'No valid URL provided'}</p>
+                {isValidURL && (
+                  <p className="filliny-text-xs filliny-text-muted-foreground">
+                    {isRootLoad ? 'Applies to entire website' : 'Applies to this exact URL only'}
+                  </p>
+                )}
+              </div>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
 
         {/* Actions Section */}
-        <div className="filliny-flex filliny-shrink-0 filliny-items-center filliny-gap-2">
+        <div className="filliny-flex filliny-shrink-0 filliny-items-center filliny-gap-1">
           {isLoading ? (
             <Loader2 className="filliny-h-5 filliny-w-5 filliny-animate-spin filliny-text-muted-foreground" />
           ) : (
@@ -120,11 +125,11 @@ const WebsitePreviewCard = ({
                   size="icon"
                   variant="ghost"
                   onClick={() => setIsExpanded(!isExpanded)}
-                  className="hover:filliny-bg-muted filliny-h-8 filliny-w-8">
+                  className="filliny-h-7 filliny-w-7 hover:filliny-bg-muted">
                   {isExpanded ? (
-                    <ChevronUp className="filliny-h-4 filliny-w-4" />
+                    <ChevronUp className="filliny-h-3.5 filliny-w-3.5" />
                   ) : (
-                    <ChevronDown className="filliny-h-4 filliny-w-4" />
+                    <ChevronDown className="filliny-h-3.5 filliny-w-3.5" />
                   )}
                 </Button>
               )}
@@ -134,8 +139,8 @@ const WebsitePreviewCard = ({
                   size="icon"
                   variant="ghost"
                   onClick={onRemove}
-                  className="hover:filliny-bg-destructive/10 hover:filliny-text-destructive filliny-h-8 filliny-w-8 filliny-text-destructive">
-                  <Trash className="filliny-h-4 filliny-w-4" />
+                  className="filliny-h-7 filliny-w-7 filliny-text-destructive hover:filliny-bg-destructive/10 hover:filliny-text-destructive">
+                  <Trash className="filliny-h-3.5 filliny-w-3.5" />
                 </Button>
               )}
               {actions}

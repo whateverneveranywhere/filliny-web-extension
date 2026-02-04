@@ -414,7 +414,6 @@ export const runTestModeFill = async (fields: Field[]): Promise<void> => {
   }
 
   console.log(`Starting test mode fill for ${fields.length} fields.`);
-  showTestModeIndicator();
 
   // Prepare all fields with test values
   const fieldsWithTestValues = fields.map(prepareFieldForTestMode);
@@ -435,33 +434,3 @@ export const runTestModeFill = async (fields: Field[]): Promise<void> => {
   }
 };
 
-/**
- * Add visual test mode indicators to the page
- */
-export const showTestModeIndicator = (): void => {
-  try {
-    const existingIndicator = document.getElementById('filliny-test-mode-indicator');
-    if (existingIndicator) {
-      existingIndicator.remove();
-    }
-
-    // Create a visual indicator for test mode
-    const testModeIndicator = document.createElement('div');
-    testModeIndicator.id = 'filliny-test-mode-indicator';
-    testModeIndicator.textContent = 'Test Mode Active';
-    testModeIndicator.style.cssText =
-      'position: fixed; top: 20px; right: 20px; background: #ca8a04; color: white; padding: 8px 16px; border-radius: 4px; z-index: 10000000; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.2);';
-    document.body.appendChild(testModeIndicator);
-
-    // Remove the indicator after 3 seconds
-    setTimeout(() => {
-      try {
-        testModeIndicator.remove();
-      } catch (removeError) {
-        console.debug('Error removing test mode indicator:', removeError);
-      }
-    }, 3000);
-  } catch (error) {
-    console.debug('Error showing test mode indicator:', error);
-  }
-};

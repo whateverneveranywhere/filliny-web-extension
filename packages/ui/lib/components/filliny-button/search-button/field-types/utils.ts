@@ -2,20 +2,13 @@
  * Safely get a string value from potentially complex field values
  */
 import { getFieldLabel } from '../fieldUtils';
-import { hasProperty, isHTMLElement, isHTMLInputElement, FieldTypeSchema } from '@extension/shared';
-import type {
-  Field,
-  FieldType,
-  JQueryStatic,
-  JQueryWindow,
-  DOMEventHandler,
-  AngularContextElement,
-} from '@extension/shared';
+import { hasProperty, isHTMLElement, FieldTypeSchema } from '@extension/shared';
+import type { Field, FieldType, JQueryWindow, DOMEventHandler, AngularContextElement } from '@extension/shared';
 
 // Track used field IDs to ensure uniqueness
 const usedFieldIds = new Set<string>();
 
-export const getStringValue = (value: unknown): string => {
+const getStringValue = (value: unknown): string => {
   if (value === null || value === undefined) return '';
   if (Array.isArray(value)) return value.join(',');
   return String(value);
@@ -42,7 +35,7 @@ const hasJQuery = (win: Window): win is JQueryWindow =>
  * Dispatches an event on the given element
  * Ensures proper event bubbling and default handling
  */
-export const dispatchEvent = (element: HTMLElement, eventName: string): void => {
+const dispatchEvent = (element: HTMLElement, eventName: string): void => {
   try {
     // Create and dispatch the event
     const event = new Event(eventName, {
@@ -89,7 +82,7 @@ export const dispatchEvent = (element: HTMLElement, eventName: string): void => 
 /**
  * Adds visual feedback to indicate that a field has been filled by the extension
  */
-export const addVisualFeedback = (element: HTMLElement): void => {
+const addVisualFeedback = (element: HTMLElement): void => {
   try {
     // First, add a data attribute to mark this field as updated
     element.setAttribute('data-filliny-updated', 'true');
@@ -100,8 +93,8 @@ export const addVisualFeedback = (element: HTMLElement): void => {
 
     // Add a subtle flash effect that doesn't interfere with the form
     element.style.transition = 'background-color 0.5s ease, box-shadow 0.5s ease';
-    element.style.backgroundColor = 'rgba(2, 132, 199, 0.1)'; // Light blue highlight
-    element.style.boxShadow = '0 0 0 2px rgba(2, 132, 199, 0.4)'; // Light blue outline
+    element.style.backgroundColor = 'rgba(100, 100, 100, 0.1)'; // Light gray highlight
+    element.style.boxShadow = '0 0 0 2px rgba(100, 100, 100, 0.4)'; // Gray outline
 
     // Return to original state after animation
     setTimeout(() => {
@@ -109,7 +102,7 @@ export const addVisualFeedback = (element: HTMLElement): void => {
       element.style.boxShadow = originalBoxShadow;
 
       // Keep a subtle indicator that this field was filled automatically
-      element.style.outline = '1px solid rgba(2, 132, 199, 0.3)';
+      element.style.outline = '1px solid rgba(100, 100, 100, 0.3)';
 
       // Remove transition to prevent animation on future user interactions
       setTimeout(() => {
@@ -124,7 +117,7 @@ export const addVisualFeedback = (element: HTMLElement): void => {
 /**
  * Determines if an element is visible and interactive
  */
-export const isElementInteractive = (element: HTMLElement): boolean => {
+const isElementInteractive = (element: HTMLElement): boolean => {
   if (!element) return false;
 
   const style = window.getComputedStyle(element);
@@ -156,7 +149,7 @@ export const isElementInteractive = (element: HTMLElement): boolean => {
 /**
  * Find all related radio buttons in a group
  */
-export const findRelatedRadioButtons = (radioButton: HTMLElement): HTMLElement[] => {
+const findRelatedRadioButtons = (radioButton: HTMLElement): HTMLElement[] => {
   const related: HTMLElement[] = [];
 
   // Method 1: Find by name attribute (standard approach)
@@ -226,7 +219,7 @@ export const findRelatedRadioButtons = (radioButton: HTMLElement): HTMLElement[]
 /**
  * Find all related checkboxes in a group
  */
-export const findRelatedCheckboxes = (checkbox: HTMLElement): HTMLElement[] => {
+const findRelatedCheckboxes = (checkbox: HTMLElement): HTMLElement[] => {
   const related: HTMLElement[] = [];
 
   // Method 1: Find by name attribute (standard approach)
@@ -298,7 +291,7 @@ export const findRelatedCheckboxes = (checkbox: HTMLElement): HTMLElement[] => {
 /**
  * Check if an element is a custom select component
  */
-export const isCustomSelect = (element: HTMLElement): boolean => {
+const isCustomSelect = (element: HTMLElement): boolean => {
   // Common class patterns for custom select components
   const selectClassPatterns = ['select', 'dropdown', 'combobox', 'combo-box'];
 
@@ -327,7 +320,7 @@ export const isCustomSelect = (element: HTMLElement): boolean => {
 /**
  * Find select options from various types of select components
  */
-export const findSelectOptions = (
+const findSelectOptions = (
   selectElement: HTMLElement,
 ): { element: HTMLElement; value: string; text: string; selected: boolean }[] => {
   const options: { element: HTMLElement; value: string; text: string; selected: boolean }[] = [];
@@ -433,7 +426,7 @@ export const findSelectOptions = (
 /**
  * Simulate human-like typing with proper focus events and composition
  */
-export const simulateTyping = async (element: HTMLElement, value: string): Promise<void> => {
+const simulateTyping = async (element: HTMLElement, value: string): Promise<void> => {
   try {
     // Focus the element
     element.focus();
@@ -620,7 +613,7 @@ export const simulateTyping = async (element: HTMLElement, value: string): Promi
 /**
  * Get an XPath expression that identifies an element
  */
-export const getElementXPath = (element: HTMLElement): string => {
+const getElementXPath = (element: HTMLElement): string => {
   if (!element.parentElement) return '';
   const idx =
     Array.from(element.parentElement.children)
@@ -632,7 +625,7 @@ export const getElementXPath = (element: HTMLElement): string => {
 /**
  * Generate unique selectors for an element to help with identification
  */
-export const generateUniqueSelectors = (element: HTMLElement): string[] => {
+const generateUniqueSelectors = (element: HTMLElement): string[] => {
   const selectors: string[] = [];
   if (element.id) selectors.push(`#${CSS.escape(element.id)}`);
   if (element.className) {
@@ -652,7 +645,7 @@ export const generateUniqueSelectors = (element: HTMLElement): string[] => {
 /**
  * Get a unique field ID
  */
-export const getUniqueFieldId = (baseIndex: number): string => {
+const getUniqueFieldId = (baseIndex: number): string => {
   let fieldId = `field-${baseIndex}`;
   let counter = baseIndex;
   while (usedFieldIds.has(fieldId)) {
@@ -666,7 +659,7 @@ export const getUniqueFieldId = (baseIndex: number): string => {
 /**
  * Create a base field object with common properties
  */
-export const createBaseField = async (
+const createBaseField = async (
   element: HTMLElement,
   index: number,
   type: string,
@@ -711,7 +704,7 @@ export const createBaseField = async (
 /**
  * Safely get a string value with fallback
  */
-export const safeGetString = (value: unknown, fallback = ''): string => {
+const safeGetString = (value: unknown, fallback = ''): string => {
   try {
     if (value === null || value === undefined) return fallback;
     if (typeof value === 'string') return value;
@@ -724,7 +717,7 @@ export const safeGetString = (value: unknown, fallback = ''): string => {
 /**
  * Safely get lowercase string value
  */
-export const safeGetLowerString = (value: unknown, fallback = ''): string => {
+const safeGetLowerString = (value: unknown, fallback = ''): string => {
   try {
     const str = safeGetString(value, fallback);
     return str.toLowerCase();
@@ -736,7 +729,7 @@ export const safeGetLowerString = (value: unknown, fallback = ''): string => {
 /**
  * Safely get element attributes
  */
-export const safeGetAttributes = (element: HTMLElement): Attr[] => {
+const safeGetAttributes = (element: HTMLElement): Attr[] => {
   try {
     return Array.from(element.attributes || []);
   } catch {
@@ -747,10 +740,34 @@ export const safeGetAttributes = (element: HTMLElement): Attr[] => {
 /**
  * Safely check if element has a specific property
  */
-export const safeHasProperty = (element: HTMLElement, property: string): boolean => {
+const safeHasProperty = (element: HTMLElement, property: string): boolean => {
   try {
     return Object.prototype.hasOwnProperty.call(element, property);
   } catch {
     return false;
   }
+};
+
+// ============================================================================
+// Exports (at end of file per ESLint import-x/exports-last rule)
+// ============================================================================
+
+export {
+  getStringValue,
+  dispatchEvent,
+  addVisualFeedback,
+  isElementInteractive,
+  findRelatedRadioButtons,
+  findRelatedCheckboxes,
+  isCustomSelect,
+  findSelectOptions,
+  simulateTyping,
+  getElementXPath,
+  generateUniqueSelectors,
+  getUniqueFieldId,
+  createBaseField,
+  safeGetString,
+  safeGetLowerString,
+  safeGetAttributes,
+  safeHasProperty,
 };

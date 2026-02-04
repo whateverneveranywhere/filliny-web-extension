@@ -63,12 +63,15 @@ const RHFShadcnComboBox = ({
       control={control}
       name={name}
       render={({ field }) => (
-        <FormItem className="filliny-flex filliny-w-full filliny-flex-col">
+        <FormItem className="filliny-flex filliny-w-full filliny-min-w-0 filliny-flex-col">
           {title && <FormLabel>{title}</FormLabel>}
-          <Popover modal open={shouldOpenCreateOnClick ? false : popoverOpen} onOpenChange={shouldOpenCreateOnClick ? undefined : setPopoverOpen}>
+          <Popover
+            modal
+            open={shouldOpenCreateOnClick ? false : popoverOpen}
+            onOpenChange={shouldOpenCreateOnClick ? undefined : setPopoverOpen}>
             <PopoverTrigger asChild>
               <FormControl>
-                <div className="filliny-flex filliny-w-full filliny-items-center filliny-gap-0">
+                <div className="filliny-flex filliny-w-full filliny-min-w-0 filliny-items-center filliny-gap-0">
                   <Button
                     loading={loading}
                     disabled={loading || disabled}
@@ -77,7 +80,7 @@ const RHFShadcnComboBox = ({
                     size={'sm'}
                     onClick={handleMainButtonClick}
                     className={cn(
-                      'filliny-w-full filliny-justify-between',
+                      'filliny-w-full filliny-min-w-0 filliny-justify-between filliny-overflow-hidden',
                       onCreate && 'filliny-rounded-r-none filliny-border-r-0',
                       !field.value && 'filliny-text-muted-foreground',
                     )}>

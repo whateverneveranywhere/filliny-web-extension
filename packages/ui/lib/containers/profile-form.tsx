@@ -34,9 +34,10 @@ const defaultFormValues: ProfileFormTypes = {
 interface Props {
   id?: string;
   onFormSubmit: () => void;
+  onDirtyChange?: (isDirty: boolean) => void;
 }
 
-const ProfileForm = ({ id, onFormSubmit }: Props) => {
+const ProfileForm = ({ id, onFormSubmit, onDirtyChange }: Props) => {
   const [currentStep, setCurrentStep] = useState<number>(0);
   const isEdit = !!id;
 
@@ -50,7 +51,17 @@ const ProfileForm = ({ id, onFormSubmit }: Props) => {
     mode: 'onChange',
   });
 
-  const { handleSubmit, trigger, reset } = methods;
+  const {
+    handleSubmit,
+    trigger,
+    reset,
+    formState: { isDirty },
+  } = methods;
+
+  // Notify parent of dirty state changes
+  useEffect(() => {
+    onDirtyChange?.(isDirty);
+  }, [isDirty, onDirtyChange]);
 
   // Update form when editing existing profile
   useEffect(() => {
@@ -72,7 +83,6 @@ const ProfileForm = ({ id, onFormSubmit }: Props) => {
       ...formData,
       // filter out the user side isNew variable before sending to api
 
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       fillingWebsites: formData.fillingWebsites.map(({ isNew: _, ...rest }) => rest),
       preferences: {
         ...formData.preferences,
@@ -86,21 +96,35 @@ const ProfileForm = ({ id, onFormSubmit }: Props) => {
   const onSubmit = handleSubmit(async formData => {
     try {
       const transformedData = transformFormData(formData);
+      const websiteCount = transformedData.fillingWebsites.length;
 
       if (isEdit) {
         await editProfile({ id, data: transformedData });
-        toast({ variant: 'default', title: 'Profile edited successfully' });
+        // Update storage so content scripts get the updated profile immediately
+        // Use the transformed data with the existing profile ID to construct the updated profile
+        const updatedProfile: DTOProfileFillingForm = {
+          ...transformedData,
+          id: editingItem?.id,
+        };
+        await profileStorage.setDefaultProfile(updatedProfile);
+        toast({
+          title: 'Profile Updated',
+          description: `"${formData.profileName}" has been saved with ${websiteCount} website${websiteCount !== 1 ? 's' : ''}.`,
+        });
       } else {
         const newProfile = await createProfile({ data: transformedData });
         await profileStorage.setDefaultProfile(newProfile);
-        toast({ variant: 'default', title: 'Profile created successfully' });
+        toast({
+          title: 'Profile Created!',
+          description: `"${formData.profileName}" is ready. Visit your websites to start filling forms.`,
+        });
       }
 
       onFormSubmit();
       reset();
     } catch (error) {
       console.error('Error submitting profile:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to save profile';
+      const errorMessage = error instanceof Error ? error.message : 'Unable to save profile. Please try again.';
       toast({ variant: 'destructive', title: 'Error', description: errorMessage });
     }
   });
@@ -140,6 +164,24 @@ const ProfileForm = ({ id, onFormSubmit }: Props) => {
     }
   }, [currentStep]);
 
+  const handleStepClick = useCallback(
+    async (targetStep: number) => {
+      // Only allow going back without validation
+      if (targetStep < currentStep) {
+        setCurrentStep(targetStep);
+        return;
+      }
+
+      // For forward navigation, validate current step first
+      const { fields } = steps[currentStep];
+      const isValid = await trigger(fields as (keyof ProfileFormTypes)[]);
+      if (isValid) {
+        setCurrentStep(targetStep);
+      }
+    },
+    [currentStep, steps, trigger],
+  );
+
   if (isLoadingEditingItem) {
     return (
       <div className="filliny-flex filliny-size-full filliny-items-center filliny-justify-center filliny-p-20">
@@ -157,6 +199,7 @@ const ProfileForm = ({ id, onFormSubmit }: Props) => {
         handleFinish={onSubmit}
         handleNext={handleNext}
         handlePrev={handlePrev}
+        onStepClick={handleStepClick}
       />
     </FormProvider>
   );

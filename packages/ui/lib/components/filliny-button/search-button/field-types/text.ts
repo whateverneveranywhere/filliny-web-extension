@@ -3,8 +3,6 @@ import {
   Framework,
   TEXT_INPUT_TYPES,
   INPUT_TYPES,
-  UILibrary,
-  FormLibrary,
   detectFrameworkForElement,
   detectUILibrary,
   detectVue,
@@ -14,7 +12,6 @@ import {
   detectAngular,
   isInShadowDOM,
   isHTMLInputElement,
-  isHTMLTextAreaElement,
   hasProperty,
 } from '@extension/shared';
 import type {
@@ -28,7 +25,6 @@ import type {
   ReactHookFormInputElement,
   ReactFiberProps,
   DOMEventHandler,
-  SvelteComponentElement,
 } from '@extension/shared';
 
 // ============================================================================
@@ -51,32 +47,6 @@ const hasFormikBag = (element: HTMLInputElement): element is FormikInputElement 
  */
 const hasReactHookFormController = (element: HTMLInputElement): element is ReactHookFormInputElement =>
   hasProperty(element, '__reactHookForm');
-
-/**
- * Type guard to check if window has Next.js data
- */
-const hasNextData = (win: Window): win is NextJsWindow => hasProperty(win, '__NEXT_DATA__');
-
-/**
- * Type guard to check if window has React DevTools
- */
-const hasReactDevTools = (win: Window): win is ReactDevToolsWindow =>
-  hasProperty(win, '__REACT_DEVTOOLS_GLOBAL_HOOK__');
-
-/**
- * Type guard to check if window has React global
- */
-const hasReactGlobal = (win: Window): win is ReactGlobalWindow => hasProperty(win, 'React');
-
-/**
- * Type guard to check if window has Redux DevTools
- */
-const hasReduxDevTools = (win: Window): win is ReduxDevToolsWindow => hasProperty(win, '__REDUX_DEVTOOLS_EXTENSION__');
-
-/**
- * Type guard to check if window has createRoot (React 18+)
- */
-const hasCreateRoot = (win: Window): win is ReactGlobalWindow => hasProperty(win, 'createRoot');
 
 /**
  * Type guard to check if value is ReactFiberProps
@@ -127,7 +97,7 @@ const getEventHandler = (element: HTMLElement, eventName: string): DOMEventHandl
  * Detect and analyze text input fields
  * Includes various input types like email, url, password, search
  */
-export const detectTextField = async (
+const detectTextField = async (
   elements: HTMLElement[],
   baseIndex: number,
   testMode: boolean = false,
@@ -190,7 +160,7 @@ export const detectTextField = async (
 /**
  * Detect and analyze standard input fields
  */
-export const detectInputField = async (
+const detectInputField = async (
   elements: HTMLElement[],
   baseIndex: number,
   testMode: boolean = false,
@@ -291,7 +261,7 @@ export const detectInputField = async (
  * Update a text input field with enhanced interaction support
  * Handles various text input types with special formatting
  */
-export const updateTextField = async (element: HTMLElement, value: string): Promise<void> => {
+const updateTextField = async (element: HTMLElement, value: string): Promise<void> => {
   try {
     // Safety check: Don't apply text updates to checkbox/radio elements
     if (element instanceof HTMLInputElement && (element.type === 'checkbox' || element.type === 'radio')) {
@@ -439,7 +409,7 @@ export const updateTextField = async (element: HTMLElement, value: string): Prom
         case 'color':
           // Ensure color format (#RRGGBB)
           if (!normalizedValue.match(/^#[0-9A-F]{6}$/i)) {
-            normalizedValue = '#4f46e5'; // Default to a nice indigo color
+            normalizedValue = '#1a1a1a'; // Default to a neutral dark gray
           }
           break;
 
@@ -543,7 +513,7 @@ export const updateTextField = async (element: HTMLElement, value: string): Prom
  */
 const STATE_MANAGER_TYPES = ['redux-toolkit', 'zustand', 'jotai', 'recoil', 'react-query'] as const;
 
-type StateManagerType = (typeof STATE_MANAGER_TYPES)[number];
+type _StateManagerType = (typeof STATE_MANAGER_TYPES)[number];
 
 /**
  * All valid React detection types
@@ -589,7 +559,7 @@ interface ReactDetection {
   props?: unknown;
 }
 
-const detectReactComponent = (element: HTMLElement): ReactDetection => {
+const _detectReactComponent = (element: HTMLElement): ReactDetection => {
   const detection: ReactDetection = {
     isReact: false,
     type: 'unknown',
@@ -685,7 +655,7 @@ const detectReactComponent = (element: HTMLElement): ReactDetection => {
 const detectReactComponentType = (
   element: HTMLElement,
   fiber: ReactFiberProps | null,
-  detection: ReactDetection,
+  _detection: ReactDetection,
 ): ReactDetection['type'] => {
   // Check for controlled vs uncontrolled
   if (element instanceof HTMLInputElement && fiber) {
@@ -907,7 +877,7 @@ const detectNextjsComponentType = (element: HTMLElement): ReactDetection['type']
 /**
  * Handle React-specific text input components with enhanced state management
  */
-async function handleReactTextInput(element: HTMLElement, value: string, detection: ReactDetection): Promise<void> {
+const handleReactTextInput = async (element: HTMLElement, value: string, detection: ReactDetection): Promise<void> => {
   try {
     console.log(`Handling React ${detection.type} component`);
 
@@ -969,46 +939,46 @@ async function handleReactTextInput(element: HTMLElement, value: string, detecti
     // Fall back to standard typing simulation
     await simulateTyping(element, value);
   }
-}
+};
 
 /**
  * Handle controlled React components
  */
-async function handleControlledComponent(
+const handleControlledComponent = async (
   element: HTMLElement,
   value: string,
   detection: ReactDetection,
-): Promise<void> {
+): Promise<void> => {
   // For controlled components, we need to update the state, not just the DOM
   if (element instanceof HTMLInputElement) {
     // Try to trigger state update through React's synthetic event system
     await triggerReactStateUpdate(element, value, detection);
   }
-}
+};
 
 /**
  * Handle uncontrolled React components
  */
-async function handleUncontrolledComponent(
+const handleUncontrolledComponent = async (
   element: HTMLElement,
   value: string,
-  detection: ReactDetection,
-): Promise<void> {
+  _detection: ReactDetection,
+): Promise<void> => {
   // For uncontrolled components, direct DOM manipulation should work
   if (element instanceof HTMLInputElement) {
     element.value = value;
     await triggerReactEvents(element, ['input', 'change']);
   }
-}
+};
 
 /**
  * Handle Material-UI components
  */
-async function handleMaterialUIComponent(
+const handleMaterialUIComponent = async (
   element: HTMLElement,
   value: string,
-  detection: ReactDetection,
-): Promise<void> {
+  _detection: ReactDetection,
+): Promise<void> => {
   // Material-UI uses controlled components with special event handling
   const muiContainer = element.closest('[class*="MuiInputBase"], [class*="MuiTextField"], [class*="MuiInput"]');
 
@@ -1023,12 +993,16 @@ async function handleMaterialUIComponent(
       await triggerReactEvents(muiContainer, ['input', 'change']);
     }
   }
-}
+};
 
 /**
  * Handle Ant Design components
  */
-async function handleAntDesignComponent(element: HTMLElement, value: string, detection: ReactDetection): Promise<void> {
+const handleAntDesignComponent = async (
+  element: HTMLElement,
+  value: string,
+  _detection: ReactDetection,
+): Promise<void> => {
   const antContainer = element.closest('[class*="ant-input"], [class*="ant-form-item"]');
 
   if (element instanceof HTMLInputElement) {
@@ -1041,22 +1015,30 @@ async function handleAntDesignComponent(element: HTMLElement, value: string, det
       await triggerReactEvents(antContainer, ['input', 'change']);
     }
   }
-}
+};
 
 /**
  * Handle Chakra UI components
  */
-async function handleChakraUIComponent(element: HTMLElement, value: string, detection: ReactDetection): Promise<void> {
+const handleChakraUIComponent = async (
+  element: HTMLElement,
+  value: string,
+  _detection: ReactDetection,
+): Promise<void> => {
   if (element instanceof HTMLInputElement) {
     element.value = value;
     await triggerReactEvents(element, ['focus', 'input', 'change', 'blur']);
   }
-}
+};
 
 /**
  * Handle Formik components
  */
-async function handleFormikComponent(element: HTMLElement, value: string, detection: ReactDetection): Promise<void> {
+const handleFormikComponent = async (
+  element: HTMLElement,
+  value: string,
+  _detection: ReactDetection,
+): Promise<void> => {
   if (element instanceof HTMLInputElement) {
     element.value = value;
 
@@ -1075,16 +1057,16 @@ async function handleFormikComponent(element: HTMLElement, value: string, detect
       console.debug('Could not access Formik bag:', error);
     }
   }
-}
+};
 
 /**
  * Handle React Hook Form components
  */
-async function handleReactHookFormComponent(
+const handleReactHookFormComponent = async (
   element: HTMLElement,
   value: string,
-  detection: ReactDetection,
-): Promise<void> {
+  _detection: ReactDetection,
+): Promise<void> => {
   if (element instanceof HTMLInputElement) {
     element.value = value;
 
@@ -1103,16 +1085,16 @@ async function handleReactHookFormComponent(
       console.debug('Could not access React Hook Form controller:', error);
     }
   }
-}
+};
 
 /**
  * Handle generic React components
  */
-async function handleGenericReactComponent(
+const handleGenericReactComponent = async (
   element: HTMLElement,
   value: string,
-  detection: ReactDetection,
-): Promise<void> {
+  _detection: ReactDetection,
+): Promise<void> => {
   if (element instanceof HTMLInputElement) {
     element.value = value;
   } else if (element.isContentEditable) {
@@ -1120,13 +1102,17 @@ async function handleGenericReactComponent(
   }
 
   // Try to trigger state update through React's synthetic event system
-  await triggerReactStateUpdate(element, value, detection);
-}
+  await triggerReactStateUpdate(element, value, _detection);
+};
 
 /**
  * Trigger React state updates using synthetic events
  */
-async function triggerReactStateUpdate(element: HTMLElement, value: string, detection: ReactDetection): Promise<void> {
+const triggerReactStateUpdate = async (
+  element: HTMLElement,
+  value: string,
+  _detection: ReactDetection,
+): Promise<void> => {
   // For controlled components, we need to simulate user input to trigger state updates
   if (element instanceof HTMLInputElement) {
     // Clear the input first
@@ -1158,12 +1144,12 @@ async function triggerReactStateUpdate(element: HTMLElement, value: string, dete
     // Final change event
     await triggerReactEvents(element, ['change', 'blur']);
   }
-}
+};
 
 /**
  * Trigger React events with proper synthetic event handling
  */
-async function triggerReactEvents(element: HTMLElement, events: string[]): Promise<void> {
+const triggerReactEvents = async (element: HTMLElement, events: string[]): Promise<void> => {
   for (const eventName of events) {
     try {
       // Create native event
@@ -1193,12 +1179,12 @@ async function triggerReactEvents(element: HTMLElement, events: string[]): Promi
       console.debug(`Error triggering ${eventName} event:`, error);
     }
   }
-}
+};
 
 /**
  * Handle Angular-specific text input components
  */
-async function handleAngularTextInput(element: HTMLElement, value: string): Promise<void> {
+const handleAngularTextInput = async (element: HTMLElement, value: string): Promise<void> => {
   try {
     // Focus the element
     element.focus();
@@ -1234,12 +1220,12 @@ async function handleAngularTextInput(element: HTMLElement, value: string): Prom
     // Fall back to standard typing simulation
     await simulateTyping(element, value);
   }
-}
+};
 
 /**
  * Handle Vue-specific text input components
  */
-async function handleVueTextInput(element: HTMLElement, value: string): Promise<void> {
+const handleVueTextInput = async (element: HTMLElement, value: string): Promise<void> => {
   try {
     // Focus the element
     element.focus();
@@ -1277,12 +1263,12 @@ async function handleVueTextInput(element: HTMLElement, value: string): Promise<
     // Fall back to standard typing simulation
     await simulateTyping(element, value);
   }
-}
+};
 
 /**
  * Handle Svelte-specific text input components
  */
-async function handleSvelteTextInput(element: HTMLElement, value: string): Promise<void> {
+const handleSvelteTextInput = async (element: HTMLElement, value: string): Promise<void> => {
   try {
     // Focus the element
     element.focus();
@@ -1319,12 +1305,12 @@ async function handleSvelteTextInput(element: HTMLElement, value: string): Promi
     // Fall back to standard typing simulation
     await simulateTyping(element, value);
   }
-}
+};
 
 /**
  * Handle Qwik-specific text input components
  */
-async function handleQwikTextInput(element: HTMLElement, value: string): Promise<void> {
+const handleQwikTextInput = async (element: HTMLElement, value: string): Promise<void> => {
   try {
     // Focus the element
     element.focus();
@@ -1359,12 +1345,12 @@ async function handleQwikTextInput(element: HTMLElement, value: string): Promise
     // Fall back to standard typing simulation
     await simulateTyping(element, value);
   }
-}
+};
 
 /**
  * Handle Next.js components with enhanced SSR/hydration support
  */
-async function handleNextjsComponent(element: HTMLElement, value: string, detection: ReactDetection): Promise<void> {
+const handleNextjsComponent = async (element: HTMLElement, value: string, detection: ReactDetection): Promise<void> => {
   try {
     console.log('Handling Next.js component with enhanced SSR support');
 
@@ -1400,16 +1386,16 @@ async function handleNextjsComponent(element: HTMLElement, value: string, detect
     console.error('Error in Next.js input handler:', error);
     await handleGenericReactComponent(element, value, detection);
   }
-}
+};
 
 /**
  * Handle React 18+ concurrent mode components
  */
-async function handleReact18ConcurrentComponent(
+const handleReact18ConcurrentComponent = async (
   element: HTMLElement,
   value: string,
   detection: ReactDetection,
-): Promise<void> {
+): Promise<void> => {
   try {
     console.log('Handling React 18+ concurrent component');
 
@@ -1444,16 +1430,16 @@ async function handleReact18ConcurrentComponent(
     console.error('Error in React 18+ concurrent input handler:', error);
     await handleGenericReactComponent(element, value, detection);
   }
-}
+};
 
 /**
  * Handle React Query/TanStack Query components
  */
-async function handleReactQueryComponent(
+const handleReactQueryComponent = async (
   element: HTMLElement,
   value: string,
   detection: ReactDetection,
-): Promise<void> {
+): Promise<void> => {
   try {
     console.log('Handling React Query component');
 
@@ -1469,16 +1455,16 @@ async function handleReactQueryComponent(
     console.error('Error in React Query input handler:', error);
     await handleGenericReactComponent(element, value, detection);
   }
-}
+};
 
 /**
  * Handle Redux Toolkit components
  */
-async function handleReduxToolkitComponent(
+const handleReduxToolkitComponent = async (
   element: HTMLElement,
   value: string,
   detection: ReactDetection,
-): Promise<void> {
+): Promise<void> => {
   try {
     console.log('Handling Redux Toolkit component');
 
@@ -1495,12 +1481,16 @@ async function handleReduxToolkitComponent(
     console.error('Error in Redux Toolkit input handler:', error);
     await handleGenericReactComponent(element, value, detection);
   }
-}
+};
 
 /**
  * Handle Zustand components
  */
-async function handleZustandComponent(element: HTMLElement, value: string, detection: ReactDetection): Promise<void> {
+const handleZustandComponent = async (
+  element: HTMLElement,
+  value: string,
+  detection: ReactDetection,
+): Promise<void> => {
   try {
     console.log('Handling Zustand component');
 
@@ -1512,12 +1502,12 @@ async function handleZustandComponent(element: HTMLElement, value: string, detec
     console.error('Error in Zustand input handler:', error);
     await handleGenericReactComponent(element, value, detection);
   }
-}
+};
 
 /**
  * Handle Jotai components
  */
-async function handleJotaiComponent(element: HTMLElement, value: string, detection: ReactDetection): Promise<void> {
+const handleJotaiComponent = async (element: HTMLElement, value: string, detection: ReactDetection): Promise<void> => {
   try {
     console.log('Handling Jotai component');
 
@@ -1529,12 +1519,12 @@ async function handleJotaiComponent(element: HTMLElement, value: string, detecti
     console.error('Error in Jotai input handler:', error);
     await handleGenericReactComponent(element, value, detection);
   }
-}
+};
 
 /**
  * Handle Recoil components
  */
-async function handleRecoilComponent(element: HTMLElement, value: string, detection: ReactDetection): Promise<void> {
+const handleRecoilComponent = async (element: HTMLElement, value: string, detection: ReactDetection): Promise<void> => {
   try {
     console.log('Handling Recoil component');
 
@@ -1546,13 +1536,13 @@ async function handleRecoilComponent(element: HTMLElement, value: string, detect
     console.error('Error in Recoil input handler:', error);
     await handleGenericReactComponent(element, value, detection);
   }
-}
+};
 
 /**
  * Wait for Next.js hydration to complete
  */
-async function waitForNextjsHydration(): Promise<void> {
-  return new Promise(resolve => {
+const waitForNextjsHydration = async (): Promise<void> =>
+  new Promise(resolve => {
     let attempts = 0;
     const maxAttempts = 50; // 5 seconds max wait
 
@@ -1574,12 +1564,11 @@ async function waitForNextjsHydration(): Promise<void> {
 
     checkHydration();
   });
-}
 
 /**
  * Handle contentEditable elements like rich text editors
  */
-export const updateContentEditable = async (element: HTMLElement, value: string): Promise<void> => {
+const updateContentEditable = async (element: HTMLElement, value: string): Promise<void> => {
   try {
     // First check if we're dealing with a rich text editor
     const isRichEditor =
@@ -1621,3 +1610,9 @@ export const updateContentEditable = async (element: HTMLElement, value: string)
     }
   }
 };
+
+// ============================================================================
+// Exports (at end of file per ESLint import-x/exports-last rule)
+// ============================================================================
+
+export { detectTextField, detectInputField, updateTextField, updateContentEditable };

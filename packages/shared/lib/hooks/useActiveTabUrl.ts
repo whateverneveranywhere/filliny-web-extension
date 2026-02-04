@@ -1,21 +1,46 @@
 import { isValidUrl } from '../services/schemas/index.js';
 import { getCurrentVistingUrl, getMatchingWebsite } from '../utils/index.js';
 import { useEffect, useState, useCallback, useMemo } from 'react';
+import { z } from 'zod';
 import type { DTOProfileFillingForm } from '@extension/storage';
 
-interface UseActiveTabUrlReturn {
-  activeTabUrl: string;
-  isLoading: boolean;
-  isValid: boolean;
-  matchingWebsite: DTOProfileFillingForm['fillingWebsites'][0] | null;
-  currentPageUrl: string;
-}
+// ============================================================================
+// Hook Schemas
+// ============================================================================
 
-interface UseActiveTabUrlProps {
-  websites?: DTOProfileFillingForm['fillingWebsites'];
-  mode?: 'activeTab' | 'currentPage' | 'both';
-}
+/**
+ * Schema for active tab URL mode
+ */
+const ActiveTabUrlModeSchema = z.enum(['activeTab', 'currentPage', 'both']);
+type _ActiveTabUrlMode = z.infer<typeof ActiveTabUrlModeSchema>;
 
+/**
+ * Schema for useActiveTabUrl hook props
+ * Note: websites uses the imported type from storage as it references the full schema
+ */
+const _UseActiveTabUrlPropsSchema = z.object({
+  websites: z.custom<DTOProfileFillingForm['fillingWebsites']>().optional(),
+  mode: ActiveTabUrlModeSchema.optional(),
+});
+type UseActiveTabUrlProps = z.infer<typeof _UseActiveTabUrlPropsSchema>;
+
+/**
+ * Schema for useActiveTabUrl hook return value
+ * Note: matchingWebsite references the external type from storage
+ */
+const _UseActiveTabUrlReturnSchema = z.object({
+  activeTabUrl: z.string(),
+  isLoading: z.boolean(),
+  isValid: z.boolean(),
+  matchingWebsite: z.custom<DTOProfileFillingForm['fillingWebsites'][0] | null>(),
+  currentPageUrl: z.string(),
+});
+type UseActiveTabUrlReturn = z.infer<typeof _UseActiveTabUrlReturnSchema>;
+
+/**
+ * TabUpdateListeners interface - uses function types which cannot be expressed in Zod
+ * This is acceptable per type-inference-patterns.md for function-heavy interfaces
+ */
 interface TabUpdateListeners {
   onActivated: (callback: () => void) => void;
   onUpdated: (callback: () => void) => void;

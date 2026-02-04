@@ -58,7 +58,14 @@ js.configs.recommended, ...tsConfigs.recommended, jsxA11y.flatConfigs.recommende
         'react/prop-types': 'off',
         'prefer-const': 'error',
         'no-var': 'error',
-        '@typescript-eslint/no-unused-vars': 'warn',
+        '@typescript-eslint/no-unused-vars': [
+            'warn',
+            {
+                argsIgnorePattern: '^_',
+                varsIgnorePattern: '^_',
+                caughtErrorsIgnorePattern: '^_',
+            },
+        ],
         'func-style': ['warn', 'expression', { allowArrowFunctions: true }],
         'no-restricted-imports': [
             'error',

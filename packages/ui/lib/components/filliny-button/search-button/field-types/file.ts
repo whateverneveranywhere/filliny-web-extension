@@ -489,7 +489,7 @@ const triggerNativeFilePicker = async (
  * Update a file input with actual file objects or simulate file selection
  * This function handles both test mode and AI mode file filling with enhanced capabilities
  */
-export const updateFileInput = async (
+const updateFileInput = async (
   fileInput: HTMLInputElement,
   value: string | string[],
   isTestMode: boolean = false,
@@ -662,7 +662,7 @@ export const updateFileInput = async (
       const indicator = document.createElement('span');
       indicator.className = 'filliny-file-indicator';
       indicator.style.marginLeft = '8px';
-      indicator.style.color = '#0284c7';
+      indicator.style.color = '#525252';
       indicator.style.fontStyle = 'italic';
       indicator.style.fontSize = '12px';
       indicator.style.fontWeight = '500';
@@ -1192,7 +1192,7 @@ const findAssociatedFileInput = (element: HTMLElement): HTMLInputElement | null 
 /**
  * Detect enhanced drag-and-drop zones with modern patterns
  */
-function detectEnhancedDragDropZone(element: HTMLElement): boolean {
+const detectEnhancedDragDropZone = (element: HTMLElement): boolean => {
   // Check for modern drag-and-drop patterns
   const dragDropPatterns = [
     /\b(drop-zone|dropzone|drop-area|drag-area)\b/i,
@@ -1219,7 +1219,7 @@ function detectEnhancedDragDropZone(element: HTMLElement): boolean {
   const hasDropText = /\b(drop\s+file|drag\s+file|drop\s+here)\b/i.test(textContent);
 
   return hasDropClass || hasDropAttributes || hasDropAria || hasDropText;
-}
+};
 
 /**
  * Cloud storage integration detection
@@ -1234,7 +1234,7 @@ interface CloudStorageIntegration {
 /**
  * Detect cloud storage integration patterns
  */
-function detectCloudStorageIntegration(element: HTMLElement): CloudStorageIntegration | null {
+const detectCloudStorageIntegration = (element: HTMLElement): CloudStorageIntegration | null => {
   const className = element.className.toLowerCase();
   const textContent = element.textContent?.toLowerCase() || '';
   const ariaLabel = element.getAttribute('aria-label')?.toLowerCase() || '';
@@ -1277,16 +1277,16 @@ function detectCloudStorageIntegration(element: HTMLElement): CloudStorageIntegr
   }
 
   return null;
-}
+};
 
 /**
  * Handle cloud storage upload interactions
  */
-async function handleCloudStorageUpload(
+const handleCloudStorageUpload = async (
   element: HTMLElement,
   files: File[],
   integration: CloudStorageIntegration,
-): Promise<void> {
+): Promise<void> => {
   try {
     console.log(`Handling ${integration.provider} upload with ${files.length} files`);
 
@@ -1312,12 +1312,12 @@ async function handleCloudStorageUpload(
   } catch (error) {
     console.warn(`Error handling ${integration.provider} upload:`, error);
   }
-}
+};
 
 /**
  * Simulate file selection in cloud storage interfaces
  */
-async function simulateCloudStorageSelection(provider: string, files: File[]): Promise<void> {
+const simulateCloudStorageSelection = async (provider: string, files: File[]): Promise<void> => {
   try {
     // Wait for potential modal/popup to appear
     await new Promise(resolve => setTimeout(resolve, 500));
@@ -1371,12 +1371,12 @@ async function simulateCloudStorageSelection(provider: string, files: File[]): P
   } catch (error) {
     console.warn(`Error simulating ${provider} selection:`, error);
   }
-}
+};
 
 /**
  * Detect file input fields from a set of elements
  */
-export const detectFileFields = async (
+const detectFileFields = async (
   elements: HTMLElement[],
   baseIndex: number,
   testMode: boolean = false,
@@ -1469,3 +1469,9 @@ export const detectFileFields = async (
 
   return fields;
 };
+
+// ============================================================================
+// Exports (at end of file per ESLint import-x/exports-last rule)
+// ============================================================================
+
+export { updateFileInput, detectFileFields };

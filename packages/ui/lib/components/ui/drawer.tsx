@@ -3,7 +3,7 @@ import * as React from 'react';
 import { Drawer as DrawerPrimitive } from 'vaul';
 
 const Drawer = ({ shouldScaleBackground = true, ...props }: React.ComponentProps<typeof DrawerPrimitive.Root>) => (
-  <DrawerPrimitive.Root shouldScaleBackground={shouldScaleBackground} {...props} />
+  <DrawerPrimitive.Root direction="bottom" shouldScaleBackground={shouldScaleBackground} {...props} />
 );
 Drawer.displayName = 'Drawer';
 
@@ -19,7 +19,12 @@ const DrawerOverlay = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DrawerPrimitive.Overlay
     ref={ref}
-    className={cn('filliny-fixed filliny-inset-0 filliny-z-50 filliny-bg-black/50', className)}
+    className={cn(
+      'filliny-fixed filliny-inset-0 filliny-z-50 filliny-bg-black/50',
+      'data-[state=open]:filliny-animate-in data-[state=open]:filliny-fade-in-0 data-[state=open]:filliny-duration-500',
+      'data-[state=closed]:filliny-animate-out data-[state=closed]:filliny-fade-out-0 data-[state=closed]:filliny-duration-300',
+      className,
+    )}
     {...props}
   />
 ));
@@ -34,11 +39,12 @@ const DrawerContent = React.forwardRef<
     <DrawerPrimitive.Content
       ref={ref}
       className={cn(
-        'filliny-fixed filliny-inset-x-0 filliny-bottom-0 filliny-z-50 filliny-mt-24 filliny-flex filliny-h-auto filliny-flex-col filliny-rounded-t-2xl filliny-border filliny-bg-background',
+        'filliny-fixed filliny-z-50 filliny-flex filliny-h-auto filliny-flex-col filliny-bg-background',
+        'data-[vaul-drawer-direction=bottom]:filliny-inset-x-0 data-[vaul-drawer-direction=bottom]:filliny-bottom-0 data-[vaul-drawer-direction=bottom]:filliny-mt-24 data-[vaul-drawer-direction=bottom]:filliny-max-h-[80vh] data-[vaul-drawer-direction=bottom]:filliny-rounded-t-2xl data-[vaul-drawer-direction=bottom]:filliny-border-t',
         className,
       )}
       {...props}>
-      <div className="filliny-mx-auto filliny-mt-4 filliny-h-2 filliny-w-[100px] filliny-rounded-full filliny-bg-muted" />
+      <div className="filliny-mx-auto filliny-mt-4 filliny-h-2 filliny-w-[100px] filliny-shrink-0 filliny-rounded-full filliny-bg-muted" />
       {children}
     </DrawerPrimitive.Content>
   </DrawerPortal>

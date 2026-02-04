@@ -12,7 +12,7 @@ const SigninPage = () => {
   };
 
   return (
-    <PageLayout isLoggedIn={false} showPattern>
+    <PageLayout isLoggedIn={false}>
       <div className="filliny-flex filliny-min-h-[calc(100vh-2rem)] filliny-flex-col filliny-items-center filliny-justify-center filliny-text-center">
         <div className="filliny-flex filliny-flex-col filliny-items-center filliny-gap-4 filliny-max-w-xs">
           <div className="filliny-transform filliny-transition-transform filliny-duration-300 hover:filliny-scale-105">

@@ -57,7 +57,7 @@ const FormFieldWrapper = <T extends FieldValues = FieldValues>({
   title,
   description,
   required,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+
   disabled: _disabled, // Available for child components via spread
   className,
   value: externalValue,

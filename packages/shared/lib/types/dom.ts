@@ -3,7 +3,13 @@
  *
  * Properly defined type extensions for DOM elements and window objects.
  * These replace inline type assertions like `as HTMLElement & { ... }`.
+ *
+ * NOTE: Framework detection interfaces intentionally use `unknown` for framework
+ * internal properties because the exact shape is framework-specific and not
+ * guaranteed across versions. Use the Zod schemas from runtime-type-guards.ts
+ * for runtime validation when accessing these properties.
  */
+import { z } from 'zod';
 
 // ============================================================================
 // HTMLElement Extensions
@@ -305,35 +311,41 @@ export interface SSRDetectionWindow extends Window {
 }
 
 // ============================================================================
-// Function Parameter Types
+// Function Parameter Types (Zod Schemas)
 // ============================================================================
 
 /**
- * Options for creating select element in tests
+ * Schema for select element options in tests
  */
-export interface SelectOption {
-  value: string;
-  text: string;
-  selected?: boolean;
-}
+export const SelectOptionSchema = z.object({
+  value: z.string(),
+  text: z.string(),
+  selected: z.boolean().optional(),
+});
+export type SelectOption = z.infer<typeof SelectOptionSchema>;
 
 /**
- * Configuration for make-manifest plugin
+ * Schema for make-manifest plugin configuration
  */
-export interface MakeManifestConfig {
-  outDir: string;
-}
+export const MakeManifestConfigSchema = z.object({
+  outDir: z.string(),
+});
+export type MakeManifestConfig = z.infer<typeof MakeManifestConfigSchema>;
 
 /**
- * Result of form container scoring
+ * Schema for form container scoring result
  */
-export interface ContainerScore {
-  score: number;
-  reasons: string[];
-}
+export const ContainerScoreSchema = z.object({
+  score: z.number(),
+  reasons: z.array(z.string()),
+});
+export type ContainerScore = z.infer<typeof ContainerScoreSchema>;
 
 /**
- * Result of timeout wrapper function
+ * TimeoutResult is a generic interface that must remain hardcoded
+ * because Zod doesn't support generic type inference in the same way.
+ * This is acceptable per the type-inference-patterns.md guidelines
+ * for complex generic types that can't be expressed with Zod.
  */
 export interface TimeoutResult<T> {
   promise: Promise<T>;
@@ -341,22 +353,38 @@ export interface TimeoutResult<T> {
 }
 
 // ============================================================================
-// Metadata Type Extensions
+// Metadata Type Extensions (Zod Schemas)
 // ============================================================================
 
 /**
- * Field metadata with file upload data
+ * Schema for accepted file types in file uploads
+ */
+export const AcceptedTypeSchema = z.object({
+  type: z.enum(['extension', 'mime']),
+  value: z.string(),
+  category: z.enum(['image', 'document', 'video', 'audio', 'archive', 'text', 'other']),
+});
+
+/**
+ * Schema for file input configuration
+ */
+export const FileInputConfigSchema = z.object({
+  multiple: z.boolean().optional(),
+});
+
+/**
+ * Schema for file upload data
+ */
+export const FileUploadDataConfigSchema = z.object({
+  acceptedTypes: z.array(AcceptedTypeSchema).optional(),
+  fileInput: FileInputConfigSchema.optional(),
+});
+
+/**
+ * Schema for field metadata with file upload data
  * Used to access fileUploadData from field metadata
  */
-export interface FileUploadMetadata {
-  fileUploadData?: {
-    acceptedTypes?: Array<{
-      type: 'extension' | 'mime';
-      value: string;
-      category: 'image' | 'document' | 'video' | 'audio' | 'archive' | 'text' | 'other';
-    }>;
-    fileInput?: {
-      multiple?: boolean;
-    };
-  };
-}
+export const FileUploadMetadataSchema = z.object({
+  fileUploadData: FileUploadDataConfigSchema.optional(),
+});
+export type FileUploadMetadata = z.infer<typeof FileUploadMetadataSchema>;

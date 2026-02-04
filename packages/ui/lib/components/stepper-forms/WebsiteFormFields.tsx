@@ -22,7 +22,8 @@ export const WebsiteFormFields = ({ index }: WebsiteFormFieldsProps) => (
     />
     <RHFShadcnSwitch
       name={`fillingWebsites[${index}].isRootLoad`}
-      title="Load it in the entire website instead of the exact given URL"
+      title="Apply to entire website"
+      description="When enabled, Filliny works on all pages of this website. When disabled, only works on this exact URL."
     />
     <RHFShadcnFileDrop
       name={`fillingWebsites[${index}].fillingContext`}

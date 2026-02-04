@@ -3,6 +3,14 @@
  *
  * This module provides type-safe query keys that can be used across
  * queries and mutations to ensure consistent cache invalidation.
+ *
+ * Query Key Hierarchy:
+ * - queryKeys.profile.all - Base key for all profile queries
+ * - queryKeys.profile.list() - Profile list query
+ * - queryKeys.profile.detail(id) - Specific profile detail
+ * - queryKeys.profile.suggestedWebsites() - Suggested websites for quick add
+ * - queryKeys.profile.tones() - Available tones
+ * - queryKeys.profile.povs() - Available POVs
  */
 import type { QueryClient } from '@tanstack/react-query';
 
@@ -20,12 +28,22 @@ export const queryKeys = {
   },
 
   /**
+   * System/API health-related query keys
+   */
+  system: {
+    all: ['system'] as const,
+    apiHealth: () => [...queryKeys.system.all, 'apiHealth'] as const,
+  },
+
+  /**
    * Profile-related query keys
    */
   profile: {
     all: ['profile'] as const,
     list: () => [...queryKeys.profile.all, 'list'] as const,
+    lists: () => [...queryKeys.profile.all, 'list'] as const, // Alias for consistency
     detail: (id: string) => [...queryKeys.profile.all, 'detail', id] as const,
+    details: () => [...queryKeys.profile.all, 'detail'] as const, // All detail queries
     suggestedWebsites: () => [...queryKeys.profile.all, 'suggestedWebsites'] as const,
     tones: () => [...queryKeys.profile.all, 'tones'] as const,
     povs: () => [...queryKeys.profile.all, 'povs'] as const,
@@ -51,7 +69,7 @@ export type QueryKeyFactory = typeof queryKeys;
  */
 
 /**
- * Invalidate all profile-related queries
+ * Invalidate all profile-related queries (list, details, etc.)
  */
 export const invalidateProfileQueries = (queryClient: QueryClient): Promise<void> =>
   queryClient.invalidateQueries({ queryKey: queryKeys.profile.all });
@@ -61,6 +79,12 @@ export const invalidateProfileQueries = (queryClient: QueryClient): Promise<void
  */
 export const invalidateProfileList = (queryClient: QueryClient): Promise<void> =>
   queryClient.invalidateQueries({ queryKey: queryKeys.profile.list() });
+
+/**
+ * Invalidate all profile detail queries
+ */
+export const invalidateProfileDetails = (queryClient: QueryClient): Promise<void> =>
+  queryClient.invalidateQueries({ queryKey: queryKeys.profile.details() });
 
 /**
  * Invalidate a specific profile detail query
@@ -84,15 +108,53 @@ export const invalidateAuthQueries = (queryClient: QueryClient): Promise<void> =
  * Centralized query invalidation helper for profile mutations
  * Ensures consistent cache invalidation across all profile-related mutations
  *
+ * Invalidates:
+ * - Profile list (always)
+ * - Dashboard overview (always - shows profile counts)
+ * - Specific profile detail (when profileId provided)
+ * - All profile details (when active profile changes to refresh isActive status)
+ *
  * @param queryClient - The React Query client instance
  * @param profileId - Optional profile ID for specific profile detail invalidation
+ * @param options - Optional configuration for invalidation behavior
  */
-export const invalidateProfileMutationQueries = async (queryClient: QueryClient, profileId?: string): Promise<void> => {
-  const invalidations = [invalidateProfileList(queryClient), invalidateDashboardQueries(queryClient)];
+export const invalidateProfileMutationQueries = async (
+  queryClient: QueryClient,
+  profileId?: string,
+  options?: { invalidateAllDetails?: boolean },
+): Promise<void> => {
+  const invalidations: Promise<void>[] = [invalidateProfileList(queryClient), invalidateDashboardQueries(queryClient)];
 
   if (profileId) {
     invalidations.push(invalidateProfileDetail(queryClient, profileId));
   }
 
+  // Optionally invalidate all profile details (useful when isActive changes)
+  if (options?.invalidateAllDetails) {
+    invalidations.push(invalidateProfileDetails(queryClient));
+  }
+
   await Promise.all(invalidations);
 };
+
+/**
+ * Invalidation patterns for common operations
+ * Pre-defined patterns for common use cases
+ */
+export const invalidationPatterns = {
+  /** Invalidate after profile CRUD operations */
+  profileMutation: (queryClient: QueryClient, profileId?: string) =>
+    invalidateProfileMutationQueries(queryClient, profileId),
+
+  /** Invalidate after active profile change (affects all profiles) */
+  activeProfileChange: (queryClient: QueryClient, profileId: string) =>
+    invalidateProfileMutationQueries(queryClient, profileId, { invalidateAllDetails: true }),
+
+  /** Invalidate after profile deletion */
+  profileDeletion: async (queryClient: QueryClient, profileId: string) => {
+    // Remove from cache immediately
+    queryClient.removeQueries({ queryKey: queryKeys.profile.detail(profileId) });
+    // Then invalidate related queries
+    await invalidateProfileMutationQueries(queryClient, profileId);
+  },
+} as const;

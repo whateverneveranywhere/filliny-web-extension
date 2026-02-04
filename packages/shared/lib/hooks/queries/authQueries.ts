@@ -16,10 +16,10 @@ export const useAuthHealthCheckQuery = (enabled: boolean = true) =>
     // Only run query when enabled (user is authenticated)
     enabled,
     // Add caching configuration to prevent excessive health check requests
-    staleTime: 10 * 60 * 1000, // 10 minutes
-    gcTime: 15 * 60 * 1000, // 15 minutes
-    refetchOnWindowFocus: false,
-    refetchOnMount: false,
+    staleTime: 30 * 1000, // 30 seconds - extension needs reasonably fresh data
+    gcTime: 60 * 1000, // 1 minute
+    refetchOnWindowFocus: true, // Refetch when user returns to extension
+    refetchOnMount: true,
     retry: false, // Don't retry on 401 - user likely isn't authenticated
     meta: {
       onError: () => {

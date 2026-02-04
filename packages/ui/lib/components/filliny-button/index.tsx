@@ -3,21 +3,17 @@ import { DragButton } from './drag-button';
 import { FillinyVisionButton } from './filliny-vision-button';
 import { LogoButton } from './logo-button';
 import { FieldFillManager } from './search-button/components/FieldFillManager';
-import { SupportRequestButton } from './support-request-button';
 import { FillinyTestModeFillerButton } from './test-mode-button';
-import { DndContext, useDraggable, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { DndContext, useDraggable, MouseSensor, TouchSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { restrictToVerticalAxis } from '@dnd-kit/modifiers';
-import { CSS } from '@dnd-kit/utilities';
 import { useStorage } from '@extension/shared';
 import { positionStorage, fieldButtonsStorage } from '@extension/storage';
-import { useRef, useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import type { ButtonComponentProps } from './button-wrapper';
 import type { DragEndEvent } from '@dnd-kit/core';
-import type { CSSProperties } from 'react';
 
 interface ButtonConfig {
   Component: React.FC<ButtonComponentProps>;
-  position: CSSProperties;
   tooltipContent: string;
 }
 
@@ -28,54 +24,50 @@ interface Position {
 
 const buttonComponents: ButtonConfig[] = [
   {
+    Component: FillinyVisionButton,
+    tooltipContent: 'Highlight fillable form fields',
+  },
+  {
     Component: FillinyTestModeFillerButton,
-    position: { top: '-28px', left: '-8px' },
     tooltipContent: 'Test form filling functionality',
   },
-  { Component: DragButton, position: { top: '15px', left: '-25px' }, tooltipContent: 'Drag to reposition the button' },
   {
-    Component: SupportRequestButton,
-    position: { top: '32px', left: '-8px' },
-    tooltipContent: 'Get help or report an issue',
-  },
-  {
-    Component: FillinyVisionButton,
-    position: { top: '-10px', left: '-25px' },
-    tooltipContent: 'Highlight fillable form fields',
+    Component: DragButton,
+    tooltipContent: 'Drag to reposition the button',
   },
 ];
 
 const DraggableButton = ({ position }: { position: Position }) => {
   const [isHovered, setIsHovered] = useState(false);
-  const nodeRef = useRef<HTMLDivElement>(null);
-  const dragHandleRef = useRef<HTMLDivElement>(null);
 
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: 'filliny-button',
   });
 
-  const style: CSSProperties = {
+  // Build transform string safely - handle null/undefined transform
+  const transformStyle = transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined;
+
+  const style: React.CSSProperties = {
     position: 'fixed',
     top: position.y,
     right: 10,
-    transform: CSS.Transform.toString(transform),
+    transform: transformStyle,
     touchAction: 'none',
     zIndex: 9999999,
   };
+
+  const handleMouseEnter = useCallback(() => setIsHovered(true), []);
+  const handleMouseLeave = useCallback(() => setIsHovered(false), []);
 
   return (
     <div
       ref={setNodeRef}
       style={style}
-      className="filliny-group filliny-flex filliny-size-16 filliny-transform-gpu filliny-cursor-pointer filliny-items-center"
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}>
-      <div ref={nodeRef} className="filliny-relative">
-        <div className="filliny-absolute filliny-z-[9999999]">
-          <div className="filliny-pointer-events-auto">
-            <LogoButton isHovered={isHovered} isDragging={isDragging} />
-          </div>
-        </div>
+      className="filliny-group filliny-flex filliny-transform-gpu filliny-cursor-pointer filliny-items-center"
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}>
+      <div className="filliny-flex filliny-flex-row filliny-items-center filliny-gap-1">
+        {/* Secondary buttons - appear to the LEFT of main button */}
         {buttonComponents.map((button, index) => {
           if (button.Component === DragButton) {
             return (
@@ -83,9 +75,8 @@ const DraggableButton = ({ position }: { position: Position }) => {
                 key={index}
                 isHovered={isHovered}
                 isDragging={isDragging}
-                position={button.position}
                 tooltipContent={button.tooltipContent}>
-                <div ref={dragHandleRef} {...attributes} {...listeners}>
+                <div className="filliny-cursor-grab active:filliny-cursor-grabbing" {...attributes} {...listeners}>
                   <button.Component isHovered={isHovered} isDragging={isDragging} />
                 </div>
               </ButtonWrapper>
@@ -96,12 +87,17 @@ const DraggableButton = ({ position }: { position: Position }) => {
               key={index}
               isHovered={isHovered}
               isDragging={isDragging}
-              position={button.position}
               tooltipContent={button.tooltipContent}>
               <button.Component isHovered={isHovered} isDragging={isDragging} />
             </ButtonWrapper>
           );
         })}
+        {/* Main logo button - stays on the RIGHT with tooltip */}
+        <div className="filliny-z-[9999999]">
+          <ButtonWrapper isHovered={true} isDragging={false} tooltipContent="Autofill with AI">
+            <LogoButton isHovered={isHovered} isDragging={isDragging} />
+          </ButtonWrapper>
+        </div>
       </div>
     </div>
   );
@@ -111,7 +107,19 @@ const FillinyButton: React.FC = () => {
   const savedPosition = useStorage(positionStorage);
   const fieldButtonSettings = useStorage(fieldButtonsStorage);
   const [position, setPosition] = useState<Position>(savedPosition);
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+  // Use MouseSensor and TouchSensor instead of PointerSensor for better Shadow DOM compatibility
+  const mouseSensor = useSensor(MouseSensor, {
+    activationConstraint: { distance: 8 },
+  });
+  const touchSensor = useSensor(TouchSensor, {
+    activationConstraint: { delay: 100, tolerance: 5 },
+  });
+  const sensors = useSensors(mouseSensor, touchSensor);
+
+  // Sync position state with storage when savedPosition changes
+  useEffect(() => {
+    setPosition(savedPosition);
+  }, [savedPosition]);
 
   // Store preference in DOM for easy access by field buttons
   useEffect(() => {

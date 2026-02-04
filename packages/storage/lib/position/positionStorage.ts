@@ -1,11 +1,21 @@
 import { createStorage } from '../base/base.js';
 import { StorageEnum } from '../base/enums.js';
+import { z } from 'zod';
 import type { BaseStorageType } from '../base/types.js';
 
-interface Position {
-  x: number;
-  y: number;
-}
+// ============================================================================
+// Position Schema
+// ============================================================================
+
+/**
+ * Position schema for button position storage
+ */
+const PositionSchema = z.object({
+  x: z.number(),
+  y: z.number(),
+});
+
+type Position = z.infer<typeof PositionSchema>;
 
 type PositionStorage = BaseStorageType<Position> & {
   setPosition: (position: Position) => Promise<void>;
@@ -25,7 +35,7 @@ const storage = isClient
     })
   : null;
 
-export const positionStorage: PositionStorage = {
+const positionStorage: PositionStorage = {
   get: async () => storage?.get() ?? defaultPosition,
   set: async value => storage?.set(value),
   getSnapshot: () => storage?.getSnapshot() ?? defaultPosition,
@@ -33,3 +43,10 @@ export const positionStorage: PositionStorage = {
   setPosition: async position => storage?.set(position),
   resetPosition: async () => storage?.set(defaultPosition),
 };
+
+// ============================================================================
+// Exports (at end of file per ESLint import-x/exports-last rule)
+// ============================================================================
+
+export { PositionSchema, positionStorage };
+export type { Position };

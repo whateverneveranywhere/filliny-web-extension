@@ -1,18 +1,22 @@
 import { ActiveProfileWebsitePreview } from './active-profile-website-preview';
+import { ProfileForm } from './profile-form';
 import { QuickAddWebsiteToProfile } from './quick-add-website';
-import { Loading, NoTokensAlert, CreditsFooterWarning } from '../components';
+import { Loading, NoTokensAlert, CreditsFooterWarning, EmptyProfileState, UpgradePrompt } from '../components';
+import { Drawer } from '../components/drawer';
 import { useToast } from '../hooks/use-toast';
 import { PageLayout } from '../layout';
 import {
+  useExtensionAuth,
   useDashboardOverview,
   useCreateFillingProfileMutation,
   useEditFillingProfileMutation,
   useActiveTabUrl,
   useActiveProfile,
   usePlanLimits,
+  useBoolean,
 } from '@extension/shared';
 import { profileStorage } from '@extension/storage';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useCallback } from 'react';
 import type { DTOProfileFillingForm } from '@extension/storage';
 
 const useProfileManagement = (url: string) => {
@@ -23,6 +27,7 @@ const useProfileManagement = (url: string) => {
   const { mutateAsync: editProfile, isPending: isUpdating } = useEditFillingProfileMutation();
 
   const isLoading = isCreatingProfile || isUpdating;
+  const hasNoProfiles = !profiles?.length;
 
   // Set the default profile in storage whenever it changes
   useEffect(() => {
@@ -34,9 +39,47 @@ const useProfileManagement = (url: string) => {
     }
   }, [activeProfile, profiles]);
 
-  const { currentPlan, maxWebsites, hasReachedWebsiteLimit } = usePlanLimits();
+  const { currentPlan, maxWebsites, hasReachedWebsiteLimit, isPro, freeFormsRemaining } = usePlanLimits();
 
-  const handleQuickAdd = async () => {
+  const handleCreateProfile = useCallback(async () => {
+    const newProfileData: DTOProfileFillingForm = {
+      profileName: 'My Profile',
+      defaultFillingContext: 'Fill the form with professional, accurate information',
+      preferences: {
+        isFormal: true,
+        isGapFillingAllowed: true,
+        povId: 1,
+        toneId: 1,
+      },
+      fillingWebsites: [{ fillingContext: '', isRootLoad: true, websiteUrl: url }],
+    };
+
+    const createdProfile = await createProfile({ data: newProfileData });
+    profileStorage.setDefaultProfile(createdProfile);
+    toast({
+      title: 'Profile created!',
+      description: 'Your first profile is ready. Start filling forms with AI.',
+    });
+  }, [url, createProfile, toast]);
+
+  const handleUpdateProfile = useCallback(async () => {
+    if (!activeProfile) return;
+
+    const updatedProfile: DTOProfileFillingForm = {
+      ...activeProfile,
+      fillingWebsites: [...activeProfile.fillingWebsites, { fillingContext: '', isRootLoad: true, websiteUrl: url }],
+    };
+
+    await editProfile({ id: activeProfileId, data: updatedProfile });
+    // Update storage immediately so content scripts get the updated profile without waiting for query refetch
+    await profileStorage.setDefaultProfile(updatedProfile);
+    toast({
+      title: 'Website added!',
+      description: 'Filliny is now ready to help you fill forms on this site.',
+    });
+  }, [activeProfile, activeProfileId, url, editProfile, toast]);
+
+  const handleQuickAdd = useCallback(async () => {
     if (hasReachedWebsiteLimit(activeProfile?.fillingWebsites?.length || 0)) return;
 
     try {
@@ -53,55 +96,28 @@ const useProfileManagement = (url: string) => {
       });
       console.error('Error adding website:', error);
     }
-  };
-
-  const handleCreateProfile = async () => {
-    const newProfileData: DTOProfileFillingForm = {
-      profileName: 'First profile',
-      defaultFillingContext: 'Fill the form with example mock data',
-      preferences: {
-        isFormal: true,
-        isGapFillingAllowed: true,
-        povId: 1,
-        toneId: 1,
-      },
-      fillingWebsites: [{ fillingContext: '', isRootLoad: true, websiteUrl: url }],
-    };
-
-    const createdProfile = await createProfile({ data: newProfileData });
-    profileStorage.setDefaultProfile(createdProfile);
-    toast({ title: 'Profile created and set as default' });
-  };
-
-  const handleUpdateProfile = async () => {
-    if (!activeProfile) return;
-
-    const updatedProfileData = {
-      id: activeProfileId,
-      data: {
-        ...activeProfile,
-        fillingWebsites: [...activeProfile.fillingWebsites, { fillingContext: '', isRootLoad: true, websiteUrl: url }],
-      },
-    };
-
-    await editProfile(updatedProfileData);
-    toast({ title: 'Website added to profile successfully' });
-  };
+  }, [activeProfile, profiles, hasReachedWebsiteLimit, handleCreateProfile, handleUpdateProfile, toast]);
 
   return {
     handleQuickAdd,
     activeProfile,
+    profiles,
     isLoading,
     currentPlan,
     maxWebsites,
     hasReachedWebsiteLimit,
+    hasNoProfiles,
+    isPro,
+    freeFormsRemaining,
   };
 };
 
 const HomePage = () => {
-  const { isLoading: isLoadingOverview } = useDashboardOverview();
+  const { isAuthenticated } = useExtensionAuth();
+  const { isLoading: isLoadingOverview } = useDashboardOverview(isAuthenticated);
   const { activeProfile } = useActiveProfile();
   const { canFillForms, isPro, freeFormsRemaining, tokensRemaining } = usePlanLimits();
+  const profileModal = useBoolean();
   const {
     activeTabUrl,
     isLoading: isLoadingUrl,
@@ -112,18 +128,26 @@ const HomePage = () => {
     mode: 'activeTab',
   });
 
-  const { handleQuickAdd, isLoading: isProfileLoading, currentPlan, maxWebsites } = useProfileManagement(activeTabUrl);
+  const {
+    handleQuickAdd,
+    isLoading: isProfileLoading,
+    currentPlan,
+    maxWebsites,
+    hasNoProfiles,
+    isPro: isPlanPro,
+  } = useProfileManagement(activeTabUrl);
+
+  // Handle profile form submission
+  const handleProfileFormSubmit = useCallback(() => {
+    profileModal.onFalse();
+  }, [profileModal]);
 
   // Footer with credit warnings - only show when user has some credits but running low
   const footerContent = useMemo(() => {
     // If user can fill forms, show the warning in footer when running low
     if (canFillForms) {
       return (
-        <CreditsFooterWarning
-          freeFormsRemaining={freeFormsRemaining}
-          tokensRemaining={tokensRemaining}
-          isPro={isPro}
-        />
+        <CreditsFooterWarning freeFormsRemaining={freeFormsRemaining} tokensRemaining={tokensRemaining} isPro={isPro} />
       );
     }
     return null;
@@ -133,6 +157,28 @@ const HomePage = () => {
     return (
       <PageLayout>
         <Loading size="xl" className="filliny-min-h-[200px]" />
+      </PageLayout>
+    );
+  }
+
+  // Show empty state for new users with no profiles
+  if (hasNoProfiles) {
+    return (
+      <PageLayout footer={footerContent}>
+        <div className="filliny-flex filliny-flex-1 filliny-w-full filliny-flex-col filliny-gap-4">
+          <EmptyProfileState
+            onCreateProfile={profileModal.onTrue}
+            onQuickStart={handleQuickAdd}
+            isLoading={isProfileLoading}
+            currentWebsiteUrl={activeTabUrl}
+            isCurrentWebsiteValid={isUrlValid}
+          />
+
+          {/* Drawer for profile creation */}
+          <Drawer hideFooter open={profileModal.value} title="Create Profile" onOpenChange={profileModal.setValue}>
+            <ProfileForm onFormSubmit={handleProfileFormSubmit} />
+          </Drawer>
+        </div>
       </PageLayout>
     );
   }
@@ -166,6 +212,11 @@ const HomePage = () => {
 
           {/* Token/Free Forms exhausted - warning at bottom */}
           {!canFillForms && <NoTokensAlert isPro={isPro} />}
+
+          {/* Subtle upgrade prompt for free users who haven't hit limits yet */}
+          {canFillForms && !isPlanPro && freeFormsRemaining <= 2 && freeFormsRemaining > 0 && (
+            <UpgradePrompt reason="token-limit" variant="inline" />
+          )}
         </div>
       </>
     </PageLayout>

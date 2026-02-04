@@ -16,4 +16,4 @@ export const cn = (...inputs: ClassValue[]) => twMerge(clsx(inputs));
  * </Button>
  */
 export const iconButtonClasses =
-  'filliny-size-10 filliny-min-h-10 filliny-min-w-10 filliny-overflow-hidden !filliny-rounded-full' as const;
+  'filliny-size-10 filliny-min-h-10 filliny-min-w-10 filliny-max-h-10 filliny-max-w-10 filliny-overflow-hidden !filliny-rounded-full filliny-aspect-square filliny-flex-shrink-0' as const;

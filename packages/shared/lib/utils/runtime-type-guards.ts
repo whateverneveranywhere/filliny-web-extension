@@ -331,33 +331,54 @@ const ReactHookFormSchema = z.object({
 // ============================================================================
 
 /**
- * Safely access a property from an unknown object
+ * Type guard to check if value is a non-null object
+ */
+const isNonNullObject = (value: unknown): value is object => value !== null && typeof value === 'object';
+
+/**
+ * Schema for objects with dynamic string keys
+ * Used internally for safe property access when the shape is truly unknown
+ */
+const DynamicObjectSchema = z.record(z.string(), z.unknown());
+
+/**
+ * Safely access a property from an unknown object using Zod validation
+ * Returns the property value if the object is valid and has the key, undefined otherwise
  */
 const safeGetProperty = <T>(obj: unknown, key: string): T | undefined => {
-  if (obj !== null && typeof obj === 'object' && key in obj) {
-    return (obj as Record<string, unknown>)[key] as T | undefined;
+  const parseResult = DynamicObjectSchema.safeParse(obj);
+  if (!parseResult.success) {
+    return undefined;
   }
-  return undefined;
+  const value = parseResult.data[key];
+  return value as T | undefined;
 };
 
 /**
- * Safely check if object has a property
+ * Safely check if object has a property using Zod validation
+ * Creates a schema that requires the specific key to exist
  */
-const hasProperty = <K extends string>(obj: unknown, key: K): obj is Record<K, unknown> =>
-  obj !== null && typeof obj === 'object' && key in obj;
+const hasProperty = <K extends string>(obj: unknown, key: K): obj is { [P in K]: unknown } => {
+  const schema = z.object({ [key]: z.unknown() });
+  return schema.safeParse(obj).success;
+};
 
 /**
- * Safely access nested property using dot notation
+ * Safely access nested property using dot notation with Zod validation
  */
 const safeGetNestedProperty = <T>(obj: unknown, path: string): T | undefined => {
   const keys = path.split('.');
   let current: unknown = obj;
 
   for (const key of keys) {
-    if (current === null || current === undefined || typeof current !== 'object') {
+    if (!isNonNullObject(current)) {
       return undefined;
     }
-    current = (current as Record<string, unknown>)[key];
+    const parseResult = DynamicObjectSchema.safeParse(current);
+    if (!parseResult.success) {
+      return undefined;
+    }
+    current = parseResult.data[key];
   }
 
   return current as T | undefined;
@@ -590,7 +611,7 @@ export {
 };
 
 // Safe Property Access Utilities
-export { safeGetProperty, hasProperty, safeGetNestedProperty };
+export { safeGetProperty, hasProperty, safeGetNestedProperty, isNonNullObject, DynamicObjectSchema };
 
 // Environment Detection Schemas
 export { GlobalWithImportMetaSchema, GlobalWithProcessEnvSchema };

@@ -76,6 +76,9 @@ export type GroupedFieldInfo = z.infer<typeof GroupedFieldInfoSchema>;
 export type DetectedContainerInfo = z.infer<typeof DetectedContainerInfoSchema>;
 export type FieldButtonData = z.infer<typeof FieldButtonDataSchema>;
 
+// Performance limit: Maximum number of fields to process per container
+const MAX_FIELDS_PER_CONTAINER = 100;
+
 // Central field registry to ensure consistency across all strategies
 export class UnifiedFieldRegistry {
   private static instance: UnifiedFieldRegistry;
@@ -105,9 +108,12 @@ export class UnifiedFieldRegistry {
 
     this.containers.set(containerId, container);
 
-    // Detect all fields in container
-    const fields = await detectFields(container, false);
-    console.log(`📋 UnifiedFieldRegistry: Detected ${fields.length} fields in container ${containerId}`);
+    // Detect all fields in container with performance limit
+    const allFields = await detectFields(container, false);
+    const fields = allFields.slice(0, MAX_FIELDS_PER_CONTAINER);
+    console.log(
+      `📋 UnifiedFieldRegistry: Detected ${fields.length} fields in container ${containerId}${allFields.length > MAX_FIELDS_PER_CONTAINER ? ` (limited from ${allFields.length})` : ''}`,
+    );
 
     // Register each field
     const individualFields: DetectedFieldInfo[] = [];

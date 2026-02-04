@@ -1,6 +1,11 @@
 import { Button } from '../../../ui/button';
-import { TogglePill } from '../../../ui/toggle-pill';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../../../ui/tooltip';
+import { ShadowTogglePill } from '../../../ui/shadow-toggle-pill';
+import {
+  ShadowTooltip,
+  ShadowTooltipContent,
+  ShadowTooltipProvider,
+  ShadowTooltipTrigger,
+} from '../../../ui/shadow-tooltip';
 import { animationClasses } from '@/lib/animations';
 import { cn, iconButtonClasses } from '@/lib/utils';
 import { useStorage } from '@extension/shared';
@@ -152,7 +157,7 @@ export const FieldFillButton: React.FC<FieldFillButtonProps> = ({ fieldElement, 
                 : 'filliny-opacity-0 filliny-scale-90 filliny-translate-x-5 filliny-pointer-events-none',
             )}
             style={{ willChange: 'transform, opacity' }}>
-            <TogglePill
+            <ShadowTogglePill
               value={fillMode}
               onValueChange={handleModeChange}
               size="sm"
@@ -177,9 +182,9 @@ export const FieldFillButton: React.FC<FieldFillButtonProps> = ({ fieldElement, 
 
         {/* Action button - higher z-index for proper layering */}
         <div className="filliny-relative filliny-z-10">
-          <TooltipProvider delayDuration={300}>
-            <Tooltip>
-              <TooltipTrigger asChild>
+          <ShadowTooltipProvider delayDuration={300}>
+            <ShadowTooltip>
+              <ShadowTooltipTrigger asChild>
                 <div
                   className={cn(animationClasses.transitionFast, 'hover:filliny-scale-105 active:filliny-scale-95')}
                   style={{ willChange: 'transform' }}>
@@ -192,12 +197,12 @@ export const FieldFillButton: React.FC<FieldFillButtonProps> = ({ fieldElement, 
                     {!isLoading && <Wand2 className="filliny-size-4 filliny-text-white" />}
                   </Button>
                 </div>
-              </TooltipTrigger>
-              <TooltipContent side="top">
+              </ShadowTooltipTrigger>
+              <ShadowTooltipContent side="top">
                 <p>Fill field with {preferTestMode ? 'test' : 'AI'} data</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+              </ShadowTooltipContent>
+            </ShadowTooltip>
+          </ShadowTooltipProvider>
         </div>
       </div>
     </div>

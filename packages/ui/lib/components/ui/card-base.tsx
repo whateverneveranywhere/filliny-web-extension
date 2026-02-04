@@ -9,11 +9,12 @@ const cardBaseVariants = cva(
     variants: {
       variant: {
         default: 'filliny-p-4 filliny-shadow-sm',
-        feature: 'filliny-p-4 filliny-shadow-sm hover:filliny-shadow-md filliny-transition-all filliny-duration-200',
+        feature:
+          'filliny-p-4 filliny-shadow-sm hover:filliny-border-primary/20 hover:filliny-shadow-md filliny-transition-all filliny-duration-200',
         step: 'filliny-p-4 filliny-shadow-sm',
       },
       hover: {
-        true: 'hover:filliny-bg-accent/30 hover:filliny-shadow-md filliny-transition-all filliny-duration-200 filliny-cursor-pointer',
+        true: 'hover:filliny-border-primary/20 hover:filliny-shadow-md filliny-transition-all filliny-duration-200 filliny-cursor-pointer',
         false: '',
       },
     },

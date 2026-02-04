@@ -1,7 +1,7 @@
-import { authStorage } from '@extension/storage';
 import { MessageType } from '../../../types/enums.js';
 import { getConfig } from '../../../utils/helpers.js';
 import { apiEndpoints } from '../../endpoints.js';
+import { authStorage } from '@extension/storage';
 import type { DTOFillPayload, Field } from '../../schemas/index.js';
 
 const { ai } = apiEndpoints;
@@ -16,6 +16,16 @@ export const aiFillService = async (
   // Get auth token for API request
   const authToken = await authStorage.getWithFallback();
 
+  // Build auth headers: Cookie header (primary) + Authorization (fallback)
+  // Better Auth expects session cookie, but we also send Bearer for plugin support
+  const authHeaders: Record<string, string> = {};
+  if (authToken) {
+    // Primary: Cookie header for Better Auth native session handling
+    authHeaders['Cookie'] = `${config.cookieName}=${authToken}`;
+    // Fallback: Authorization header for Bearer plugin support
+    authHeaders['Authorization'] = `Bearer ${authToken}`;
+  }
+
   const response = await chrome.runtime.sendMessage({
     type: MessageType.API_REQUEST,
     url: fullUrl,
@@ -24,7 +34,7 @@ export const aiFillService = async (
       body: JSON.stringify(fillPayLoad),
       headers: {
         'Content-Type': 'application/json',
-        ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+        ...authHeaders,
       },
       isStream: true,
     },

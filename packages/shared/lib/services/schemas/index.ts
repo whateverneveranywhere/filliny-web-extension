@@ -85,11 +85,7 @@ const UserSchema = z.object({
 
 /**
  * Limitations schema for user plan limitations
- * Updated to match the new pricing model from API
- *
- * Pricing Model:
- * - Free tier: 5 free form fills, 1 profile, 3 websites per profile
- * - Pro tier: $29/month, 50M tokens, 100 profiles, 500 websites per profile
+ * All limits are returned dynamically from the API based on user's subscription.
  */
 const LimitationsSchema = z.object({
   maxFillingProfiles: z.number(),
@@ -107,6 +103,17 @@ const AuthHealthCheckSchema = z.object({
   status: z.literal('success'),
   user: UserSchema,
   limitations: LimitationsSchema,
+});
+
+/**
+ * Public health check response schema
+ * Does not require authentication - used to check if API is reachable
+ */
+const PublicHealthCheckSchema = z.object({
+  status: z.enum(['healthy', 'unhealthy']),
+  ok: z.boolean(),
+  version: z.string(),
+  timestamp: z.number(),
 });
 
 // ============================================================================
@@ -141,7 +148,7 @@ const DTOOverviewSchema = z.object({
  * detail/create/edit API contracts.
  */
 const DTOFillingProfileItemSchema = z.object({
-  id: z.number(),
+  id: z.union([z.string(), z.number()]).transform(val => (typeof val === 'string' ? val : String(val))),
   isActive: z.boolean(),
   name: z.string(),
 });
@@ -201,7 +208,10 @@ const DTOFillingPreferencesSchema = z.object({
  * while detail/CRUD endpoints use the full schema with 'profileName'.
  */
 const DTOProfileFillingFormSchema = z.object({
-  id: z.union([z.string(), z.number()]).optional(),
+  id: z
+    .union([z.string(), z.number()])
+    .optional()
+    .transform(val => (val === undefined ? undefined : typeof val === 'string' ? val : String(val))),
   profileName: z.string(),
   defaultFillingContext: z.string(),
   preferences: DTOFillingPreferencesSchema,
@@ -415,10 +425,14 @@ const SuccessResponseSchema = z.object({
 
 /**
  * Edit profile response schema
+ * After envelope unwrapping, API may return the profile directly or wrapped in { success, profile }
  */
-const EditProfileResponseSchema = SuccessResponseSchema.extend({
-  profile: DTOProfileFillingFormSchema.optional(),
-});
+const EditProfileResponseSchema = z.union([
+  SuccessResponseSchema.extend({
+    profile: DTOProfileFillingFormSchema.optional(),
+  }),
+  DTOProfileFillingFormSchema, // API may return profile directly after envelope unwrapping
+]);
 
 /**
  * Change active profile response schema
@@ -575,10 +589,7 @@ const ProfileSelectorSchema = z.object({
  * UserStatus schema - combines limitations data with computed properties
  * Used by UI components to determine what features are available
  *
- * Pricing Model:
- * - Free tier: 5 free form fills, 1 profile, 3 websites per profile
- * - Pro tier: $29/month, 50M tokens, 100 profiles, 500 websites per profile
- *
+ * All limits come from the API dynamically based on the user's subscription.
  * isPro is computed based on: isProSubscriber flag OR tokensRemaining > 0
  */
 const UserStatusSchema = z.object({
@@ -620,6 +631,7 @@ type Plan = z.infer<typeof PlanSchema>;
 type User = z.infer<typeof UserSchema>;
 type Limitations = z.infer<typeof LimitationsSchema>;
 type AuthHealthCheckResponse = z.infer<typeof AuthHealthCheckSchema>;
+type PublicHealthCheckResponse = z.infer<typeof PublicHealthCheckSchema>;
 type UserStatus = z.infer<typeof UserStatusSchema>;
 
 // Dashboard types
@@ -679,7 +691,7 @@ type FillingWebsiteFormItem = z.infer<typeof FillingWebsiteFormItemSchema>;
 export { UrlSchema, isValidUrl };
 
 // Auth Schemas
-export { PlanSchema, UserSchema, LimitationsSchema, AuthHealthCheckSchema, UserStatusSchema };
+export { PlanSchema, UserSchema, LimitationsSchema, AuthHealthCheckSchema, PublicHealthCheckSchema, UserStatusSchema };
 
 // User Status Helpers
 export { computeIsPro, toUserStatus };
@@ -740,6 +752,7 @@ export type {
   User,
   Limitations,
   AuthHealthCheckResponse,
+  PublicHealthCheckResponse,
   UserStatus,
   DTOOverviewResponse,
   DTOFillingProfileItem,

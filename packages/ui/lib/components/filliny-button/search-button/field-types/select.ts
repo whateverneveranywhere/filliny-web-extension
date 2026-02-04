@@ -7,7 +7,7 @@ const debug = createDebugLogger('Select');
 /**
  * Enhanced React Select handler for all React Select variants
  */
-export const handleReactSelect = (element: HTMLElement, normalizedValues: string[]): boolean => {
+const handleReactSelect = (element: HTMLElement, normalizedValues: string[]): boolean => {
   try {
     debug.log('🔍 Handling React Select component...', element);
 
@@ -52,7 +52,7 @@ export const handleReactSelect = (element: HTMLElement, normalizedValues: string
 /**
  * Detect if element is part of a React Select component
  */
-function detectReactSelectComponent(element: HTMLElement): boolean {
+const detectReactSelectComponent = (element: HTMLElement): boolean => {
   // Check element itself
   if (hasReactSelectClasses(element)) return true;
 
@@ -82,12 +82,12 @@ function detectReactSelectComponent(element: HTMLElement): boolean {
   }
 
   return false;
-}
+};
 
 /**
  * Check if element has React Select related classes
  */
-function hasReactSelectClasses(element: HTMLElement): boolean {
+const hasReactSelectClasses = (element: HTMLElement): boolean => {
   const className = element.className.toLowerCase();
   const reactSelectPatterns = [
     'react-select',
@@ -109,12 +109,12 @@ function hasReactSelectClasses(element: HTMLElement): boolean {
     }
     return className.includes(pattern);
   });
-}
+};
 
 /**
  * Find the React Select container element
  */
-function findReactSelectContainer(element: HTMLElement): HTMLElement | null {
+const findReactSelectContainer = (element: HTMLElement): HTMLElement | null => {
   // Strategy 1: Look for container in parent chain
   let current: HTMLElement | null = element;
   while (current) {
@@ -157,22 +157,22 @@ function findReactSelectContainer(element: HTMLElement): HTMLElement | null {
   }
 
   return closest;
-}
+};
 
 /**
  * Calculate distance between two elements
  */
-function getElementDistance(el1: HTMLElement, el2: HTMLElement): number {
+const getElementDistance = (el1: HTMLElement, el2: HTMLElement): number => {
   const rect1 = el1.getBoundingClientRect();
   const rect2 = el2.getBoundingClientRect();
 
   return Math.abs(rect1.top - rect2.top) + Math.abs(rect1.left - rect2.left);
-}
+};
 
 /**
  * Open React Select dropdown
  */
-function openReactSelectDropdown(container: HTMLElement): boolean {
+const openReactSelectDropdown = (container: HTMLElement): boolean => {
   try {
     // Try clicking the control area
     const control = container.querySelector('[class*="control"]') || container;
@@ -193,12 +193,12 @@ function openReactSelectDropdown(container: HTMLElement): boolean {
     debug.error('Error opening React Select dropdown:', error);
     return false;
   }
-}
+};
 
 /**
  * Select an option in React Select dropdown
  */
-function selectReactSelectOption(value: string, originalElement: HTMLElement): void {
+const selectReactSelectOption = (value: string, originalElement: HTMLElement): void => {
   try {
     // Find dropdown menu
     const menuSelectors = [
@@ -274,12 +274,12 @@ function selectReactSelectOption(value: string, originalElement: HTMLElement): v
   } catch (error) {
     debug.error('Error selecting React Select option:', error);
   }
-}
+};
 
 /**
  * Find matching option in React Select dropdown
  */
-function findMatchingReactSelectOption(options: HTMLElement[], value: string): HTMLElement | null {
+const findMatchingReactSelectOption = (options: HTMLElement[], value: string): HTMLElement | null => {
   const normalizedValue = value.toLowerCase().trim();
 
   // Strategy 1: Exact value match
@@ -322,12 +322,12 @@ function findMatchingReactSelectOption(options: HTMLElement[], value: string): H
   }
 
   return null;
-}
+};
 
 /**
  * Enhanced Material-UI Select handler
  */
-export const handleMaterialUISelect = (element: HTMLElement, normalizedValues: string[]): boolean => {
+const handleMaterialUISelect = (element: HTMLElement, normalizedValues: string[]): boolean => {
   try {
     debug.log('🔍 Handling Material-UI Select component...', element);
 
@@ -372,7 +372,7 @@ export const handleMaterialUISelect = (element: HTMLElement, normalizedValues: s
 /**
  * Detect if element is part of a Material-UI Select component
  */
-function detectMaterialUIComponent(element: HTMLElement): boolean {
+const detectMaterialUIComponent = (element: HTMLElement): boolean => {
   // Check element itself
   if (hasMaterialUIClasses(element)) return true;
 
@@ -397,12 +397,12 @@ function detectMaterialUIComponent(element: HTMLElement): boolean {
   }
 
   return false;
-}
+};
 
 /**
  * Check if element has Material-UI related classes
  */
-function hasMaterialUIClasses(element: HTMLElement): boolean {
+const hasMaterialUIClasses = (element: HTMLElement): boolean => {
   if (!element) return false;
 
   const className = element.className.toLowerCase();
@@ -427,12 +427,12 @@ function hasMaterialUIClasses(element: HTMLElement): boolean {
     }
     return className.includes(pattern);
   });
-}
+};
 
 /**
  * Find the Material-UI select container element
  */
-function findMaterialUISelectContainer(element: HTMLElement): HTMLElement | null {
+const findMaterialUISelectContainer = (element: HTMLElement): HTMLElement | null => {
   // Strategy 1: Look for FormControl in parent chain
   let current: HTMLElement | null = element;
   while (current) {
@@ -474,12 +474,12 @@ function findMaterialUISelectContainer(element: HTMLElement): HTMLElement | null
   }
 
   return closest;
-}
+};
 
 /**
  * Open Material-UI dropdown
  */
-function openMaterialUIDropdown(container: HTMLElement): boolean {
+const openMaterialUIDropdown = (container: HTMLElement): boolean => {
   try {
     // Try clicking the select element
     const selectElement =
@@ -502,12 +502,12 @@ function openMaterialUIDropdown(container: HTMLElement): boolean {
     debug.error('Error opening Material-UI dropdown:', error);
     return false;
   }
-}
+};
 
 /**
  * Select an option in Material-UI dropdown
  */
-function selectMaterialUIOption(value: string, originalElement: HTMLElement): void {
+const selectMaterialUIOption = (value: string, originalElement: HTMLElement): void => {
   try {
     // Find dropdown menu - Material-UI often uses Popover or Menu
     const menuSelectors = [
@@ -584,12 +584,12 @@ function selectMaterialUIOption(value: string, originalElement: HTMLElement): vo
   } catch (error) {
     debug.error('Error selecting Material-UI option:', error);
   }
-}
+};
 
 /**
  * Find matching option in Material-UI dropdown
  */
-function findMatchingMaterialUIOption(options: HTMLElement[], value: string): HTMLElement | null {
+const findMatchingMaterialUIOption = (options: HTMLElement[], value: string): HTMLElement | null => {
   const normalizedValue = value.toLowerCase().trim();
 
   // Strategy 1: Exact value match
@@ -632,7 +632,7 @@ function findMatchingMaterialUIOption(options: HTMLElement[], value: string): HT
   }
 
   return null;
-}
+};
 
 /**
  * Handle Tsselect components commonly found on career sites
@@ -1722,3 +1722,9 @@ const detectDynamicSelectOptions = async (
 
   return options;
 };
+
+// ============================================================================
+// Exports (at end of file per ESLint import-x/exports-last rule)
+// ============================================================================
+
+export { handleReactSelect, handleMaterialUISelect };

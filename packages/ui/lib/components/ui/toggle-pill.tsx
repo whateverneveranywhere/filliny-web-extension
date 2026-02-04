@@ -80,7 +80,7 @@ const TogglePill = React.forwardRef<HTMLDivElement, TogglePillProps>(
         setHighlightStyle({
           width: `${buttonRect.width}px`,
           transform: `translateX(${buttonRect.left - containerRect.left}px)`,
-          transition: `transform ${durations.normal}ms ${easings.spring}, width ${durations.normal}ms ${easings.spring}`,
+          transition: `transform ${durations.default}ms ${easings.spring}, width ${durations.default}ms ${easings.spring}`,
         });
       }
     }, [activeIndex, options.length]);

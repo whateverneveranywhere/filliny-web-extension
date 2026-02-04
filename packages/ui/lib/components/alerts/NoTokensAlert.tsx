@@ -6,7 +6,6 @@ import { ExternalLink, AlertTriangle } from 'lucide-react';
  * Credits warning thresholds
  */
 const LOW_CREDITS_THRESHOLD = 2;
-const LOW_CREDITS_THRESHOLD_PERCENT = 0.4; // Warn at 40% of max free forms
 
 /**
  * Type for credit warning states
@@ -34,7 +33,10 @@ interface NoTokensAlertProps {
  * - Warning (yellow): Free user has low free forms remaining
  * - Error (red): Free user has 0 free forms OR Pro user has 0 tokens
  */
-export default function NoTokensAlert({ isPro = false, freeFormsRemaining = 0 }: NoTokensAlertProps) {
+export default function NoTokensAlert({
+  isPro = false,
+  freeFormsRemaining: _freeFormsRemaining = 0,
+}: NoTokensAlertProps) {
   const config = getConfig();
   const { FREE_TIER_LIMITS } = usePlanLimits();
 
@@ -45,10 +47,10 @@ export default function NoTokensAlert({ isPro = false, freeFormsRemaining = 0 }:
         variant="warning"
         icon={AlertTriangle}
         title="Token Limit Reached"
-        description="Your tokens will refresh on your next billing cycle. Need more? Purchase additional tokens."
-        buttonText="Purchase Tokens"
+        description="Your tokens will refresh on your next billing cycle."
+        buttonText="View Subscription"
         buttonIcon={ExternalLink}
-        onButtonClick={() => window.open(`${config.baseURL}/pricing?tab=token`, '_blank')}
+        onButtonClick={() => window.open(`${config.baseURL}/pricing`, '_blank')}
       />
     );
   }

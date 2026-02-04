@@ -32,7 +32,7 @@ export const ToggleButton = ({
   size = 'default',
   ...props
 }: ToggleButtonProps) => {
-  const { isLight } = useStorage(exampleThemeStorage);
+  const { isLight: _isLight } = useStorage(exampleThemeStorage);
 
   const handleClick = () => {
     if (onClick) {

@@ -44,7 +44,7 @@ const isElement = (node: Node): node is Element => node.nodeType === Node.ELEMEN
  * Note: Document is a native type, so we define the extension properties
  */
 // Zod schema for type inference - not used at runtime
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+
 const _DocumentWithObserverPropsSchema = z.object({
   __fillinyFrameObserver: z.custom<MutationObserver>(val => val instanceof MutationObserver).optional(),
 });
@@ -56,7 +56,7 @@ type DocumentWithObserver = Document & DocumentWithObserverProps;
  * Type guard to check if a document has the observer extension
  * This allows safely accessing the __fillinyFrameObserver property
  */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+
 const _isDocumentWithObserver = (doc: Document): doc is DocumentWithObserver =>
   '__fillinyFrameObserver' in doc || doc instanceof Document;
 
@@ -73,7 +73,7 @@ export type FormDetectionCallback = (doc: Document) => void;
 /**
  * Schema for dynamic content detector
  */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+
 const _DynamicContentDetectorSchema = z.object({
   observer: z.custom<MutationObserver>(val => val instanceof MutationObserver, {
     message: 'Expected MutationObserver',
@@ -92,7 +92,7 @@ const dynamicDetectors = new Map<Document, DynamicContentDetector>();
 /**
  * Schema for API response monitor
  */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+
 const _APIResponseMonitorSchema = z.object({
   originalFetch: z.custom<typeof fetch>(val => typeof val === 'function', { message: 'Expected fetch function' }),
   originalXHROpen: z.custom<typeof XMLHttpRequest.prototype.open>(val => typeof val === 'function', {
@@ -417,7 +417,7 @@ export const getAllFrameDocuments = (onNewFrameLoaded?: FormDetectionCallback): 
 /**
  * Schema for form candidate detection results
  */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+
 const _FormCandidateSchema = z.object({
   element: z.custom<HTMLElement>(val => val instanceof HTMLElement, { message: 'Expected HTMLElement' }),
   score: z.number(),
@@ -436,7 +436,7 @@ export const getAllFormContainersFromRegistry = (): HTMLElement[] => unifiedFiel
 /**
  * Progressive detection strategy with multiple passes and intelligent timing
  */
-async function performProgressiveDetection(documents: Document[]): Promise<HTMLElement[]> {
+const performProgressiveDetection = async (documents: Document[]): Promise<HTMLElement[]> => {
   debug.log('🔄 Starting progressive form detection strategy...');
 
   // Use enum-based detection passes for better maintainability
@@ -511,16 +511,16 @@ async function performProgressiveDetection(documents: Document[]): Promise<HTMLE
 
   debug.log(`🏁 Progressive detection completed. Final result: ${bestResults.length} containers`);
   return bestResults;
-}
+};
 
 /**
  * Perform a single detection pass with specified confidence threshold
  * Now includes Shadow DOM support using deep query selectors
  */
-async function performSingleDetectionPass(
+const performSingleDetectionPass = async (
   documents: Document[],
   confidenceThreshold: number,
-): Promise<FormCandidate[]> {
+): Promise<FormCandidate[]> => {
   const candidates: FormCandidate[] = [];
 
   for (const doc of documents) {
@@ -626,12 +626,12 @@ async function performSingleDetectionPass(
     );
 
   return sortedCandidates.slice(0, 10); // Return top 10 candidates
-}
+};
 
 /**
  * Calculate overall score for a detection pass
  */
-function calculatePassScore(candidates: FormCandidate[]): number {
+const calculatePassScore = (candidates: FormCandidate[]): number => {
   if (candidates.length === 0) return 0;
 
   const totalScore = candidates.reduce((sum, candidate) => sum + candidate.score, 0);
@@ -640,16 +640,16 @@ function calculatePassScore(candidates: FormCandidate[]): number {
 
   // Combine average score, field count, and number of containers
   return avgScore + fieldCount * 2 + candidates.length * 5;
-}
+};
 
 /**
  * Determine if we should terminate progressive detection early
  */
-function shouldTerminateEarly(
+const shouldTerminateEarly = (
   candidates: FormCandidate[],
   pass: { name: string; delay: number; confidence: number },
   hasAPIData: boolean,
-): boolean {
+): boolean => {
   // If we have API data and found good results, we can terminate early
   if (hasAPIData && candidates.length > 0 && pass.name !== 'immediate') {
     const avgScore = candidates.reduce((sum, c) => sum + c.score, 0) / candidates.length;
@@ -675,7 +675,7 @@ function shouldTerminateEarly(
   }
 
   return false;
-}
+};
 
 /**
  * Enhanced form container detection with improved scoring for group detection
@@ -706,20 +706,20 @@ export const detectFormLikeContainers = async (): Promise<HTMLElement[]> => {
 export { detectFields, unifiedFieldRegistry };
 
 // --- Cross-origin handling ---
-function isInsideCrossOriginIframe(): boolean {
+const isInsideCrossOriginIframe = (): boolean => {
   try {
     return window.self !== window.top;
   } catch {
     return true;
   }
-}
+};
 
 // Remove unused function
 // function showCrossOriginIframeWarning() {
 //   debug.warn("🚨 Filliny detected it's running inside a cross-origin iframe. Form detection may be limited.");
 // }
 
-export function openCrossOriginIframeInNewTabAndAlert() {
+export const openCrossOriginIframeInNewTabAndAlert = (): void => {
   if (isInsideCrossOriginIframe()) {
     try {
       const currentUrl = window.location.href;
@@ -731,7 +731,7 @@ export function openCrossOriginIframeInNewTabAndAlert() {
       debug.error('Could not open page in new tab:', error);
     }
   }
-}
+};
 
 // --- System Diagnostics ---
 export const diagnoseFillinySystem = async (): Promise<void> => {
@@ -765,7 +765,7 @@ export const diagnoseFillinySystem = async (): Promise<void> => {
 /**
  * Initialize universal dynamic content detection for a document
  */
-function initializeDynamicContentDetection(doc: Document, onNewFormLoaded?: FormDetectionCallback): void {
+const initializeDynamicContentDetection = (doc: Document, onNewFormLoaded?: FormDetectionCallback): void => {
   // Skip if already initialized
   if (dynamicDetectors.has(doc)) {
     return;
@@ -961,12 +961,12 @@ function initializeDynamicContentDetection(doc: Document, onNewFormLoaded?: Form
   dynamicDetectors.set(doc, detector);
 
   debug.log(`🔍 Dynamic content detection initialized for ${doc.location?.href || 'document'}`);
-}
+};
 
 /**
  * Wait for content to stabilize across all documents
  */
-async function waitForContentStability(documents: Document[], maxWaitTime = 5000): Promise<void> {
+const waitForContentStability = async (documents: Document[], maxWaitTime = 5000): Promise<void> => {
   const startTime = Date.now();
   const checkInterval = 200;
 
@@ -1000,7 +1000,7 @@ async function waitForContentStability(documents: Document[], maxWaitTime = 5000
 
     checkStability();
   });
-}
+};
 
 /**
  * Enhanced form container detection with universal behavioral analysis
@@ -1042,7 +1042,7 @@ export const detectUniversalFormContainers = async (): Promise<HTMLElement[]> =>
 /**
  * Detect form containers using semantic analysis
  */
-async function detectSemanticFormContainers(doc: Document): Promise<FormCandidate[]> {
+const detectSemanticFormContainers = async (doc: Document): Promise<FormCandidate[]> => {
   const candidates: FormCandidate[] = [];
 
   // Look for elements with form-related semantic meaning
@@ -1084,12 +1084,12 @@ async function detectSemanticFormContainers(doc: Document): Promise<FormCandidat
   }
 
   return candidates;
-}
+};
 
 /**
  * Detect form containers using behavioral analysis
  */
-async function detectBehavioralFormContainers(doc: Document): Promise<FormCandidate[]> {
+const detectBehavioralFormContainers = async (doc: Document): Promise<FormCandidate[]> => {
   const candidates: FormCandidate[] = [];
 
   // Look for containers with interactive behavior patterns
@@ -1142,12 +1142,12 @@ async function detectBehavioralFormContainers(doc: Document): Promise<FormCandid
   }
 
   return candidates;
-}
+};
 
 /**
  * Detect form containers using visual layout analysis
  */
-async function detectVisualFormContainers(doc: Document): Promise<FormCandidate[]> {
+const detectVisualFormContainers = async (doc: Document): Promise<FormCandidate[]> => {
   const candidates: FormCandidate[] = [];
 
   // Look for containers with form-like visual patterns
@@ -1176,12 +1176,12 @@ async function detectVisualFormContainers(doc: Document): Promise<FormCandidate[
   }
 
   return candidates;
-}
+};
 
 /**
  * Analyze visual patterns that suggest form-like layout
  */
-function analyzeVisualFormPattern(_container: HTMLElement, fields: HTMLElement[]): number {
+const analyzeVisualFormPattern = (_container: HTMLElement, fields: HTMLElement[]): number => {
   let score = 0;
 
   try {
@@ -1240,12 +1240,12 @@ function analyzeVisualFormPattern(_container: HTMLElement, fields: HTMLElement[]
   }
 
   return score;
-}
+};
 
 /**
  * Clean up dynamic content detection when no longer needed
  */
-export function cleanupDynamicContentDetection(doc?: Document): void {
+export const cleanupDynamicContentDetection = (doc?: Document): void => {
   if (doc) {
     const detector = dynamicDetectors.get(doc);
     if (detector) {
@@ -1278,12 +1278,15 @@ export function cleanupDynamicContentDetection(doc?: Document): void {
     cleanupShadowDOMObservation();
     observedShadowRoots.clear();
   }
-}
+};
 
 /**
  * Initialize API response monitoring for form definition detection
  */
-export function initializeAPIResponseMonitoring(doc: Document, onFormDefinitionLoaded?: (data: unknown) => void): void {
+export const initializeAPIResponseMonitoring = (
+  doc: Document,
+  onFormDefinitionLoaded?: (data: unknown) => void,
+): void => {
   // Skip if already initialized
   if (apiResponseMonitors.has(doc)) {
     return;
@@ -1406,12 +1409,12 @@ export function initializeAPIResponseMonitoring(doc: Document, onFormDefinitionL
 
   apiResponseMonitors.set(doc, monitor);
   debug.log(`📡 API response monitoring initialized for ${doc.location?.href || 'document'}`);
-}
+};
 
 /**
  * Cleanup API response monitoring
  */
-function cleanupAPIResponseMonitoring(doc?: Document): void {
+const cleanupAPIResponseMonitoring = (doc?: Document): void => {
   if (doc) {
     const monitor = apiResponseMonitors.get(doc);
     if (monitor) {
@@ -1434,28 +1437,28 @@ function cleanupAPIResponseMonitoring(doc?: Document): void {
     }
     apiResponseMonitors.clear();
   }
-}
+};
 
 /**
  * Check if form definition APIs have been detected and processed
  */
-export function hasFormDefinitionAPIsLoaded(doc: Document): boolean {
+export const hasFormDefinitionAPIsLoaded = (doc: Document): boolean => {
   const monitor = apiResponseMonitors.get(doc);
   return monitor ? monitor.interceptedResponses.size > 0 : false;
-}
+};
 
 /**
  * Get intercepted form definition data
  */
-export function getInterceptedFormDefinitions(doc: Document): Map<string, unknown> {
+export const getInterceptedFormDefinitions = (doc: Document): Map<string, unknown> => {
   const monitor = apiResponseMonitors.get(doc);
   return monitor?.interceptedResponses || new Map();
-}
+};
 
 /**
  * Detect custom form components that might not be standard HTML elements
  */
-function detectCustomFormComponent(element: Element): boolean {
+const detectCustomFormComponent = (element: Element): boolean => {
   const tagName = element.tagName.toLowerCase();
   const className = element.className?.toLowerCase() || '';
   const dataAttrs = Array.from(element.attributes)
@@ -1489,13 +1492,13 @@ function detectCustomFormComponent(element: Element): boolean {
 
   const allText = `${tagName} ${className} ${dataAttrs}`;
   return customComponentPatterns.some(pattern => pattern.test(allText));
-}
+};
 
 /**
  * Detect React/Vue/Angular/Svelte/Qwik component mounting patterns
  * Uses the centralized framework detection module
  */
-function detectFrameworkFormComponent(element: Element): boolean {
+const detectFrameworkFormComponent = (element: Element): boolean => {
   // Use centralized framework detection
   const framework = detectFrameworkForElement(element);
 
@@ -1541,12 +1544,12 @@ function detectFrameworkFormComponent(element: Element): boolean {
       hasModernFramework) &&
     hasFormAttributes
   );
-}
+};
 
 /**
  * Detect job application specific form elements
  */
-function detectJobApplicationElement(element: Element): boolean {
+const detectJobApplicationElement = (element: Element): boolean => {
   const textContent = element.textContent?.toLowerCase() || '';
   const className = element.className?.toLowerCase() || '';
   const id = element.id?.toLowerCase() || '';
@@ -1581,13 +1584,13 @@ function detectJobApplicationElement(element: Element): boolean {
   ];
 
   return jobPatterns.some(pattern => pattern.test(allText));
-}
+};
 
 /**
  * Enhanced multi-step form detection
  * Detects forms with step-based navigation and handles them appropriately
  */
-async function detectMultiStepFormContainers(documents: Document[]): Promise<HTMLElement[]> {
+const detectMultiStepFormContainers = async (documents: Document[]): Promise<HTMLElement[]> => {
   debug.log('🔍 Starting multi-step form detection...');
 
   const containers: HTMLElement[] = [];
@@ -1619,12 +1622,12 @@ async function detectMultiStepFormContainers(documents: Document[]): Promise<HTM
 
   debug.log(`📋 Multi-step detection found ${containers.length} containers`);
   return containers;
-}
+};
 
 /**
  * Detect step navigation elements (prev/next buttons, step indicators)
  */
-function detectStepNavigationElements(doc: Document): HTMLElement[] {
+const detectStepNavigationElements = (doc: Document): HTMLElement[] => {
   const containers: HTMLElement[] = [];
 
   // Look for step navigation patterns
@@ -1665,12 +1668,12 @@ function detectStepNavigationElements(doc: Document): HTMLElement[] {
   }
 
   return containers;
-}
+};
 
 /**
  * Detect step content containers
  */
-function detectStepContentContainers(doc: Document): HTMLElement[] {
+const detectStepContentContainers = (doc: Document): HTMLElement[] => {
   const containers: HTMLElement[] = [];
 
   // Look for step content patterns
@@ -1703,12 +1706,12 @@ function detectStepContentContainers(doc: Document): HTMLElement[] {
   }
 
   return containers;
-}
+};
 
 /**
  * Detect wizard/flow patterns
  */
-function detectWizardPatterns(doc: Document): HTMLElement[] {
+const detectWizardPatterns = (doc: Document): HTMLElement[] => {
   const containers: HTMLElement[] = [];
 
   // Look for wizard/flow specific patterns
@@ -1740,12 +1743,12 @@ function detectWizardPatterns(doc: Document): HTMLElement[] {
   }
 
   return containers;
-}
+};
 
 /**
  * Detect progress indicators
  */
-function detectProgressIndicators(doc: Document): HTMLElement[] {
+const detectProgressIndicators = (doc: Document): HTMLElement[] => {
   const containers: HTMLElement[] = [];
 
   // Look for progress indicator patterns
@@ -1782,12 +1785,12 @@ function detectProgressIndicators(doc: Document): HTMLElement[] {
   }
 
   return containers;
-}
+};
 
 /**
  * Find the appropriate container for a multi-step form
  */
-function findMultiStepFormContainer(element: HTMLElement): HTMLElement | null {
+const findMultiStepFormContainer = (element: HTMLElement): HTMLElement | null => {
   // Start from the element and traverse up to find the most appropriate container
   let current = element;
   let bestContainer: HTMLElement | null = null;
@@ -1805,12 +1808,12 @@ function findMultiStepFormContainer(element: HTMLElement): HTMLElement | null {
   }
 
   return bestContainer && bestScore > 10 ? bestContainer : null;
-}
+};
 
 /**
  * Score a container for multi-step form likelihood
  */
-function scoreMultiStepContainer(container: HTMLElement): number {
+const scoreMultiStepContainer = (container: HTMLElement): number => {
   let score = 0;
 
   // Check for form-related tags
@@ -1878,12 +1881,12 @@ function scoreMultiStepContainer(container: HTMLElement): number {
   }
 
   return score;
-}
+};
 
 /**
  * Process and optimize multi-step containers
  */
-function processMultiStepContainers(containers: HTMLElement[]): HTMLElement[] {
+const processMultiStepContainers = (containers: HTMLElement[]): HTMLElement[] => {
   const processed: HTMLElement[] = [];
   const processedSet = new Set<HTMLElement>();
 
@@ -1905,7 +1908,7 @@ function processMultiStepContainers(containers: HTMLElement[]): HTMLElement[] {
   }
 
   return processed;
-}
+};
 
 /**
  * Enhanced form definition data processing
@@ -1927,7 +1930,7 @@ const ValidationRuleSchema = z.object({
   required: z.boolean().optional(),
 });
 // Type alias used in ValidationRulesSchema union type
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+
 type _ValidationRule = z.infer<typeof ValidationRuleSchema>;
 
 const ValidationRulesSchema = z.record(
@@ -2090,11 +2093,10 @@ type ProcessedFormDefinition = z.infer<typeof ProcessedFormDefinitionSchema>;
 /**
  * Type guard for ProcessedFormDefinition using Zod validation
  */
-function isProcessedFormDefinition(value: unknown): value is ProcessedFormDefinition {
-  return ProcessedFormDefinitionSchema.safeParse(value).success;
-}
+const isProcessedFormDefinition = (value: unknown): value is ProcessedFormDefinition =>
+  ProcessedFormDefinitionSchema.safeParse(value).success;
 
-function processFormDefinitionData(data: unknown, source: string): ProcessedFormDefinition | null {
+const processFormDefinitionData = (data: unknown, source: string): ProcessedFormDefinition | null => {
   try {
     if (!data || typeof data !== 'object') {
       return null;
@@ -2131,7 +2133,7 @@ function processFormDefinitionData(data: unknown, source: string): ProcessedForm
     debug.error('Error processing form definition data:', error);
     return null;
   }
-}
+};
 
 // Schema for plain objects
 const PlainObjectSchema = z.record(z.string(), z.unknown());
@@ -2139,16 +2141,16 @@ const PlainObjectSchema = z.record(z.string(), z.unknown());
 /**
  * Type guard for objects using Zod validation
  */
-function isObject(value: unknown): value is Record<string, unknown> {
+const isObject = (value: unknown): value is Record<string, unknown> => {
   if (value === null || Array.isArray(value)) return false;
   return PlainObjectSchema.safeParse(value).success;
-}
+};
 
 /**
  * Type guard for NormalizedAPIData using Zod validation
  * Checks if the object has any of the expected form definition properties
  */
-function isNormalizedAPIData(value: unknown): value is NormalizedAPIData {
+const isNormalizedAPIData = (value: unknown): value is NormalizedAPIData => {
   // First check if it's a valid object
   if (!isObject(value)) {
     return false;
@@ -2159,12 +2161,12 @@ function isNormalizedAPIData(value: unknown): value is NormalizedAPIData {
   if (!hasKnownProps) return false;
   // Validate against schema for more strict checking
   return NormalizedAPIDataSchema.safeParse(value).success;
-}
+};
 
 /**
  * Normalize different API response formats to a common structure
  */
-function normalizeAPIResponse(data: unknown): NormalizedAPIData {
+const normalizeAPIResponse = (data: unknown): NormalizedAPIData => {
   if (!isObject(data)) {
     return {};
   }
@@ -2200,26 +2202,22 @@ function normalizeAPIResponse(data: unknown): NormalizedAPIData {
 
   // Return empty object if data doesn't match expected structure
   return {};
-}
+};
 
 /**
  * Type guard for RawFieldData using Zod validation
  */
-function isRawFieldData(value: unknown): value is RawFieldData {
-  return RawFieldDataSchema.safeParse(value).success;
-}
+const isRawFieldData = (value: unknown): value is RawFieldData => RawFieldDataSchema.safeParse(value).success;
 
 /**
  * Type guard for RawStepData using Zod validation
  */
-function isRawStepData(value: unknown): value is RawStepData {
-  return RawStepDataSchema.safeParse(value).success;
-}
+const isRawStepData = (value: unknown): value is RawStepData => RawStepDataSchema.safeParse(value).success;
 
 /**
  * Extract field definitions from normalized data
  */
-function extractFieldsFromData(data: NormalizedAPIData): ProcessedFormField[] {
+const extractFieldsFromData = (data: NormalizedAPIData): ProcessedFormField[] => {
   const fields: ProcessedFormField[] = [];
 
   // Strategy 1: Direct fields array
@@ -2253,12 +2251,12 @@ function extractFieldsFromData(data: NormalizedAPIData): ProcessedFormField[] {
   }
 
   return fields;
-}
+};
 
 /**
  * Process an array of field definitions
  */
-function processFieldsArray(fieldsArray: RawFieldData[]): ProcessedFormField[] {
+const processFieldsArray = (fieldsArray: RawFieldData[]): ProcessedFormField[] => {
   const fields: ProcessedFormField[] = [];
 
   for (const fieldData of fieldsArray) {
@@ -2271,12 +2269,12 @@ function processFieldsArray(fieldsArray: RawFieldData[]): ProcessedFormField[] {
   }
 
   return fields;
-}
+};
 
 /**
  * Process schema properties as field definitions
  */
-function processSchemaProperties(properties: Record<string, RawFieldData>): ProcessedFormField[] {
+const processSchemaProperties = (properties: Record<string, RawFieldData>): ProcessedFormField[] => {
   const fields: ProcessedFormField[] = [];
 
   for (const [key, property] of Object.entries(properties)) {
@@ -2289,19 +2287,17 @@ function processSchemaProperties(properties: Record<string, RawFieldData>): Proc
   }
 
   return fields;
-}
+};
 
 /**
  * Type guard for FieldOption using Zod validation
  */
-function isFieldOption(value: unknown): value is FieldOption {
-  return FieldOptionSchema.safeParse(value).success;
-}
+const isFieldOption = (value: unknown): value is FieldOption => FieldOptionSchema.safeParse(value).success;
 
 /**
  * Process individual field definition
  */
-function processFieldDefinition(fieldData: RawFieldData, fallbackId?: string): ProcessedFormField | null {
+const processFieldDefinition = (fieldData: RawFieldData, fallbackId?: string): ProcessedFormField | null => {
   try {
     const id = String(fieldData.id ?? fieldData.name ?? fieldData.key ?? fallbackId ?? '');
     if (!id) return null;
@@ -2347,12 +2343,12 @@ function processFieldDefinition(fieldData: RawFieldData, fallbackId?: string): P
     debug.log('Error processing field definition:', error);
     return null;
   }
-}
+};
 
 /**
  * Normalize field type from various formats
  */
-function normalizeFieldType(type: string): string {
+const normalizeFieldType = (type: string): string => {
   const normalizedType = type.toLowerCase().trim();
 
   // Map common variations to standard types
@@ -2384,12 +2380,12 @@ function normalizeFieldType(type: string): string {
   };
 
   return typeMap[normalizedType] || normalizedType;
-}
+};
 
 /**
  * Extract steps from form definition data
  */
-function extractStepsFromData(data: NormalizedAPIData): ProcessedFormStep[] {
+const extractStepsFromData = (data: NormalizedAPIData): ProcessedFormStep[] => {
   const steps: ProcessedFormStep[] = [];
 
   if (Array.isArray(data.steps)) {
@@ -2419,12 +2415,12 @@ function extractStepsFromData(data: NormalizedAPIData): ProcessedFormStep[] {
   }
 
   return steps;
-}
+};
 
 /**
  * Process individual step definition
  */
-function processStepDefinition(stepData: RawStepData): ProcessedFormStep | null {
+const processStepDefinition = (stepData: RawStepData): ProcessedFormStep | null => {
   try {
     const id = stepData.id ?? stepData.name ?? stepData.key;
     if (id === undefined) return null;
@@ -2454,12 +2450,12 @@ function processStepDefinition(stepData: RawStepData): ProcessedFormStep | null 
     debug.log('Error processing step definition:', error);
     return null;
   }
-}
+};
 
 /**
  * Extract validation rules from form definition data
  */
-function extractValidationFromData(data: NormalizedAPIData): ValidationRules {
+const extractValidationFromData = (data: NormalizedAPIData): ValidationRules => {
   const validation: ValidationRules = {};
 
   if (data.validation && typeof data.validation === 'object') {
@@ -2475,12 +2471,12 @@ function extractValidationFromData(data: NormalizedAPIData): ValidationRules {
   }
 
   return validation;
-}
+};
 
 /**
  * Get processed form definitions for a document
  */
-export function getProcessedFormDefinitions(doc: Document): ProcessedFormDefinition[] {
+export const getProcessedFormDefinitions = (doc: Document): ProcessedFormDefinition[] => {
   const monitor = apiResponseMonitors.get(doc);
   if (!monitor) return [];
 
@@ -2499,4 +2495,4 @@ export function getProcessedFormDefinitions(doc: Document): ProcessedFormDefinit
   }
 
   return definitions;
-}
+};

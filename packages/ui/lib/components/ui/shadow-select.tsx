@@ -67,7 +67,7 @@ const ShadowSelectContent = React.forwardRef<
     <SelectPrimitive.Content
       ref={ref}
       className={cn(
-        'filliny-relative filliny-z-50 filliny-max-h-96 filliny-min-w-[8rem] filliny-overflow-hidden filliny-rounded-md filliny-border filliny-bg-popover filliny-text-popover-foreground filliny-shadow-md data-[state=open]:filliny-animate-in data-[state=closed]:filliny-animate-out data-[state=closed]:filliny-fade-out-0 data-[state=open]:filliny-fade-in-0 data-[state=closed]:filliny-zoom-out-95 data-[state=open]:filliny-zoom-in-95 data-[side=bottom]:filliny-slide-in-from-top-2 data-[side=left]:filliny-slide-in-from-right-2 data-[side=right]:filliny-slide-in-from-left-2 data-[side=top]:filliny-slide-in-from-bottom-2',
+        'filliny-relative filliny-z-50 filliny-max-h-96 filliny-min-w-[8rem] filliny-overflow-hidden filliny-rounded-md filliny-border filliny-bg-popover/80 filliny-backdrop-blur-sm filliny-text-popover-foreground filliny-shadow-md data-[state=open]:filliny-animate-in data-[state=closed]:filliny-animate-out data-[state=closed]:filliny-fade-out-0 data-[state=open]:filliny-fade-in-0 data-[state=closed]:filliny-zoom-out-95 data-[state=open]:filliny-zoom-in-95 data-[side=bottom]:filliny-slide-in-from-top-2 data-[side=left]:filliny-slide-in-from-right-2 data-[side=right]:filliny-slide-in-from-left-2 data-[side=top]:filliny-slide-in-from-bottom-2',
         position === 'popper' &&
           'data-[side=bottom]:filliny-translate-y-1 data-[side=left]:filliny-translate-x-1 data-[side=right]:filliny-translate-x-1 data-[side=top]:filliny-translate-y-1',
         className,

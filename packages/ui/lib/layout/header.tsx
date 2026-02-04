@@ -1,14 +1,15 @@
 import { ProfileSelector } from './profile-selector';
 import { TokenDisplay } from '../components';
 import { Logo } from '../components/logo';
-import { getConfig, useDashboardOverview, usePlanLimits } from '@extension/shared';
+import { getConfig, useExtensionAuth, useDashboardOverview, usePlanLimits } from '@extension/shared';
 
 const config = getConfig();
 // Dashboard path for the dashboard route
 const dashboardPath = '/dashboard';
 
 const Header = () => {
-  const { data, refetch, isRefetching, isLoading } = useDashboardOverview();
+  const { isAuthenticated } = useExtensionAuth();
+  const { data, refetch, isRefetching, isLoading } = useDashboardOverview(isAuthenticated);
   const { isPro, freeFormsRemaining } = usePlanLimits();
 
   const handleRefresh = async () => {
@@ -16,8 +17,8 @@ const Header = () => {
   };
 
   return (
-    <header className="filliny-sticky filliny-top-0 filliny-z-50 filliny-w-full filliny-border-b filliny-border-border filliny-bg-background">
-      <div className="filliny-flex filliny-h-14 filliny-items-center filliny-gap-3 filliny-px-4">
+    <header className="filliny-sticky filliny-top-0 filliny-z-50 filliny-w-full filliny-border-b filliny-border-border filliny-bg-background/80 filliny-backdrop-blur-sm">
+      <div className="filliny-flex filliny-h-14 filliny-items-center filliny-justify-between filliny-px-4">
         <div className="filliny-shrink-0">
           <TokenDisplay
             tokens={data?.remainingTokens || 0}
@@ -29,7 +30,7 @@ const Header = () => {
           />
         </div>
 
-        <div className="filliny-flex filliny-min-w-0 filliny-flex-1 filliny-justify-center">
+        <div className="filliny-flex filliny-min-w-0 filliny-max-w-[55%] filliny-mx-auto filliny-justify-center">
           <ProfileSelector />
         </div>
 

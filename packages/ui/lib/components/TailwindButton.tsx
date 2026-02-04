@@ -25,7 +25,7 @@ export type TWButtonProps = {
  *   Click me
  * </Button>
  */
-export const TailwindButton = ({ theme, className, children, ...props }: TWButtonProps) => (
+export const TailwindButton = ({ theme: _theme, className, children, ...props }: TWButtonProps) => (
   <Button
     variant="ghost"
     className={cn(

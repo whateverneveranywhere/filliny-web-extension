@@ -1,11 +1,11 @@
+import { getCreditWarningState } from '../alerts/NoTokensAlert';
 import { Popover, PopoverContent, PopoverTrigger, Loading } from '../ui';
 import { Button } from '../ui/button';
+import { cn } from '@/lib/utils';
 import { formatToK, getConfig, usePlanLimits } from '@extension/shared';
 import { RefreshCw, AlertTriangle } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { getCreditWarningState } from '../alerts/NoTokensAlert';
 import type { CreditWarningState } from '../alerts/NoTokensAlert';
-import { cn } from '@/lib/utils';
 
 interface TokenDisplayProps {
   tokens?: number;
@@ -83,14 +83,14 @@ const TokenDisplay = ({
   const displayValue = isPro ? abbreviatedTokens : String(freeFormsRemaining);
   const displayLabel = isPro ? 'Tokens' : 'Free Forms';
   const tooltipTitle = isPro ? 'Available Tokens' : 'Free Form Fills';
-  const actionButtonText = isPro ? 'Purchase More Tokens' : 'Subscribe to Pro';
-  const actionUrl = isPro ? `${config.baseURL}/pricing?tab=token` : `${config.baseURL}/pricing`;
+  const actionButtonText = isPro ? 'View Subscription' : 'Subscribe to Pro';
+  const actionUrl = `${config.baseURL}/pricing`;
 
   // Get warning message for tooltip
   const getWarningMessage = () => {
     if (hasError) {
       return isPro
-        ? 'Token limit reached. Purchase more tokens to continue.'
+        ? 'Token limit reached. Tokens refresh on your next billing cycle.'
         : 'Free forms exhausted. Subscribe to Pro to continue.';
     }
     if (hasWarning) {
@@ -111,11 +111,7 @@ const TokenDisplay = ({
             {isLoading ? (
               <Loading size="sm" />
             ) : isPro ? (
-              <span
-                className={cn(
-                  'filliny-font-bold',
-                  (hasError || hasWarning) && 'filliny-text-warning',
-                )}>
+              <span className={cn('filliny-font-bold', (hasError || hasWarning) && 'filliny-text-warning')}>
                 {displayValue}
               </span>
             ) : (
@@ -138,59 +134,53 @@ const TokenDisplay = ({
         </button>
       </PopoverTrigger>
       <PopoverContent className="filliny-flex filliny-w-64 filliny-flex-col filliny-gap-3 filliny-p-4">
-          <div className="filliny-flex filliny-items-center filliny-justify-between">
-            <p className="filliny-text-sm filliny-text-muted-foreground">{tooltipTitle}</p>
-            <Button
-              size="icon"
-              variant="ghost"
-              onClick={handleRefresh}
-              disabled={isRefetching || isOnCooldown || !onRefresh}
-              className="filliny-h-8 filliny-w-8 filliny-transition-all hover:filliny-bg-muted">
-              {cooldownSeconds ? <span>{cooldownSeconds}s</span> : <RefreshCw className="filliny-h-4 filliny-w-4" />}
-            </Button>
-          </div>
-          <div className="filliny-flex filliny-items-baseline filliny-justify-center filliny-gap-1">
-            {isPro ? (
-              <p
+        <div className="filliny-flex filliny-items-center filliny-justify-between">
+          <p className="filliny-text-sm filliny-text-muted-foreground">{tooltipTitle}</p>
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={handleRefresh}
+            disabled={isRefetching || isOnCooldown || !onRefresh}
+            className="filliny-h-8 filliny-w-8 filliny-transition-all hover:filliny-bg-muted">
+            {cooldownSeconds ? <span>{cooldownSeconds}s</span> : <RefreshCw className="filliny-h-4 filliny-w-4" />}
+          </Button>
+        </div>
+        <div className="filliny-flex filliny-items-baseline filliny-justify-center filliny-gap-1">
+          {isPro ? (
+            <p
+              className={cn('filliny-text-lg filliny-font-medium', (hasError || hasWarning) && 'filliny-text-warning')}>
+              {formattedTokens}
+            </p>
+          ) : (
+            <>
+              <span
                 className={cn(
-                  'filliny-text-lg filliny-font-medium',
+                  'filliny-text-2xl filliny-font-bold filliny-tabular-nums',
                   (hasError || hasWarning) && 'filliny-text-warning',
                 )}>
-                {formattedTokens}
-              </p>
-            ) : (
-              <>
-                <span
-                  className={cn(
-                    'filliny-text-2xl filliny-font-bold filliny-tabular-nums',
-                    (hasError || hasWarning) && 'filliny-text-warning',
-                  )}>
-                  {freeFormsUsed}
-                </span>
-                <span className="filliny-text-muted-foreground">/</span>
-                <span className="filliny-text-sm filliny-text-muted-foreground filliny-tabular-nums">
-                  {FREE_TIER_LIMITS.MAX_FREE_FORMS}
-                </span>
-                <span className="filliny-ml-1 filliny-text-xs filliny-text-muted-foreground">used</span>
-              </>
-            )}
-          </div>
-          {/* Warning message - always subtle warning styling */}
-          {warningMessage && (
-            <div className="filliny-flex filliny-items-center filliny-gap-2 filliny-rounded-md filliny-bg-warning/10 filliny-p-2">
-              <AlertTriangle className="filliny-h-4 filliny-w-4 filliny-shrink-0 filliny-text-warning" />
-              <p className="filliny-text-xs filliny-text-warning">{warningMessage}</p>
-            </div>
+                {freeFormsUsed}
+              </span>
+              <span className="filliny-text-muted-foreground">/</span>
+              <span className="filliny-text-sm filliny-text-muted-foreground filliny-tabular-nums">
+                {FREE_TIER_LIMITS.MAX_FREE_FORMS}
+              </span>
+              <span className="filliny-ml-1 filliny-text-xs filliny-text-muted-foreground">used</span>
+            </>
           )}
-          <a className="filliny-w-full" href={actionUrl} target="_blank" rel="noopener noreferrer">
-            <Button
-              size={'sm'}
-              variant={(hasError || hasWarning) ? 'warning' : 'default'}
-              className="filliny-w-full">
-              {actionButtonText}
-            </Button>
-          </a>
-        </PopoverContent>
+        </div>
+        {/* Warning message - always subtle warning styling */}
+        {warningMessage && (
+          <div className="filliny-flex filliny-items-center filliny-gap-2 filliny-rounded-md filliny-bg-warning/10 filliny-p-2">
+            <AlertTriangle className="filliny-h-4 filliny-w-4 filliny-shrink-0 filliny-text-warning" />
+            <p className="filliny-text-xs filliny-text-warning">{warningMessage}</p>
+          </div>
+        )}
+        <a className="filliny-w-full" href={actionUrl} target="_blank" rel="noopener noreferrer">
+          <Button size={'sm'} variant={hasError || hasWarning ? 'warning' : 'default'} className="filliny-w-full">
+            {actionButtonText}
+          </Button>
+        </a>
+      </PopoverContent>
     </Popover>
   );
 };

@@ -649,7 +649,7 @@ export const updateFormFields = async (fields: Field[], testMode = false): Promi
     const duration = ((performance.now() - startTime) / 1000).toFixed(2);
     debug.log(
       `%c⏱ Form filling completed: ${duration}s`,
-      'background: #0284c7; color: white; padding: 4px 8px; border-radius: 4px; font-size: 14px;',
+      'background: #404040; color: white; padding: 4px 8px; border-radius: 4px; font-size: 14px;',
     );
 
     debug.log(`Results: ${results.successful} successful, ${results.failed} failed, ${results.skipped} skipped`);

@@ -128,7 +128,7 @@ export const handleFieldFill = async (field: Field): Promise<FieldUpdateResult> 
     element.setAttribute('data-filliny-element', 'true');
 
     // Add a highlight effect to show which field is being filled
-    element.style.outline = '2px solid #4f46e5';
+    element.style.outline = '2px solid #404040';
     element.style.outlineOffset = '2px';
     element.style.transition = 'all 0.3s ease';
 
@@ -234,7 +234,7 @@ export const handleFieldFill = async (field: Field): Promise<FieldUpdateResult> 
       const quotaMessage =
         error.errorType === 'no_free_forms'
           ? 'No free forms remaining. Subscribe to continue.'
-          : 'No tokens remaining. Purchase more tokens.';
+          : 'Token limit reached. Tokens refresh on your billing cycle.';
 
       showErrorFeedback(element, quotaMessage);
       restoreStyles(5000);

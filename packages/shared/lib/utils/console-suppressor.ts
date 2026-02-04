@@ -4,26 +4,42 @@
  * Suppresses all console logging in production builds to prevent
  * debug information from being visible to end users.
  */
+import { z } from 'zod';
 
-// Define the Vite-specific import.meta.env interface
-interface ViteImportMeta {
-  env: {
-    VITE_WEBAPP_ENV?: string;
-    MODE?: string;
-  };
-}
+// ============================================================================
+// Vite Import Meta Schema
+// ============================================================================
+
+/**
+ * Schema for Vite environment variables
+ */
+const ViteEnvSchema = z.object({
+  VITE_WEBAPP_ENV: z.string().optional(),
+  MODE: z.string().optional(),
+});
+
+/**
+ * Schema for Vite import.meta object
+ */
+const ViteImportMetaSchema = z.object({
+  env: ViteEnvSchema,
+});
+
+type ViteEnv = z.infer<typeof ViteEnvSchema>;
 
 /**
  * Safely checks for Vite import.meta.env
  * Uses eval to avoid static analysis issues with import.meta in non-ESM contexts
  */
-const getViteEnv = (): ViteImportMeta['env'] | null => {
+const getViteEnv = (): ViteEnv | null => {
   try {
     // Use indirect eval to check for import.meta in browser ESM context
     // This avoids static parsing issues in non-ESM contexts like jiti
     const meta = new Function('return typeof import.meta !== "undefined" ? import.meta : null')();
-    if (meta && 'env' in meta) {
-      return (meta as ViteImportMeta).env;
+    // Validate with Zod schema instead of manual type assertion
+    const parseResult = ViteImportMetaSchema.safeParse(meta);
+    if (parseResult.success) {
+      return parseResult.data.env;
     }
   } catch {
     // import.meta not available in this context

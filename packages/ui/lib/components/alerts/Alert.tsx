@@ -3,19 +3,22 @@ import { cva } from 'class-variance-authority';
 import type { VariantProps } from 'class-variance-authority';
 import type { LucideIcon } from 'lucide-react';
 
-const alertVariants = cva('filliny-rounded-lg filliny-border filliny-p-4 filliny-bg-background', {
-  variants: {
-    variant: {
-      default: 'filliny-border-primary/30',
-      destructive: 'filliny-border-destructive/30',
-      warning: 'filliny-border-warning/50',
-      success: 'filliny-border-success/30',
+const alertVariants = cva(
+  'filliny-rounded-lg filliny-border filliny-p-4 filliny-bg-background/50 filliny-backdrop-blur-sm',
+  {
+    variants: {
+      variant: {
+        default: 'filliny-border-primary/30',
+        destructive: 'filliny-border-destructive/30',
+        warning: 'filliny-border-warning/50',
+        success: 'filliny-border-success/30',
+      },
+    },
+    defaultVariants: {
+      variant: 'default',
     },
   },
-  defaultVariants: {
-    variant: 'default',
-  },
-});
+);
 
 const titleVariants = cva('filliny-text-sm filliny-font-semibold', {
   variants: {

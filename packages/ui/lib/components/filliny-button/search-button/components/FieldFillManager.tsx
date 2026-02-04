@@ -11,6 +11,8 @@ import type React from 'react';
 const MAX_DETECT_ATTEMPTS = 5;
 const RETRY_DELAY = 1000;
 const MUTATION_DEBOUNCE_DELAY = 1000;
+// Performance limit: Maximum number of field buttons to render to prevent memory exhaustion
+const MAX_FIELD_BUTTONS = 50;
 
 const isFormField = (node: Node): boolean => {
   if (!(node instanceof HTMLElement)) return false;
@@ -142,11 +144,14 @@ export const FieldFillManager: React.FC = () => {
         }
       });
 
-      const visibleFieldButtons = Array.from(uniqueButtons.values()).filter(
-        buttonData => buttonData.element && isElementVisibleAndInteractive(buttonData.element),
-      );
+      const visibleFieldButtons = Array.from(uniqueButtons.values())
+        .filter(buttonData => buttonData.element && isElementVisibleAndInteractive(buttonData.element))
+        // Limit the number of field buttons to prevent memory exhaustion
+        .slice(0, MAX_FIELD_BUTTONS);
 
-      console.log(`🎯 Final result: ${visibleFieldButtons.length} field buttons will be created`);
+      console.log(
+        `🎯 Final result: ${visibleFieldButtons.length} field buttons will be created${Array.from(uniqueButtons.values()).length > MAX_FIELD_BUTTONS ? ` (limited from ${Array.from(uniqueButtons.values()).length})` : ''}`,
+      );
 
       if (visibleFieldButtons.length > 0) {
         setFieldButtons(visibleFieldButtons);

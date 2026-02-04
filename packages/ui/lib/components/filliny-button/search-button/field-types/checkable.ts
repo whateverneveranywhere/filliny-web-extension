@@ -62,7 +62,7 @@ const toCheckableField = (baseField: Field, checkableProps?: Partial<CheckableFi
  * Handles various formats like true/false, 0/1, "yes"/"no", etc.
  * Uses Zod for type validation.
  */
-export const isValueChecked = (value: unknown): boolean => {
+const isValueChecked = (value: unknown): boolean => {
   // Null/undefined check
   if (value === undefined || value === null) {
     return false;
@@ -114,7 +114,7 @@ export const isValueChecked = (value: unknown): boolean => {
  * Used to determine if a checkbox should be checked when multiple values are involved
  * Uses Zod for type validation.
  */
-export const matchesCheckboxValue = (optionValue: string, targetValue: unknown): boolean => {
+const matchesCheckboxValue = (optionValue: string, targetValue: unknown): boolean => {
   // Handle direct equality
   if (optionValue === targetValue) {
     return true;
@@ -151,7 +151,7 @@ export const matchesCheckboxValue = (optionValue: string, targetValue: unknown):
  * Update a checkbox or radio button input
  * This is the main entry point for updating checkable fields
  */
-export const updateCheckable = (element: HTMLElement, checked: boolean): void => {
+const updateCheckable = (element: HTMLElement, checked: boolean): void => {
   try {
     // Handle both native inputs and ARIA-based custom controls
     if (element instanceof HTMLInputElement && (element.type === 'checkbox' || element.type === 'radio')) {
@@ -433,7 +433,7 @@ const findCommonContainer = (elements: HTMLElement[]): HTMLElement | null => {
  * Detect checkable fields with proper grouping
  * This is the main entry point for detecting radio and checkbox fields
  */
-export const detectCheckableFields = async (
+const detectCheckableFields = async (
   elements: HTMLElement[],
   baseIndex: number,
   testMode: boolean = false,
@@ -1047,8 +1047,8 @@ const createSwitchField = async (element: HTMLElement, index: number, testMode: 
   return field;
 };
 
-// Export for testing
-export const __testing = {
+// Testing utilities
+const __testing = {
   updateNativeCheckable,
   updateAriaCheckable,
   updateCustomCheckable,
@@ -1060,3 +1060,9 @@ export const __testing = {
   createRadioGroupField,
   createCheckboxField,
 };
+
+// ============================================================================
+// Exports (at end of file per ESLint import-x/exports-last rule)
+// ============================================================================
+
+export { isValueChecked, matchesCheckboxValue, updateCheckable, detectCheckableFields, __testing };

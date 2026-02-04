@@ -3,16 +3,6 @@
 import { SingleWebsiteEditModal } from '../components/SingleWebsiteEditModal';
 import { WebsitePreviewCard } from '../components/stepper-forms/WebsitePreviewCard';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../components/ui';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '../components/ui/alert-dialog';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { Separator } from '../components/ui/separator';
@@ -21,7 +11,7 @@ import { cn } from '../utils';
 import { usePOVListQuery, useTonesListQuery, useEditFillingProfileMutation } from '@extension/shared';
 import { profileStorage } from '@extension/storage';
 import { Label } from '@radix-ui/react-label';
-import { Check, X, Info, Pencil, Trash } from 'lucide-react';
+import { Check, X, Info, Pencil } from 'lucide-react';
 import { useState } from 'react';
 import type { DTOFillingPreferences, DTOFillingWebsite, DTOProfileFillingForm } from '@extension/storage';
 import type React from 'react';
@@ -78,7 +68,6 @@ const ActiveProfileWebsitePreview: React.FC<Props> = ({ matchingWebsite, prefere
   const { data: tonesList } = useTonesListQuery();
   const { mutateAsync: editProfile } = useEditFillingProfileMutation();
   const { toast } = useToast();
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   const toneLabel = tonesList?.find(tone => tone.value === String(preferences.toneId))?.label || preferences.toneId;
   const povLabel = povList?.find(pov => pov.value === String(preferences.povId))?.label || preferences.povId;
@@ -101,38 +90,13 @@ const ActiveProfileWebsitePreview: React.FC<Props> = ({ matchingWebsite, prefere
 
       await profileStorage.setDefaultProfile(updatedProfile);
 
-      toast({ title: 'Website settings updated successfully' });
+      toast({ title: 'Settings Saved', description: 'Your website settings have been updated.' });
     } catch (error) {
       console.error('Error updating website:', error);
       toast({
         variant: 'destructive',
         title: 'Error',
         description: error instanceof Error ? error.message : 'Failed to update website settings',
-      });
-    }
-  };
-
-  const handleDelete = async () => {
-    try {
-      const updatedProfile = {
-        ...profile,
-        fillingWebsites: profile.fillingWebsites.filter(website => website.websiteUrl !== matchingWebsite.websiteUrl),
-      };
-
-      await editProfile({
-        id: String(profile.id),
-        data: updatedProfile,
-      });
-
-      await profileStorage.setDefaultProfile(updatedProfile);
-
-      toast({ title: 'Website removed from profile successfully' });
-    } catch (error) {
-      console.error('Error removing website:', error);
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to remove website',
       });
     }
   };
@@ -146,24 +110,14 @@ const ActiveProfileWebsitePreview: React.FC<Props> = ({ matchingWebsite, prefere
         defaultExpanded
         className=""
         actions={
-          <div className="filliny-flex filliny-gap-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setIsEditModalOpen(true)}
-              className="filliny-h-8 filliny-w-8"
-              title="Edit website settings">
-              <Pencil className="filliny-h-4 filliny-w-4" />
-            </Button>
-            <Button
-              variant="destructive"
-              size="icon"
-              onClick={() => setShowDeleteDialog(true)}
-              className="filliny-h-8 filliny-w-8 filliny-bg-transparent filliny-text-destructive"
-              title="Remove website from profile">
-              <Trash className="filliny-h-4 filliny-w-4" />
-            </Button>
-          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setIsEditModalOpen(true)}
+            className="filliny-h-8 filliny-w-8"
+            title="Edit website settings">
+            <Pencil className="filliny-h-4 filliny-w-4" />
+          </Button>
         }>
         <div className="filliny-flex filliny-flex-col filliny-gap-4">
           {/* Context Section */}
@@ -216,25 +170,6 @@ const ActiveProfileWebsitePreview: React.FC<Props> = ({ matchingWebsite, prefere
           </div>
         </div>
       </WebsitePreviewCard>
-
-      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Remove Website</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to remove this website from your profile? This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              className="filliny-bg-destructive hover:filliny-bg-destructive/10">
-              Remove
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       <SingleWebsiteEditModal
         open={isEditModalOpen}

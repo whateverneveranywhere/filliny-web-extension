@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import type { ReactNode, FC, ComponentType } from 'react';
 
@@ -45,10 +45,13 @@ const ShadowPortal: FC<ShadowPortalProps> = ({ children, containerId = 'shadow-p
     container = document.createElement('div');
     container.id = containerId;
     container.setAttribute('data-shadow-portal', 'true');
-    container.style.position = 'relative';
-    if (zIndex) {
-      container.style.zIndex = zIndex.toString();
-    }
+    // Set styles to ensure proper layering and inheritance
+    container.style.cssText = `
+      position: relative;
+      font-family: inherit;
+      color: inherit;
+      ${zIndex ? `z-index: ${zIndex};` : ''}
+    `.trim();
     shadowRoot.appendChild(container);
   }
 

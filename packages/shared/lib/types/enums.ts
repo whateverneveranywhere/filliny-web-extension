@@ -8,6 +8,8 @@
  * Maps to HTML input types and custom form elements
  * Note: This is an enum version. The string union type is in services/types/ai.ts
  */
+import { z } from 'zod';
+
 export enum FieldTypeEnum {
   TEXT = 'text',
   EMAIL = 'email',
@@ -464,6 +466,11 @@ export enum WebappEnvs {
   PREVIEW = 'preview',
   PROD = 'prod',
 }
+
+/**
+ * Zod schema for WebappEnvs validation
+ */
+export const WebappEnvsSchema = z.nativeEnum(WebappEnvs);
 
 /**
  * Checkable field types

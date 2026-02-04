@@ -3,6 +3,7 @@ export * from './profileQueries.js';
 export * from './dashboardQueries.js';
 export * from './activeProfile.js';
 export * from './planLimits.js';
+export * from './apiHealthQueries.js';
 
 // queryKeys is exported here for convenient access alongside queries
 // Single source of truth is in ../queryKeys.ts

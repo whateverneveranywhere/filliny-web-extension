@@ -1,8 +1,35 @@
 import { createStorage } from '../base/base.js';
 import { StorageEnum } from '../base/enums.js';
+import { z } from 'zod';
 import type { BaseStorageType } from '../base/types.js';
 
-type AuthTokenType = string;
+// ============================================================================
+// Auth Token Schema
+// ============================================================================
+
+/**
+ * Schema for auth token (non-empty string)
+ */
+const _AuthTokenSchema = z.string();
+type AuthTokenType = z.infer<typeof _AuthTokenSchema>;
+
+/**
+ * Schema for background script response
+ */
+const BackgroundTokenResponseSchema = z.object({
+  success: z
+    .object({
+      token: z.string().nullable().optional(),
+    })
+    .optional(),
+});
+
+/**
+ * Schema for storage result with bearer_token
+ */
+const BearerTokenStorageResultSchema = z.object({
+  bearer_token: z.string().optional(),
+});
 
 type AuthStorage = BaseStorageType<AuthTokenType> & {
   setToken: (token: AuthTokenType) => Promise<void>;
@@ -16,9 +43,13 @@ const storage = createStorage<AuthTokenType>('auth-token', '', {
   liveUpdate: true,
 });
 
+/** Timeout for cookie token retrieval (2 seconds) */
+const COOKIE_TOKEN_TIMEOUT_MS = 2000;
+
 /**
  * Get session token from cookie via background script
- * The cookie is set by Better Auth on the API domain
+ * The cookie is set by Better Auth on the FRONTEND domain (not the API domain)
+ * Has a timeout to prevent hanging if background script doesn't respond
  */
 const getTokenFromCookie = (): Promise<string> =>
   new Promise(resolve => {
@@ -27,34 +58,53 @@ const getTokenFromCookie = (): Promise<string> =>
       resolve('');
       return;
     }
-    chrome.runtime.sendMessage({ action: 'GET_AUTH_TOKEN' }, response => {
-      if (chrome.runtime.lastError) {
-        console.error('[Auth Storage] Error getting token from cookie:', chrome.runtime.lastError);
-        resolve('');
-        return;
-      }
 
-      // Validate response format: { success: { token: string | null } }
-      if (!response || typeof response !== 'object') {
-        console.error('[Auth Storage] Invalid response format from background script:', response);
+    // Set up timeout to prevent hanging
+    let resolved = false;
+    const timeoutId = setTimeout(() => {
+      if (!resolved) {
+        resolved = true;
+        console.warn('[Auth Storage] Cookie token request timed out after', COOKIE_TOKEN_TIMEOUT_MS, 'ms');
         resolve('');
-        return;
       }
+    }, COOKIE_TOKEN_TIMEOUT_MS);
 
-      if (!response.success || typeof response.success !== 'object') {
-        console.error('[Auth Storage] Missing success field in response:', response);
+    try {
+      chrome.runtime.sendMessage({ action: 'GET_AUTH_TOKEN' }, response => {
+        if (resolved) return; // Already timed out
+        resolved = true;
+        clearTimeout(timeoutId);
+
+        if (chrome.runtime.lastError) {
+          console.error('[Auth Storage] Error getting token from cookie:', chrome.runtime.lastError);
+          resolve('');
+          return;
+        }
+
+        // Validate response format using Zod schema
+        const parseResult = BackgroundTokenResponseSchema.safeParse(response);
+        if (!parseResult.success) {
+          console.error('[Auth Storage] Invalid response format from background script:', response);
+          resolve('');
+          return;
+        }
+
+        const token = parseResult.data.success?.token ?? '';
+        if (token) {
+          console.log('[Auth Storage] Got token from cookie:', `${token.substring(0, 20)}...`);
+        } else {
+          console.warn('[Auth Storage] No token found in cookie');
+        }
+        resolve(token);
+      });
+    } catch (error) {
+      if (!resolved) {
+        resolved = true;
+        clearTimeout(timeoutId);
+        console.error('[Auth Storage] Failed to send message to background:', error);
         resolve('');
-        return;
       }
-
-      const token = response.success.token || '';
-      if (token) {
-        console.log('[Auth Storage] Got token from cookie:', `${token.substring(0, 20)}...`);
-      } else {
-        console.warn('[Auth Storage] No token found in cookie');
-      }
-      resolve(token);
-    });
+    }
   });
 
 /**
@@ -70,26 +120,22 @@ const getBearerTokenFromStorage = (): Promise<string> =>
     }
     chrome.storage.local.get('bearer_token', result => {
       if (chrome.runtime.lastError) {
-        console.error(
-          '[Auth Storage] Error getting bearer token from storage:',
-          chrome.runtime.lastError,
-        );
+        console.error('[Auth Storage] Error getting bearer token from storage:', chrome.runtime.lastError);
         resolve('');
         return;
       }
 
-      if (!result || typeof result !== 'object') {
+      // Validate storage result using Zod schema
+      const parseResult = BearerTokenStorageResultSchema.safeParse(result);
+      if (!parseResult.success) {
         console.error('[Auth Storage] Invalid storage result format:', result);
         resolve('');
         return;
       }
 
-      const token = result.bearer_token || '';
+      const token = parseResult.data.bearer_token ?? '';
       if (token) {
-        console.log(
-          '[Auth Storage] Got bearer token from storage:',
-          `${token.substring(0, 20)}...`,
-        );
+        console.log('[Auth Storage] Got bearer token from storage:', `${token.substring(0, 20)}...`);
       } else {
         console.warn('[Auth Storage] No bearer token found in storage');
       }

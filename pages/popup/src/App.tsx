@@ -1,4 +1,4 @@
-import { useExtensionAuth, getConfig, WebappEnvs } from '@extension/shared';
+import { useAuthContext, AuthProvider, getConfig, WebappEnvs } from '@extension/shared';
 import { Loading, QueryClientProvider, RouterProvider, SigninPage, withPageWrapper } from '@extension/ui';
 import { useEffect, useState } from 'react';
 
@@ -9,8 +9,12 @@ interface ConfigInfo {
   cookieName: string;
 }
 
-const HomePage = () => {
-  const { isLoading, isAuthenticated } = useExtensionAuth();
+/**
+ * Inner component that uses auth context.
+ * Must be inside AuthProvider to use useAuthContext.
+ */
+const PopupContent = () => {
+  const { isLoading, isAuthenticated } = useAuthContext();
   const [configInfo, setConfigInfo] = useState<ConfigInfo | null>(null);
 
   useEffect(() => {
@@ -67,17 +71,24 @@ const HomePage = () => {
       </div>
 
       {/* Rest of your app */}
-      <div className="filliny-mt-4">
-        <QueryClientProvider>
-          {isAuthenticated ? (
-            <RouterProvider />
-          ) : (
-            <SigninPage />
-          )}
-        </QueryClientProvider>
-      </div>
+      <div className="filliny-mt-4">{isAuthenticated ? <RouterProvider /> : <SigninPage />}</div>
     </div>
   );
 };
+
+/**
+ * HomePage component with provider hierarchy:
+ * QueryClientProvider -> AuthProvider -> PopupContent
+ *
+ * This ensures auth-dependent hooks like usePlanLimits automatically disable
+ * API calls when user is not authenticated, preventing 401 errors.
+ */
+const HomePage = () => (
+  <QueryClientProvider>
+    <AuthProvider>
+      <PopupContent />
+    </AuthProvider>
+  </QueryClientProvider>
+);
 
 export default withPageWrapper(HomePage);

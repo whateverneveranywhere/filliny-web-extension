@@ -10,6 +10,7 @@ export const FillinyTestModeFillerButton = () => {
   return (
     <Button
       variant="default"
+      size="icon"
       onClick={() => highlightForms({ visionOnly: false, testMode: true })}
       disabled={!isDOMReady}
       className={cn(iconButtonClasses, 'filliny-text-primary-foreground')}>

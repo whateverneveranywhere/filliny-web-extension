@@ -20,27 +20,47 @@
 /**
  * Animation duration presets in milliseconds.
  * Use these for consistency across CSS transitions and framer-motion.
+ *
+ * IMPORTANT: These values match the parent project (filliny-app) constants.
+ * See: apps/web/src/components/ui/motion.tsx
  */
 export const durations = {
-  fast: 150,
-  normal: 200,
-  slow: 300,
-  verySlow: 500,
+  /** 200ms - Fast interactions (hover, tap, micro-animations) */
+  fast: 200,
+  /** 300ms - Default for most animations */
+  default: 300,
+  /** 500ms - Slow entrance animations (page transitions, modals) */
+  slow: 500,
 } as const;
 
 /**
  * Duration presets in seconds (for framer-motion).
  * Derived from millisecond values for consistency.
+ *
+ * IMPORTANT: These values match the parent project (filliny-app) constants.
+ * See: apps/web/src/components/ui/motion.tsx
  */
 export const durationsInSeconds = {
+  /** 0.2s - Fast interactions (hover, tap, micro-animations) */
   fast: durations.fast / 1000,
-  normal: durations.normal / 1000,
+  /** 0.3s - Default for most animations */
+  default: durations.default / 1000,
+  /** 0.5s - Slow entrance animations (page transitions, modals) */
   slow: durations.slow / 1000,
-  verySlow: durations.verySlow / 1000,
 } as const;
 
-// CSS transition timing function presets
+/**
+ * CSS transition timing function presets.
+ *
+ * IMPORTANT: The 'out' and 'inOut' values match the parent project (filliny-app) constants.
+ * See: apps/web/src/components/ui/motion.tsx
+ */
 export const easings = {
+  /** Standard easeOut for most animations - matches parent project */
+  out: 'cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+  /** EaseInOut for bidirectional animations - matches parent project */
+  inOut: 'cubic-bezier(0.4, 0, 0.2, 1)',
+  /** Legacy easeOut (different curve) */
   easeOut: 'cubic-bezier(0.33, 1, 0.68, 1)',
   easeIn: 'cubic-bezier(0.32, 0, 0.67, 0)',
   easeInOut: 'cubic-bezier(0.65, 0, 0.35, 1)',
@@ -48,65 +68,77 @@ export const easings = {
   bounce: 'cubic-bezier(0.68, -0.6, 0.32, 1.6)',
 } as const;
 
-// Tailwind animation class combinations for common patterns
+/**
+ * Tailwind animation class combinations for common patterns.
+ *
+ * Duration values aligned with parent project (filliny-app):
+ * - fast: 200ms (hover, tap, micro-animations)
+ * - default: 300ms (most animations)
+ * - slow: 500ms (entrance animations, modals)
+ */
 export const animationClasses = {
-  // Fade animations
-  fadeIn: 'filliny-animate-in filliny-fade-in filliny-duration-200',
-  fadeOut: 'filliny-animate-out filliny-fade-out filliny-duration-200',
-  fadeInFast: 'filliny-animate-in filliny-fade-in filliny-duration-150',
-  fadeOutFast: 'filliny-animate-out filliny-fade-out filliny-duration-150',
-  fadeInSlow: 'filliny-animate-in filliny-fade-in filliny-duration-300',
-  fadeOutSlow: 'filliny-animate-out filliny-fade-out filliny-duration-300',
+  // Fade animations - default duration (300ms)
+  fadeIn: 'filliny-animate-in filliny-fade-in filliny-duration-300',
+  fadeOut: 'filliny-animate-out filliny-fade-out filliny-duration-300',
+  // Fade animations - fast duration (200ms)
+  fadeInFast: 'filliny-animate-in filliny-fade-in filliny-duration-200',
+  fadeOutFast: 'filliny-animate-out filliny-fade-out filliny-duration-200',
+  // Fade animations - slow duration (500ms)
+  fadeInSlow: 'filliny-animate-in filliny-fade-in filliny-duration-500',
+  fadeOutSlow: 'filliny-animate-out filliny-fade-out filliny-duration-500',
 
-  // Scale animations
-  scaleIn: 'filliny-animate-in filliny-zoom-in-95 filliny-duration-200',
-  scaleOut: 'filliny-animate-out filliny-zoom-out-95 filliny-duration-200',
-  scaleInFade: 'filliny-animate-in filliny-zoom-in-95 filliny-fade-in filliny-duration-200',
-  scaleOutFade: 'filliny-animate-out filliny-zoom-out-95 filliny-fade-out filliny-duration-200',
+  // Scale animations - default duration (300ms)
+  scaleIn: 'filliny-animate-in filliny-zoom-in-95 filliny-duration-300',
+  scaleOut: 'filliny-animate-out filliny-zoom-out-95 filliny-duration-300',
+  scaleInFade: 'filliny-animate-in filliny-zoom-in-95 filliny-fade-in filliny-duration-300',
+  scaleOutFade: 'filliny-animate-out filliny-zoom-out-95 filliny-fade-out filliny-duration-300',
 
-  // Slide animations
-  slideInRight: 'filliny-animate-in filliny-slide-in-from-right-4 filliny-fade-in filliny-duration-200',
-  slideOutRight: 'filliny-animate-out filliny-slide-out-to-right-4 filliny-fade-out filliny-duration-200',
-  slideInLeft: 'filliny-animate-in filliny-slide-in-from-left-4 filliny-fade-in filliny-duration-200',
-  slideOutLeft: 'filliny-animate-out filliny-slide-out-to-left-4 filliny-fade-out filliny-duration-200',
-  slideInTop: 'filliny-animate-in filliny-slide-in-from-top-2 filliny-fade-in filliny-duration-200',
-  slideOutTop: 'filliny-animate-out filliny-slide-out-to-top-2 filliny-fade-out filliny-duration-200',
-  slideInBottom: 'filliny-animate-in filliny-slide-in-from-bottom-2 filliny-fade-in filliny-duration-200',
-  slideOutBottom: 'filliny-animate-out filliny-slide-out-to-bottom-2 filliny-fade-out filliny-duration-200',
+  // Slide animations - default duration (300ms)
+  slideInRight: 'filliny-animate-in filliny-slide-in-from-right-4 filliny-fade-in filliny-duration-300',
+  slideOutRight: 'filliny-animate-out filliny-slide-out-to-right-4 filliny-fade-out filliny-duration-300',
+  slideInLeft: 'filliny-animate-in filliny-slide-in-from-left-4 filliny-fade-in filliny-duration-300',
+  slideOutLeft: 'filliny-animate-out filliny-slide-out-to-left-4 filliny-fade-out filliny-duration-300',
+  slideInTop: 'filliny-animate-in filliny-slide-in-from-top-2 filliny-fade-in filliny-duration-300',
+  slideOutTop: 'filliny-animate-out filliny-slide-out-to-top-2 filliny-fade-out filliny-duration-300',
+  slideInBottom: 'filliny-animate-in filliny-slide-in-from-bottom-2 filliny-fade-in filliny-duration-300',
+  slideOutBottom: 'filliny-animate-out filliny-slide-out-to-bottom-2 filliny-fade-out filliny-duration-300',
 
   // Continuous animations
   spin: 'filliny-animate-spin',
   pulse: 'filliny-animate-pulse',
   bounce: 'filliny-animate-bounce',
 
-  // Transition utilities
-  transition: 'filliny-transition-all filliny-duration-200 filliny-ease-out',
-  transitionFast: 'filliny-transition-all filliny-duration-150 filliny-ease-out',
-  transitionSlow: 'filliny-transition-all filliny-duration-300 filliny-ease-out',
-  transitionColors: 'filliny-transition-colors filliny-duration-200 filliny-ease-out',
-  transitionTransform: 'filliny-transition-transform filliny-duration-200 filliny-ease-out',
-  transitionOpacity: 'filliny-transition-opacity filliny-duration-200 filliny-ease-out',
+  // Transition utilities - aligned with parent project durations
+  transition: 'filliny-transition-all filliny-duration-300 filliny-ease-out',
+  transitionFast: 'filliny-transition-all filliny-duration-200 filliny-ease-out',
+  transitionSlow: 'filliny-transition-all filliny-duration-500 filliny-ease-out',
+  transitionColors: 'filliny-transition-colors filliny-duration-300 filliny-ease-out',
+  transitionTransform: 'filliny-transition-transform filliny-duration-300 filliny-ease-out',
+  transitionOpacity: 'filliny-transition-opacity filliny-duration-300 filliny-ease-out',
 } as const;
 
-// Inline style objects for CSS transitions (when Tailwind classes aren't sufficient)
+/**
+ * Inline style objects for CSS transitions (when Tailwind classes aren't sufficient).
+ * Uses the standardized easing curves from parent project.
+ */
 export const transitionStyles = {
   spring: {
     transitionTimingFunction: easings.spring,
-    transitionDuration: `${durations.normal}ms`,
+    transitionDuration: `${durations.default}ms`,
     transitionProperty: 'all',
   },
   bouncy: {
     transitionTimingFunction: easings.bounce,
-    transitionDuration: `${durations.normal}ms`,
+    transitionDuration: `${durations.default}ms`,
     transitionProperty: 'all',
   },
   smooth: {
-    transitionTimingFunction: easings.easeInOut,
+    transitionTimingFunction: easings.inOut,
     transitionDuration: `${durations.slow}ms`,
     transitionProperty: 'all',
   },
   quick: {
-    transitionTimingFunction: easings.easeOut,
+    transitionTimingFunction: easings.out,
     transitionDuration: `${durations.fast}ms`,
     transitionProperty: 'all',
   },
@@ -145,12 +177,13 @@ export const combineAnimations = (...classes: (string | undefined | null | false
 /**
  * Standard fade variants for framer-motion.
  * Use when Tailwind animations are insufficient (e.g., exit animations, gestures).
+ * Durations aligned with parent project.
  */
 export const fadeVariants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
-    transition: { duration: durationsInSeconds.normal },
+    transition: { duration: durationsInSeconds.default },
   },
   exit: {
     opacity: 0,
@@ -161,13 +194,14 @@ export const fadeVariants = {
 /**
  * Slide variants for framer-motion.
  * Use for elements that slide in from a direction.
+ * Durations aligned with parent project.
  */
 export const slideVariants = {
   hidden: { x: -20, opacity: 0 },
   visible: {
     x: 0,
     opacity: 1,
-    transition: { duration: durationsInSeconds.normal },
+    transition: { duration: durationsInSeconds.default },
   },
   exit: {
     x: 20,
@@ -179,13 +213,14 @@ export const slideVariants = {
 /**
  * Scale variants for framer-motion.
  * Use for elements that scale in/out.
+ * Durations aligned with parent project.
  */
 export const scaleVariants = {
   hidden: { scale: 0.95, opacity: 0 },
   visible: {
     scale: 1,
     opacity: 1,
-    transition: { duration: durationsInSeconds.normal },
+    transition: { duration: durationsInSeconds.default },
   },
   exit: {
     scale: 0.95,
@@ -212,12 +247,14 @@ export const staggerContainerVariants = {
 /**
  * Stagger item variants for framer-motion.
  * Use as children within a stagger container.
+ * Durations aligned with parent project.
  */
 export const staggerItemVariants = {
-  hidden: { opacity: 0 },
+  hidden: { opacity: 0, y: 20 },
   visible: {
     opacity: 1,
-    transition: { duration: durationsInSeconds.normal },
+    y: 0,
+    transition: { duration: durationsInSeconds.default },
   },
 } as const;
 
@@ -228,25 +265,33 @@ export const staggerItemVariants = {
 /**
  * Standard transition configurations for framer-motion.
  * Use with the `transition` prop when not using variants.
+ *
+ * IMPORTANT: These values match the parent project (filliny-app) constants.
+ * See: apps/web/src/components/ui/motion.tsx
  */
 export const motionTransitions = {
+  /** 0.2s - Fast interactions (hover, tap) */
   fast: {
     duration: durationsInSeconds.fast,
-    ease: [0.32, 0.72, 0, 1],
+    ease: [0.25, 0.46, 0.45, 0.94], // matches parent project ANIMATION_EASE.out
   },
-  normal: {
-    duration: durationsInSeconds.normal,
-    ease: [0.32, 0.72, 0, 1],
+  /** 0.3s - Default for most animations */
+  default: {
+    duration: durationsInSeconds.default,
+    ease: [0.25, 0.46, 0.45, 0.94], // matches parent project ANIMATION_EASE.out
   },
+  /** 0.5s - Slow entrance animations (page transitions, modals) */
   slow: {
     duration: durationsInSeconds.slow,
-    ease: [0.32, 0.72, 0, 1],
+    ease: [0.25, 0.46, 0.45, 0.94], // matches parent project ANIMATION_EASE.out
   },
+  /** Spring-like easing for playful interactions - matches parent project */
   spring: {
     type: 'spring' as const,
     stiffness: 400,
     damping: 30,
   },
+  /** Bouncier spring for more playful animations */
   bouncy: {
     type: 'spring' as const,
     stiffness: 300,

@@ -9,7 +9,7 @@
 /**
  * Confidence levels for selector reliability
  */
-export enum SelectorConfidence {
+enum SelectorConfidence {
   HIGHEST = 0.95,
   HIGH = 0.9,
   MEDIUM_HIGH = 0.85,
@@ -25,7 +25,7 @@ export enum SelectorConfidence {
 /**
  * Selector with confidence scoring interface
  */
-export interface SelectorWithConfidence {
+interface SelectorWithConfidence {
   selector: string;
   confidence: number;
   description: string;
@@ -48,7 +48,7 @@ const createSelector = (
 /**
  * Selector categories organized by type
  */
-export const SELECTOR_CATEGORIES = {
+const SELECTOR_CATEGORIES = {
   // Standard HTML form elements
   STANDARD_HTML: [
     'input:not([type="hidden"]):not([type="submit"]):not([type="button"]):not([type="reset"]):not([type="image"])',
@@ -106,7 +106,7 @@ export const SELECTOR_CATEGORIES = {
 /**
  * Framework-specific selector configurations
  */
-export const FRAMEWORK_SELECTORS = {
+const FRAMEWORK_SELECTORS = {
   // Material-UI (MUI)
   MATERIAL_UI: {
     inputs: ['.MuiTextField-root input', '.MuiTextField-root textarea', '.MuiInputBase-input'],
@@ -193,7 +193,7 @@ export const FRAMEWORK_SELECTORS = {
 /**
  * CSS class patterns for generic form elements
  */
-export const CSS_CLASS_PATTERNS = {
+const CSS_CLASS_PATTERNS = {
   UPLOAD: ['[class*="upload"]', '[class*="file"]', '[class*="attach"]', '[class*="dropzone"]'],
   FIELD: ['[class*="field"]', '[class*="input"]', '[class*="control"]'],
   FORM: ['[class*="form-"]', '[class*="-form"]'],
@@ -233,7 +233,7 @@ const createFrameworkSelectors = (
  * Create universal form element selectors with confidence scoring
  * Selectors are ordered by confidence level for optimal matching
  */
-export const UNIVERSAL_FORM_SELECTORS: SelectorWithConfidence[] = [
+const UNIVERSAL_FORM_SELECTORS: SelectorWithConfidence[] = [
   // ========================================
   // STANDARD HTML FORM FIELDS (HIGHEST CONFIDENCE)
   // ========================================
@@ -510,37 +510,34 @@ export const UNIVERSAL_FORM_SELECTORS: SelectorWithConfidence[] = [
 /**
  * Get selectors by minimum confidence level
  */
-export const getSelectorsByConfidence = (minConfidence: number): SelectorWithConfidence[] =>
+const getSelectorsByConfidence = (minConfidence: number): SelectorWithConfidence[] =>
   UNIVERSAL_FORM_SELECTORS.filter(s => s.confidence >= minConfidence);
 
 /**
  * Get selectors within a confidence range
  */
-export const getSelectorsByConfidenceRange = (minConfidence: number, maxConfidence: number): SelectorWithConfidence[] =>
+const getSelectorsByConfidenceRange = (minConfidence: number, maxConfidence: number): SelectorWithConfidence[] =>
   UNIVERSAL_FORM_SELECTORS.filter(s => s.confidence >= minConfidence && s.confidence <= maxConfidence);
 
 /**
  * Get high confidence selectors (0.85+)
  */
-export const HIGH_CONFIDENCE_SELECTORS = getSelectorsByConfidence(SelectorConfidence.MEDIUM_HIGH);
+const HIGH_CONFIDENCE_SELECTORS = getSelectorsByConfidence(SelectorConfidence.MEDIUM_HIGH);
 
 /**
  * Get medium confidence selectors (0.7-0.85)
  */
-export const MEDIUM_CONFIDENCE_SELECTORS = getSelectorsByConfidenceRange(
-  SelectorConfidence.LOW,
-  SelectorConfidence.MEDIUM,
-);
+const MEDIUM_CONFIDENCE_SELECTORS = getSelectorsByConfidenceRange(SelectorConfidence.LOW, SelectorConfidence.MEDIUM);
 
 /**
  * Get low confidence selectors (<0.7)
  */
-export const LOW_CONFIDENCE_SELECTORS = UNIVERSAL_FORM_SELECTORS.filter(s => s.confidence < SelectorConfidence.LOW);
+const LOW_CONFIDENCE_SELECTORS = UNIVERSAL_FORM_SELECTORS.filter(s => s.confidence < SelectorConfidence.LOW);
 
 /**
  * Get selectors for a specific framework
  */
-export const getFrameworkSelectors = (framework: keyof typeof FRAMEWORK_SELECTORS): SelectorWithConfidence[] => {
+const getFrameworkSelectors = (framework: keyof typeof FRAMEWORK_SELECTORS): SelectorWithConfidence[] => {
   const frameworkConfig = FRAMEWORK_SELECTORS[framework];
   const selectors: SelectorWithConfidence[] = [];
 
@@ -556,7 +553,7 @@ export const getFrameworkSelectors = (framework: keyof typeof FRAMEWORK_SELECTOR
 /**
  * Get all rich text editor selectors
  */
-export const getRichTextEditorSelectors = (): SelectorWithConfidence[] => {
+const getRichTextEditorSelectors = (): SelectorWithConfidence[] => {
   const editors = FRAMEWORK_SELECTORS.RICH_TEXT_EDITORS;
   const selectors: SelectorWithConfidence[] = [];
 
@@ -572,7 +569,7 @@ export const getRichTextEditorSelectors = (): SelectorWithConfidence[] => {
 /**
  * Combine multiple selector arrays and deduplicate
  */
-export const combineSelectors = (...selectorArrays: SelectorWithConfidence[][]): SelectorWithConfidence[] => {
+const combineSelectors = (...selectorArrays: SelectorWithConfidence[][]): SelectorWithConfidence[] => {
   const seen = new Set<string>();
   const combined: SelectorWithConfidence[] = [];
 
@@ -589,7 +586,29 @@ export const combineSelectors = (...selectorArrays: SelectorWithConfidence[][]):
 /**
  * Get combined selector string for querySelectorAll
  */
-export const getCombinedSelectorString = (minConfidence: number = SelectorConfidence.LOW): string =>
+const getCombinedSelectorString = (minConfidence: number = SelectorConfidence.LOW): string =>
   getSelectorsByConfidence(minConfidence)
     .map(s => s.selector)
     .join(', ');
+
+// ============================================================================
+// Exports (at end of file per ESLint import-x/exports-last rule)
+// ============================================================================
+
+export {
+  SelectorConfidence,
+  SELECTOR_CATEGORIES,
+  FRAMEWORK_SELECTORS,
+  CSS_CLASS_PATTERNS,
+  UNIVERSAL_FORM_SELECTORS,
+  getSelectorsByConfidence,
+  getSelectorsByConfidenceRange,
+  HIGH_CONFIDENCE_SELECTORS,
+  MEDIUM_CONFIDENCE_SELECTORS,
+  LOW_CONFIDENCE_SELECTORS,
+  getFrameworkSelectors,
+  getRichTextEditorSelectors,
+  combineSelectors,
+  getCombinedSelectorString,
+};
+export type { SelectorWithConfidence };

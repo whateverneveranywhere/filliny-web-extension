@@ -1,8 +1,8 @@
+import { getCreditWarningState, LOW_CREDITS_THRESHOLD } from './NoTokensAlert';
+import { cn } from '@/lib/utils';
 import { getConfig, usePlanLimits } from '@extension/shared';
 import { ExternalLink, AlertTriangle } from 'lucide-react';
-import { getCreditWarningState, LOW_CREDITS_THRESHOLD } from './NoTokensAlert';
 import type { CreditWarningState } from './NoTokensAlert';
-import { cn } from '@/lib/utils';
 
 interface CreditsFooterWarningProps {
   freeFormsRemaining?: number;
@@ -26,23 +26,20 @@ const CreditsFooterWarning = ({
 }: CreditsFooterWarningProps) => {
   const config = getConfig();
   const { FREE_TIER_LIMITS } = usePlanLimits();
-  const warningState: CreditWarningState = getCreditWarningState(
-    isPro ? tokensRemaining : freeFormsRemaining,
-    isPro,
-  );
+  const warningState: CreditWarningState = getCreditWarningState(isPro ? tokensRemaining : freeFormsRemaining, isPro);
 
   // Don't render if no warning needed
   if (warningState === 'none') return null;
 
-  const actionUrl = isPro ? `${config.baseURL}/pricing?tab=token` : `${config.baseURL}/pricing`;
+  const actionUrl = `${config.baseURL}/pricing`;
 
   // Warning messages based on state and user type
   const getMessage = () => {
     if (isPro) {
       return {
         title: 'Token Limit Reached',
-        description: 'Purchase additional tokens to continue.',
-        buttonText: 'Purchase Tokens',
+        description: 'Tokens refresh on your next billing cycle.',
+        buttonText: 'View Subscription',
       };
     }
 
@@ -67,7 +64,7 @@ const CreditsFooterWarning = ({
     <div
       className={cn(
         'filliny-flex filliny-items-center filliny-justify-between filliny-gap-3 filliny-rounded-lg filliny-border filliny-px-3 filliny-py-2.5',
-        'filliny-border-warning/30 filliny-bg-warning/5',
+        'filliny-border-warning/30 filliny-bg-warning/5 filliny-backdrop-blur-sm',
         className,
       )}>
       <div className="filliny-flex filliny-items-center filliny-gap-2.5">

@@ -1,4 +1,11 @@
-import { getConfig, handleAction, setupAuthTokenListener, syncAuthTokenFromCookie, WebappEnvs, MessageType } from '@extension/shared';
+import {
+  getConfig,
+  handleAction,
+  setupAuthTokenListener,
+  syncAuthTokenFromCookie,
+  WebappEnvs,
+  MessageType,
+} from '@extension/shared';
 import 'webextension-polyfill';
 
 // Add this near the top of the file, after imports

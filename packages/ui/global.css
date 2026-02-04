@@ -6,27 +6,29 @@
 
 /* shadcn/ui theme variables - aligned with webapp design system */
 /* :host is needed for Shadow DOM (content-ui), :root for normal pages */
-:root, :host {
+:root,
+:host {
   /* Color values are oklch channels only (L C H) - oklch() wrapper is added by Tailwind config */
-  --background: 0.985 0.002 260;
-  --foreground: 0.141 0.005 285.823;
+  /* MONOCHROME DESIGN SYSTEM: All colors are black/white/gray (chroma = 0) */
+  --background: 0.985 0 0;
+  --foreground: 0.141 0 0;
   --card: 1 0 0;
-  --card-foreground: 0.141 0.005 285.823;
+  --card-foreground: 0.141 0 0;
   --popover: 1 0 0;
-  --popover-foreground: 0.141 0.005 285.823;
-  --primary: 0.45 0.18 260;
-  --primary-foreground: 0.96 0.01 260;
-  --secondary: 0.967 0.001 286.375;
-  --secondary-foreground: 0.21 0.006 285.885;
-  --muted: 0.967 0.001 286.375;
-  --muted-foreground: 0.552 0.016 285.938;
-  --accent: 0.967 0.001 286.375;
-  --accent-foreground: 0.21 0.006 285.885;
-  --destructive: 0.577 0.245 27.325;
-  --destructive-foreground: 0.96 0.01 0;
-  --border: 0.92 0.004 286.32;
-  --input: 0.92 0.004 286.32;
-  --ring: 0.705 0.015 286.067;
+  --popover-foreground: 0.141 0 0;
+  --primary: 0.205 0 0;
+  --primary-foreground: 0.96 0 0;
+  --secondary: 0.967 0 0;
+  --secondary-foreground: 0.21 0 0;
+  --muted: 0.967 0 0;
+  --muted-foreground: 0.552 0 0;
+  --accent: 0.967 0 0;
+  --accent-foreground: 0.21 0 0;
+  --destructive: 0.45 0 0;
+  --destructive-foreground: 0.96 0 0;
+  --border: 0.92 0 0;
+  --input: 0.92 0 0;
+  --ring: 0.705 0 0;
   --radius: 0.625rem;
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
@@ -35,33 +37,34 @@
   --radius-2xl: calc(var(--radius) + 8px);
   --radius-3xl: calc(var(--radius) + 12px);
   --radius-4xl: calc(var(--radius) + 16px);
-  --chart-1: 0.79 0.1 260;
-  --chart-2: 0.68 0.14 260;
-  --chart-3: 0.59 0.16 260;
-  --chart-4: 0.45 0.18 260;
-  --chart-5: 0.4 0.16 260;
-  --success: 0.52 0.17 160;
+  --chart-1: 0.79 0 0;
+  --chart-2: 0.68 0 0;
+  --chart-3: 0.59 0 0;
+  --chart-4: 0.45 0 0;
+  --chart-5: 0.4 0 0;
+  --success: 0.52 0 0;
   --success-foreground: 1 0 0;
-  --warning: 0.75 0.18 70;
+  --warning: 0.75 0 0;
   --warning-foreground: 0.15 0 0;
-  --info: 0.55 0.2 260;
+  --info: 0.55 0 0;
   --info-foreground: 1 0 0;
   --sidebar: 0.985 0 0;
-  --sidebar-foreground: 0.141 0.005 285.823;
-  --sidebar-primary: 0.45 0.18 260;
-  --sidebar-primary-foreground: 0.96 0.01 260;
-  --sidebar-accent: 0.967 0.001 286.375;
-  --sidebar-accent-foreground: 0.21 0.006 285.885;
-  --sidebar-border: 0.92 0.004 286.32;
-  --sidebar-ring: 0.705 0.015 286.067;
+  --sidebar-foreground: 0.141 0 0;
+  --sidebar-primary: 0.205 0 0;
+  --sidebar-primary-foreground: 0.96 0 0;
+  --sidebar-accent: 0.967 0 0;
+  --sidebar-accent-foreground: 0.21 0 0;
+  --sidebar-border: 0.92 0 0;
+  --sidebar-ring: 0.705 0 0;
 }
 
 /* Dark mode theme variables - aligned with webapp design system */
 /* Color values are oklch channels only (L C H) - oklch() wrapper is added by Tailwind config */
+/* MONOCHROME DESIGN SYSTEM: All colors are black/white/gray (chroma = 0) */
 .dark {
   --background: 0.12 0 0;
   --foreground: 0.9 0 0;
-  --card: 0.18 0.005 260;
+  --card: 0.18 0 0;
   --card-foreground: 0.9 0 0;
   --popover: 0.22 0 0;
   --popover-foreground: 0.87 0 0;
@@ -73,26 +76,26 @@
   --muted-foreground: 0.75 0 0;
   --accent: 0.269 0 0;
   --accent-foreground: 0.87 0 0;
-  --destructive: 0.704 0.191 22.216;
-  --destructive-foreground: 0.96 0.01 0;
+  --destructive: 0.55 0 0;
+  --destructive-foreground: 0.96 0 0;
   --border: 0.288 0 0;
   --input: 0.351 0 0;
   --ring: 0.65 0 0;
-  --chart-1: 0.488 0.243 264.376;
-  --chart-2: 0.696 0.17 162.48;
-  --chart-3: 0.769 0.188 70.08;
-  --chart-4: 0.627 0.265 303.9;
-  --chart-5: 0.645 0.246 16.439;
-  --success: 0.696 0.17 162.48;
+  --chart-1: 0.85 0 0;
+  --chart-2: 0.7 0 0;
+  --chart-3: 0.55 0 0;
+  --chart-4: 0.4 0 0;
+  --chart-5: 0.25 0 0;
+  --success: 0.7 0 0;
   --success-foreground: 0.15 0 0;
-  --warning: 0.769 0.188 70.08;
+  --warning: 0.77 0 0;
   --warning-foreground: 0.15 0 0;
-  --info: 0.488 0.243 264.376;
+  --info: 0.65 0 0;
   --info-foreground: 1 0 0;
   --sidebar: 0.22 0 0;
   --sidebar-foreground: 0.87 0 0;
-  --sidebar-primary: 0.488 0.243 264.376;
-  --sidebar-primary-foreground: 0.87 0 0;
+  --sidebar-primary: 0.87 0 0;
+  --sidebar-primary-foreground: 0.15 0 0;
   --sidebar-accent: 0.269 0 0;
   --sidebar-accent-foreground: 0.87 0 0;
   --sidebar-border: 0.288 0 0;
@@ -124,6 +127,36 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Shadow DOM specific styles - :host applies to the shadow root container */
+/* This ensures content inside shadow DOM gets the same base styles as body */
+:host {
+  display: block;
+  color: oklch(var(--foreground));
+
+  font-family:
+    'Inter',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    'Roboto',
+    'Oxygen',
+    'Ubuntu',
+    'Cantarell',
+    'Fira Sans',
+    'Droid Sans',
+    'Helvetica Neue',
+    sans-serif;
+
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Apply base styles to elements inside shadow DOM root container */
+:host > * {
+  font-family: inherit;
+  color: inherit;
+}
+
 code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
 }
@@ -136,30 +169,6 @@ code {
 button:not([disabled]),
 [role='button']:not([disabled]) {
   cursor: pointer;
-}
-
-/* Background Patterns */
-.bg-dot-pattern {
-  background-image: radial-gradient(circle, oklch(0.5 0 0 / 20%) 1.5px, transparent 1.5px);
-  background-size: 24px 24px;
-  background-position: 0 0;
-}
-
-.dark .bg-dot-pattern {
-  background-image: radial-gradient(circle, oklch(0.7 0 0 / 15%) 1.5px, transparent 1.5px);
-}
-
-.bg-grid-pattern {
-  background-image:
-    linear-gradient(oklch(0.5 0 0 / 8%) 1px, transparent 1px),
-    linear-gradient(90deg, oklch(0.5 0 0 / 8%) 1px, transparent 1px);
-  background-size: 32px 32px;
-}
-
-.dark .bg-grid-pattern {
-  background-image:
-    linear-gradient(oklch(0.6 0 0 / 6%) 1px, transparent 1px),
-    linear-gradient(90deg, oklch(0.6 0 0 / 6%) 1px, transparent 1px);
 }
 
 /* Smooth Scrolling */
@@ -218,7 +227,8 @@ button:not([disabled]),
    ============================================================================ */
 
 /* Base animation variables */
-:root, :host {
+:root,
+:host {
   --filliny-animate-duration: 150ms;
   --filliny-animate-delay: 0ms;
   --filliny-animate-timing: cubic-bezier(0.4, 0, 0.2, 1);

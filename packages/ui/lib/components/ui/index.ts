@@ -30,5 +30,7 @@ export * from './loading-states';
 export * from './tooltip';
 export { TogglePill } from './toggle-pill';
 export * from './typography';
+export * from './scroll-area';
 export * from './container';
 export * from './motion';
+export * from './shadow-ui';

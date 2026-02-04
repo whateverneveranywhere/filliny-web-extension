@@ -11,6 +11,11 @@ export { ShadowPortal, withShadowPortal } from '../shadow-portal';
 // Enhanced UI components that use ShadowPortal
 export { ShadowPopover, ShadowPopoverTrigger, ShadowPopoverContent } from './shadow-popover';
 
+export { ShadowTooltip, ShadowTooltipTrigger, ShadowTooltipContent, ShadowTooltipProvider } from './shadow-tooltip';
+
+export { ShadowTogglePill } from './shadow-toggle-pill';
+export type { ShadowTogglePillProps } from './shadow-toggle-pill';
+
 export {
   ShadowSelect,
   ShadowSelectGroup,

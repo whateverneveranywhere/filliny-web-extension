@@ -2,6 +2,9 @@ import { getConfig } from '../utils/index.js';
 import { authStorage } from '@extension/storage';
 import { z } from 'zod';
 
+// Get config once for cookie name access
+const appConfigForCookie = getConfig();
+
 // ============================================================================
 // Zod Schemas for HTTP Service Types
 // ============================================================================
@@ -153,30 +156,75 @@ class HttpService {
 
       console.log('[HTTP Service] Auth token received:', authToken ? `${authToken.substring(0, 20)}...` : 'empty');
 
+      // For cross-origin requests from Chrome extension, cookies won't auto-send.
+      // Better Auth expects authentication via one of these methods:
+      //
+      // 1. Cookie header (primary - how Better Auth natively works):
+      //    Send the session cookie manually in the Cookie header.
+      //    This is the recommended approach per Better Auth docs for cross-origin requests.
+      //
+      // 2. Authorization header (fallback - requires Bearer plugin on server):
+      //    Send as Bearer token if server has Better Auth's Bearer plugin enabled.
+      //
+      // We send BOTH to maximize compatibility with different server configurations.
       if (authToken) {
+        // Primary: Set Cookie header with the session token
+        // Better Auth looks for its session cookie (e.g., filliny.session_token=<value>)
+        const cookieName = appConfigForCookie.cookieName;
+        headers.set('Cookie', `${cookieName}=${authToken}`);
+        console.log('[HTTP Service] Cookie header set:', `${cookieName}=<token>`);
+
+        // Fallback: Also set Authorization header for servers with Bearer plugin
         headers.set('Authorization', `Bearer ${authToken}`);
-        console.log('[HTTP Service] Authorization header set');
+        console.log('[HTTP Service] Authorization header set with Bearer token');
       } else {
-        console.log('[HTTP Service] No auth token - skipping Authorization header');
+        console.log('[HTTP Service] No auth token - skipping auth headers');
       }
 
       headers.set('Content-Type', 'application/json');
 
       // apiUrl already includes /api/v1, so just append the endpoint path
       // Handle absolute URLs separately
-      const fullUrl = url.startsWith('http')
-        ? url
-        : `${finalApiUrl}${url}`;
+      const fullUrl = url.startsWith('http') ? url : `${finalApiUrl}${url}`;
 
+      console.log('[HTTP Service] Making request to:', fullUrl);
+      console.log('[HTTP Service] Request method:', config?.method || 'GET');
+      // Log headers for debugging - iterate manually since Headers.entries() may not be available in all TypeScript targets
+      const headerObj: Record<string, string> = {};
+      headers.forEach((value, key) => {
+        if (key.toLowerCase() === 'authorization') {
+          headerObj[key] = `${value.substring(0, 30)}...`;
+        } else if (key.toLowerCase() === 'cookie') {
+          // Mask cookie value for security
+          headerObj[key] = value.replace(/=.+$/, '=<token>');
+        } else {
+          headerObj[key] = value;
+        }
+      });
+      console.log('[HTTP Service] Headers:', headerObj);
+
+      // Use credentials: 'omit' since we're manually setting Cookie header.
+      // Per Better Auth docs: 'include' can interfere with manually set cookies.
       const response = await fetch(fullUrl, {
         ...config,
         headers,
         signal: controller.signal,
+        credentials: 'omit',
       });
 
+      console.log('[HTTP Service] Response status:', response.status);
+
       if (!response.ok) {
-        const errorData: ApiErrorResponse = await response.json();
         const requestStatus = response.status;
+
+        // Safely parse error response - it might not be JSON
+        let errorData: ApiErrorResponse = { message: 'An unexpected error occurred' };
+        try {
+          errorData = await response.json();
+        } catch {
+          // If parsing fails, use response status text as message
+          errorData = { message: response.statusText || `HTTP ${requestStatus} error` };
+        }
 
         if (requestStatus === 401) {
           // Clear stored auth token on unauthorized responses
@@ -218,16 +266,23 @@ class HttpService {
 
       const jsonResponse = await response.json();
 
+      // Unwrap the API response envelope - the API wraps all responses in { data, meta, success }
+      // Extract the 'data' property if it exists, otherwise use the full response
+      const unwrappedData =
+        jsonResponse && typeof jsonResponse === 'object' && 'data' in jsonResponse && 'success' in jsonResponse
+          ? jsonResponse.data
+          : jsonResponse;
+
       // Validate response with schema if provided - throw on validation failure
       if (config?.schema) {
-        const result = config.schema.safeParse(jsonResponse);
+        const result = config.schema.safeParse(unwrappedData);
         if (!result.success) {
           throw new ApiValidationError('API response validation failed', result.error.errors);
         }
         return result.data as T;
       }
 
-      return jsonResponse as T;
+      return unwrappedData as T;
     } catch (error) {
       if (error instanceof Error) {
         // Handle abort/timeout errors
@@ -287,6 +342,21 @@ class HttpService {
   }
 
   async requestViaBackground<T>(url: string, config?: CustomFetchConfig): Promise<T> {
+    // Get auth token if not provided - same as the request() method
+    const authToken = config?.authToken || (await authStorage.getWithFallback()) || '';
+    const cookieName = appConfigForCookie.cookieName;
+
+    console.log('[HTTP Service Background] Auth token:', authToken ? `${authToken.substring(0, 20)}...` : 'empty');
+
+    // Build auth headers: Cookie header (primary) + Authorization (fallback)
+    const authHeaders: Record<string, string> = {};
+    if (authToken) {
+      // Primary: Cookie header for Better Auth native session handling
+      authHeaders['Cookie'] = `${cookieName}=${authToken}`;
+      // Fallback: Authorization header for Bearer plugin support
+      authHeaders['Authorization'] = `Bearer ${authToken}`;
+    }
+
     const message = {
       type: 'API_REQUEST',
       url: `${config?.baseUrl || this.apiUrl}${url}`,
@@ -294,7 +364,7 @@ class HttpService {
         ...config,
         headers: {
           ...config?.headers,
-          Authorization: `Bearer ${config?.authToken}`,
+          ...authHeaders,
           'Content-Type': 'application/json',
           'X-Extension-ID': chrome.runtime.id,
         },
