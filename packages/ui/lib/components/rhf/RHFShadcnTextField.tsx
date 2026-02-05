@@ -47,7 +47,7 @@ const RHFShadcnTextField = <T extends FieldValues = FieldValues>({
     className={className}
     value={externalValue}
     onChange={externalOnChange}>
-    {({ field, handleChange, getValue }) => (
+    {({ field, fieldState, handleChange, getValue }) => (
       <Input
         {...field}
         required={required}
@@ -55,6 +55,7 @@ const RHFShadcnTextField = <T extends FieldValues = FieldValues>({
         data-testid={field.name}
         type={fieldType}
         placeholder={placeholder}
+        aria-invalid={!!fieldState.error}
         onChange={e => {
           const value = fieldType === 'number' ? Number(e.target.value) : String(e.target.value);
           handleChange(value);

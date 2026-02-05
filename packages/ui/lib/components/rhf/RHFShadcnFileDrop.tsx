@@ -112,6 +112,7 @@ const RHFShadcnFileDrop = ({
           animationClasses.transitionSlow,
           isDragging && 'filliny-border-primary filliny-bg-accent/50 filliny-scale-[1.02] filliny-shadow-lg',
           isHovering && !isDragging && 'filliny-border-muted-foreground filliny-shadow-sm',
+          error && 'filliny-border-destructive',
           className,
         )}
         onDragOver={handleDragOver}
@@ -123,6 +124,7 @@ const RHFShadcnFileDrop = ({
           {...field}
           rows={rows}
           placeholder={placeholder}
+          aria-invalid={!!error}
           className={cn(
             'filliny-min-h-[80px] filliny-w-full filliny-resize-none filliny-bg-transparent filliny-p-3',
             animationClasses.transitionOpacity,

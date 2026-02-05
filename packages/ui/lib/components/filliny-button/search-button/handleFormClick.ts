@@ -12,9 +12,8 @@ import {
   ApiUnauthorizedError,
   getConfig,
   MessageType,
-  listAuthorizedFilesService,
 } from '@extension/shared';
-import { profileStorage } from '@extension/storage';
+import { profileStorage, localFilesStorage } from '@extension/storage';
 import type { FormUpdateResults } from './fieldUpdaterHelpers';
 import type { Field, DTOFillingPreferences, DTOAuthorizedFileForAI } from '@extension/shared';
 import type { DTOProfileFillingForm } from '@extension/storage';
@@ -231,23 +230,26 @@ export const handleFormClick = async (
     const visitingUrl = window.location.href;
     const matchingWebsite = getMatchingWebsite((defaultProfile as DTOProfileFillingForm).fillingWebsites, visitingUrl);
 
-    // Fetch authorized files for the current profile (if profile has an ID)
+    // Fetch authorized local files for the current profile (if profile has an ID)
     let authorizedFiles: DTOAuthorizedFileForAI[] = [];
     const profileId = (defaultProfile as DTOProfileFillingForm)?.id;
     if (profileId) {
       try {
-        const files = await listAuthorizedFilesService(String(profileId));
-        // Transform to the AI-friendly format
-        authorizedFiles = files.map(file => ({
-          id: file.id,
-          filename: file.filename,
-          description: file.description,
-          useCases: file.useCases,
-          category: file.category,
+        // Read from local storage instead of cloud API
+        const localFiles = await localFilesStorage.getProfileFiles(String(profileId));
+        // Transform local files to the AI-friendly format
+        // Note: Local files don't have id, description, useCases, or category
+        // so we generate minimal info needed for AI to match files with fields
+        authorizedFiles = localFiles.map((file, index) => ({
+          id: index, // Use index as a placeholder ID
+          filename: file.name,
+          description: `Local file: ${file.name}`, // Auto-generated description
+          useCases: `Match with fields accepting ${file.extension.toUpperCase()} files`, // Auto-generated use case
+          category: 'document' as const, // Default category
           mimeType: file.mimeType,
-          fileSize: file.fileSize,
+          fileSize: file.size,
         }));
-        debug.log(`Loaded ${authorizedFiles.length} authorized files for AI context`);
+        debug.log(`Loaded ${authorizedFiles.length} local authorized files for AI context`);
       } catch (filesError) {
         debug.warn('Failed to load authorized files, continuing without them:', filesError);
         // Continue without authorized files - not a critical error

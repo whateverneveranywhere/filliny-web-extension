@@ -46,7 +46,7 @@ const RHFShadcnTextarea = <T extends FieldValues = FieldValues>({
     className={className}
     value={externalValue}
     onChange={externalOnChange}>
-    {({ field, handleChange, getValue }) => (
+    {({ field, fieldState, handleChange, getValue }) => (
       <Textarea
         {...field}
         required={required}
@@ -55,6 +55,7 @@ const RHFShadcnTextarea = <T extends FieldValues = FieldValues>({
         placeholder={placeholder}
         className={cn(!resizable && 'filliny-resize-none')}
         rows={rows}
+        aria-invalid={!!fieldState.error}
         onChange={e => handleChange(e.target.value)}
         value={(getValue() as string) ?? ''}
       />

@@ -290,9 +290,7 @@ const ProfileSelector = () => {
         description={editingId ? undefined : 'Set up how Filliny fills forms for you'}
         onOpenChange={handleDrawerChange}
         onInterceptClose={handleInterceptClose}>
-        <div className="filliny-h-[70vh] filliny-overflow-y-auto">
-          <ProfileForm id={editingId} onFormSubmit={handleFormSubmit} onDirtyChange={handleFormDirtyChange} />
-        </div>
+        <ProfileForm id={editingId} onFormSubmit={handleFormSubmit} onDirtyChange={handleFormDirtyChange} />
       </Drawer>
 
       {/* Unsaved Changes Dialog */}

@@ -82,24 +82,25 @@ const WebsitePreviewCard = ({
           )}
         </div>
 
-        {/* URL Section - truncates aggressively */}
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div
-                className={cn(
-                  'filliny-flex filliny-min-w-0 filliny-flex-1 filliny-items-center filliny-gap-1 filliny-overflow-hidden',
-                  isValidURL && 'filliny-cursor-pointer hover:filliny-text-primary',
-                )}
-                onClick={handleVisitWebsite}>
-                <span className="filliny-truncate filliny-text-sm filliny-font-medium">
-                  {formattedURL || 'Enter website URL'}
-                </span>
-                {isValidURL && (
-                  <ExternalLink className="filliny-h-3 filliny-w-3 filliny-shrink-0 filliny-text-muted-foreground" />
-                )}
-              </div>
-            </TooltipTrigger>
+        {/* URL Section - fit content width, doesn't fill entire row */}
+        <div className="filliny-flex-1 filliny-min-w-0 filliny-overflow-hidden">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div
+                  className={cn(
+                    'filliny-inline-flex filliny-max-w-full filliny-items-center filliny-gap-1',
+                    isValidURL && 'filliny-cursor-pointer hover:filliny-text-primary',
+                  )}
+                  onClick={handleVisitWebsite}>
+                  <span className="filliny-truncate filliny-text-sm filliny-font-medium">
+                    {formattedURL || 'Enter website URL'}
+                  </span>
+                  {isValidURL && (
+                    <ExternalLink className="filliny-h-3 filliny-w-3 filliny-shrink-0 filliny-text-muted-foreground" />
+                  )}
+                </div>
+              </TooltipTrigger>
             <TooltipContent side="top" className="filliny-max-w-xs">
               <div className="filliny-flex filliny-flex-col filliny-gap-1">
                 <p className="filliny-break-all filliny-text-sm">{isValidURL ? websiteURL : 'No valid URL provided'}</p>
@@ -112,6 +113,7 @@ const WebsitePreviewCard = ({
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
+        </div>
 
         {/* Actions Section */}
         <div className="filliny-flex filliny-shrink-0 filliny-items-center filliny-gap-1">

@@ -5,4 +5,5 @@ export * from './profile/profileStorage.js';
 export * from './position/positionStorage.js';
 export * from './fieldButtons/fieldButtonsStorage.js';
 export * from './draft/profileDraftStorage.js';
+export * from './localFiles/localFilesStorage.js';
 export type * from './types/index.js';

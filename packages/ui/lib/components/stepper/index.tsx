@@ -1,5 +1,5 @@
 import { Button } from '../ui/button';
-import { ScrollArea } from '../ui/scroll-area';
+import { ScrollArea, ScrollBar } from '../ui/scroll-area';
 import type { StepperProps } from '@extension/shared';
 
 interface ExtendedStepperProps extends StepperProps {
@@ -54,10 +54,9 @@ const Stepper = ({
       </div>
 
       {/* Scrollable Content Area */}
-      <ScrollArea className="filliny-flex-1 filliny-overflow-hidden">
-        <div className="filliny-min-w-0 filliny-overflow-hidden filliny-px-4 filliny-py-4">
-          {steps[currentStep].content}
-        </div>
+      <ScrollArea className="filliny-flex-1">
+        <div className="filliny-min-w-0 filliny-px-4 filliny-py-4">{steps[currentStep].content}</div>
+        <ScrollBar />
       </ScrollArea>
 
       {/* Fixed Footer - Navigation Buttons */}
