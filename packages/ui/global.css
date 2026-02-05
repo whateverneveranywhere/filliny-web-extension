@@ -567,3 +567,9 @@ button:not([disabled]),
 .filliny-slide-out-to-bottom-full {
   --filliny-exit-translate-y: 100%;
 }
+
+/* Fix Radix ScrollArea overflow - override internal min-width: 100% and display: table */
+.scroll-area-viewport > div {
+  display: block !important;
+  min-width: 0 !important;
+}

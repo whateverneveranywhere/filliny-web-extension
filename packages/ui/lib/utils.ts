@@ -15,5 +15,9 @@ export const cn = (...inputs: ClassValue[]) => twMerge(clsx(inputs));
  *   <Icon />
  * </Button>
  */
+/**
+ * Standardized class names for circular icon buttons.
+ * Size is 32px (size-8) for subtle secondary buttons.
+ */
 export const iconButtonClasses =
-  'filliny-size-10 filliny-min-h-10 filliny-min-w-10 filliny-max-h-10 filliny-max-w-10 filliny-overflow-hidden !filliny-rounded-full filliny-aspect-square filliny-flex-shrink-0' as const;
+  'filliny-size-8 filliny-min-h-8 filliny-min-w-8 filliny-max-h-8 filliny-max-w-8 filliny-overflow-hidden !filliny-rounded-full filliny-aspect-square filliny-flex-shrink-0' as const;

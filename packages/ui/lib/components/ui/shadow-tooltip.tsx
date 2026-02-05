@@ -17,7 +17,7 @@ const ShadowTooltipContent = React.forwardRef<
   React.ElementRef<typeof TooltipPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof TooltipPrimitive.Content> & { portalContainerId?: string }
 >(({ className, sideOffset = 4, portalContainerId = 'shadow-tooltip-container', ...props }, ref) => (
-  <ShadowPortal containerId={portalContainerId} zIndex={9999999}>
+  <ShadowPortal containerId={portalContainerId} zIndex={1000000000003}>
     <TooltipPrimitive.Content
       ref={ref}
       sideOffset={sideOffset}

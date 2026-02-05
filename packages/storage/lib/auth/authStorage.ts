@@ -34,7 +34,12 @@ const BearerTokenStorageResultSchema = z.object({
 type AuthStorage = BaseStorageType<AuthTokenType> & {
   setToken: (token: AuthTokenType) => Promise<void>;
   deleteToken: () => Promise<void>;
-  /** Get token - reads from session cookie via background script */
+  /**
+   * Get auth token following Better Auth's official pattern:
+   * 1. First try bearer token from storage (from webapp via SET_BEARER_TOKEN)
+   * 2. Fall back to session cookie (for compatibility)
+   * @see https://www.better-auth.com/docs/plugins/bearer
+   */
   getWithFallback: () => Promise<AuthTokenType>;
 };
 
@@ -89,7 +94,17 @@ const getTokenFromCookie = (): Promise<string> =>
           return;
         }
 
-        const token = parseResult.data.success?.token ?? '';
+        let token = parseResult.data.success?.token ?? '';
+        // URL-decode the token if it contains encoded characters
+        // Cookies may store URL-encoded values that need decoding for auth headers
+        if (token && (token.includes('%2F') || token.includes('%3D') || token.includes('%'))) {
+          try {
+            token = decodeURIComponent(token);
+            console.log('[Auth Storage] Decoded URL-encoded cookie token');
+          } catch {
+            console.warn('[Auth Storage] Failed to decode token, using as-is');
+          }
+        }
         if (token) {
           console.log('[Auth Storage] Got token from cookie:', `${token.substring(0, 20)}...`);
         } else {
@@ -133,6 +148,7 @@ const getBearerTokenFromStorage = (): Promise<string> =>
         return;
       }
 
+      // Bearer token from storage is stored as-is from webapp (no decoding needed)
       const token = parseResult.data.bearer_token ?? '';
       if (token) {
         console.log('[Auth Storage] Got bearer token from storage:', `${token.substring(0, 20)}...`);
@@ -150,24 +166,28 @@ export const authStorage: AuthStorage = {
     await storage.set('');
   },
   /**
-   * Get token - reads from session cookie via background script
-   * Falls back to bearer token from storage if cookie token is empty
+   * Get auth token following Better Auth's official pattern.
+   * Prioritizes bearer token (from webapp via SET_BEARER_TOKEN) as per Better Auth docs.
+   * Falls back to session cookie for compatibility with existing cookie-based flows.
+   * @see https://www.better-auth.com/docs/plugins/bearer
    */
   getWithFallback: async () => {
-    // Try cookie first (Better Auth session token)
-    const cookieToken = await getTokenFromCookie();
-    if (cookieToken) {
-      return cookieToken;
-    }
-
-    // Fallback to bearer token from storage (set by web app)
+    // Per Better Auth docs: bearer token is the recommended approach for extensions
+    // The bearer token is stored by the webapp after sign-in via SET_BEARER_TOKEN message
     const bearerToken = await getBearerTokenFromStorage();
     if (bearerToken) {
-      console.log('[Auth Storage] Using bearer token from storage as fallback');
+      console.log('[Auth Storage] Using bearer token from storage');
       return bearerToken;
     }
 
-    console.log('[Auth Storage] No token found from cookie or storage');
+    // Fallback to session cookie (for existing cookie-based flows)
+    const cookieToken = await getTokenFromCookie();
+    if (cookieToken) {
+      console.log('[Auth Storage] Using session cookie token');
+      return cookieToken;
+    }
+
+    console.log('[Auth Storage] No token found from bearer storage or cookie');
     return '';
   },
 };

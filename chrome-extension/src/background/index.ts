@@ -149,12 +149,33 @@ const storeEnvironmentInStorage = () => {
 // Initialize environment storage
 storeEnvironmentInStorage();
 
+// Function to notify active tab about profile updates
+const notifyActiveTabAboutProfileUpdate = async () => {
+  try {
+    const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (activeTab?.id) {
+      chrome.tabs.sendMessage(activeTab.id, { type: MessageType.PROFILE_UPDATED }).catch(() => {
+        // Content script might not be listening, ignore the error
+      });
+    }
+  } catch (error) {
+    console.error('[Background] Failed to notify active tab about profile update:', error);
+  }
+};
+
 // Listen for messages from other parts of the extension
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   // Handle API requests separately from other actions
   if (request.type === MessageType.API_REQUEST) {
     handleApiRequest(request, sender, sendResponse);
     return true; // Keep the message channel open for async response
+  }
+
+  // Handle profile update notifications
+  if (request.type === MessageType.PROFILE_UPDATED) {
+    notifyActiveTabAboutProfileUpdate();
+    sendResponse({ success: true });
+    return true;
   }
 
   return handleAction(request, sender, sendResponse);
@@ -242,6 +263,43 @@ chrome.runtime.onMessageExternal.addListener((request, sender, sendResponse) => 
       sendResponse({ token: result.bearer_token || null });
     });
     return true;
+  }
+
+  // Handle open side panel request from webapp
+  if (request.type === MessageType.OPEN_SIDE_PANEL || request.message === 'openSidePanel') {
+    // Get the sender's tab to open the side panel in the correct window
+    const senderTab = sender.tab;
+    if (senderTab?.windowId) {
+      chrome.sidePanel
+        .open({ windowId: senderTab.windowId })
+        .then(() => {
+          console.log('[Background] Side panel opened successfully');
+          sendResponse({ success: true });
+        })
+        .catch(error => {
+          console.error('[Background] Failed to open side panel:', error);
+          sendResponse({ success: false, error: error.message });
+        });
+      return true; // Keep message channel open for async response
+    } else {
+      // Fallback: try to open in the current focused window
+      chrome.windows.getCurrent({ populate: false }, window => {
+        if (window?.id) {
+          chrome.sidePanel
+            .open({ windowId: window.id })
+            .then(() => {
+              sendResponse({ success: true });
+            })
+            .catch(error => {
+              console.error('[Background] Failed to open side panel:', error);
+              sendResponse({ success: false, error: error.message });
+            });
+        } else {
+          sendResponse({ success: false, error: 'No window available' });
+        }
+      });
+      return true;
+    }
   }
 
   return false;
@@ -391,7 +449,16 @@ const handleApiRequest = (
 
   // console.log('Background: Making API request to:', url);
 
-  fetch(url, options)
+  // Remove Cookie header as it's forbidden in fetch - rely on Authorization header
+  // Also ensure credentials are included for cookie-based auth
+  const headers = { ...options.headers };
+  delete headers['Cookie']; // Forbidden header in service workers
+
+  fetch(url, {
+    ...options,
+    headers,
+    credentials: 'include', // Include cookies for same-origin requests
+  })
     .then(async response => {
       // console.log('Background: API response status:', response.status);
 
@@ -444,6 +511,13 @@ const handleApiRequest = (
           });
           sendResponse({ error: errorMessage });
           return;
+        } finally {
+          // Explicitly release the reader lock to prevent resource leaks
+          try {
+            reader.releaseLock();
+          } catch {
+            // Reader may already be released, ignore
+          }
         }
         sendResponse({ success: true }); // Acknowledge the request
       } else {

@@ -25,6 +25,15 @@ export const apiEndpoints = {
     tones: '/profiles/tones',
     povs: '/profiles/povs',
     suggestedWebsites: '/profiles/suggested-websites',
+    // Authorized files
+    files: {
+      list: (profileId: string) => `/profiles/${profileId}/files`,
+      create: (profileId: string) => `/profiles/${profileId}/files`,
+      update: (profileId: string, fileId: string) => `/profiles/${profileId}/files/${fileId}`,
+      delete: (profileId: string, fileId: string) => `/profiles/${profileId}/files/${fileId}`,
+      confirm: (profileId: string, fileId: string) => `/profiles/${profileId}/files/${fileId}/confirm`,
+      download: (profileId: string, fileId: string) => `/profiles/${profileId}/files/${fileId}/download`,
+    },
   },
   // Dashboard routes (overview is at root, not under /dashboard)
   dashboard: {

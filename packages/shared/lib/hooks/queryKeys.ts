@@ -47,6 +47,11 @@ export const queryKeys = {
     suggestedWebsites: () => [...queryKeys.profile.all, 'suggestedWebsites'] as const,
     tones: () => [...queryKeys.profile.all, 'tones'] as const,
     povs: () => [...queryKeys.profile.all, 'povs'] as const,
+    // Authorized files
+    files: {
+      all: (profileId: string) => [...queryKeys.profile.all, 'files', profileId] as const,
+      list: (profileId: string) => [...queryKeys.profile.files.all(profileId), 'list'] as const,
+    },
   },
 
   /**

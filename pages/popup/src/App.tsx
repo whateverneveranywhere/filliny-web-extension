@@ -1,3 +1,4 @@
+import { IS_DEV } from '@extension/env';
 import { useAuthContext, AuthProvider, getConfig, WebappEnvs } from '@extension/shared';
 import { Loading, QueryClientProvider, RouterProvider, SigninPage, withPageWrapper } from '@extension/ui';
 import { useEffect, useState } from 'react';
@@ -50,25 +51,27 @@ const PopupContent = () => {
     <div className="filliny-min-h-[300px] filliny-w-[350px] filliny-p-4">
       <h1 className="filliny-mb-4 filliny-text-xl filliny-font-bold">Filliny</h1>
 
-      {/* Debug info */}
-      <div className="filliny-mt-4 filliny-rounded-md filliny-bg-muted filliny-p-2 filliny-text-sm">
-        <h2 className="filliny-mb-2 filliny-font-semibold">Environment Configuration:</h2>
-        {configInfo ? (
-          <ul className="filliny-space-y-1">
-            <li>
-              <span className="filliny-font-medium">Environment:</span> {configInfo.env}
-            </li>
-            <li>
-              <span className="filliny-font-medium">Base URL:</span> {configInfo.baseURL}
-            </li>
-            <li>
-              <span className="filliny-font-medium">Cookie Name:</span> {configInfo.cookieName}
-            </li>
-          </ul>
-        ) : (
-          <p>Loading configuration...</p>
-        )}
-      </div>
+      {/* Debug info - only shown in development */}
+      {IS_DEV && (
+        <div className="filliny-mt-4 filliny-rounded-md filliny-bg-muted filliny-p-2 filliny-text-sm">
+          <h2 className="filliny-mb-2 filliny-font-semibold">Environment Configuration:</h2>
+          {configInfo ? (
+            <ul className="filliny-space-y-1">
+              <li>
+                <span className="filliny-font-medium">Environment:</span> {configInfo.env}
+              </li>
+              <li>
+                <span className="filliny-font-medium">Base URL:</span> {configInfo.baseURL}
+              </li>
+              <li>
+                <span className="filliny-font-medium">Cookie Name:</span> {configInfo.cookieName}
+              </li>
+            </ul>
+          ) : (
+            <p>Loading configuration...</p>
+          )}
+        </div>
+      )}
 
       {/* Rest of your app */}
       <div className="filliny-mt-4">{isAuthenticated ? <RouterProvider /> : <SigninPage />}</div>

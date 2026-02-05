@@ -12,3 +12,6 @@ export * from './utils/index.js';
 
 // Export types (enums and type definitions)
 export * from './types/index.js';
+
+// Export components (AppLifecycleMonitor)
+export * from './components/index.js';

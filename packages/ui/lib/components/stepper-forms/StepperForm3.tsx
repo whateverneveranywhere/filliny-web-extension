@@ -1,4 +1,4 @@
-import { RHFShadcnComboBox, RHFShadcnSwitch } from '../rhf';
+import { RHFShadcnSelect, RHFShadcnSwitch } from '../rhf';
 import { usePOVListQuery, useTonesListQuery } from '@extension/shared';
 
 const StepperForm3 = () => {
@@ -9,20 +9,20 @@ const StepperForm3 = () => {
       <div className="filliny-grid filliny-gap-4">
         <RHFShadcnSwitch name="preferences.isFormal" title="Use formal tone" />
         <RHFShadcnSwitch name="preferences.isGapFillingAllowed" title="Guess-complete missing context" />
-        <RHFShadcnComboBox
+        <RHFShadcnSelect
           isFullWidth
           loading={isLoadingPOVs}
           options={povList || []}
           name="preferences.povId"
-          placeholder="POV"
+          placeholder="Select POV"
           title="POV"
         />
-        <RHFShadcnComboBox
+        <RHFShadcnSelect
           isFullWidth
           loading={isLoadingTones}
           options={tonesList || []}
           name="preferences.toneId"
-          placeholder="Tone"
+          placeholder="Select Tone"
           title="Tone"
         />
       </div>

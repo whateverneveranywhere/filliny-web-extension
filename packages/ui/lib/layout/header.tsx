@@ -30,7 +30,7 @@ const Header = () => {
           />
         </div>
 
-        <div className="filliny-flex filliny-min-w-0 filliny-max-w-[55%] filliny-mx-auto filliny-justify-center">
+        <div className="filliny-flex filliny-flex-1 filliny-min-w-0 filliny-max-w-[200px] filliny-mx-2 filliny-justify-center">
           <ProfileSelector />
         </div>
 

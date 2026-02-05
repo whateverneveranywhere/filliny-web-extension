@@ -76,9 +76,6 @@ const TokenDisplay = ({
 
   const cooldownSeconds = Math.ceil(cooldownRemaining / 1000);
 
-  // Calculate used forms for free tier (total - remaining)
-  const freeFormsUsed = FREE_TIER_LIMITS.MAX_FREE_FORMS - freeFormsRemaining;
-
   // Determine display based on user tier
   const displayValue = isPro ? abbreviatedTokens : String(freeFormsRemaining);
   const displayLabel = isPro ? 'Tokens' : 'Free Forms';
@@ -121,7 +118,7 @@ const TokenDisplay = ({
                     'filliny-text-lg filliny-font-bold filliny-tabular-nums filliny-leading-none',
                     (hasError || hasWarning) && 'filliny-text-warning',
                   )}>
-                  {freeFormsUsed}
+                  {freeFormsRemaining}
                 </span>
                 <span className="filliny-text-xs filliny-text-muted-foreground">/</span>
                 <span className="filliny-text-xs filliny-text-muted-foreground filliny-tabular-nums">
@@ -158,13 +155,13 @@ const TokenDisplay = ({
                   'filliny-text-2xl filliny-font-bold filliny-tabular-nums',
                   (hasError || hasWarning) && 'filliny-text-warning',
                 )}>
-                {freeFormsUsed}
+                {freeFormsRemaining}
               </span>
               <span className="filliny-text-muted-foreground">/</span>
               <span className="filliny-text-sm filliny-text-muted-foreground filliny-tabular-nums">
                 {FREE_TIER_LIMITS.MAX_FREE_FORMS}
               </span>
-              <span className="filliny-ml-1 filliny-text-xs filliny-text-muted-foreground">used</span>
+              <span className="filliny-ml-1 filliny-text-xs filliny-text-muted-foreground">remaining</span>
             </>
           )}
         </div>

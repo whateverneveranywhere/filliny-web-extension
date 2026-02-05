@@ -8,14 +8,17 @@ import {
   useCreateFillingProfileMutation,
   useEditFillingProfileMutation,
   useFillingProfileById,
+  notifyProfileUpdate,
+  MessageType,
 } from '@extension/shared';
 import { profileStorage } from '@extension/storage';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import type { ProfileFormValues, Step } from '@extension/shared';
 import type { DTOProfileFillingForm } from '@extension/storage';
+import type { FieldPath } from 'react-hook-form';
 
 type ProfileFormTypes = ProfileFormValues;
 
@@ -55,8 +58,12 @@ const ProfileForm = ({ id, onFormSubmit, onDirtyChange }: Props) => {
     handleSubmit,
     trigger,
     reset,
+    control,
     formState: { isDirty },
   } = methods;
+
+  // Watch fillingWebsites to get the current array length for dynamic field validation
+  const fillingWebsites = useWatch({ control, name: 'fillingWebsites' });
 
   // Notify parent of dirty state changes
   useEffect(() => {
@@ -107,6 +114,8 @@ const ProfileForm = ({ id, onFormSubmit, onDirtyChange }: Props) => {
           id: editingItem?.id,
         };
         await profileStorage.setDefaultProfile(updatedProfile);
+        // Notify content scripts about the profile update
+        await notifyProfileUpdate(MessageType.PROFILE_UPDATED);
         toast({
           title: 'Profile Updated',
           description: `"${formData.profileName}" has been saved with ${websiteCount} website${websiteCount !== 1 ? 's' : ''}.`,
@@ -114,6 +123,8 @@ const ProfileForm = ({ id, onFormSubmit, onDirtyChange }: Props) => {
       } else {
         const newProfile = await createProfile({ data: transformedData });
         await profileStorage.setDefaultProfile(newProfile);
+        // Notify content scripts about the profile update
+        await notifyProfileUpdate(MessageType.PROFILE_UPDATED);
         toast({
           title: 'Profile Created!',
           description: `"${formData.profileName}" is ready. Visit your websites to start filling forms.`,
@@ -137,8 +148,8 @@ const ProfileForm = ({ id, onFormSubmit, onDirtyChange }: Props) => {
         fields: ['fillingWebsites'],
       },
       {
-        title: 'General details',
-        content: <StepperForm2 />,
+        title: 'Filling context',
+        content: <StepperForm2 profileId={isEdit ? id : undefined} />,
         fields: ['profileName', 'defaultFillingContext'],
       },
       {
@@ -147,16 +158,68 @@ const ProfileForm = ({ id, onFormSubmit, onDirtyChange }: Props) => {
         fields: ['preferences.isFormal', 'preferences.isGapFillingAllowed', 'preferences.povId', 'preferences.toneId'],
       },
     ],
-    [],
+    [isEdit, id],
+  );
+
+  // Get expanded field paths for a step, handling dynamic array fields
+  const getStepFieldPaths = useCallback(
+    (stepIndex: number): FieldPath<ProfileFormTypes>[] => {
+      const stepFields = steps[stepIndex]?.fields || [];
+      const expandedFields: FieldPath<ProfileFormTypes>[] = [];
+
+      for (const field of stepFields) {
+        if (field === 'fillingWebsites') {
+          // For fillingWebsites, we need to validate each item's websiteUrl field
+          // which is the required field in the schema
+          if (fillingWebsites && fillingWebsites.length > 0) {
+            for (let i = 0; i < fillingWebsites.length; i++) {
+              expandedFields.push(`fillingWebsites.${i}.websiteUrl` as FieldPath<ProfileFormTypes>);
+            }
+          }
+          // Also include the array itself to catch array-level errors
+          expandedFields.push('fillingWebsites' as FieldPath<ProfileFormTypes>);
+        } else {
+          expandedFields.push(field as FieldPath<ProfileFormTypes>);
+        }
+      }
+
+      return expandedFields;
+    },
+    [steps, fillingWebsites],
+  );
+
+  // Validate fields for a specific step
+  const validateStep = useCallback(
+    async (stepIndex: number): Promise<boolean> => {
+      const fieldPaths = getStepFieldPaths(stepIndex);
+      if (fieldPaths.length === 0) return true;
+      return trigger(fieldPaths);
+    },
+    [getStepFieldPaths, trigger],
+  );
+
+  // Validate all steps from start to end (inclusive)
+  const validateStepsRange = useCallback(
+    async (startStep: number, endStep: number): Promise<boolean> => {
+      for (let step = startStep; step <= endStep; step++) {
+        const isValid = await validateStep(step);
+        if (!isValid) {
+          // Navigate to the first invalid step to show errors
+          setCurrentStep(step);
+          return false;
+        }
+      }
+      return true;
+    },
+    [validateStep],
   );
 
   const handleNext = useCallback(async () => {
-    const { fields } = steps[currentStep];
-    const isValid = await trigger(fields as (keyof ProfileFormTypes)[]);
+    const isValid = await validateStep(currentStep);
     if (isValid && currentStep < steps.length - 1) {
       setCurrentStep(prev => prev + 1);
     }
-  }, [currentStep, steps, trigger]);
+  }, [currentStep, steps.length, validateStep]);
 
   const handlePrev = useCallback(() => {
     if (currentStep > 0) {
@@ -172,15 +235,26 @@ const ProfileForm = ({ id, onFormSubmit, onDirtyChange }: Props) => {
         return;
       }
 
-      // For forward navigation, validate current step first
-      const { fields } = steps[currentStep];
-      const isValid = await trigger(fields as (keyof ProfileFormTypes)[]);
+      // For forward navigation, validate all steps from current to target-1
+      // We validate up to target-1 because we need to ensure all intermediate steps are valid
+      const isValid = await validateStepsRange(currentStep, targetStep - 1);
       if (isValid) {
         setCurrentStep(targetStep);
       }
     },
-    [currentStep, steps, trigger],
+    [currentStep, validateStepsRange],
   );
+
+  // Handle finish with full form validation
+  const handleFinish = useCallback(async () => {
+    // First validate all steps to ensure proper error display
+    const allStepsValid = await validateStepsRange(0, steps.length - 1);
+    if (!allStepsValid) {
+      return;
+    }
+    // If all steps are valid, submit the form
+    await onSubmit();
+  }, [validateStepsRange, steps.length, onSubmit]);
 
   if (isLoadingEditingItem) {
     return (
@@ -196,7 +270,7 @@ const ProfileForm = ({ id, onFormSubmit, onDirtyChange }: Props) => {
         steps={steps}
         isLoading={isCreating || isUpdating}
         currentStep={currentStep}
-        handleFinish={onSubmit}
+        handleFinish={handleFinish}
         handleNext={handleNext}
         handlePrev={handlePrev}
         onStepClick={handleStepClick}

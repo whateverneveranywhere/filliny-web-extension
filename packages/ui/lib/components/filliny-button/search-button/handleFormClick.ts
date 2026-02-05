@@ -9,13 +9,84 @@ import {
   getMatchingWebsite,
   createDebugLogger,
   ApiQuotaExceededError,
+  ApiUnauthorizedError,
   getConfig,
+  MessageType,
+  listAuthorizedFilesService,
 } from '@extension/shared';
 import { profileStorage } from '@extension/storage';
 import type { FormUpdateResults } from './fieldUpdaterHelpers';
+import type { Field, DTOFillingPreferences, DTOAuthorizedFileForAI } from '@extension/shared';
 import type { DTOProfileFillingForm } from '@extension/storage';
 
+/**
+ * Type for stream message from background script
+ */
+interface StreamMessage {
+  type: string;
+  data?: string;
+  error?: string;
+}
+
 const debug = createDebugLogger('FormClick');
+
+/**
+ * Allowed fields for the API formData payload
+ * Only includes fields that exist on both the extension's Field type AND the API schema
+ * Strips: xpath, uniqueSelectors, validation, title, testValue, metadata
+ */
+const ALLOWED_FORM_DATA_FIELDS = [
+  'id',
+  'name',
+  'type',
+  'placeholder',
+  'label',
+  'description',
+  'value',
+  'options',
+  'required',
+] as const;
+
+/**
+ * Allowed fields for the API preferences payload
+ * Strip id and profileId which the API doesn't accept
+ */
+const ALLOWED_PREFERENCES_FIELDS = ['isFormal', 'isGapFillingAllowed', 'toneId', 'povId'] as const;
+
+/**
+ * Transform form field data to only include fields accepted by the API
+ * Strips: xpath, uniqueSelectors, validation
+ */
+const transformFormDataForApi = (fields: Field[]): Partial<Field>[] =>
+  fields.map(field => {
+    const transformed: Partial<Field> = {};
+    for (const key of ALLOWED_FORM_DATA_FIELDS) {
+      if (key in field && field[key] !== undefined) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (transformed as any)[key] = field[key];
+      }
+    }
+    return transformed;
+  });
+
+/**
+ * Transform preferences to only include fields accepted by the API
+ * Strips: id, profileId
+ */
+const transformPreferencesForApi = (
+  preferences: DTOFillingPreferences | undefined,
+): DTOFillingPreferences | undefined => {
+  if (!preferences) return undefined;
+
+  const transformed: Partial<DTOFillingPreferences> = {};
+  for (const key of ALLOWED_PREFERENCES_FIELDS) {
+    if (key in preferences && preferences[key] !== undefined) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (transformed as any)[key] = preferences[key];
+    }
+  }
+  return transformed as DTOFillingPreferences;
+};
 
 /**
  * Default timeout for form fill operations
@@ -117,8 +188,10 @@ export const handleFormClick = async (
   }
 
   // Track cleanup functions
-  let messageHandler: ((message: { type: string; data?: string; error?: string }) => void) | null = null;
+  let messageHandler: ((message: StreamMessage) => void) | null = null;
   let timeoutId: ReturnType<typeof setTimeout> | null = null;
+  // Track partial chunk data between stream messages
+  let partialChunk = '';
 
   const cleanup = (): void => {
     if (messageHandler) {
@@ -129,6 +202,8 @@ export const handleFormClick = async (
       clearTimeout(timeoutId);
       timeoutId = null;
     }
+    // Reset partial chunk state
+    partialChunk = '';
   };
 
   try {
@@ -156,6 +231,29 @@ export const handleFormClick = async (
     const visitingUrl = window.location.href;
     const matchingWebsite = getMatchingWebsite((defaultProfile as DTOProfileFillingForm).fillingWebsites, visitingUrl);
 
+    // Fetch authorized files for the current profile (if profile has an ID)
+    let authorizedFiles: DTOAuthorizedFileForAI[] = [];
+    const profileId = (defaultProfile as DTOProfileFillingForm)?.id;
+    if (profileId) {
+      try {
+        const files = await listAuthorizedFilesService(String(profileId));
+        // Transform to the AI-friendly format
+        authorizedFiles = files.map(file => ({
+          id: file.id,
+          filename: file.filename,
+          description: file.description,
+          useCases: file.useCases,
+          category: file.category,
+          mimeType: file.mimeType,
+          fileSize: file.fileSize,
+        }));
+        debug.log(`Loaded ${authorizedFiles.length} authorized files for AI context`);
+      } catch (filesError) {
+        debug.warn('Failed to load authorized files, continuing without them:', filesError);
+        // Continue without authorized files - not a critical error
+      }
+    }
+
     // Create promise control for streaming
     let streamResolve: () => void;
     let streamReject: (error: Error) => void;
@@ -176,20 +274,23 @@ export const handleFormClick = async (
       );
     }, FORM_FILL_TIMEOUT);
 
-    // Set up message listener for streaming response
-    messageHandler = (message: { type: string; data?: string; error?: string }) => {
+    // Set up message listener for streaming response using MessageType enum for consistency
+    messageHandler = (message: StreamMessage) => {
       try {
-        if (message.type === 'STREAM_CHUNK' && message.data) {
+        if (message.type === MessageType.STREAM_CHUNK && message.data) {
           try {
-            processChunks(message.data, fields);
+            // Pass and track partial chunk data between calls to avoid data loss
+            processChunks(message.data, fields, partialChunk).then(newPartial => {
+              partialChunk = newPartial;
+            });
           } catch (error) {
             debug.error('Form Click: Error processing chunk:', error);
             // Don't reject here, continue processing other chunks
           }
-        } else if (message.type === 'STREAM_DONE') {
+        } else if (message.type === MessageType.STREAM_DONE) {
           debug.log('Stream processing complete');
           streamResolve();
-        } else if (message.type === 'STREAM_ERROR') {
+        } else if (message.type === MessageType.STREAM_ERROR) {
           debug.error('Form Click: Stream error:', message.error);
           streamReject(new FieldUpdateError(message.error || 'Stream error', ErrorCategory.NETWORK_ERROR, 'form'));
         }
@@ -200,12 +301,17 @@ export const handleFormClick = async (
 
     chrome.runtime.onMessage.addListener(messageHandler);
 
-    // Make the API call
+    // Transform data before API call to strip fields the API doesn't accept
+    const transformedFormData = transformFormDataForApi(fields);
+    const transformedPreferences = transformPreferencesForApi(defaultProfile?.preferences);
+
+    // Make the API call with authorized files for AI context
     const response = await aiFillService({
       contextText: matchingWebsite?.fillingContext || defaultProfile?.defaultFillingContext || '',
-      formData: fields,
+      formData: transformedFormData as Field[],
       websiteUrl: visitingUrl,
-      preferences: defaultProfile?.preferences,
+      preferences: transformedPreferences,
+      authorizedFiles: authorizedFiles.length > 0 ? authorizedFiles : undefined,
     });
 
     let updateResults: FormUpdateResults | null = null;
@@ -232,6 +338,20 @@ export const handleFormClick = async (
   } catch (error) {
     cleanup();
     debug.error('Form Click: Error processing AI fill service:', error);
+
+    // Handle unauthorized errors - user needs to log in again
+    if (error instanceof ApiUnauthorizedError) {
+      const config = getConfig();
+      const loginUrl = `${config.baseURL}/sign-in`;
+
+      debug.error('Unauthorized error:', error.message);
+
+      const shouldRedirect = confirm(`${error.message}\n\nWould you like to log in again?`);
+      if (shouldRedirect) {
+        window.open(loginUrl, '_blank');
+      }
+      return;
+    }
 
     // Handle quota exceeded errors specially
     if (error instanceof ApiQuotaExceededError) {

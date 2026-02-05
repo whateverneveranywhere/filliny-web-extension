@@ -4,7 +4,6 @@ import { WebsitePreviewCard } from './WebsitePreviewCard';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
-import { ScrollArea, ScrollBar } from '../ui/scroll-area';
 import { usePlanLimits } from '@extension/shared';
 import { Globe, Plus, Sparkles } from 'lucide-react';
 import { useCallback } from 'react';
@@ -53,7 +52,7 @@ const StepperForm1 = () => {
   return (
     <div className="filliny-flex filliny-h-full filliny-w-full filliny-min-w-0 filliny-flex-col filliny-overflow-hidden">
       {/* Scrollable Content */}
-      <div className="filliny-flex filliny-flex-1 filliny-flex-col filliny-gap-4 filliny-overflow-hidden">
+      <div className="filliny-flex filliny-flex-1 filliny-flex-col filliny-gap-4 filliny-min-w-0">
         {/* Empty State - Show encouraging message for new users */}
         {hasNoWebsites && (
           <Card className="filliny-border-dashed filliny-border-primary/30 filliny-bg-primary/5">
@@ -76,15 +75,8 @@ const StepperForm1 = () => {
           </Card>
         )}
 
-        {/* Recommended Websites - Horizontal Scroll */}
-        <div className="filliny-w-full filliny-min-w-0 filliny-shrink-0">
-          <ScrollArea className="filliny-w-full filliny-max-w-full">
-            <div className="filliny-w-full filliny-overflow-x-auto">
-              <RecommendedWebsites onWebsiteSelect={handleWebsiteSelect} hasReachedLimit={websitesReachedLimit} />
-            </div>
-            <ScrollBar orientation="horizontal" />
-          </ScrollArea>
-        </div>
+        {/* Recommended Websites */}
+        <RecommendedWebsites onWebsiteSelect={handleWebsiteSelect} hasReachedLimit={websitesReachedLimit} />
 
         {/* Website Cards */}
         <div className="filliny-flex filliny-min-w-0 filliny-flex-col filliny-gap-3 filliny-overflow-hidden">

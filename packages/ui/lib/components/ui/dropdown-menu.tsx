@@ -59,7 +59,7 @@ const DropdownMenuContent = React.forwardRef<
       ref={ref}
       sideOffset={sideOffset}
       className={cn(
-        'filliny-z-50 filliny-min-w-[8rem] filliny-overflow-hidden filliny-rounded-md filliny-border filliny-bg-popover/80 filliny-backdrop-blur-sm filliny-p-1 filliny-text-popover-foreground filliny-shadow-md data-[state=open]:filliny-animate-in data-[state=closed]:filliny-animate-out data-[state=closed]:filliny-fade-out-0 data-[state=open]:filliny-fade-in-0 data-[state=closed]:filliny-zoom-out-95 data-[state=open]:filliny-zoom-in-95 data-[side=bottom]:filliny-slide-in-from-top-2 data-[side=left]:filliny-slide-in-from-right-2 data-[side=right]:filliny-slide-in-from-left-2 data-[side=top]:filliny-slide-in-from-bottom-2',
+        'filliny-z-50 filliny-min-w-[8rem] filliny-overflow-hidden filliny-rounded-lg filliny-border filliny-border-border/50 filliny-bg-card/95 filliny-backdrop-blur-xl filliny-p-1 filliny-text-card-foreground filliny-shadow-xl data-[state=open]:filliny-animate-in data-[state=closed]:filliny-animate-out data-[state=closed]:filliny-fade-out-0 data-[state=open]:filliny-fade-in-0 data-[state=closed]:filliny-zoom-out-95 data-[state=open]:filliny-zoom-in-95 data-[side=bottom]:filliny-slide-in-from-top-2 data-[side=left]:filliny-slide-in-from-right-2 data-[side=right]:filliny-slide-in-from-left-2 data-[side=top]:filliny-slide-in-from-bottom-2',
         className,
       )}
       {...props}
@@ -77,7 +77,7 @@ const DropdownMenuItem = React.forwardRef<
   <DropdownMenuPrimitive.Item
     ref={ref}
     className={cn(
-      'filliny-relative filliny-flex filliny-cursor-default filliny-select-none filliny-items-center filliny-gap-2 filliny-rounded-sm filliny-px-2 filliny-py-1.5 filliny-text-sm filliny-outline-none filliny-transition-colors focus:filliny-bg-accent focus:filliny-text-accent-foreground data-[disabled]:filliny-pointer-events-none data-[disabled]:filliny-opacity-50 [&_svg]:filliny-pointer-events-none [&_svg]:filliny-size-4 [&_svg]:filliny-shrink-0',
+      'filliny-relative filliny-flex filliny-cursor-default filliny-select-none filliny-items-center filliny-gap-2 filliny-rounded-md filliny-px-2 filliny-py-1.5 filliny-text-sm filliny-outline-none filliny-transition-colors focus:filliny-bg-accent/80 focus:filliny-text-accent-foreground data-[disabled]:filliny-pointer-events-none data-[disabled]:filliny-opacity-50 [&_svg]:filliny-pointer-events-none [&_svg]:filliny-size-4 [&_svg]:filliny-shrink-0',
       inset && 'filliny-pl-8',
       className,
     )}

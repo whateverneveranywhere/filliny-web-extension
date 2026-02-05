@@ -527,15 +527,24 @@ const updateFileInputElement = async (
 };
 
 /**
- * Determine if file value is from AI (URL-based)
+ * Pattern for authorized file references from AI
+ * Format: "authorized_file:123" where 123 is the file ID
+ */
+const AUTHORIZED_FILE_PATTERN = /^authorized_file:\d+$/;
+
+/**
+ * Determine if file value is from AI (URL-based or authorized file reference)
  */
 const isFileValueFromAI = (fileValue: string | string[]): boolean => {
+  const isAIValue = (val: string): boolean =>
+    val.startsWith('http://') || val.startsWith('https://') || AUTHORIZED_FILE_PATTERN.test(val);
+
   if (typeof fileValue === 'string') {
-    return fileValue.startsWith('http://') || fileValue.startsWith('https://');
+    return isAIValue(fileValue);
   }
 
   if (Array.isArray(fileValue)) {
-    return fileValue.some(val => val.startsWith('http://') || val.startsWith('https://'));
+    return fileValue.some(isAIValue);
   }
 
   return false;

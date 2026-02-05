@@ -1,5 +1,6 @@
 import { createBaseField } from './utils';
-import { Framework } from '@extension/shared';
+import { Framework, getFileDownloadUrlService, downloadFileFromSignedUrl } from '@extension/shared';
+import { profileStorage } from '@extension/storage';
 import type { Field, FillinyFileInputElement } from '@extension/shared';
 
 // Extend Field type with file-specific properties
@@ -28,6 +29,75 @@ interface FileFieldMetadata {
   fileUploadData?: FileUploadMetadata;
   [key: string]: unknown;
 }
+
+/**
+ * Pattern for authorized file references from AI
+ * Format: "authorized_file:123" where 123 is the file ID
+ */
+const AUTHORIZED_FILE_PATTERN = /^authorized_file:(\d+)$/;
+
+/**
+ * Check if a value is an authorized file reference
+ */
+const isAuthorizedFileReference = (value: string): boolean => AUTHORIZED_FILE_PATTERN.test(value);
+
+/**
+ * Extract file ID from an authorized file reference
+ */
+const extractAuthorizedFileId = (value: string): string | null => {
+  const match = value.match(AUTHORIZED_FILE_PATTERN);
+  return match ? match[1] : null;
+};
+
+/**
+ * Download an authorized file using the API
+ */
+const downloadAuthorizedFile = async (fileId: string, acceptTypes?: AcceptType[]): Promise<File> => {
+  try {
+    // Get the current profile ID from storage
+    const profile = await profileStorage.get();
+    const profileId = profile?.id;
+
+    if (!profileId) {
+      throw new Error('No active profile found - cannot download authorized file');
+    }
+
+    console.log(`Downloading authorized file ${fileId} for profile ${profileId}`);
+
+    // Get the signed download URL
+    const { downloadUrl, filename } = await getFileDownloadUrlService(String(profileId), fileId);
+
+    // Download the file using the signed URL
+    const file = await downloadFileFromSignedUrl(downloadUrl, filename);
+
+    // Validate file type against accept types if provided
+    if (acceptTypes && acceptTypes.length > 0) {
+      const isValidType = acceptTypes.some(acceptType => {
+        if (acceptType.type === 'mime') {
+          return (
+            file.type === acceptType.value ||
+            (acceptType.value.endsWith('/*') && file.type.startsWith(acceptType.value.slice(0, -1)))
+          );
+        } else {
+          return file.name.toLowerCase().endsWith(`.${acceptType.value.toLowerCase()}`);
+        }
+      });
+
+      if (!isValidType) {
+        console.warn(
+          `Authorized file type '${file.type}' may not match expected types: ${acceptTypes.map(t => t.value).join(', ')}`,
+        );
+        // Don't throw - let the form decide if it accepts the file
+      }
+    }
+
+    console.log(`Successfully downloaded authorized file: ${filename} (${file.size} bytes, ${file.type})`);
+    return file;
+  } catch (error) {
+    console.error(`Error downloading authorized file ${fileId}:`, error);
+    throw error;
+  }
+};
 
 /**
  * Download file from URL with enhanced validation and error handling
@@ -510,14 +580,26 @@ const updateFileInput = async (
     const triggerElement = fieldMetadata?.fileUploadData?.triggerElement || fileInput;
 
     if (isAiMode) {
-      // AI mode - download files from URLs or create realistic files
+      // AI mode - download files from URLs, authorized files, or create realistic files
       for (const fileUrl of fileNames) {
         try {
+          // Check if this is an authorized file reference (format: "authorized_file:123")
+          if (isAuthorizedFileReference(fileUrl)) {
+            const fileId = extractAuthorizedFileId(fileUrl);
+            if (fileId) {
+              console.log(`Processing authorized file reference: ${fileUrl}`);
+              const file = await downloadAuthorizedFile(fileId, acceptTypes);
+              files.push(file);
+              continue;
+            }
+          }
+
+          // Check if this is a URL
           if (fileUrl.startsWith('http://') || fileUrl.startsWith('https://')) {
             const file = await downloadFileFromUrl(fileUrl, undefined, acceptTypes);
             files.push(file);
           } else {
-            // If not a URL, treat as filename and create a realistic file
+            // If not a URL or authorized file, treat as filename and create a realistic file
             const file = createRealisticFile(fileUrl, getFileTypeFromExtension(fileUrl));
             files.push(file);
           }
@@ -526,10 +608,15 @@ const updateFileInput = async (
           // Extract filename from URL for fallback
           let fallbackName = fileUrl;
           try {
-            const urlObj = new URL(fileUrl);
-            const pathName = urlObj.pathname.split('/').pop();
-            if (pathName && pathName !== '') {
-              fallbackName = pathName;
+            // Handle authorized_file references in fallback
+            if (isAuthorizedFileReference(fileUrl)) {
+              fallbackName = `authorized_file_${extractAuthorizedFileId(fileUrl) || 'unknown'}.pdf`;
+            } else {
+              const urlObj = new URL(fileUrl);
+              const pathName = urlObj.pathname.split('/').pop();
+              if (pathName && pathName !== '') {
+                fallbackName = pathName;
+              }
             }
           } catch {
             // Keep original fileUrl as fallback name

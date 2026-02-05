@@ -27,9 +27,11 @@ import {
   useChangeActiveFillingProfileMutation,
   useDeleteProfileByIdMutation,
   useProfilesListQuery,
+  notifyProfileUpdate,
+  MessageType,
 } from '@extension/shared';
 import { profileStorage } from '@extension/storage';
-import { Check, ChevronDown, Edit, Loader2, Plus, Trash2, User } from 'lucide-react';
+import { Check, ChevronDown, ClipboardList, Edit, Loader2, Plus, Trash2 } from 'lucide-react';
 import { useCallback, useRef, useState } from 'react';
 import type { DTOFillingProfileItem, DTOProfileFillingForm } from '@extension/storage';
 
@@ -67,6 +69,8 @@ const ProfileSelector = () => {
         const newActiveProfile = profiles?.find(profile => String(profile.id) === nextActiveId);
         if (newActiveProfile) {
           await profileStorage.setDefaultProfile(newActiveProfile as unknown as DTOProfileFillingForm);
+          // Notify content scripts about the profile update
+          await notifyProfileUpdate(MessageType.PROFILE_UPDATED);
         }
 
         toast({
@@ -96,11 +100,15 @@ const ProfileSelector = () => {
         const remainingProfiles = profiles.filter(profile => String(profile.id) !== deletingId);
         if (remainingProfiles.length === 0) {
           await profileStorage.resetDefaultProfile();
+          // Notify content scripts about the profile update (removal)
+          await notifyProfileUpdate(MessageType.PROFILE_UPDATED);
         } else {
           const deletedIndex = profiles.findIndex(profile => String(profile.id) === deletingId);
           const newActiveProfile = remainingProfiles[deletedIndex] || remainingProfiles[deletedIndex - 1];
           if (newActiveProfile) {
             await updateActiveProfile({ activeProfileId: String(newActiveProfile.id) });
+            // Notify content scripts about the profile update
+            await notifyProfileUpdate(MessageType.PROFILE_UPDATED);
           }
         }
       }
@@ -199,7 +207,7 @@ const ProfileSelector = () => {
               {isLoaderVisible ? (
                 <Loader2 className="filliny-size-4 filliny-shrink-0 filliny-animate-spin" />
               ) : (
-                <User className="filliny-size-4 filliny-shrink-0" />
+                <ClipboardList className="filliny-size-4 filliny-shrink-0" />
               )}
               <span className="filliny-truncate">
                 {activeProfile?.profileName || (hasProfiles ? 'Select profile' : 'Create profile')}
@@ -208,11 +216,14 @@ const ProfileSelector = () => {
             <ChevronDown className="filliny-size-4 filliny-shrink-0 filliny-opacity-50" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="center" className="filliny-w-[var(--radix-dropdown-menu-trigger-width)]">
+        <DropdownMenuContent
+          align="center"
+          sideOffset={8}
+          className="filliny-w-[calc(100vw-2rem)] filliny-max-w-[320px] filliny-min-w-[200px]">
           {hasProfiles && (
             <>
-              <DropdownMenuLabel className="filliny-text-xs filliny-text-muted-foreground">
-                Your Profiles
+              <DropdownMenuLabel className="filliny-px-2 filliny-py-1.5 filliny-text-[10px] filliny-font-semibold filliny-uppercase filliny-tracking-wider filliny-text-muted-foreground">
+                Profiles
               </DropdownMenuLabel>
               <ScrollArea className="filliny-max-h-[200px]">
                 {profiles.map(profile => {
@@ -223,33 +234,36 @@ const ProfileSelector = () => {
                     <DropdownMenuItem
                       key={profileId}
                       className={cn(
-                        'filliny-flex filliny-cursor-pointer filliny-items-center filliny-justify-between filliny-gap-2',
-                        isActive && 'filliny-bg-accent',
+                        'filliny-mx-0.5 filliny-my-0.5 filliny-flex filliny-cursor-pointer filliny-items-center filliny-justify-between filliny-gap-2 filliny-rounded-md filliny-px-2 filliny-py-1.5',
+                        isActive && 'filliny-bg-accent/80',
                       )}
                       onSelect={() => handleProfileChange(profileId)}>
                       <div className="filliny-flex filliny-min-w-0 filliny-flex-1 filliny-items-center filliny-gap-2">
-                        <Check
+                        <div
                           className={cn(
-                            'filliny-size-4 filliny-shrink-0',
-                            isActive ? 'filliny-opacity-100' : 'filliny-opacity-0',
-                          )}
-                        />
-                        <span className="filliny-truncate">{profile.name}</span>
+                            'filliny-flex filliny-size-4 filliny-shrink-0 filliny-items-center filliny-justify-center filliny-rounded-full filliny-border',
+                            isActive
+                              ? 'filliny-border-primary filliny-bg-primary'
+                              : 'filliny-border-muted-foreground/40 filliny-bg-transparent',
+                          )}>
+                          {isActive && <Check className="filliny-size-2.5 filliny-text-primary-foreground" />}
+                        </div>
+                        <span className="filliny-truncate filliny-text-sm">{profile.name}</span>
                       </div>
-                      <div className="filliny-flex filliny-shrink-0 filliny-items-center filliny-gap-1">
+                      <div className="filliny-flex filliny-shrink-0 filliny-items-center">
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="filliny-size-7"
+                          className="filliny-size-6 filliny-rounded hover:filliny-bg-muted"
                           onClick={e => handleEditProfile(profileId, e)}>
-                          <Edit className="filliny-size-3.5" />
+                          <Edit className="filliny-size-3" />
                         </Button>
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="filliny-size-7 hover:filliny-text-destructive"
+                          className="filliny-size-6 filliny-rounded hover:filliny-bg-destructive/10 hover:filliny-text-destructive"
                           onClick={e => handleDeleteClick(profileId, e)}>
-                          <Trash2 className="filliny-size-3.5" />
+                          <Trash2 className="filliny-size-3" />
                         </Button>
                       </div>
                     </DropdownMenuItem>
@@ -257,10 +271,12 @@ const ProfileSelector = () => {
                 })}
                 <ScrollBar />
               </ScrollArea>
-              <DropdownMenuSeparator />
+              <DropdownMenuSeparator className="filliny-my-1" />
             </>
           )}
-          <DropdownMenuItem className="filliny-cursor-pointer filliny-gap-2" onSelect={handleCreateProfile}>
+          <DropdownMenuItem
+            className="filliny-mx-0.5 filliny-mb-0.5 filliny-cursor-pointer filliny-gap-2 filliny-rounded-md filliny-bg-primary/10 filliny-px-2 filliny-py-2 filliny-font-medium filliny-text-primary hover:filliny-bg-primary/20"
+            onSelect={handleCreateProfile}>
             <Plus className="filliny-size-4" />
             <span>Create new profile</span>
           </DropdownMenuItem>

@@ -1,4 +1,3 @@
-import { Button } from '../../ui';
 import { highlightForms } from '../search-button/highlightForms';
 import { animationClasses } from '@/lib/animations';
 import { cn } from '@/lib/utils';
@@ -12,28 +11,27 @@ const LogoButton: React.FC<ButtonComponentProps> = () => {
 
   return (
     <div className={cn(animationClasses.transitionFast, 'hover:filliny-scale-105 active:filliny-scale-95')}>
-      <Button
-        variant={'default'}
-        size={'icon'}
+      <button
+        type="button"
         className={cn(
-          '!filliny-size-14 !filliny-rounded-full !filliny-p-0 filliny-overflow-hidden filliny-shadow-lg',
+          'filliny-flex filliny-items-center filliny-justify-center',
+          // Size - much larger main button (prominent CTA)
+          'filliny-size-14 filliny-rounded-full filliny-p-0',
+          // Gray glass design - very intense blur, nearly opaque
+          'filliny-bg-zinc-800/90 filliny-backdrop-blur-3xl',
+          'filliny-text-white',
+          'filliny-border filliny-border-white/10',
+          'filliny-shadow-lg filliny-overflow-hidden',
+          // Hover state - subtle bg change only, icon stays white
+          'hover:filliny-bg-zinc-700/95 hover:filliny-border-white/15',
+          'hover:filliny-shadow-xl',
+          'disabled:filliny-opacity-50 disabled:filliny-cursor-not-allowed',
           animationClasses.transition,
-          // Default state: full black background
-          '!filliny-bg-black',
-          // Hover state: white background (only when this button is directly hovered)
-          'hover:!filliny-bg-white',
-          // Wand icon color changes on direct hover
-          '[&:hover_.filliny-wand-icon]:filliny-text-black [&:not(:hover)_.filliny-wand-icon]:filliny-text-white',
         )}
         onClick={() => highlightForms({ visionOnly: false })}
         disabled={!isDOMReady}>
-        <div className="filliny-relative filliny-size-full filliny-flex filliny-items-center filliny-justify-center">
-          {/* Wand icon - always visible, color changes on direct button hover */}
-          <div className="filliny-flex filliny-items-center filliny-justify-center">
-            <Wand2 className={cn('filliny-wand-icon filliny-size-8', animationClasses.transition)} />
-          </div>
-        </div>
-      </Button>
+        <Wand2 className="filliny-size-6 filliny-text-white" />
+      </button>
     </div>
   );
 };

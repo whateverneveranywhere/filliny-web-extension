@@ -301,6 +301,12 @@ export enum MessageType {
   GET_BEARER_TOKEN = 'GET_BEARER_TOKEN',
   /** Clear bearer token (logout) */
   CLEAR_BEARER_TOKEN = 'CLEAR_BEARER_TOKEN',
+  /** Profile updated notification (website added/removed) */
+  PROFILE_UPDATED = 'PROFILE_UPDATED',
+  /** Request to remove extension UI from current tab */
+  REMOVE_EXTENSION_UI = 'REMOVE_EXTENSION_UI',
+  /** Request to open the extension side panel (from webapp) */
+  OPEN_SIDE_PANEL = 'OPEN_SIDE_PANEL',
 }
 
 // NOTE: Framework is exported from utils/frameworkDetection.ts (single source of truth)

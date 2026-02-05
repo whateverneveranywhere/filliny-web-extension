@@ -5,12 +5,80 @@ import {
   getMatchingWebsite,
   createDebugLogger,
   ApiQuotaExceededError,
+  ApiUnauthorizedError,
   getConfig,
+  MessageType,
 } from '@extension/shared';
 import { profileStorage } from '@extension/storage';
 import type { FieldUpdateResult, FormUpdateResults } from './fieldUpdaterHelpers';
-import type { Field } from '@extension/shared';
+import type { Field, DTOFillingPreferences } from '@extension/shared';
 import type { DTOProfileFillingForm } from '@extension/storage';
+
+/**
+ * Allowed fields for the API formData payload
+ * Only includes fields that exist on both the extension's Field type AND the API schema
+ * Strips: xpath, uniqueSelectors, validation, title, testValue, metadata
+ */
+const ALLOWED_FORM_DATA_FIELDS = [
+  'id',
+  'name',
+  'type',
+  'placeholder',
+  'label',
+  'description',
+  'value',
+  'options',
+  'required',
+] as const;
+
+/**
+ * Allowed fields for the API preferences payload
+ * Strip id and profileId which the API doesn't accept
+ */
+const ALLOWED_PREFERENCES_FIELDS = ['isFormal', 'isGapFillingAllowed', 'toneId', 'povId'] as const;
+
+/**
+ * Transform form field data to only include fields accepted by the API
+ * Strips: xpath, uniqueSelectors, validation, title, testValue, metadata
+ */
+const transformFieldForApi = (field: Field): Partial<Field> => {
+  const transformed: Partial<Field> = {};
+  for (const key of ALLOWED_FORM_DATA_FIELDS) {
+    if (key in field && field[key] !== undefined) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (transformed as any)[key] = field[key];
+    }
+  }
+  return transformed;
+};
+
+/**
+ * Transform preferences to only include fields accepted by the API
+ * Strips: id, profileId
+ */
+const transformPreferencesForApi = (
+  preferences: DTOFillingPreferences | undefined,
+): DTOFillingPreferences | undefined => {
+  if (!preferences) return undefined;
+
+  const transformed: Partial<DTOFillingPreferences> = {};
+  for (const key of ALLOWED_PREFERENCES_FIELDS) {
+    if (key in preferences && preferences[key] !== undefined) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (transformed as any)[key] = preferences[key];
+    }
+  }
+  return transformed as DTOFillingPreferences;
+};
+
+/**
+ * Type for stream message from background script
+ */
+interface StreamMessage {
+  type: string;
+  data?: string;
+  error?: string;
+}
 
 const debug = createDebugLogger('FieldFill');
 
@@ -90,8 +158,10 @@ export const handleFieldFill = async (field: Field): Promise<FieldUpdateResult> 
   };
 
   // Track cleanup functions
-  let messageHandler: ((message: { type: string; data?: string; error?: string }) => void) | null = null;
+  let messageHandler: ((message: StreamMessage) => void) | null = null;
   let timeoutId: ReturnType<typeof setTimeout> | null = null;
+  // Track partial chunk data between stream messages
+  let partialChunk = '';
 
   const cleanup = (): void => {
     // Remove message listener if it exists
@@ -104,6 +174,8 @@ export const handleFieldFill = async (field: Field): Promise<FieldUpdateResult> 
       clearTimeout(timeoutId);
       timeoutId = null;
     }
+    // Reset partial chunk state
+    partialChunk = '';
     // Always remove loading state
     element.removeAttribute('data-filliny-loading');
   };
@@ -156,22 +228,25 @@ export const handleFieldFill = async (field: Field): Promise<FieldUpdateResult> 
       streamReject(error);
     }, FIELD_FILL_TIMEOUT);
 
-    // Set up message listener for streaming response
-    messageHandler = (message: { type: string; data?: string; error?: string }) => {
-      if (message.type === 'STREAM_CHUNK' && message.data) {
+    // Set up message listener for streaming response using MessageType enum for consistency
+    messageHandler = (message: StreamMessage) => {
+      if (message.type === MessageType.STREAM_CHUNK && message.data) {
         try {
           debug.log('Received stream chunk:', message.data.substring(0, 100) + '...');
           // Pass ALL fields from the registry to processChunks for proper merging
+          // Pass and track partial chunk data between calls to avoid data loss
           const allFields = unifiedFieldRegistry.getAllFields();
-          processChunks(message.data, allFields);
+          processChunks(message.data, allFields, partialChunk).then(newPartial => {
+            partialChunk = newPartial;
+          });
         } catch (error) {
           debug.error('Field Fill: Error processing chunk:', error);
           // Don't reject on chunk errors - continue processing
         }
-      } else if (message.type === 'STREAM_DONE') {
+      } else if (message.type === MessageType.STREAM_DONE) {
         debug.log('Stream processing complete for field:', field.id);
         streamResolve();
-      } else if (message.type === 'STREAM_ERROR') {
+      } else if (message.type === MessageType.STREAM_ERROR) {
         debug.error('Field Fill: Stream error:', message.error);
         streamReject(new FieldUpdateError(message.error || 'Stream error', ErrorCategory.NETWORK_ERROR, field.id));
       }
@@ -179,13 +254,17 @@ export const handleFieldFill = async (field: Field): Promise<FieldUpdateResult> 
 
     chrome.runtime.onMessage.addListener(messageHandler);
 
+    // Transform field and preferences to strip fields the API doesn't accept
+    const transformedField = transformFieldForApi(field);
+    const transformedPreferences = transformPreferencesForApi(defaultProfile?.preferences);
+
     // Call AI service with just this field
     debug.log(`Calling AI service for field: ${field.id}, label: ${field.label || field.name}`);
     const response = await aiFillService({
       contextText: matchingWebsite?.fillingContext || defaultProfile?.defaultFillingContext || '',
-      formData: [field], // Send only this single field
+      formData: [transformedField as Field], // Send only this single field (transformed)
       websiteUrl: visitingUrl,
-      preferences: defaultProfile?.preferences,
+      preferences: transformedPreferences,
     });
 
     // Process the response
@@ -222,6 +301,30 @@ export const handleFieldFill = async (field: Field): Promise<FieldUpdateResult> 
     return { success: true, fieldId: field.id, retryCount: updateResult?.totalRetries };
   } catch (error) {
     cleanup();
+
+    // Handle unauthorized errors - user needs to log in again
+    if (error instanceof ApiUnauthorizedError) {
+      const config = getConfig();
+      const loginUrl = `${config.baseURL}/sign-in`;
+
+      debug.error('Unauthorized error:', error.message);
+
+      const authMessage = 'Session expired. Please log in again.';
+      showErrorFeedback(element, authMessage);
+      restoreStyles(5000);
+
+      // Prompt user to log in
+      const shouldRedirect = confirm(`${error.message}\n\nWould you like to log in again?`);
+      if (shouldRedirect) {
+        window.open(loginUrl, '_blank');
+      }
+
+      return {
+        success: false,
+        fieldId: field.id,
+        error: new FieldUpdateError(authMessage, ErrorCategory.NETWORK_ERROR, field.id),
+      };
+    }
 
     // Handle quota exceeded errors specially
     if (error instanceof ApiQuotaExceededError) {

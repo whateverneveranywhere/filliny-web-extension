@@ -2,9 +2,6 @@ import { getConfig } from '../utils/index.js';
 import { authStorage } from '@extension/storage';
 import { z } from 'zod';
 
-// Get config once for cookie name access
-const appConfigForCookie = getConfig();
-
 // ============================================================================
 // Zod Schemas for HTTP Service Types
 // ============================================================================
@@ -149,34 +146,20 @@ class HttpService {
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
-      // Use getWithFallback to check both stored token and bearer token from web app
+      // Get auth token - prioritizes bearer token, falls back to session cookie
       const authToken = config?.authToken || (await authStorage.getWithFallback()) || '';
       const headers = new Headers(config?.headers || {});
       const finalApiUrl = config?.baseUrl || this.apiUrl;
 
-      console.log('[HTTP Service] Auth token received:', authToken ? `${authToken.substring(0, 20)}...` : 'empty');
+      console.log('[HTTP Service] Auth token:', authToken ? `${authToken.substring(0, 20)}...` : 'empty');
 
-      // For cross-origin requests from Chrome extension, cookies won't auto-send.
-      // Better Auth expects authentication via one of these methods:
-      //
-      // 1. Cookie header (primary - how Better Auth natively works):
-      //    Send the session cookie manually in the Cookie header.
-      //    This is the recommended approach per Better Auth docs for cross-origin requests.
-      //
-      // 2. Authorization header (fallback - requires Bearer plugin on server):
-      //    Send as Bearer token if server has Better Auth's Bearer plugin enabled.
-      //
-      // We send BOTH to maximize compatibility with different server configurations.
+      // Use Authorization header for authentication
+      // Note: Cookie header is forbidden in fetch, so we rely on Authorization
+      // and credentials: 'include' for cookie-based auth
       if (authToken) {
-        // Primary: Set Cookie header with the session token
-        // Better Auth looks for its session cookie (e.g., filliny.session_token=<value>)
-        const cookieName = appConfigForCookie.cookieName;
-        headers.set('Cookie', `${cookieName}=${authToken}`);
-        console.log('[HTTP Service] Cookie header set:', `${cookieName}=<token>`);
-
-        // Fallback: Also set Authorization header for servers with Bearer plugin
+        // Authorization header for Bearer plugin support
         headers.set('Authorization', `Bearer ${authToken}`);
-        console.log('[HTTP Service] Authorization header set with Bearer token');
+        console.log('[HTTP Service] Auth header set (Bearer)');
       } else {
         console.log('[HTTP Service] No auth token - skipping auth headers');
       }
@@ -203,13 +186,13 @@ class HttpService {
       });
       console.log('[HTTP Service] Headers:', headerObj);
 
-      // Use credentials: 'omit' since we're manually setting Cookie header.
-      // Per Better Auth docs: 'include' can interfere with manually set cookies.
+      // Use credentials: 'include' to send cookies for same-origin requests
+      // Combined with Authorization header for maximum compatibility
       const response = await fetch(fullUrl, {
         ...config,
         headers,
         signal: controller.signal,
-        credentials: 'omit',
+        credentials: 'include',
       });
 
       console.log('[HTTP Service] Response status:', response.status);
@@ -342,18 +325,15 @@ class HttpService {
   }
 
   async requestViaBackground<T>(url: string, config?: CustomFetchConfig): Promise<T> {
-    // Get auth token if not provided - same as the request() method
+    // Get auth token - prioritizes bearer token, falls back to session cookie
     const authToken = config?.authToken || (await authStorage.getWithFallback()) || '';
-    const cookieName = appConfigForCookie.cookieName;
 
     console.log('[HTTP Service Background] Auth token:', authToken ? `${authToken.substring(0, 20)}...` : 'empty');
 
-    // Build auth headers: Cookie header (primary) + Authorization (fallback)
+    // Use Authorization header for authentication
+    // Note: Cookie header is forbidden in service workers
     const authHeaders: Record<string, string> = {};
     if (authToken) {
-      // Primary: Cookie header for Better Auth native session handling
-      authHeaders['Cookie'] = `${cookieName}=${authToken}`;
-      // Fallback: Authorization header for Bearer plugin support
       authHeaders['Authorization'] = `Bearer ${authToken}`;
     }
 

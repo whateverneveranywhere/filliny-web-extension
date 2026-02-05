@@ -700,6 +700,9 @@ importers:
 
   pages/popup:
     dependencies:
+      '@extension/env':
+        specifier: workspace:*
+        version: link:../../packages/env
       '@extension/i18n':
         specifier: workspace:*
         version: link:../../packages/i18n

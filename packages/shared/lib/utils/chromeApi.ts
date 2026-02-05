@@ -183,3 +183,20 @@ export const chromeCookies = {
  */
 export const isChromeExtensionContext = (): boolean =>
   typeof chrome !== 'undefined' && chrome.runtime?.id !== undefined;
+
+/**
+ * Notify the background script about a profile update
+ * The background script will then relay this to the active tab's content script
+ * @param messageType - The message type constant to send
+ */
+export const notifyProfileUpdate = async (messageType: string): Promise<void> => {
+  if (!isChromeExtensionContext()) {
+    return;
+  }
+  try {
+    await chromeRuntime.sendMessage({ type: messageType });
+  } catch (_error) {
+    // Ignore errors - content script might not be listening
+    console.debug('[Filliny] Profile update notification sent:', messageType);
+  }
+};

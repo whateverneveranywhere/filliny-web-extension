@@ -219,6 +219,97 @@ const DTOProfileFillingFormSchema = z.object({
 });
 
 // ============================================================================
+// Authorized Files Schemas
+// ============================================================================
+
+/**
+ * Authorized file category schema
+ * Note: This is different from FileCategory in enums.ts which is for file upload type categorization
+ * This schema is specifically for user-authorized files (resume, photo, certificate, etc.)
+ */
+const AuthorizedFileCategorySchema = z.enum(['resume', 'photo', 'certificate', 'document', 'other']);
+
+/**
+ * Authorized file schema for user-uploaded files that AI can use during form filling
+ */
+const DTOAuthorizedFileSchema = z.object({
+  id: z.number(),
+  filename: z.string(),
+  originalFilename: z.string(),
+  extension: z.string(),
+  mimeType: z.string(),
+  fileSize: z.number(),
+  r2Url: z.string(),
+  description: z.string(),
+  useCases: z.string(),
+  category: AuthorizedFileCategorySchema,
+  uploadedAt: z.string().nullable().optional(),
+  lastUsedAt: z.string().nullable().optional(),
+  createdAt: z.string().nullable().optional(),
+  updatedAt: z.string().nullable().optional(),
+});
+
+/**
+ * Authorized file list response schema
+ */
+const DTOAuthorizedFilesListSchema = z.array(DTOAuthorizedFileSchema);
+
+/**
+ * Authorized file creation request schema
+ */
+const DTOAuthorizedFileCreateSchema = z.object({
+  filename: z.string().min(1, 'Filename is required'),
+  originalFilename: z.string().min(1, 'Original filename is required'),
+  extension: z.string().min(1, 'Extension is required'),
+  mimeType: z.string().min(1, 'MIME type is required'),
+  fileSize: z.number().positive('File size must be positive'),
+  description: z.string().min(1, 'Description is required'),
+  useCases: z.string().min(1, 'Use cases are required'),
+  category: AuthorizedFileCategorySchema,
+});
+
+/**
+ * Authorized file update request schema
+ */
+const DTOAuthorizedFileUpdateSchema = z.object({
+  description: z.string().min(1, 'Description is required').optional(),
+  useCases: z.string().min(1, 'Use cases are required').optional(),
+  category: AuthorizedFileCategorySchema.optional(),
+});
+
+/**
+ * Presigned URL response schema for file uploads
+ */
+const DTOPresignedUrlResponseSchema = z.object({
+  uploadUrl: z.string().url(),
+  fileId: z.number(),
+  r2Key: z.string(),
+  expiresAt: z.string(),
+});
+
+/**
+ * File download URL response schema
+ */
+const DTOFileDownloadUrlSchema = z.object({
+  downloadUrl: z.string().url(),
+  filename: z.string(),
+  expiresAt: z.string(),
+});
+
+/**
+ * Authorized file for AI context (minimal version for API payload)
+ */
+const DTOAuthorizedFileForAISchema = z.object({
+  id: z.number(),
+  filename: z.string(),
+  description: z.string(),
+  useCases: z.string(),
+  category: AuthorizedFileCategorySchema,
+  mimeType: z.string(),
+  fileSize: z.number(),
+});
+
+// ============================================================================
 // Field Type Schemas (for form detection and AI filling)
 // ============================================================================
 
@@ -403,12 +494,18 @@ const FieldSchema = z.object({
  *   (see handleFormClick.ts and handleFieldFill.ts for usage patterns)
  * - If no profile is available (edge case), the server will use sensible defaults
  * - The profileStorage can return undefined, making defaultProfile?.preferences also undefined
+ *
+ * Note on authorizedFiles field:
+ * - authorizedFiles is optional and contains user pre-authorized files
+ * - These files can be used by AI to fill file upload fields
+ * - When present, AI can select appropriate files based on field context
  */
 const DTOFillPayloadSchema = z.object({
   contextText: z.string(),
   formData: z.array(FieldSchema),
   websiteUrl: z.string(),
   preferences: DTOFillingPreferencesSchema.optional(),
+  authorizedFiles: z.array(DTOAuthorizedFileForAISchema).optional(),
 });
 
 // ============================================================================
@@ -667,6 +764,16 @@ type FieldValidation = z.infer<typeof FieldValidationSchema>;
 type Field = z.infer<typeof FieldSchema>;
 type DTOFillPayload = z.infer<typeof DTOFillPayloadSchema>;
 
+// Authorized files types
+type AuthorizedFileCategory = z.infer<typeof AuthorizedFileCategorySchema>;
+type DTOAuthorizedFile = z.infer<typeof DTOAuthorizedFileSchema>;
+type DTOAuthorizedFilesList = z.infer<typeof DTOAuthorizedFilesListSchema>;
+type DTOAuthorizedFileCreate = z.infer<typeof DTOAuthorizedFileCreateSchema>;
+type DTOAuthorizedFileUpdate = z.infer<typeof DTOAuthorizedFileUpdateSchema>;
+type DTOPresignedUrlResponse = z.infer<typeof DTOPresignedUrlResponseSchema>;
+type DTOFileDownloadUrl = z.infer<typeof DTOFileDownloadUrlSchema>;
+type DTOAuthorizedFileForAI = z.infer<typeof DTOAuthorizedFileForAISchema>;
+
 // API Response types
 type SuccessResponse = z.infer<typeof SuccessResponseSchema>;
 type EditProfileResponse = z.infer<typeof EditProfileResponseSchema>;
@@ -708,6 +815,18 @@ export {
   DTOFillingWebsiteSchema,
   DTOFillingPreferencesSchema,
   DTOProfileFillingFormSchema,
+};
+
+// Authorized Files Schemas
+export {
+  AuthorizedFileCategorySchema,
+  DTOAuthorizedFileSchema,
+  DTOAuthorizedFilesListSchema,
+  DTOAuthorizedFileCreateSchema,
+  DTOAuthorizedFileUpdateSchema,
+  DTOPresignedUrlResponseSchema,
+  DTOFileDownloadUrlSchema,
+  DTOAuthorizedFileForAISchema,
 };
 
 // Field Type Schemas
@@ -791,4 +910,13 @@ export type {
   WebsiteEditFormValues,
   ProfileSelectorFormValues,
   FillingWebsiteFormItem,
+  // Authorized files types
+  AuthorizedFileCategory,
+  DTOAuthorizedFile,
+  DTOAuthorizedFilesList,
+  DTOAuthorizedFileCreate,
+  DTOAuthorizedFileUpdate,
+  DTOPresignedUrlResponse,
+  DTOFileDownloadUrl,
+  DTOAuthorizedFileForAI,
 };

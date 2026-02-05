@@ -20,6 +20,11 @@ interface Props extends GeneralFormProps {
   emptyPlaceholder?: string;
 }
 
+// Helper to stop all event propagation to prevent drawer/parent container closing
+const stopAllPropagation = (e: React.SyntheticEvent) => {
+  e.stopPropagation();
+};
+
 const RHFShadcnComboBox = ({
   name,
   title,
@@ -50,10 +55,11 @@ const RHFShadcnComboBox = ({
   };
 
   const handleMainButtonClick = (e: React.MouseEvent) => {
+    // Always stop propagation to prevent parent containers (like drawers) from closing
+    e.stopPropagation();
     // If no options and onCreate exists, open create dialog instead of popover
     if (shouldOpenCreateOnClick) {
       e.preventDefault();
-      e.stopPropagation();
       onCreate?.();
     }
   };
@@ -65,125 +71,149 @@ const RHFShadcnComboBox = ({
       render={({ field }) => (
         <FormItem className="filliny-flex filliny-w-full filliny-min-w-0 filliny-flex-col">
           {title && <FormLabel>{title}</FormLabel>}
-          <Popover
-            modal
-            open={shouldOpenCreateOnClick ? false : popoverOpen}
-            onOpenChange={shouldOpenCreateOnClick ? undefined : setPopoverOpen}>
-            <PopoverTrigger asChild>
-              <FormControl>
-                <div className="filliny-flex filliny-w-full filliny-min-w-0 filliny-items-center filliny-gap-0">
-                  <Button
-                    loading={loading}
-                    disabled={loading || disabled}
-                    variant="outline"
-                    role="combobox"
-                    size={'sm'}
-                    onClick={handleMainButtonClick}
-                    className={cn(
-                      'filliny-w-full filliny-min-w-0 filliny-justify-between filliny-overflow-hidden',
-                      onCreate && 'filliny-rounded-r-none filliny-border-r-0',
-                      !field.value && 'filliny-text-muted-foreground',
-                    )}>
-                    <p className="filliny-w-full filliny-truncate filliny-text-left">
-                      {field.value
-                        ? options.find(option => option.value === field.value)?.label
-                        : options.length === 0 && emptyPlaceholder
-                          ? emptyPlaceholder
-                          : placeholder || `Select ${title}`}
-                    </p>
-                    {!onCreate && (
-                      <ChevronsUpDown className="filliny-ml-2 filliny-size-4 filliny-shrink-0 filliny-opacity-50" />
-                    )}
-                  </Button>
-                  {onCreate && (
+          {/* Wrapper div to stop ALL event propagation to parent containers like drawers */}
+          {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events */}
+          <div
+            className="filliny-w-full filliny-min-w-0"
+            onPointerDown={stopAllPropagation}
+            onPointerUp={stopAllPropagation}
+            onMouseDown={stopAllPropagation}
+            onMouseUp={stopAllPropagation}
+            onClick={stopAllPropagation}
+            onTouchStart={stopAllPropagation}
+            onTouchEnd={stopAllPropagation}>
+            <Popover
+              modal
+              open={shouldOpenCreateOnClick ? false : popoverOpen}
+              onOpenChange={shouldOpenCreateOnClick ? undefined : setPopoverOpen}>
+              <PopoverTrigger asChild>
+                <FormControl>
+                  <div className="filliny-flex filliny-w-full filliny-min-w-0 filliny-items-center filliny-gap-0">
                     <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
+                      loading={loading}
                       disabled={loading || disabled}
-                      onClick={e => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        onCreate();
-                      }}
-                      className="filliny-h-9 filliny-w-9 filliny-shrink-0 filliny-rounded-l-none filliny-border-l-0 filliny-px-0">
-                      <Plus className="filliny-size-4" />
+                      variant="outline"
+                      role="combobox"
+                      size={'sm'}
+                      onPointerDown={stopAllPropagation}
+                      onPointerUp={stopAllPropagation}
+                      onMouseDown={stopAllPropagation}
+                      onMouseUp={stopAllPropagation}
+                      onClick={handleMainButtonClick}
+                      onTouchStart={stopAllPropagation}
+                      onTouchEnd={stopAllPropagation}
+                      className={cn(
+                        'filliny-w-full filliny-min-w-0 filliny-justify-between filliny-overflow-hidden',
+                        onCreate && 'filliny-rounded-r-none filliny-border-r-0',
+                        !field.value && 'filliny-text-muted-foreground',
+                      )}>
+                      <p className="filliny-w-full filliny-truncate filliny-text-left">
+                        {field.value
+                          ? options.find(option => option.value === field.value)?.label
+                          : options.length === 0 && emptyPlaceholder
+                            ? emptyPlaceholder
+                            : placeholder || `Select ${title}`}
+                      </p>
+                      {!onCreate && (
+                        <ChevronsUpDown className="filliny-ml-2 filliny-size-4 filliny-shrink-0 filliny-opacity-50" />
+                      )}
                     </Button>
-                  )}
-                </div>
-              </FormControl>
-            </PopoverTrigger>
-            <PopoverContent align="start" className="filliny-w-[var(--radix-popover-trigger-width)] filliny-p-0">
-              <Command className="filliny-w-full">
-                <CommandInput placeholder={`${placeholder}...`} />
-                <CommandEmpty>No {title} found.</CommandEmpty>
-                <CommandGroup>
-                  <CommandList>
-                    {!loading &&
-                      !!options.length &&
-                      options.map(option => (
-                        <CommandItem
-                          className="filliny-flex filliny-h-10 filliny-w-full filliny-items-center filliny-justify-between"
-                          data-testid={field.name}
-                          value={option.label}
-                          key={option.value}
-                          onSelect={() => handleSelect(option.value)}>
-                          <div className="filliny-flex filliny-w-full filliny-items-center filliny-truncate">
-                            <Check
-                              className={cn(
-                                'filliny-mr-2 filliny-h-4 filliny-w-4',
-                                option.value === field.value ? 'filliny-opacity-100' : 'filliny-opacity-0',
-                              )}
-                            />
-                            <p className="filliny-w-full filliny-truncate">{option.label}</p>{' '}
-                          </div>
+                    {onCreate && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={loading || disabled}
+                        onClick={e => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          onCreate();
+                        }}
+                        className="filliny-h-9 filliny-w-9 filliny-shrink-0 filliny-rounded-l-none filliny-border-l-0 filliny-px-0">
+                        <Plus className="filliny-size-4" />
+                      </Button>
+                    )}
+                  </div>
+                </FormControl>
+              </PopoverTrigger>
+              <PopoverContent
+                align="start"
+                className="filliny-w-[var(--radix-popover-trigger-width)] filliny-p-0"
+                onOpenAutoFocus={e => e.preventDefault()}
+                onCloseAutoFocus={e => e.preventDefault()}
+                onPointerDownOutside={e => e.preventDefault()}
+                onInteractOutside={e => e.preventDefault()}>
+                <Command className="filliny-w-full">
+                  <CommandInput placeholder={`${placeholder}...`} />
+                  <CommandEmpty>No {title} found.</CommandEmpty>
+                  <CommandGroup>
+                    <CommandList>
+                      {!loading &&
+                        !!options.length &&
+                        options.map(option => (
+                          <CommandItem
+                            className="filliny-flex filliny-h-10 filliny-w-full filliny-items-center filliny-justify-between"
+                            data-testid={field.name}
+                            value={option.label}
+                            key={option.value}
+                            onSelect={() => handleSelect(option.value)}>
+                            <div className="filliny-flex filliny-w-full filliny-items-center filliny-truncate">
+                              <Check
+                                className={cn(
+                                  'filliny-mr-2 filliny-h-4 filliny-w-4',
+                                  option.value === field.value ? 'filliny-opacity-100' : 'filliny-opacity-0',
+                                )}
+                              />
+                              <p className="filliny-w-full filliny-truncate">{option.label}</p>{' '}
+                            </div>
 
-                          <div className="filliny-flex filliny-items-center filliny-justify-center filliny-gap-1">
-                            {onEdit && (
-                              <Button
-                                variant="outline"
-                                size="icon"
-                                className="filliny-h-8 filliny-w-8"
-                                onClick={e => {
-                                  e.stopPropagation();
-                                  onEdit(option.value);
-                                  setPopoverOpen(false);
-                                }}>
-                                <Edit />
-                              </Button>
-                            )}
-                            {onDelete && (
-                              <Button
-                                variant="outline"
-                                size="icon"
-                                className="filliny-h-8 filliny-w-8"
-                                onClick={e => {
-                                  e.stopPropagation();
-                                  onDelete(option.value);
-                                  setPopoverOpen(false);
-                                }}>
-                                <Trash className="filliny-text-destructive" />
-                              </Button>
-                            )}
-                          </div>
+                            <div className="filliny-flex filliny-items-center filliny-justify-center filliny-gap-1">
+                              {onEdit && (
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  className="filliny-h-8 filliny-w-8"
+                                  onClick={e => {
+                                    e.stopPropagation();
+                                    onEdit(option.value);
+                                    setPopoverOpen(false);
+                                  }}>
+                                  <Edit />
+                                </Button>
+                              )}
+                              {onDelete && (
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  className="filliny-h-8 filliny-w-8"
+                                  onClick={e => {
+                                    e.stopPropagation();
+                                    onDelete(option.value);
+                                    setPopoverOpen(false);
+                                  }}>
+                                  <Trash className="filliny-text-destructive" />
+                                </Button>
+                              )}
+                            </div>
+                          </CommandItem>
+                        ))}
+                      {!loading && !options.length && (
+                        <CommandItem value="empty" disabled>
+                          No options
                         </CommandItem>
-                      ))}
-                    {!loading && !options.length && (
-                      <CommandItem value="empty" disabled>
-                        No options
-                      </CommandItem>
-                    )}
-                    {loading && (
-                      <CommandItem value="loading" disabled>
-                        <Loader2 className={cn('filliny-mr-2 filliny-h-4 filliny-w-4 filliny-animate-spin')} />
-                        Loading...
-                      </CommandItem>
-                    )}
-                  </CommandList>
-                </CommandGroup>
-              </Command>
-            </PopoverContent>
-          </Popover>
+                      )}
+                      {loading && (
+                        <CommandItem value="loading" disabled>
+                          <Loader2 className={cn('filliny-mr-2 filliny-h-4 filliny-w-4 filliny-animate-spin')} />
+                          Loading...
+                        </CommandItem>
+                      )}
+                    </CommandList>
+                  </CommandGroup>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          </div>
           {description && <FormDescription>{description}</FormDescription>}
           <FormMessage />
         </FormItem>

@@ -14,6 +14,8 @@ import {
   useActiveProfile,
   usePlanLimits,
   useBoolean,
+  notifyProfileUpdate,
+  MessageType,
 } from '@extension/shared';
 import { profileStorage } from '@extension/storage';
 import { useEffect, useMemo, useCallback } from 'react';
@@ -55,7 +57,9 @@ const useProfileManagement = (url: string) => {
     };
 
     const createdProfile = await createProfile({ data: newProfileData });
-    profileStorage.setDefaultProfile(createdProfile);
+    await profileStorage.setDefaultProfile(createdProfile);
+    // Notify content scripts about the profile update so they can show the UI
+    await notifyProfileUpdate(MessageType.PROFILE_UPDATED);
     toast({
       title: 'Profile created!',
       description: 'Your first profile is ready. Start filling forms with AI.',
@@ -73,6 +77,8 @@ const useProfileManagement = (url: string) => {
     await editProfile({ id: activeProfileId, data: updatedProfile });
     // Update storage immediately so content scripts get the updated profile without waiting for query refetch
     await profileStorage.setDefaultProfile(updatedProfile);
+    // Notify content scripts about the profile update so they can show the UI
+    await notifyProfileUpdate(MessageType.PROFILE_UPDATED);
     toast({
       title: 'Website added!',
       description: 'Filliny is now ready to help you fill forms on this site.',

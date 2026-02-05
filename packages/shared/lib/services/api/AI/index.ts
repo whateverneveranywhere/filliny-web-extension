@@ -1,11 +1,21 @@
 import { MessageType } from '../../../types/enums.js';
 import { getConfig } from '../../../utils/helpers.js';
 import { apiEndpoints } from '../../endpoints.js';
+import { ApiUnauthorizedError, ApiQuotaExceededError, detectQuotaErrorType } from '../../httpService.js';
 import { authStorage } from '@extension/storage';
 import type { DTOFillPayload, Field } from '../../schemas/index.js';
 
 const { ai } = apiEndpoints;
 
+/**
+ * AI Fill Service - sends form data to AI for intelligent form filling
+ *
+ * Uses the same authentication pattern as httpService.requestViaBackground:
+ * 1. Gets auth token via authStorage.getWithFallback() (cookie first, then bearer token)
+ * 2. Sends both Cookie and Authorization headers for Better Auth compatibility
+ * 3. Includes X-Extension-ID header for extension identification
+ * 4. Routes request through background script to handle CORS
+ */
 export const aiFillService = async (
   fillPayLoad: DTOFillPayload,
 ): Promise<{ data: Field[] } | ReadableStream<Uint8Array>> => {
@@ -13,20 +23,24 @@ export const aiFillService = async (
   // Use apiURL which already includes /api/v1, then append the endpoint path
   const fullUrl = `${config.apiURL}${ai.fill}`;
 
-  // Get auth token for API request
+  // Get auth token - prioritizes bearer token, falls back to session cookie
   const authToken = await authStorage.getWithFallback();
 
-  // Build auth headers: Cookie header (primary) + Authorization (fallback)
-  // Better Auth expects session cookie, but we also send Bearer for plugin support
+  console.log('[AI Service] Auth token:', authToken ? `${authToken.substring(0, 20)}...` : 'empty');
+
+  // Use Authorization header for authentication
+  // Note: Cookie header is forbidden in service workers/fetch
   const authHeaders: Record<string, string> = {};
   if (authToken) {
-    // Primary: Cookie header for Better Auth native session handling
-    authHeaders['Cookie'] = `${config.cookieName}=${authToken}`;
-    // Fallback: Authorization header for Bearer plugin support
     authHeaders['Authorization'] = `Bearer ${authToken}`;
+    console.log('[AI Service] Auth header set (Bearer)');
+  } else {
+    console.warn('[AI Service] No auth token available - request may fail with 401');
   }
 
-  const response = await chrome.runtime.sendMessage({
+  // Use the same message structure as httpService.requestViaBackground
+  // Note: Use string literal 'API_REQUEST' for consistency with httpService
+  const message = {
     type: MessageType.API_REQUEST,
     url: fullUrl,
     options: {
@@ -35,30 +49,86 @@ export const aiFillService = async (
       headers: {
         'Content-Type': 'application/json',
         ...authHeaders,
+        // Include extension ID header like httpService does
+        'X-Extension-ID': chrome.runtime.id,
       },
       isStream: true,
     },
+  };
+
+  console.log('[AI Service] Sending request to:', fullUrl);
+
+  return new Promise((resolve, reject) => {
+    chrome.runtime.sendMessage(message, response => {
+      // Handle Chrome runtime errors
+      if (chrome.runtime.lastError) {
+        console.error('[AI Service] Chrome runtime error:', chrome.runtime.lastError);
+        reject(new Error(chrome.runtime.lastError.message || 'Chrome runtime error'));
+        return;
+      }
+
+      // Handle API errors - using same error types as httpService for consistency
+      if (response?.error) {
+        console.error('[AI Service] API error:', response.error);
+        const errorMessage = response.error;
+
+        // Check for 401 unauthorized errors
+        if (
+          errorMessage.includes('401') ||
+          errorMessage.toLowerCase().includes('unauthorized') ||
+          errorMessage.toLowerCase().includes('unauthenticated')
+        ) {
+          // Clear stored auth token on unauthorized responses (same as httpService)
+          authStorage.set('').catch(err => console.error('[AI Service] Failed to clear auth token:', err));
+          reject(new ApiUnauthorizedError('Unauthorized: Please log in again', 401));
+          return;
+        }
+
+        // Check for 403 forbidden errors - could be quota exceeded or access denied
+        if (errorMessage.includes('403') || errorMessage.toLowerCase().includes('forbidden')) {
+          const quotaErrorType = detectQuotaErrorType(errorMessage);
+          if (quotaErrorType) {
+            reject(new ApiQuotaExceededError(errorMessage, quotaErrorType));
+            return;
+          }
+          // Treat non-quota 403 as authorization error
+          reject(new ApiUnauthorizedError(errorMessage || 'Forbidden: Access denied', 403));
+          return;
+        }
+
+        // Check for quota-related errors that might not have 403 status code
+        const quotaErrorType = detectQuotaErrorType(errorMessage);
+        if (quotaErrorType) {
+          reject(new ApiQuotaExceededError(errorMessage, quotaErrorType));
+          return;
+        }
+
+        reject(new Error(errorMessage));
+        return;
+      }
+
+      // If it's a ReadableStream, return it directly for processing by the caller
+      if (response?.data instanceof ReadableStream) {
+        resolve(response.data);
+        return;
+      }
+
+      // If it's a regular response with data, return it in the expected format
+      if (response?.data && typeof response.data === 'object') {
+        resolve({ data: response.data as Field[] });
+        return;
+      }
+
+      // If we got a success response from streaming, return an empty data array
+      // This is fine because the streaming data has already been processed
+      if (response?.success === true) {
+        resolve({ data: [] });
+        return;
+      }
+
+      // No valid response received
+      console.error('[AI Service] Unexpected response:', response);
+      reject(new Error('Unexpected response type from AI service'));
+    });
   });
-
-  if (response.error) {
-    throw new Error(response.error);
-  }
-
-  // If it's a ReadableStream, return it directly for processing by the caller
-  if (response.data instanceof ReadableStream) {
-    return response.data;
-  }
-
-  // If it's a regular response with data, return it in the expected format
-  if (response.data && typeof response.data === 'object') {
-    return { data: response.data };
-  }
-
-  // If we got a success response from streaming, return an empty data array
-  // This is fine because the streaming data has already been processed
-  if (response.success === true) {
-    return { data: [] };
-  }
-
-  throw new Error('Unexpected response type');
 };
