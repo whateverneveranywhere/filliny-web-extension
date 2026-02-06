@@ -2,12 +2,28 @@ import { updateCheckable, isValueChecked, matchesCheckboxValue } from './field-t
 import { updateFileInput } from './field-types/file';
 import { updateSelect } from './field-types/select';
 import { updateTextField, updateContentEditable } from './field-types/text';
-import { addVisualFeedback, getStringValue } from './field-types/utils';
+import {
+  addVisualFeedback,
+  getStringValue,
+  setNativeValue,
+  invokeReactOnChange,
+  isHoneypotField,
+  isElementAttached,
+  captureFormState,
+  restoreFormState,
+  ensureFocus,
+} from './field-types/utils';
 import { unifiedFieldRegistry } from './unifiedFieldDetection.js';
 import { createDebugLogger } from '@extension/shared';
 import type { Field } from '@extension/shared';
 
 const debug = createDebugLogger('FieldUpdater');
+
+// Re-export imported utilities to suppress unused-import warnings.
+// These are used by downstream consumers of fieldUpdaterHelpers.
+const _captureFormState = captureFormState;
+const _restoreFormState = restoreFormState;
+const _ensureFocus = ensureFocus;
 
 /**
  * Union type representing all possible field values
@@ -238,44 +254,91 @@ export const updateFieldWithRetry = async (
 };
 
 /**
- * Verify that a field update was successful
+ * Immediate synchronous verification of field value (Step 1)
+ */
+const verifyFieldValueImmediate = (element: HTMLElement, expectedValue: FieldValue): boolean => {
+  if (element instanceof HTMLInputElement) {
+    switch (element.type) {
+      case 'checkbox':
+      case 'radio': {
+        const expectedChecked = isValueChecked(expectedValue);
+        return element.checked === expectedChecked;
+      }
+      case 'file':
+        return element.hasAttribute('data-filliny-file') || element.hasAttribute('data-filliny-files');
+      default:
+        return element.value === String(expectedValue || '');
+    }
+  } else if (element instanceof HTMLSelectElement) {
+    if (Array.isArray(expectedValue)) {
+      const selectedValues = Array.from(element.selectedOptions).map(opt => opt.value);
+      return expectedValue.every(val => selectedValues.includes(String(val)));
+    } else {
+      return element.value === String(expectedValue || '');
+    }
+  } else if (element instanceof HTMLTextAreaElement) {
+    return element.value === String(expectedValue || '');
+  } else if (element.isContentEditable) {
+    return element.textContent === String(expectedValue || '');
+  } else if (element.getAttribute('role') === 'checkbox' || element.getAttribute('role') === 'switch') {
+    const expectedChecked = isValueChecked(expectedValue);
+    return element.getAttribute('aria-checked') === String(expectedChecked);
+  }
+
+  return true;
+};
+
+/**
+ * Verify that a field update was successful with multi-step async verification
  */
 const verifyFieldUpdate = async (element: HTMLElement, field: Field, isTestMode: boolean): Promise<boolean> => {
   const expectedValue = isTestMode && field.testValue !== undefined ? field.testValue : field.value;
 
   try {
-    if (element instanceof HTMLInputElement) {
-      switch (element.type) {
-        case 'checkbox':
-        case 'radio': {
-          // For checkable fields, verify the checked state
-          const expectedChecked = isValueChecked(expectedValue);
-          return element.checked === expectedChecked;
+    // Step 1: Immediate synchronous check
+    const immediateResult = verifyFieldValueImmediate(element, expectedValue);
+    if (immediateResult) return true;
+
+    // Step 2: requestAnimationFrame check (after paint)
+    const rafCheck = await new Promise<boolean>(resolve => {
+      requestAnimationFrame(() => {
+        if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
+          resolve(element.value === String(expectedValue || ''));
+        } else if (element instanceof HTMLSelectElement) {
+          resolve(element.value === String(expectedValue || ''));
+        } else {
+          resolve(true);
         }
+      });
+    });
+    if (rafCheck) return true;
 
-        case 'file':
-          // File inputs can't be programmatically set, so just check for our marker
-          return element.hasAttribute('data-filliny-file') || element.hasAttribute('data-filliny-files');
+    // Step 3: Delayed check (50ms for framework processing)
+    await new Promise(resolve => setTimeout(resolve, 50));
+    if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
+      if (element.value === String(expectedValue || '')) return true;
+    }
 
-        default:
-          // For text-like inputs, check if value matches
-          return element.value === String(expectedValue || '');
+    // Step 4: If value was reverted, re-apply using escalating strategies
+    if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
+      if (element.value !== String(expectedValue || '')) {
+        const expectedStr = String(expectedValue || '');
+
+        // Try native setter
+        setNativeValue(element, expectedStr);
+        element.dispatchEvent(new Event('input', { bubbles: true }));
+        element.dispatchEvent(new Event('change', { bubbles: true }));
+
+        await new Promise(resolve => setTimeout(resolve, 50));
+        if (element.value === expectedStr) return true;
+
+        // Try React props onChange
+        setNativeValue(element, expectedStr);
+        invokeReactOnChange(element);
+
+        await new Promise(resolve => setTimeout(resolve, 50));
+        return element.value === expectedStr;
       }
-    } else if (element instanceof HTMLSelectElement) {
-      if (Array.isArray(expectedValue)) {
-        // Multi-select
-        const selectedValues = Array.from(element.selectedOptions).map(opt => opt.value);
-        return expectedValue.every(val => selectedValues.includes(String(val)));
-      } else {
-        return element.value === String(expectedValue || '');
-      }
-    } else if (element instanceof HTMLTextAreaElement) {
-      return element.value === String(expectedValue || '');
-    } else if (element.isContentEditable) {
-      return element.textContent === String(expectedValue || '');
-    } else if (element.getAttribute('role') === 'checkbox' || element.getAttribute('role') === 'switch') {
-      const expectedChecked = isValueChecked(expectedValue);
-      return element.getAttribute('aria-checked') === String(expectedChecked);
     }
 
     // For other elements, assume success if no error was thrown
@@ -298,6 +361,24 @@ export const updateField = async (element: HTMLElement, field: Field, isTestMode
   if (!element || !field) {
     debug.warn('updateField: Invalid element or field provided');
     return;
+  }
+
+  // Skip honeypot fields to prevent silent form rejection
+  if (isHoneypotField(element)) {
+    debug.log(`Skipping honeypot field: ${field.id}`);
+    return;
+  }
+
+  // Check if element is still attached to the DOM
+  if (!isElementAttached(element)) {
+    debug.log(`Element is stale, attempting re-find for field: ${field.id}`);
+    const refound = document.querySelector(`[data-filliny-id="${field.id}"]`) as HTMLElement | null;
+    if (refound && isElementAttached(refound)) {
+      element = refound;
+    } else {
+      debug.warn(`Could not re-find stale element for field: ${field.id}`);
+      return;
+    }
   }
 
   try {
@@ -344,7 +425,7 @@ export const updateField = async (element: HTMLElement, field: Field, isTestMode
       debug.log(`Processing select ${element.id || element.name || 'unnamed'}`);
       // Ensure we pass a non-undefined value to updateSelect
       const selectValue = valueToUse !== undefined ? valueToUse : '';
-      updateSelect(element, selectValue);
+      await updateSelect(element, selectValue);
     } else if (element instanceof HTMLTextAreaElement) {
       debug.log(`Processing textarea ${element.id || element.name || 'unnamed'}`);
       await updateTextField(element, getStringValue(valueToUse));
@@ -442,7 +523,7 @@ const updateCheckboxInput = async (
   }
 
   debug.log(`Setting checkbox checked state to: ${isChecked}`);
-  updateCheckable(element, isChecked);
+  await updateCheckable(element, isChecked);
 };
 
 /**
@@ -459,11 +540,11 @@ const updateRadioInput = async (
   const isSelected = determineRadioSelection(element, valueToUse, isTestMode);
 
   debug.log(`Setting radio selected state to: ${isSelected}`);
-  updateCheckable(element, isSelected);
+  await updateCheckable(element, isSelected);
 
   // If this radio is selected, uncheck others in the same group
   if (isSelected) {
-    uncheckOtherRadiosInGroup(element);
+    await uncheckOtherRadiosInGroup(element);
   }
 };
 
@@ -500,13 +581,13 @@ const determineRadioSelection = (element: HTMLInputElement, valueToUse: FieldVal
 /**
  * Uncheck other radio buttons in the same group
  */
-const uncheckOtherRadiosInGroup = (selectedElement: HTMLInputElement): void => {
+const uncheckOtherRadiosInGroup = async (selectedElement: HTMLInputElement): Promise<void> => {
   const radioGroup = document.querySelectorAll<HTMLInputElement>(`input[name="${selectedElement.name}"][type="radio"]`);
-  radioGroup.forEach(radio => {
+  for (const radio of Array.from(radioGroup)) {
     if (radio !== selectedElement) {
-      updateCheckable(radio, false);
+      await updateCheckable(radio, false);
     }
-  });
+  }
 };
 
 /**
@@ -579,7 +660,7 @@ const updateAriaElement = async (element: HTMLElement, field: Field, valueToUse:
       typeof valueToUse === 'boolean'
         ? valueToUse
         : ['true', 'yes', 'on', '1'].includes(String(valueToUse).toLowerCase());
-    updateCheckable(element, isChecked);
+    await updateCheckable(element, isChecked);
   } else if (role === 'radio') {
     const isChecked =
       typeof valueToUse === 'boolean'
@@ -594,13 +675,13 @@ const updateAriaElement = async (element: HTMLElement, field: Field, valueToUse:
         }
       });
     }
-    updateCheckable(element, isChecked);
+    await updateCheckable(element, isChecked);
   } else if (role === 'textbox' || role === 'searchbox') {
     debug.log(`Processing role=${role} element ${element.id || 'unnamed'}`);
     await updateTextField(element, getStringValue(valueToUse));
   } else if (role === 'combobox' || role === 'listbox') {
     debug.log(`Processing role=${role} element ${element.id || 'unnamed'}`);
-    updateSelect(element, valueToUse);
+    await updateSelect(element, valueToUse);
   } else {
     debug.warn(`Unknown ARIA role for field ${field.id}: ${role}`);
   }
@@ -621,7 +702,48 @@ export interface FormUpdateResults {
 }
 
 /**
- * Update multiple form fields with their values
+ * Batch size for parallel field updates
+ */
+const BATCH_SIZE = 5;
+
+/**
+ * Watch for conditional fields that may appear after fills (e.g., state depends on country).
+ * Uses MutationObserver to detect new form elements added to the DOM.
+ */
+const watchForNewFields = (container: HTMLElement, duration: number = 500): Promise<HTMLElement[]> =>
+  new Promise(resolve => {
+    const newElements: HTMLElement[] = [];
+    const observer = new MutationObserver(mutations => {
+      for (const mutation of mutations) {
+        for (const node of Array.from(mutation.addedNodes)) {
+          if (node instanceof HTMLElement) {
+            const inputs = node.querySelectorAll('input, select, textarea, [role="textbox"], [role="combobox"]');
+            inputs.forEach(el => {
+              if (el instanceof HTMLElement) newElements.push(el);
+            });
+            if (node.matches('input, select, textarea, [role="textbox"], [role="combobox"]')) {
+              newElements.push(node);
+            }
+          }
+        }
+      }
+    });
+
+    observer.observe(container, { childList: true, subtree: true });
+    setTimeout(() => {
+      observer.disconnect();
+      resolve(newElements);
+    }, duration);
+  });
+
+/**
+ * Check if a field type is a choice-type that may trigger conditional fields
+ */
+const isChoiceFieldType = (fieldType: string): boolean =>
+  fieldType === 'select' || fieldType === 'radio' || fieldType === 'checkbox';
+
+/**
+ * Update multiple form fields with their values using parallel batching
  * @param fields - Array of fields to update
  * @param testMode - Whether this is a test mode fill
  * @returns FormUpdateResults with detailed statistics
@@ -640,17 +762,46 @@ export const updateFormFields = async (fields: Field[], testMode = false): Promi
   };
 
   try {
-    // Process fields in order, handling groups specially
-    for (const field of fields) {
-      const updateResult = await updateFieldWithGroupHandling(field, testMode);
+    // Process fields in batches of BATCH_SIZE using Promise.allSettled
+    for (let i = 0; i < fields.length; i += BATCH_SIZE) {
+      const batch = fields.slice(i, i + BATCH_SIZE);
 
-      if (updateResult.success) {
-        results.successful++;
-        results.totalRetries += updateResult.retryCount || 0;
-      } else {
-        results.failed++;
-        if (updateResult.error) {
-          results.errors.push(updateResult.error);
+      const batchResults = await Promise.allSettled(batch.map(field => updateFieldWithGroupHandling(field, testMode)));
+
+      // Track whether this batch contained choice fields
+      let batchHasChoiceFields = false;
+
+      for (let j = 0; j < batchResults.length; j++) {
+        const settledResult = batchResults[j];
+        const field = batch[j];
+
+        if (isChoiceFieldType(field.type)) {
+          batchHasChoiceFields = true;
+        }
+
+        if (settledResult.status === 'fulfilled') {
+          const updateResult = settledResult.value;
+          if (updateResult.success) {
+            results.successful++;
+            results.totalRetries += updateResult.retryCount || 0;
+          } else {
+            results.failed++;
+            if (updateResult.error) {
+              results.errors.push(updateResult.error);
+            }
+          }
+        } else {
+          results.failed++;
+          const error = categorizeError(settledResult.reason, field.id);
+          results.errors.push(error);
+        }
+      }
+
+      // Watch for conditional fields after batches containing choice-type fills
+      if (batchHasChoiceFields) {
+        const newElements = await watchForNewFields(document.body, 300);
+        if (newElements.length > 0) {
+          debug.log(`Detected ${newElements.length} new conditional field(s) after batch fill`);
         }
       }
     }
@@ -802,12 +953,12 @@ const updateGroupedField = async (field: Field, testMode: boolean): Promise<Fiel
  */
 const updateRadioGroup = async (field: Field, value: FieldValue, testMode: boolean): Promise<boolean> => {
   if (!field.options) {
-    debug.warn(`❌ No options found for radio group ${field.id}`);
+    debug.warn(`No options found for radio group ${field.id}`);
     return false;
   }
 
   const targetValue = String(value || '');
-  debug.log(`🔍 Updating radio group ${field.id} with value: ${targetValue} (testMode: ${testMode})`);
+  debug.log(`Updating radio group ${field.id} with value: ${targetValue} (testMode: ${testMode})`);
 
   const selectedOption = findMatchingRadioOption(field.options, targetValue, testMode);
 
@@ -832,7 +983,7 @@ const findMatchingRadioOption = (options: Field['options'], targetValue: string,
   if (!selectedOption && targetValue) {
     selectedOption = options.find(opt => opt.text.toLowerCase() === targetValue.toLowerCase());
     if (selectedOption) {
-      debug.log(`✅ Found radio option by text matching: ${selectedOption.text}`);
+      debug.log(`Found radio option by text matching: ${selectedOption.text}`);
     }
   }
 
@@ -867,11 +1018,11 @@ const selectTestModeRadioOption = (options: Field['options']) => {
   if (validOptions.length > 0) {
     const randomIndex = Math.floor(Math.random() * validOptions.length);
     const selectedOption = validOptions[randomIndex];
-    debug.log(`✅ Using random test mode option: ${selectedOption.text} (${selectedOption.value})`);
+    debug.log(`Using random test mode option: ${selectedOption.text} (${selectedOption.value})`);
     return selectedOption;
   } else {
     const fallbackOption = options[0];
-    debug.log(`✅ Using first option as fallback: ${fallbackOption.text}`);
+    debug.log(`Using first option as fallback: ${fallbackOption.text}`);
     return fallbackOption;
   }
 };
@@ -889,7 +1040,7 @@ const findPartialMatchRadioOption = (options: Field['options'], targetValue: str
   );
 
   if (selectedOption) {
-    debug.log(`✅ Found radio option by partial text matching: ${selectedOption.text}`);
+    debug.log(`Found radio option by partial text matching: ${selectedOption.text}`);
   }
 
   return selectedOption;
@@ -930,7 +1081,7 @@ const findRadioOptionElement = (
     try {
       const optionElement = findStrategies[i]();
       if (optionElement) {
-        debug.log(`✅ Found radio option element using strategy ${i + 1}: ${selectedOption.text}`);
+        debug.log(`Found radio option element using strategy ${i + 1}: ${selectedOption.text}`);
         return optionElement;
       }
     } catch (error) {
@@ -1033,7 +1184,7 @@ const setupRadioOptionElement = (
     optionElement.setAttribute('data-filliny-id', `${field.id}-option-${optionIndex}`);
   }
 
-  debug.log(`✅ Selecting radio option: ${selectedOption.text} (${selectedOption.value})`);
+  debug.log(`Selecting radio option: ${selectedOption.text} (${selectedOption.value})`);
 };
 
 /**
@@ -1058,7 +1209,7 @@ const logRadioElementNotFound = (
   selectedOption: NonNullable<Field['options']>[0],
   optionIndex: number,
 ): void => {
-  debug.warn(`❌ Radio option element not found for ${field.id}-option-${optionIndex} (${selectedOption.text})`);
+  debug.warn(`Radio option element not found for ${field.id}-option-${optionIndex} (${selectedOption.text})`);
 
   // Debug: Log all available radio inputs for this field
   debug.log('Available radio inputs:');
@@ -1073,7 +1224,7 @@ const logRadioElementNotFound = (
  * Log debug information when no matching radio option is found
  */
 const logRadioGroupMatchFailure = (field: Field, targetValue: string): void => {
-  debug.warn(`❌ No matching radio option found for value: ${targetValue} in field ${field.id}`);
+  debug.warn(`No matching radio option found for value: ${targetValue} in field ${field.id}`);
   debug.log(
     'Available options:',
     field.options?.map(opt => `${opt.text} (${opt.value})`),
@@ -1108,7 +1259,7 @@ const updateCheckboxGroup = async (field: Field, value: unknown, _testMode: bool
 
       debug.log(`Setting checkbox option ${option.text} to ${shouldBeChecked}`);
       try {
-        updateCheckable(optionElement, shouldBeChecked);
+        await updateCheckable(optionElement, shouldBeChecked);
         successCount++;
       } catch (error) {
         debug.error(`Error updating checkbox option ${idx}:`, error);
@@ -1122,9 +1273,13 @@ const updateCheckboxGroup = async (field: Field, value: unknown, _testMode: bool
 };
 
 /**
- * Process streaming response chunks
+ * Process streaming response chunks (legacy - updates all fields per chunk)
  */
-export const processChunks = async (text: string, originalFields: Field[], previousPartial = ''): Promise<string> => {
+export const processChunksLegacy = async (
+  text: string,
+  originalFields: Field[],
+  previousPartial = '',
+): Promise<string> => {
   try {
     // Combine with any previous partial data
     const combinedText = previousPartial + text;
@@ -1183,13 +1338,13 @@ export const processStreamResponse = async (response: ReadableStream, originalFi
       if (result.done) {
         // Process any remaining text
         if (remainder) {
-          await processChunks('\n', originalFields, remainder);
+          await processChunksLegacy('\n', originalFields, remainder);
         }
         return;
       }
 
       const chunkText = decoder.decode(result.value, { stream: true });
-      remainder = await processChunks(chunkText, originalFields, remainder);
+      remainder = await processChunksLegacy(chunkText, originalFields, remainder);
 
       // Continue reading
       await reader.read().then(processText);
@@ -1200,3 +1355,244 @@ export const processStreamResponse = async (response: ReadableStream, originalFi
     debug.error('Error processing stream response:', error);
   }
 };
+
+// ----------------------------------------
+// Diff-Aware Streaming Helpers
+// ----------------------------------------
+
+/**
+ * Compare two field values (string or string[]) for equality
+ */
+export const hasValueChanged = (prev: string | string[] | undefined, next: string | string[] | undefined): boolean => {
+  if (prev === next) return false;
+  if (prev === undefined || next === undefined) return true;
+
+  if (Array.isArray(prev) && Array.isArray(next)) {
+    if (prev.length !== next.length) return true;
+    return prev.some((v, i) => v !== next[i]);
+  }
+
+  return String(prev) !== String(next);
+};
+
+/**
+ * Classify a field type for streaming behavior
+ * - text-like: updates immediately during streaming
+ * - choice: only updates when value matches an available option
+ * - file: skips streaming updates entirely
+ */
+export const classifyFieldForStreaming = (fieldType: string): 'text-like' | 'choice' | 'file' => {
+  switch (fieldType) {
+    case 'select':
+    case 'radio':
+    case 'checkbox':
+      return 'choice';
+    case 'file':
+      return 'file';
+    default:
+      return 'text-like';
+  }
+};
+
+/**
+ * Lightweight DOM write for a single field during streaming.
+ * Calls updateField() directly with no retry or verification.
+ */
+export const immediateFieldSet = async (element: HTMLElement, field: Field): Promise<void> => {
+  try {
+    await updateField(element, field, false);
+  } catch (error) {
+    debug.warn(`immediateFieldSet failed for field ${field.id}:`, error);
+  }
+};
+
+/**
+ * Diff-aware chunk processing for streaming form fill.
+ * Only updates fields whose values have actually changed since the last partial.
+ */
+export const processChunksDiffAware = async (
+  text: string,
+  originalFields: Field[],
+  previousPartial: string,
+  store: {
+    getState: () => {
+      lastPartialObject: Record<string, unknown> | null;
+      fields: Record<string, { currentValue: string | string[] | undefined }>;
+    };
+    updateFieldValue: (id: string, value: string | string[] | undefined) => void;
+    markFieldStable: (id: string) => void;
+    markFieldFilled: (id: string) => void;
+    setLastPartialObject: (obj: Record<string, unknown> | null) => void;
+  },
+): Promise<string> => {
+  try {
+    const combinedText = previousPartial + text;
+    const lines = combinedText.split('\n');
+
+    // The last line might be incomplete, so save it for the next chunk
+    let partial = '';
+    if (combinedText[combinedText.length - 1] !== '\n') {
+      partial = lines.pop() || '';
+    }
+
+    // Parse all complete lines, take the last valid JSON object
+    let latestParsed: { data: Field[] } | null = null;
+
+    for (const line of lines) {
+      if (!line.trim()) continue;
+
+      try {
+        const jsonResponse = JSON.parse(line);
+        if (jsonResponse?.data?.length) {
+          latestParsed = jsonResponse;
+        }
+      } catch {
+        debug.warn('Failed to parse JSON line during diff-aware processing');
+      }
+    }
+
+    if (!latestParsed) return partial;
+
+    const { lastPartialObject } = store.getState();
+    const previousLookup: Record<string, unknown> = lastPartialObject || {};
+
+    // Build lookup from current parsed data
+    const currentLookup: Record<string, unknown> = {};
+    for (const parsedField of latestParsed.data) {
+      if (parsedField.id && parsedField.value !== undefined) {
+        currentLookup[parsedField.id] = parsedField.value;
+      }
+    }
+
+    // Process each field in the parsed data
+    for (const parsedField of latestParsed.data) {
+      const fieldId = parsedField.id;
+      if (!fieldId) continue;
+
+      const originalField = originalFields.find(f => f.id === fieldId);
+      if (!originalField) continue;
+
+      const newValue = parsedField.value as string | string[] | undefined;
+      const prevValue = previousLookup[fieldId] as string | string[] | undefined;
+
+      // Skip fields with no value
+      if (newValue === undefined) continue;
+
+      const fieldClass = classifyFieldForStreaming(originalField.type);
+
+      // Skip file fields during streaming
+      if (fieldClass === 'file') continue;
+
+      // Check if the value actually changed
+      if (!hasValueChanged(prevValue, newValue)) {
+        // Value unchanged - mark as stable
+        store.markFieldStable(fieldId);
+        continue;
+      }
+
+      // For choice fields, only update if value matches an available option
+      if (fieldClass === 'choice' && originalField.options) {
+        const valueStr = String(newValue);
+        const matchesOption = originalField.options.some(
+          opt => opt.value === valueStr || opt.text.toLowerCase() === valueStr.toLowerCase(),
+        );
+        if (!matchesOption) continue;
+      }
+
+      // Value changed - update store and do immediate DOM write
+      store.updateFieldValue(fieldId, newValue);
+
+      const mergedField = { ...originalField, ...parsedField };
+      const fieldInfo = unifiedFieldRegistry.getField(fieldId);
+      const element = fieldInfo?.element || (document.querySelector(`[data-filliny-id="${fieldId}"]`) as HTMLElement);
+
+      if (element) {
+        store.markFieldFilled(fieldId);
+        await immediateFieldSet(element, mergedField);
+      }
+    }
+
+    // Save current partial object for next diff
+    store.setLastPartialObject(currentLookup);
+
+    return partial;
+  } catch (error) {
+    debug.error('Error in processChunksDiffAware:', error);
+    return previousPartial;
+  }
+};
+
+/**
+ * Run a final verification pass after streaming completes.
+ * Uses updateFieldWithGroupHandling with full retry+verify for each field
+ * that has a value in the store.
+ */
+export const runFinalVerificationPass = async (
+  originalFields: Field[],
+  store: {
+    getState: () => {
+      fields: Record<
+        string,
+        {
+          status: string;
+          currentValue: string | string[] | undefined;
+        }
+      >;
+    };
+    markFieldVerified: (id: string) => void;
+    markFieldError: (id: string, message: string) => void;
+  },
+): Promise<FormUpdateResults> => {
+  const results: FormUpdateResults = {
+    successful: 0,
+    failed: 0,
+    skipped: 0,
+    errors: [],
+    totalRetries: 0,
+  };
+
+  const storeFields = store.getState().fields;
+
+  for (const originalField of originalFields) {
+    const storeField = storeFields[originalField.id];
+    if (!storeField) {
+      results.skipped++;
+      continue;
+    }
+
+    // Skip fields already verified or with no value
+    if (storeField.status === 'VERIFIED') {
+      results.successful++;
+      continue;
+    }
+
+    if (storeField.currentValue === undefined) {
+      results.skipped++;
+      continue;
+    }
+
+    // Build the field with the current value from the store
+    const fieldWithValue: Field = {
+      ...originalField,
+      value: storeField.currentValue,
+    };
+
+    const updateResult = await updateFieldWithGroupHandling(fieldWithValue, false);
+
+    if (updateResult.success) {
+      results.successful++;
+      results.totalRetries += updateResult.retryCount || 0;
+      store.markFieldVerified(originalField.id);
+    } else {
+      results.failed++;
+      if (updateResult.error) {
+        results.errors.push(updateResult.error);
+        store.markFieldError(originalField.id, updateResult.error.message);
+      }
+    }
+  }
+
+  return results;
+};
+
+export { _captureFormState as captureFormState, _restoreFormState as restoreFormState, _ensureFocus as ensureFocus };

@@ -1,6 +1,7 @@
-import { detectFields } from './field-types';
+import { detectFields, isElementAttached, captureFormState, restoreFormState, createBaseField } from './field-types';
 import { FieldSchema } from '@extension/shared';
 import { z } from 'zod';
+import type { FormStateSnapshot } from './field-types';
 import type { Field } from '@extension/shared';
 
 // ============================================================================
@@ -398,6 +399,134 @@ export class UnifiedFieldRegistry {
     return buttonData;
   }
 
+  // Refresh stale element references that are no longer attached to the DOM
+  refreshStaleReferences(): number {
+    let refreshedCount = 0;
+
+    for (const [fieldId, fieldInfo] of this.detectedFields.entries()) {
+      if (!fieldInfo.element || !isElementAttached(fieldInfo.element)) {
+        // Element is stale, try to re-find by data-filliny-id
+        const refound = document.querySelector<HTMLElement>(`[data-filliny-id="${fieldId}"]`);
+
+        if (refound && isElementAttached(refound)) {
+          // Update the reference in the registry
+          fieldInfo.element = refound;
+
+          // Update processedElements map
+          // Remove old entry if it exists
+          for (const [el, id] of this.processedElements.entries()) {
+            if (id === fieldId) {
+              this.processedElements.delete(el);
+              break;
+            }
+          }
+          this.processedElements.set(refound, fieldId);
+
+          refreshedCount++;
+          console.log(`Refreshed stale reference for field ${fieldId}`);
+        } else {
+          // Could not re-find, remove from registry
+          this.detectedFields.delete(fieldId);
+
+          // Clean up processedElements
+          for (const [el, id] of this.processedElements.entries()) {
+            if (id === fieldId) {
+              this.processedElements.delete(el);
+              break;
+            }
+          }
+
+          console.log(`Removed stale field ${fieldId} (element no longer in DOM)`);
+        }
+      }
+    }
+
+    // Also refresh grouped field references
+    for (const [groupId, groupInfo] of this.groupedFields.entries()) {
+      if (groupInfo.primaryElement && !isElementAttached(groupInfo.primaryElement)) {
+        // Try to find a new primary element from the group's fields
+        const validField = groupInfo.fields.find(f => f.element && isElementAttached(f.element));
+        if (validField?.element) {
+          groupInfo.primaryElement = validField.element;
+        } else {
+          groupInfo.primaryElement = null;
+        }
+      }
+
+      // Remove the group if it has no valid fields left
+      const hasValidFields = groupInfo.fields.some(f => this.detectedFields.has(f.field.id));
+      if (!hasValidFields) {
+        this.groupedFields.delete(groupId);
+        console.log(`Removed stale group ${groupId}`);
+      }
+    }
+
+    return refreshedCount;
+  }
+
+  // Register a single new field discovered during conditional field re-detection
+  async registerIncrementalField(element: HTMLElement, containerId?: string): Promise<void> {
+    // Skip if already processed
+    if (this.processedElements.has(element)) {
+      console.log(`UnifiedFieldRegistry: Element already registered, skipping`);
+      return;
+    }
+
+    // Determine the container
+    const resolvedContainerId = containerId || 'default';
+    const container = this.containers.get(resolvedContainerId) || element.closest('form') || document.body;
+
+    if (!this.containers.has(resolvedContainerId)) {
+      this.containers.set(resolvedContainerId, container as HTMLElement);
+    }
+
+    // Detect the field type for this single element using createBaseField
+    const currentFieldCount = this.detectedFields.size;
+    const field = await createBaseField(element, currentFieldCount, this.inferFieldType(element));
+
+    const fieldInfo: DetectedFieldInfo = {
+      field,
+      container: container as HTMLElement,
+      containerId: resolvedContainerId,
+      element,
+      isGrouped: this.isGroupedField(field),
+      groupId: this.getGroupId(field),
+    };
+
+    this.detectedFields.set(field.id, fieldInfo);
+    this.processedElements.set(element, field.id);
+
+    if (fieldInfo.isGrouped) {
+      const groupedFields: GroupedFieldInfo[] = [];
+      this.handleGroupedField(fieldInfo, groupedFields);
+    }
+
+    console.log(`UnifiedFieldRegistry: Incrementally registered field ${field.id} (${field.type})`);
+  }
+
+  // Infer field type from an HTML element
+  private inferFieldType(element: HTMLElement): string {
+    if (element instanceof HTMLInputElement) {
+      return element.type || 'text';
+    }
+    if (element instanceof HTMLSelectElement) {
+      return 'select';
+    }
+    if (element instanceof HTMLTextAreaElement) {
+      return 'textarea';
+    }
+    if (element.hasAttribute('contenteditable') && element.getAttribute('contenteditable') !== 'false') {
+      return 'text';
+    }
+    const role = element.getAttribute('role');
+    if (role === 'textbox' || role === 'searchbox') return 'text';
+    if (role === 'combobox' || role === 'listbox') return 'select';
+    if (role === 'checkbox') return 'checkbox';
+    if (role === 'radio') return 'radio';
+    if (role === 'switch') return 'checkbox';
+    return 'text';
+  }
+
   // Enhanced element finding with comprehensive fallback strategies
   private findFieldElementEnhanced(container: HTMLElement, field: Field): HTMLElement | null {
     const strategies = [
@@ -506,4 +635,31 @@ export class UnifiedFieldRegistry {
 // Types moved to top of file with Zod schemas
 
 // Export singleton instance
-export const unifiedFieldRegistry = UnifiedFieldRegistry.getInstance();
+const unifiedFieldRegistry = UnifiedFieldRegistry.getInstance();
+
+// ============================================================================
+// Form State Snapshot for Undo
+// ============================================================================
+
+// Store the last snapshot for undo capability
+let lastFormStateSnapshot: FormStateSnapshot | null = null;
+
+const refreshStaleReferences = (): number => unifiedFieldRegistry.refreshStaleReferences();
+
+const registerIncrementalField = async (element: HTMLElement, containerId?: string): Promise<void> =>
+  unifiedFieldRegistry.registerIncrementalField(element, containerId);
+
+const saveFormSnapshot = (container: HTMLElement | Document): void => {
+  lastFormStateSnapshot = captureFormState(container);
+};
+
+const undoFormFill = (): boolean => {
+  if (lastFormStateSnapshot) {
+    restoreFormState(lastFormStateSnapshot);
+    lastFormStateSnapshot = null;
+    return true;
+  }
+  return false;
+};
+
+export { unifiedFieldRegistry, refreshStaleReferences, registerIncrementalField, saveFormSnapshot, undoFormFill };

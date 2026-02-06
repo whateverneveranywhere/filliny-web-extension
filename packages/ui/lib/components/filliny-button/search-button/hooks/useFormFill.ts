@@ -1,6 +1,8 @@
 import { handleFormClick } from '../handleFormClick';
 import { disableOtherButtons, showLoadingIndicator } from '../overlayUtils';
+import { useFormFillStore } from '../stores';
 import { useState, useCallback } from 'react';
+import type { StreamingPhase } from '../stores';
 import type React from 'react';
 
 interface UseFormFillProps {
@@ -11,6 +13,7 @@ interface UseFormFillProps {
 
 interface UseFormFillReturn {
   loading: boolean;
+  phase: StreamingPhase;
   handleFillClick: (event: React.MouseEvent<HTMLButtonElement>) => Promise<void>;
 }
 
@@ -20,6 +23,7 @@ interface UseFormFillReturn {
  */
 export const useFormFill = ({ formId, testMode, onDismiss }: UseFormFillProps): UseFormFillReturn => {
   const [loading, setLoading] = useState(false);
+  const phase = useFormFillStore(state => state.phase);
 
   const handleFillClick = useCallback(
     async (event: React.MouseEvent<HTMLButtonElement>) => {
@@ -49,6 +53,7 @@ export const useFormFill = ({ formId, testMode, onDismiss }: UseFormFillProps): 
 
   return {
     loading,
+    phase,
     handleFillClick,
   };
 };

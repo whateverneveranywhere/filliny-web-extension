@@ -6,7 +6,7 @@ import { Drawer } from '../components/drawer';
 import { useToast } from '../hooks/use-toast';
 import { PageLayout } from '../layout';
 import {
-  useExtensionAuth,
+  useAuthContext,
   useDashboardOverview,
   useCreateFillingProfileMutation,
   useEditFillingProfileMutation,
@@ -119,7 +119,7 @@ const useProfileManagement = (url: string) => {
 };
 
 const HomePage = () => {
-  const { isAuthenticated } = useExtensionAuth();
+  const { isAuthenticated } = useAuthContext();
   const { isLoading: isLoadingOverview } = useDashboardOverview(isAuthenticated);
   const { activeProfile } = useActiveProfile();
   const { canFillForms, isPro, freeFormsRemaining, tokensRemaining } = usePlanLimits();

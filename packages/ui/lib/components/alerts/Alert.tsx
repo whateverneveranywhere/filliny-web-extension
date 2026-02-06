@@ -67,9 +67,9 @@ export const Alert = ({
             <Icon className="filliny-h-4 filliny-w-4" />
           </div>
         )}
-        <div className="filliny-flex filliny-flex-col filliny-gap-1.5">
+        <div className="filliny-flex filliny-min-w-0 filliny-flex-1 filliny-flex-col filliny-gap-1">
           <p className={titleVariants({ variant })}>{title}</p>
-          <p className="filliny-text-sm filliny-text-muted-foreground">{description}</p>
+          <p className="filliny-text-xs filliny-leading-relaxed filliny-text-muted-foreground">{description}</p>
         </div>
       </div>
       {buttonText && (

@@ -1,7 +1,14 @@
 import { getAllFormContainersFromRegistry } from './detectionHelpers';
-import { processChunks, updateFormFields, ErrorCategory, FieldUpdateError } from './fieldUpdaterHelpers';
+import {
+  processChunksDiffAware,
+  runFinalVerificationPass,
+  updateFormFields,
+  ErrorCategory,
+  FieldUpdateError,
+} from './fieldUpdaterHelpers';
 import { highlightForms } from './highlightForms';
 import { disableOtherButtons, resetOverlays, showLoadingIndicator } from './overlayUtils';
+import { formFillStore, StreamingPhase } from './stores';
 import { runTestModeFill } from './testModeHelpers';
 import { unifiedFieldRegistry } from './unifiedFieldDetection';
 import {
@@ -256,6 +263,10 @@ export const handleFormClick = async (
       }
     }
 
+    // Initialize the Zustand store session for streaming tracking
+    const storeActions = formFillStore.getState();
+    storeActions.initSession(fields.map(f => f.id));
+
     // Create promise control for streaming
     let streamResolve: () => void;
     let streamReject: (error: Error) => void;
@@ -267,6 +278,7 @@ export const handleFormClick = async (
     // Set up overall timeout for the operation
     timeoutId = setTimeout(() => {
       cleanup();
+      formFillStore.getState().setPhase(StreamingPhase.ERROR);
       streamReject(
         new FieldUpdateError(
           `Form fill operation timed out after ${FORM_FILL_TIMEOUT}ms`,
@@ -276,13 +288,25 @@ export const handleFormClick = async (
       );
     }, FORM_FILL_TIMEOUT);
 
+    // Store adapter for diff-aware processing
+    const storeAdapter = {
+      getState: () => formFillStore.getState(),
+      updateFieldValue: (id: string, value: string | string[] | undefined) =>
+        formFillStore.getState().updateFieldValue(id, value),
+      markFieldStable: (id: string) => formFillStore.getState().markFieldStable(id),
+      markFieldFilled: (id: string) => formFillStore.getState().markFieldFilled(id),
+      markFieldVerified: (id: string) => formFillStore.getState().markFieldVerified(id),
+      markFieldError: (id: string, msg: string) => formFillStore.getState().markFieldError(id, msg),
+      setLastPartialObject: (obj: Record<string, unknown> | null) => formFillStore.getState().setLastPartialObject(obj),
+    };
+
     // Set up message listener for streaming response using MessageType enum for consistency
     messageHandler = (message: StreamMessage) => {
       try {
         if (message.type === MessageType.STREAM_CHUNK && message.data) {
           try {
-            // Pass and track partial chunk data between calls to avoid data loss
-            processChunks(message.data, fields, partialChunk).then(newPartial => {
+            // Use diff-aware processing for incremental updates
+            processChunksDiffAware(message.data, fields, partialChunk, storeAdapter).then(newPartial => {
               partialChunk = newPartial;
             });
           } catch (error) {
@@ -294,6 +318,7 @@ export const handleFormClick = async (
           streamResolve();
         } else if (message.type === MessageType.STREAM_ERROR) {
           debug.error('Form Click: Stream error:', message.error);
+          formFillStore.getState().setPhase(StreamingPhase.ERROR);
           streamReject(new FieldUpdateError(message.error || 'Stream error', ErrorCategory.NETWORK_ERROR, 'form'));
         }
       } catch (messageError) {
@@ -321,8 +346,25 @@ export const handleFormClick = async (
     if (response instanceof ReadableStream) {
       // Wait for all streaming chunks to be processed
       await streamPromise;
+
+      // Streaming complete - run final verification pass
+      formFillStore.getState().setPhase(StreamingPhase.FINALIZING);
+      updateResults = await runFinalVerificationPass(fields, storeAdapter);
+
+      // Update phase based on verification results
+      formFillStore.getState().setPhase(StreamingPhase.COMPLETE);
+
+      // Check for partial failures
+      if (updateResults.failed > 0 && updateResults.successful > 0) {
+        const message = `Form partially filled: ${updateResults.successful} field(s) succeeded, ${updateResults.failed} failed. ${getUserErrorMessage(updateResults)}`;
+        debug.warn(message);
+        console.warn(message);
+      } else if (updateResults.failed > 0 && updateResults.successful === 0) {
+        throw new FieldUpdateError(getUserErrorMessage(updateResults), ErrorCategory.UPDATE_FAILED, 'form');
+      }
     } else if (response.data) {
       updateResults = await updateFormFields(response.data, false);
+      formFillStore.getState().setPhase(StreamingPhase.COMPLETE);
 
       // Check for partial failures
       if (updateResults.failed > 0 && updateResults.successful > 0) {
@@ -339,6 +381,7 @@ export const handleFormClick = async (
     }
   } catch (error) {
     cleanup();
+    formFillStore.getState().setPhase(StreamingPhase.ERROR);
     debug.error('Form Click: Error processing AI fill service:', error);
 
     // Handle unauthorized errors - user needs to log in again
@@ -391,6 +434,11 @@ export const handleFormClick = async (
       resetOverlays();
       // Notify the field manager to re-detect everything to prevent stale state
       document.dispatchEvent(new CustomEvent('filliny:bulkFillComplete'));
+
+      // Reset the store after a short delay to let UI show completion state
+      setTimeout(() => {
+        formFillStore.getState().reset();
+      }, 2000);
     } catch (finallyError) {
       debug.error('Error in finally block:', finallyError);
     }

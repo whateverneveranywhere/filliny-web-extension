@@ -1,4 +1,11 @@
-import { findSelectOptions, isCustomSelect, createBaseField } from './utils';
+import {
+  findSelectOptions,
+  isCustomSelect,
+  createBaseField,
+  setNativeValue,
+  dispatchPointerClickSequence,
+  waitForElement,
+} from './utils';
 import { createDebugLogger, Framework, isHTMLElement, isHTMLSelectElement } from '@extension/shared';
 import type { Field } from '@extension/shared';
 
@@ -177,12 +184,12 @@ const openReactSelectDropdown = (container: HTMLElement): boolean => {
     // Try clicking the control area
     const control = container.querySelector('[class*="control"]') || container;
     if (control instanceof HTMLElement) {
-      control.click();
+      dispatchPointerClickSequence(control);
 
       // Also try clicking the dropdown indicator
       const indicator = container.querySelector('[class*="dropdown-indicator"], [class*="indicatorContainer"]');
       if (indicator instanceof HTMLElement) {
-        indicator.click();
+        dispatchPointerClickSequence(indicator);
       }
 
       return true;
@@ -255,11 +262,7 @@ const selectReactSelectOption = (value: string, originalElement: HTMLElement): v
 
     if (matchingOption) {
       debug.log('🎯 Clicking matching React Select option:', matchingOption.textContent);
-      matchingOption.click();
-
-      // Dispatch additional events
-      matchingOption.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
-      matchingOption.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+      dispatchPointerClickSequence(matchingOption);
 
       // Update original element
       if (originalElement instanceof HTMLInputElement) {
@@ -486,12 +489,12 @@ const openMaterialUIDropdown = (container: HTMLElement): boolean => {
       container.querySelector('[role="combobox"], [role="button"]') || container.querySelector('input') || container;
 
     if (selectElement instanceof HTMLElement) {
-      selectElement.click();
+      dispatchPointerClickSequence(selectElement);
 
       // Also try clicking the dropdown arrow
       const arrow = container.querySelector('[class*="arrow"], [class*="icon"], [class*="dropdown"]');
       if (arrow instanceof HTMLElement) {
-        arrow.click();
+        dispatchPointerClickSequence(arrow);
       }
 
       return true;
@@ -565,11 +568,7 @@ const selectMaterialUIOption = (value: string, originalElement: HTMLElement): vo
 
     if (matchingOption) {
       debug.log('🎯 Clicking matching Material-UI option:', matchingOption.textContent);
-      matchingOption.click();
-
-      // Dispatch additional events
-      matchingOption.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
-      matchingOption.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+      dispatchPointerClickSequence(matchingOption);
 
       // Update original element if it's an input
       if (originalElement instanceof HTMLInputElement) {
@@ -637,7 +636,7 @@ const findMatchingMaterialUIOption = (options: HTMLElement[], value: string): HT
 /**
  * Handle Tsselect components commonly found on career sites
  */
-export const handleTsselect = (element: HTMLSelectElement, normalizedValues: string[]): boolean => {
+const handleTsselect = (element: HTMLSelectElement, normalizedValues: string[]): boolean => {
   try {
     debug.log('Attempting to handle Tsselect component...');
 
@@ -744,7 +743,7 @@ export const handleTsselect = (element: HTMLSelectElement, normalizedValues: str
       debug.log('Found select container:', selectContainer);
 
       // Click to open the dropdown
-      selectContainer.click();
+      dispatchPointerClickSequence(selectContainer);
       debug.log('Clicked on select container to open dropdown');
 
       // Process dropdown immediately rather than using setTimeout
@@ -873,12 +872,7 @@ export const handleTsselect = (element: HTMLSelectElement, normalizedValues: str
 
         try {
           // Click and dispatch events immediately without timeouts
-          matchedOption.click();
-
-          // Dispatch additional events for React handlers
-          // Some React components need these specific events
-          const mouseDownEvent = new MouseEvent('mousedown', { bubbles: true });
-          matchedOption?.dispatchEvent(mouseDownEvent);
+          dispatchPointerClickSequence(matchedOption);
 
           // Dispatch events to both the option and the original element
           const changeEvent = new Event('change', { bubbles: true });
@@ -917,7 +911,7 @@ export const handleTsselect = (element: HTMLSelectElement, normalizedValues: str
 /**
  * Update a select element with the provided value
  */
-export const updateSelect = (element: HTMLElement, value: string | string[] | unknown): void => {
+const updateSelect = async (element: HTMLElement, value: string | string[] | unknown): Promise<void> => {
   try {
     const normalizedValues = normalizeSelectValue(value);
 
@@ -935,34 +929,56 @@ export const updateSelect = (element: HTMLElement, value: string | string[] | un
       return;
     }
 
-    // 3. Try specialized Tsselect handler (for career sites)
+    // 3. Try Headless UI select
+    if (element.closest('[data-headlessui-state]') || element.querySelector('[data-headlessui-state]')) {
+      const result = await handleHeadlessUISelect(element, normalizedValues[0] || '');
+      if (result) {
+        debug.log('✅ Successfully handled as Headless UI Select');
+        return;
+      }
+    }
+
+    // 4. Try Radix UI select
+    if (
+      element.closest('[data-radix-select-trigger]') ||
+      element.querySelector('[data-radix-collection-item]') ||
+      element.closest('[data-radix-slot]')
+    ) {
+      const result = await handleRadixSelect(element, normalizedValues[0] || '');
+      if (result) {
+        debug.log('✅ Successfully handled as Radix UI Select');
+        return;
+      }
+    }
+
+    // 5. Try specialized Tsselect handler (for career sites)
     if (element instanceof HTMLSelectElement && handleTsselect(element, normalizedValues)) {
       debug.log('✅ Successfully handled as Tsselect');
       return;
     }
 
-    // 4. Standard HTML select elements
+    // 6. Standard HTML select elements
     if (element instanceof HTMLSelectElement) {
       updateStandardSelect(element, value);
       return;
     }
 
-    // 5. ARIA combobox/listbox elements
+    // 7. ARIA combobox/listbox elements
     if (element.getAttribute('role') === 'combobox' || element.getAttribute('role') === 'listbox') {
       updateAriaSelect(element, value);
       return;
     }
 
-    // 6. Custom select components (fallback)
+    // 8. Custom select components (fallback)
     if (isCustomSelect(element)) {
       updateCustomSelect(element, value);
       return;
     }
 
-    // 7. Try to find associated select element
+    // 9. Try to find associated select element
     const associatedSelect = findAssociatedSelectElement(element);
     if (associatedSelect) {
-      updateSelect(associatedSelect, value);
+      await updateSelect(associatedSelect, value);
       return;
     }
 
@@ -1066,6 +1082,7 @@ const updateStandardSelect = (element: HTMLSelectElement, value: string | string
 
   // Track if we've made a successful selection
   let selectionMade = false;
+  let matchedOptionValue = '';
 
   // First try exact match on value
   for (let i = 0; i < element.options.length; i++) {
@@ -1076,6 +1093,7 @@ const updateStandardSelect = (element: HTMLSelectElement, value: string | string
 
     if (valueArray.some(val => isValueMatch(option.value, val))) {
       option.selected = true;
+      matchedOptionValue = option.value;
       selectionMade = true;
 
       // For single selects, we're done after finding the first match
@@ -1096,6 +1114,7 @@ const updateStandardSelect = (element: HTMLSelectElement, value: string | string
 
       if (valueArray.some(val => isValueMatch(optionText, val))) {
         option.selected = true;
+        matchedOptionValue = option.value;
         selectionMade = true;
 
         // For single selects, we're done after finding the first match
@@ -1110,9 +1129,15 @@ const updateStandardSelect = (element: HTMLSelectElement, value: string | string
       const option = element.options[i];
       if (!option.disabled && !isPlaceholderOption(option)) {
         option.selected = true;
+        matchedOptionValue = option.value;
         break;
       }
     }
+  }
+
+  // Use setNativeValue as the primary way to set the value (bypasses framework interception)
+  if (matchedOptionValue && !element.multiple) {
+    setNativeValue(element, matchedOptionValue);
   }
 
   // Dispatch events to notify of change
@@ -1206,7 +1231,7 @@ const updateCustomSelect = (element: HTMLElement, value: string | string[] | unk
   // Try to click the component to open the dropdown
   const clickTarget = element.querySelector('button, [role="button"], [class*="select"]') || element;
   if (clickTarget instanceof HTMLElement) {
-    clickTarget.click();
+    dispatchPointerClickSequence(clickTarget);
   }
 
   // Give the dropdown time to open
@@ -1229,7 +1254,7 @@ const updateCustomSelect = (element: HTMLElement, value: string | string[] | unk
         )
       ) {
         // Found a match - click it
-        option.click();
+        dispatchPointerClickSequence(option);
         optionClicked = true;
         break;
       }
@@ -1389,7 +1414,7 @@ const dispatchSelectEvents = (element: HTMLSelectElement): void => {
  * Detect select fields from a set of elements
  * Handles both native selects and custom select components
  */
-export const detectSelectFields = async (
+const detectSelectFields = async (
   elements: HTMLElement[],
   baseIndex: number,
   testMode: boolean = false,
@@ -1723,8 +1748,175 @@ const detectDynamicSelectOptions = async (
   return options;
 };
 
+/**
+ * Handle Headless UI select components
+ */
+const handleHeadlessUISelect = async (element: HTMLElement, value: string): Promise<boolean> => {
+  try {
+    // Find the Headless UI trigger button
+    const trigger =
+      element.querySelector('[data-headlessui-state]') || element.closest('[data-headlessui-state]') || element;
+
+    // Click trigger to open the listbox
+    dispatchPointerClickSequence(trigger as HTMLElement);
+
+    // Wait for the listbox portal to appear
+    const listbox = await waitForElement('[role="listbox"]', 1500);
+    if (!listbox) return false;
+
+    // Find the matching option
+    const options = listbox.querySelectorAll('[role="option"]');
+    let matched = false;
+
+    for (const option of Array.from(options)) {
+      const optionText = (option.textContent || '').trim().toLowerCase();
+      const optionValue = option.getAttribute('data-value') || option.getAttribute('aria-value') || optionText;
+
+      if (optionValue.toLowerCase() === value.toLowerCase() || optionText === value.toLowerCase()) {
+        dispatchPointerClickSequence(option as HTMLElement);
+        matched = true;
+        break;
+      }
+    }
+
+    // Partial match fallback
+    if (!matched) {
+      for (const option of Array.from(options)) {
+        const optionText = (option.textContent || '').trim().toLowerCase();
+        if (optionText.includes(value.toLowerCase()) || value.toLowerCase().includes(optionText)) {
+          dispatchPointerClickSequence(option as HTMLElement);
+          matched = true;
+          break;
+        }
+      }
+    }
+
+    return matched;
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Handle Radix UI select components
+ */
+const handleRadixSelect = async (element: HTMLElement, value: string): Promise<boolean> => {
+  try {
+    // Find Radix select trigger
+    const trigger =
+      element.querySelector('[data-radix-select-trigger]') ||
+      element.closest('[data-radix-select-trigger]') ||
+      element.querySelector('button[role="combobox"]') ||
+      element;
+
+    // Click trigger to open
+    dispatchPointerClickSequence(trigger as HTMLElement);
+
+    // Wait for the content portal
+    const content = await waitForElement(
+      '[data-radix-popper-content-wrapper] [role="listbox"], [data-radix-select-viewport]',
+      1500,
+    );
+    if (!content) return false;
+
+    // Find matching option
+    const options = content.querySelectorAll('[role="option"], [data-radix-collection-item]');
+    let matched = false;
+
+    for (const option of Array.from(options)) {
+      const optionText = (option.textContent || '').trim().toLowerCase();
+      const optionValue = option.getAttribute('data-value') || optionText;
+
+      if (optionValue.toLowerCase() === value.toLowerCase() || optionText === value.toLowerCase()) {
+        dispatchPointerClickSequence(option as HTMLElement);
+        matched = true;
+        break;
+      }
+    }
+
+    if (!matched) {
+      for (const option of Array.from(options)) {
+        const optionText = (option.textContent || '').trim().toLowerCase();
+        if (optionText.includes(value.toLowerCase()) || value.toLowerCase().includes(optionText)) {
+          dispatchPointerClickSequence(option as HTMLElement);
+          matched = true;
+          break;
+        }
+      }
+    }
+
+    return matched;
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Handle multi-select components (React Select multi, Choices.js, Select2 multi, standard multi-select)
+ */
+const handleMultiSelect = async (element: HTMLElement, values: string[]): Promise<boolean> => {
+  try {
+    // Handle React Select multi, Choices.js, Select2 multi
+    const searchInput = element.querySelector(
+      'input[role="combobox"], input[type="text"], input.select__input',
+    ) as HTMLInputElement | null;
+
+    let successCount = 0;
+
+    for (const val of values) {
+      // Type into search if available
+      if (searchInput) {
+        setNativeValue(searchInput, val);
+        searchInput.dispatchEvent(new InputEvent('input', { bubbles: true, data: val }));
+
+        // Wait for dropdown options
+        await new Promise(resolve => setTimeout(resolve, 300));
+
+        // Find and click matching option
+        const options = document.querySelectorAll('[class*="option"], [role="option"]');
+        for (const option of Array.from(options)) {
+          const text = (option.textContent || '').trim().toLowerCase();
+          if (text === val.toLowerCase() || text.includes(val.toLowerCase())) {
+            dispatchPointerClickSequence(option as HTMLElement);
+            successCount++;
+            break;
+          }
+        }
+      } else {
+        // For standard multi-select
+        if (element instanceof HTMLSelectElement && element.multiple) {
+          const options = Array.from(element.options);
+          for (const option of options) {
+            if (option.value.toLowerCase() === val.toLowerCase() || option.text.toLowerCase() === val.toLowerCase()) {
+              option.selected = true;
+              successCount++;
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    // Dispatch change event
+    element.dispatchEvent(new Event('change', { bubbles: true }));
+
+    return successCount > 0;
+  } catch {
+    return false;
+  }
+};
+
 // ============================================================================
 // Exports (at end of file per ESLint import-x/exports-last rule)
 // ============================================================================
 
-export { handleReactSelect, handleMaterialUISelect };
+export {
+  handleReactSelect,
+  handleMaterialUISelect,
+  handleHeadlessUISelect,
+  handleRadixSelect,
+  handleMultiSelect,
+  handleTsselect,
+  updateSelect,
+  detectSelectFields,
+};

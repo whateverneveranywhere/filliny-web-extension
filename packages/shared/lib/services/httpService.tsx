@@ -356,7 +356,14 @@ class HttpService {
         if (response.error) {
           reject(new Error(response.error));
         } else {
-          resolve(response.data);
+          // Unwrap the API response envelope (same as request() does)
+          // The API wraps responses in { data, success }, extract 'data' if present
+          const rawData = response.data;
+          const unwrappedData =
+            rawData && typeof rawData === 'object' && 'data' in rawData && 'success' in rawData
+              ? rawData.data
+              : rawData;
+          resolve(unwrappedData);
         }
       });
     });

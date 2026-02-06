@@ -6,10 +6,10 @@ import { useQuery } from '@tanstack/react-query';
 /**
  * Hook to fetch auth health check data
  *
- * @param enabled - Whether the query should be enabled (default: true)
- *                  Pass false when user is not authenticated to prevent 401 errors
+ * @param enabled - Whether the query should be enabled (default: false)
+ *                  Only set to true when user is confirmed authenticated to prevent 401 errors
  */
-export const useAuthHealthCheckQuery = (enabled: boolean = true) =>
+export const useAuthHealthCheckQuery = (enabled: boolean = false) =>
   useQuery({
     queryKey: queryKeys.auth.healthCheck(),
     queryFn: authHealthCheckService,

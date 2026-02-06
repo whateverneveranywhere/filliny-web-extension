@@ -25,13 +25,12 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
-    "@extension/i18n": "workspace:*",
-    "@extension/shared": "workspace:*",
-    "@extension/storage": "workspace:*",
-    "tailwind-merge": "^3.3.0",
     "@dnd-kit/core": "^6.1.0",
     "@dnd-kit/modifiers": "^7.0.0",
     "@dnd-kit/utilities": "^3.2.2",
+    "@extension/i18n": "workspace:*",
+    "@extension/shared": "workspace:*",
+    "@extension/storage": "workspace:*",
     "@hookform/resolvers": "^3.9.0",
     "@radix-ui/react-accordion": "^1.1.2",
     "@radix-ui/react-alert-dialog": "^1.1.2",
@@ -73,18 +72,20 @@
     "react-hook-form": "^7.53.1",
     "react-router-dom": "^6.27.0",
     "sonner": "^2.0.3",
+    "tailwind-merge": "^3.3.0",
     "vaul": "^1.1.1",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "zustand": "^5.0.11"
   },
   "devDependencies": {
     "@extension/tailwindcss-config": "workspace:*",
     "@extension/tsconfig": "workspace:*",
+    "@tanstack/eslint-plugin-query": "^5.59.7",
     "@vitest/coverage-v8": "^2.1.0",
+    "deepmerge": "^4.3.1",
     "jsdom": "^25.0.0",
     "react-spinners": "^0.17.0",
     "tsc-alias": "^1.8.16",
-    "@tanstack/eslint-plugin-query": "^5.59.7",
-    "deepmerge": "^4.3.1",
     "vitest": "^2.1.0",
     "zod": "^3.23.8"
   }

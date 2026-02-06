@@ -1,8 +1,7 @@
-import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { getConfig, getFaviconUrl } from '@extension/shared';
-import { ExternalLink, FolderPlus, Sparkles, Zap } from 'lucide-react';
+import { ExternalLink, FolderPlus, Zap } from 'lucide-react';
 
 interface EmptyProfileStateProps {
   onCreateProfile: () => void;
@@ -33,31 +32,27 @@ const EmptyProfileState = ({
 
   return (
     <div className="filliny-flex filliny-flex-col filliny-gap-4">
-      {/* Quick Start Card */}
+      {/* Enable on this website */}
       {isCurrentWebsiteValid && currentWebsiteUrl && (
-        <Card className="filliny-w-full filliny-border-primary/30 filliny-bg-gradient-to-br filliny-from-primary/10 filliny-via-primary/5 filliny-to-transparent filliny-backdrop-blur-sm">
-          <CardHeader className="filliny-pb-3">
-            <div className="filliny-flex filliny-items-center filliny-gap-3">
-              <div className="filliny-flex filliny-h-10 filliny-w-10 filliny-items-center filliny-justify-center filliny-rounded-full filliny-bg-primary/15">
-                <Zap className="filliny-h-5 filliny-w-5 filliny-text-primary" />
+        <Card className="filliny-w-full filliny-border-border">
+          <CardHeader className="filliny-pb-2">
+            <div className="filliny-flex filliny-items-center filliny-gap-2.5">
+              <div className="filliny-flex filliny-h-8 filliny-w-8 filliny-items-center filliny-justify-center filliny-rounded-full filliny-bg-primary/10">
+                <Zap className="filliny-h-4 filliny-w-4 filliny-text-primary" />
               </div>
               <div className="filliny-flex-1">
-                <CardTitle className="filliny-text-base">Quick Start</CardTitle>
-                <CardDescription className="filliny-text-xs">Enable AI form filling on this website</CardDescription>
+                <CardTitle className="filliny-text-sm">Enable Filliny</CardTitle>
+                <CardDescription className="filliny-text-xs">AI form filling on this website</CardDescription>
               </div>
-              <Badge variant="success" className="filliny-gap-1 filliny-shrink-0">
-                <Sparkles className="filliny-h-3 filliny-w-3" />
-                Recommended
-              </Badge>
             </div>
           </CardHeader>
-          <CardContent className="filliny-flex filliny-flex-col filliny-gap-3 filliny-pt-0">
-            <div className="filliny-flex filliny-items-center filliny-gap-3 filliny-rounded-lg filliny-border filliny-border-border/50 filliny-bg-card/50 filliny-p-3">
+          <CardContent className="filliny-flex filliny-flex-col filliny-gap-2.5 filliny-pt-0">
+            <div className="filliny-flex filliny-items-center filliny-gap-2.5 filliny-rounded-lg filliny-border filliny-border-border/50 filliny-bg-muted/30 filliny-px-3 filliny-py-2">
               <img
                 src={getFaviconUrl(currentWebsiteUrl)}
                 alt="Current site favicon"
-                width={24}
-                height={24}
+                width={20}
+                height={20}
                 className="filliny-rounded filliny-shrink-0"
                 onError={e => {
                   (e.target as HTMLImageElement).style.display = 'none';
@@ -66,7 +61,12 @@ const EmptyProfileState = ({
               <span className="filliny-text-sm filliny-font-medium filliny-flex-1">{currentHostname}</span>
             </div>
 
-            <Button onClick={onQuickStart} disabled={isLoading} loading={isLoading} className="filliny-w-full">
+            <Button
+              size="sm"
+              onClick={onQuickStart}
+              disabled={isLoading}
+              loading={isLoading}
+              className="filliny-w-full">
               Enable on this website
             </Button>
           </CardContent>
@@ -75,17 +75,17 @@ const EmptyProfileState = ({
 
       {/* Create Custom Profile Card */}
       <Card className="filliny-w-full filliny-border-border/50 filliny-bg-card/30">
-        <CardContent className="filliny-flex filliny-items-center filliny-justify-between filliny-py-3 filliny-px-4">
+        <CardContent className="filliny-flex filliny-flex-col filliny-gap-3 filliny-py-3 filliny-px-4">
           <div className="filliny-flex filliny-items-center filliny-gap-3">
-            <div className="filliny-flex filliny-h-8 filliny-w-8 filliny-items-center filliny-justify-center filliny-rounded-full filliny-bg-muted">
+            <div className="filliny-flex filliny-h-8 filliny-w-8 filliny-shrink-0 filliny-items-center filliny-justify-center filliny-rounded-full filliny-bg-muted">
               <FolderPlus className="filliny-h-4 filliny-w-4 filliny-text-muted-foreground" />
             </div>
-            <div>
+            <div className="filliny-min-w-0">
               <p className="filliny-text-sm filliny-font-medium">Want more control?</p>
               <p className="filliny-text-xs filliny-text-muted-foreground">Customize your profile settings</p>
             </div>
           </div>
-          <Button variant="outline" size="sm" onClick={onCreateProfile} disabled={isLoading}>
+          <Button variant="outline" size="sm" className="filliny-w-full" onClick={onCreateProfile} disabled={isLoading}>
             Create Custom
           </Button>
         </CardContent>

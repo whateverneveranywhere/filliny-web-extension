@@ -72,14 +72,17 @@ const manifest = {
     {
       matches: ['http://*/*', 'https://*/*', '<all_urls>'],
       js: ['content/all.iife.js'],
+      all_frames: true,
     },
     {
       matches: ['http://*/*', 'https://*/*', '<all_urls>'],
       js: ['content-ui/all.iife.js'],
+      all_frames: true,
     },
     {
       matches: ['http://*/*', 'https://*/*', '<all_urls>'],
       css: ['content.css'],
+      all_frames: true,
     },
   ],
   web_accessible_resources: [
@@ -94,7 +97,7 @@ const manifest = {
   externally_connectable: {
     matches: [
       'https://*.filliny.io/*', // Production domain
-      'https://*.filliny.com/*', // Production & preview domains (filliny.io redirects to filliny.com)
+      'https://*.filliny.com/*', // Legacy domain support
       ...(env === WebappEnvs.DEV ? ['http://localhost:*/*'] : []), // Local development only in DEV
     ],
   },

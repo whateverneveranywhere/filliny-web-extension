@@ -2496,3 +2496,185 @@ export const getProcessedFormDefinitions = (doc: Document): ProcessedFormDefinit
 
   return definitions;
 };
+
+/**
+ * Enhance detected fields with API response data.
+ * Correlates API-defined form fields to detected DOM elements, finding
+ * any fields that were missed during DOM-based detection.
+ */
+const enhanceDetectionWithAPIData = (
+  fields: HTMLElement[],
+  container: HTMLElement,
+  doc: Document = document,
+): HTMLElement[] => {
+  try {
+    const apiDefinitions = getProcessedFormDefinitions(doc);
+    if (!apiDefinitions || apiDefinitions.length === 0) return fields;
+
+    const fieldSet = new Set(fields);
+
+    // Match API-defined fields to detected DOM elements
+    for (const definition of apiDefinitions) {
+      if (definition.fields) {
+        for (const apiField of definition.fields) {
+          // Check if we already have this field
+          const alreadyDetected = fields.some(el => {
+            const name = el.getAttribute('name') || el.getAttribute('id') || '';
+            const label = el.getAttribute('aria-label') || '';
+            return name === apiField.name || name === apiField.id || label === apiField.label;
+          });
+
+          if (!alreadyDetected) {
+            // Try to find the element in DOM by name/id/label
+            const selectors = [
+              apiField.name ? `[name="${apiField.name}"]` : null,
+              apiField.id ? `#${CSS.escape(apiField.id)}` : null,
+              apiField.id ? `[id="${apiField.id}"]` : null,
+              apiField.label ? `[aria-label="${apiField.label}"]` : null,
+            ].filter(Boolean);
+
+            for (const selector of selectors) {
+              try {
+                const el = container.querySelector(selector as string);
+                if (el instanceof HTMLElement && !fieldSet.has(el)) {
+                  fieldSet.add(el);
+                  fields.push(el);
+                  break;
+                }
+              } catch {
+                // Invalid selector, skip
+              }
+            }
+          }
+        }
+      }
+    }
+
+    return fields;
+  } catch {
+    return fields;
+  }
+};
+
+/**
+ * Listen for HTMX content swaps and re-trigger detection.
+ * Returns a cleanup function to remove the event listeners.
+ */
+const initializeHTMXSwapListener = (onSwap: (target: HTMLElement) => void): (() => void) => {
+  const handler = (event: Event) => {
+    const customEvent = event as CustomEvent;
+    const target = customEvent.detail?.target || customEvent.target;
+    if (target instanceof HTMLElement) {
+      onSwap(target);
+    }
+  };
+
+  document.addEventListener('htmx:afterSwap', handler);
+  document.addEventListener('htmx:afterSettle', handler);
+
+  return () => {
+    document.removeEventListener('htmx:afterSwap', handler);
+    document.removeEventListener('htmx:afterSettle', handler);
+  };
+};
+
+/**
+ * Watch for conditionally rendered form fields via MutationObserver.
+ * Observes the given container for new form field elements added to the DOM.
+ * After the specified duration, the observer disconnects and reports any new fields found.
+ * Returns a cleanup function to stop observation early.
+ */
+const watchForConditionalFields = (
+  container: HTMLElement,
+  onNewFields: (elements: HTMLElement[]) => void,
+  duration: number = 500,
+): (() => void) => {
+  const newElements: HTMLElement[] = [];
+
+  const observer = new MutationObserver(mutations => {
+    for (const mutation of mutations) {
+      for (const node of Array.from(mutation.addedNodes)) {
+        if (node instanceof HTMLElement) {
+          // Check if the added node contains form fields
+          const inputs = node.querySelectorAll(
+            'input, select, textarea, [role="textbox"], [role="combobox"], [role="checkbox"], [role="radio"]',
+          );
+          inputs.forEach(el => {
+            if (el instanceof HTMLElement && !el.hasAttribute('data-filliny-id')) {
+              newElements.push(el);
+            }
+          });
+          // Check the node itself
+          if (
+            node.matches('input, select, textarea, [role="textbox"], [role="combobox"]') &&
+            !node.hasAttribute('data-filliny-id')
+          ) {
+            newElements.push(node);
+          }
+        }
+      }
+    }
+  });
+
+  observer.observe(container, { childList: true, subtree: true });
+
+  const timer = window.setTimeout(() => {
+    observer.disconnect();
+    if (newElements.length > 0) {
+      onNewFields(newElements);
+    }
+  }, duration);
+
+  return () => {
+    observer.disconnect();
+    clearTimeout(timer);
+  };
+};
+
+/**
+ * Detect form containers inside open dialogs, popovers, and modal elements.
+ * These containers may hold forms that are not part of the main document flow.
+ */
+const detectFormsInDialogsAndPopovers = (doc: Document = document): HTMLElement[] => {
+  const containers: HTMLElement[] = [];
+
+  try {
+    // Open dialogs
+    const dialogs = doc.querySelectorAll('dialog[open]');
+    dialogs.forEach(dialog => {
+      if (dialog instanceof HTMLElement) containers.push(dialog);
+    });
+
+    // Popover elements (HTML Popover API)
+    try {
+      const popovers = doc.querySelectorAll('[popover]:popover-open');
+      popovers.forEach(popover => {
+        if (popover instanceof HTMLElement) containers.push(popover);
+      });
+    } catch {
+      // :popover-open may not be supported in all browsers
+    }
+
+    // Modal elements
+    const modals = doc.querySelectorAll('[role="dialog"][aria-modal="true"]');
+    modals.forEach(modal => {
+      if (modal instanceof HTMLElement) {
+        const style = window.getComputedStyle(modal);
+        if (style.display !== 'none' && style.visibility !== 'hidden') {
+          containers.push(modal);
+        }
+      }
+    });
+  } catch {
+    // Detection failed, return empty
+  }
+
+  return containers;
+};
+
+export {
+  enhanceDetectionWithAPIData,
+  initializeHTMXSwapListener,
+  watchForConditionalFields,
+  detectFormsInDialogsAndPopovers,
+};

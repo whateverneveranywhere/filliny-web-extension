@@ -4,6 +4,7 @@ import { detectFileFields } from './file';
 import { detectSelectFields } from './select';
 import { UNIVERSAL_FORM_SELECTORS } from './selectors';
 import { detectTextField } from './text';
+import { isHoneypotField } from './utils';
 import type { SelectorWithConfidence } from './selectors';
 import type { Field, ShadowDOMHostElement, ElementWithEventListeners } from '@extension/shared';
 
@@ -35,6 +36,63 @@ const getFormElementsRobust = (container: HTMLElement | ShadowRoot): HTMLElement
   // Strategy 5: Visual layout analysis for form-like structures
   elements = enhanceWithVisualAnalysis(container, elements);
   console.log(`👁️ Visual analysis enhanced to ${elements.length} elements`);
+
+  // Build a set of already-processed elements for deduplication
+  const processedElements = new Set<HTMLElement>(elements);
+
+  // Strategy 6: FormAssociated custom elements
+  // Iterate form.elements to catch custom elements with formAssociated = true
+  try {
+    const forms = container.querySelectorAll('form');
+    forms.forEach(form => {
+      if (form.elements) {
+        Array.from(form.elements).forEach(el => {
+          if (el instanceof HTMLElement && !processedElements.has(el)) {
+            // Check if it's a custom element (has a hyphen in tagName) or is form-associated
+            if (
+              el.tagName.includes('-') ||
+              !(
+                el instanceof HTMLInputElement ||
+                el instanceof HTMLSelectElement ||
+                el instanceof HTMLTextAreaElement ||
+                el instanceof HTMLButtonElement
+              )
+            ) {
+              processedElements.add(el);
+              elements.push(el);
+            }
+          }
+        });
+      }
+    });
+  } catch {
+    // FormAssociated detection failed, continue
+  }
+
+  // Strategy 7: Dialog and popover detection
+  // Detect forms inside open <dialog> and [popover] elements
+  try {
+    const combinedSelector = createUniversalFormElementSelectors()
+      .map(s => s.selector)
+      .join(', ');
+    const dialogsAndPopovers = container.querySelectorAll('dialog[open], [popover]:popover-open');
+    dialogsAndPopovers.forEach(dp => {
+      if (dp instanceof HTMLElement) {
+        // Run detection within each open dialog/popover
+        const innerElements = dp.querySelectorAll(combinedSelector);
+        innerElements.forEach(el => {
+          if (el instanceof HTMLElement && !processedElements.has(el)) {
+            processedElements.add(el);
+            elements.push(el);
+          }
+        });
+      }
+    });
+  } catch {
+    // Dialog/popover detection failed, continue
+  }
+
+  console.log(`📋 After FormAssociated + dialog/popover detection: ${elements.length} elements`);
 
   // Final filtering with confidence scoring
   const filteredElements = applyUniversalFieldFiltering(elements);
@@ -123,8 +181,23 @@ const enhanceWithBehavioralPatternDetection = (
 ): HTMLElement[] => {
   console.log('🎯 Enhancing with behavioral pattern detection...');
 
-  const allElements = Array.from(container.querySelectorAll<HTMLElement>('*'));
-  const behavioralElements = allElements.filter(el => isInteractiveFormFieldByBehavior(el, existingElements));
+  // Performance guard: cap element count to prevent page freezing
+  const MAX_ELEMENTS = 2000;
+  const allElements = Array.from(container.querySelectorAll<HTMLElement>('*')).slice(0, MAX_ELEMENTS);
+
+  const startTime = performance.now();
+  const TIME_BUDGET_MS = 500;
+
+  const behavioralElements: HTMLElement[] = [];
+  for (const el of allElements) {
+    if (performance.now() - startTime > TIME_BUDGET_MS) {
+      console.debug('Behavioral detection time budget exceeded, stopping');
+      break;
+    }
+    if (isInteractiveFormFieldByBehavior(el, existingElements)) {
+      behavioralElements.push(el);
+    }
+  }
 
   console.log(`🎯 Found ${behavioralElements.length} additional elements through behavioral analysis`);
   const combinedElements = [...existingElements, ...behavioralElements];
@@ -856,10 +929,20 @@ const enhanceWithAdvancedShadowDOMDetection = (
 
   const shadowElements: HTMLElement[] = [];
 
+  // Performance guard: cap element count to prevent page freezing
+  const MAX_ELEMENTS = 2000;
+  const startTime = performance.now();
+  const TIME_BUDGET_MS = 500;
+
   // Strategy 1: Direct Shadow DOM access
-  const shadowHosts = Array.from(container.querySelectorAll('*')).filter(el => (el as ShadowDOMHostElement).shadowRoot);
+  const allContainerElements = Array.from(container.querySelectorAll('*')).slice(0, MAX_ELEMENTS);
+  const shadowHosts = allContainerElements.filter(el => (el as ShadowDOMHostElement).shadowRoot);
 
   for (const host of shadowHosts) {
+    if (performance.now() - startTime > TIME_BUDGET_MS) {
+      console.debug('Shadow DOM detection time budget exceeded, stopping');
+      break;
+    }
     try {
       const shadowRoot = (host as ShadowDOMHostElement).shadowRoot;
       if (shadowRoot) {
@@ -873,11 +956,15 @@ const enhanceWithAdvancedShadowDOMDetection = (
   }
 
   // Strategy 2: Custom element detection (Web Components)
-  const customElements = Array.from(container.querySelectorAll('*')).filter(
+  const customElements = allContainerElements.filter(
     el => el.tagName.includes('-') && !el.tagName.startsWith('WEBKIT-'),
   );
 
   for (const customEl of customElements) {
+    if (performance.now() - startTime > TIME_BUDGET_MS) {
+      console.debug('Shadow DOM custom element detection time budget exceeded, stopping');
+      break;
+    }
     try {
       // Check if custom element has form-like behavior
       if (isCustomElementFormLike(customEl as HTMLElement)) {
@@ -892,6 +979,10 @@ const enhanceWithAdvancedShadowDOMDetection = (
   // Strategy 3: Slotted content detection
   const slots = Array.from(container.querySelectorAll('slot'));
   for (const slot of slots) {
+    if (performance.now() - startTime > TIME_BUDGET_MS) {
+      console.debug('Shadow DOM slot detection time budget exceeded, stopping');
+      break;
+    }
     try {
       const assignedElements = slot.assignedElements ? slot.assignedElements() : [];
       for (const assigned of assignedElements) {
@@ -945,12 +1036,20 @@ const enhanceWithSemanticAnalysis = (
 
   const semanticElements: HTMLElement[] = [];
 
+  const MAX_ELEMENTS = 2000;
+  const startTime = performance.now();
+  const TIME_BUDGET_MS = 500;
+
   // Strategy 1: ARIA relationship traversal
   const ariaElements = Array.from(
     container.querySelectorAll('[aria-labelledby], [aria-describedby], [aria-controls], [aria-owns]'),
-  );
+  ).slice(0, MAX_ELEMENTS);
 
   for (const el of ariaElements) {
+    if (performance.now() - startTime > TIME_BUDGET_MS) {
+      console.debug('Semantic analysis time budget exceeded, stopping');
+      break;
+    }
     try {
       const htmlEl = el as HTMLElement;
 
@@ -984,8 +1083,12 @@ const enhanceWithSemanticAnalysis = (
   }
 
   // Strategy 2: Label association discovery
-  const labels = Array.from(container.querySelectorAll('label'));
+  const labels = Array.from(container.querySelectorAll('label')).slice(0, MAX_ELEMENTS);
   for (const label of labels) {
+    if (performance.now() - startTime > TIME_BUDGET_MS) {
+      console.debug('Semantic analysis time budget exceeded during label discovery, stopping');
+      break;
+    }
     try {
       const forAttr = label.getAttribute('for');
       if (forAttr) {
@@ -1023,17 +1126,30 @@ const enhanceWithVisualAnalysis = (
 
   const visualElements: HTMLElement[] = [];
 
+  // Performance guard: cap element count to prevent page freezing
+  const MAX_ELEMENTS = 2000;
+
   try {
     // Strategy 1: Find elements in form-like visual arrangements
-    const potentialElements = Array.from(container.querySelectorAll('*')).filter(el => {
-      const htmlEl = el as HTMLElement;
-      return (
-        !existingElements.includes(htmlEl) &&
-        !['SCRIPT', 'STYLE', 'META', 'LINK', 'TITLE', 'HEAD', 'NOSCRIPT'].includes(htmlEl.tagName)
-      );
-    });
+    const potentialElements = Array.from(container.querySelectorAll('*'))
+      .slice(0, MAX_ELEMENTS)
+      .filter(el => {
+        const htmlEl = el as HTMLElement;
+        return (
+          !existingElements.includes(htmlEl) &&
+          !['SCRIPT', 'STYLE', 'META', 'LINK', 'TITLE', 'HEAD', 'NOSCRIPT'].includes(htmlEl.tagName)
+        );
+      });
+
+    const startTime = performance.now();
+    const TIME_BUDGET_MS = 500;
 
     for (const el of potentialElements) {
+      if (performance.now() - startTime > TIME_BUDGET_MS) {
+        console.debug('Visual analysis time budget exceeded, stopping');
+        break;
+      }
+
       const htmlEl = el as HTMLElement;
 
       // Check if element is in a form-like visual arrangement
@@ -1134,6 +1250,12 @@ const applyUniversalFieldFiltering = (elements: HTMLElement[]): HTMLElement[] =>
       if (isElementDisabledOrReadonly(el)) return false;
       if (isElementDecorative(el)) return false;
 
+      // Skip honeypot fields
+      if (isHoneypotField(el)) {
+        console.debug('Skipping honeypot field:', el);
+        return false;
+      }
+
       // Advanced form field validation
       if (!isUniversalFormFieldElement(el)) return false;
 
@@ -1231,7 +1353,10 @@ const isUniversalElementVisible = (el: HTMLElement): boolean => {
  * Check if element is disabled or readonly
  */
 const isElementDisabledOrReadonly = (el: HTMLElement): boolean =>
-  el.hasAttribute('disabled') || el.hasAttribute('readonly');
+  el.hasAttribute('disabled') ||
+  el.hasAttribute('readonly') ||
+  el.getAttribute('aria-disabled') === 'true' ||
+  el.closest('fieldset[disabled]') !== null;
 
 /**
  * Check if element is decorative (not interactive)

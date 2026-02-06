@@ -1,4 +1,12 @@
-import { dispatchEvent, simulateTyping, addVisualFeedback, createBaseField } from './utils';
+import {
+  dispatchEvent,
+  simulateTyping,
+  addVisualFeedback,
+  createBaseField,
+  setNativeValue,
+  invokeReactOnChange,
+  ensureFocus,
+} from './utils';
 import {
   Framework,
   TEXT_INPUT_TYPES,
@@ -299,6 +307,10 @@ const updateTextField = async (element: HTMLElement, value: string): Promise<voi
     // Special handling for textareas
     if (element instanceof HTMLTextAreaElement) {
       console.log('Handling textarea element specifically');
+      // Truncate to maxLength if defined
+      if (element.maxLength > 0 && normalizedValue.length > element.maxLength) {
+        normalizedValue = normalizedValue.substring(0, element.maxLength);
+      }
       // Set value directly and dispatch events
       element.value = normalizedValue;
       dispatchEvent(element, 'input');
@@ -474,6 +486,38 @@ const updateTextField = async (element: HTMLElement, value: string): Promise<voi
     if (detectedFramework === Framework.QWIK || detectQwik(element)) {
       console.log('Detected Qwik component, using Qwik-specific update strategy');
       await handleQwikTextInput(element, normalizedValue);
+      return;
+    }
+
+    // Handle new framework-specific components
+    let frameworkResult = false;
+    switch (detectedFramework) {
+      case Framework.ALPINE:
+        frameworkResult = await handleAlpineTextInput(element, normalizedValue);
+        break;
+      case Framework.HTMX:
+        frameworkResult = await handleHTMXTextInput(element, normalizedValue);
+        break;
+      case Framework.KNOCKOUT:
+        frameworkResult = await handleKnockoutTextInput(element, normalizedValue);
+        break;
+      case Framework.LIT:
+        frameworkResult = await handleLitTextInput(element, normalizedValue);
+        break;
+      case Framework.PREACT:
+        frameworkResult = await handlePreactTextInput(element, normalizedValue);
+        break;
+      case Framework.SOLID:
+        frameworkResult = await handleSolidTextInput(element, normalizedValue);
+        break;
+      case Framework.EMBER:
+        frameworkResult = await handleEmberTextInput(element, normalizedValue);
+        break;
+      default:
+        break;
+    }
+
+    if (frameworkResult) {
       return;
     }
 
@@ -884,6 +928,27 @@ const handleReactTextInput = async (element: HTMLElement, value: string, detecti
     // Focus the element first
     element.focus();
 
+    // Try native value setter as a fast path before dispatching to specific handlers
+    if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
+      setNativeValue(element, value);
+      element.dispatchEvent(
+        new InputEvent('input', { bubbles: true, data: value, inputType: 'insertReplacementText' }),
+      );
+      element.dispatchEvent(new Event('change', { bubbles: true }));
+
+      if (element.value === value) {
+        return;
+      }
+
+      // Fallback: try invokeReactOnChange
+      setNativeValue(element, value);
+      invokeReactOnChange(element);
+
+      if (element.value === value) {
+        return;
+      }
+    }
+
     // Handle different React component types
     switch (detection.type) {
       case 'controlled':
@@ -1114,20 +1179,34 @@ const triggerReactStateUpdate = async (
   _detection: ReactDetection,
 ): Promise<void> => {
   // For controlled components, we need to simulate user input to trigger state updates
-  if (element instanceof HTMLInputElement) {
-    // Clear the input first
+  if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
+    // PRIMARY: Use native value setter + dispatch input event
+    setNativeValue(element, value);
+    element.dispatchEvent(new InputEvent('input', { bubbles: true, data: value, inputType: 'insertReplacementText' }));
+    element.dispatchEvent(new Event('change', { bubbles: true }));
+
+    if (element.value === value) {
+      return;
+    }
+
+    // FALLBACK 1: Native setter + direct React onChange invocation
+    setNativeValue(element, value);
+    invokeReactOnChange(element);
+
+    if (element.value === value) {
+      return;
+    }
+
+    // FALLBACK 2: Character-by-character typing (last resort)
     element.value = '';
     await triggerReactEvents(element, ['focus']);
 
-    // Simulate typing character by character for controlled components
     for (let i = 0; i < value.length; i++) {
       const char = value[i];
       const newValue = value.substring(0, i + 1);
 
-      // Update the value
       element.value = newValue;
 
-      // Create synthetic events
       const inputEvent = new InputEvent('input', {
         bubbles: true,
         cancelable: true,
@@ -1570,6 +1649,82 @@ const waitForNextjsHydration = async (): Promise<void> =>
  */
 const updateContentEditable = async (element: HTMLElement, value: string): Promise<void> => {
   try {
+    // Try CKEditor 5 API
+    if ('ckeditorInstance' in element) {
+      try {
+        (element as unknown as { ckeditorInstance: { setData: (v: string) => void } }).ckeditorInstance.setData(value);
+        return;
+      } catch {
+        /* fall through */
+      }
+    }
+
+    // Try TinyMCE API
+    const tinymceId = element.id || element.closest('[id]')?.id;
+    if (tinymceId && 'tinymce' in window) {
+      try {
+        const tinymceGlobal = (
+          window as unknown as { tinymce: { get: (id: string) => { setContent: (v: string) => void } | null } }
+        ).tinymce;
+        const editor = tinymceGlobal.get(tinymceId);
+        if (editor) {
+          editor.setContent(value);
+          return;
+        }
+      } catch {
+        /* fall through */
+      }
+    }
+
+    // Try Quill API
+    if ('__quill' in element) {
+      try {
+        (element as unknown as { __quill: { setText: (v: string) => void } }).__quill.setText(value);
+        return;
+      } catch {
+        /* fall through */
+      }
+    }
+
+    // Try ProseMirror/Tiptap
+    if (element.classList.contains('ProseMirror')) {
+      try {
+        const pmDesc = (
+          element as unknown as {
+            pmViewDesc?: {
+              view: {
+                state: {
+                  tr: { insertText: (text: string, from: number, to: number) => unknown };
+                  doc: { content: { size: number } };
+                };
+                dispatch: (tr: unknown) => void;
+              };
+            };
+          }
+        ).pmViewDesc;
+        const view = pmDesc?.view;
+        if (view) {
+          const tr = view.state.tr.insertText(value, 0, view.state.doc.content.size);
+          view.dispatch(tr);
+          return;
+        }
+      } catch {
+        /* fall through */
+      }
+    }
+
+    // Try Slate
+    if (element.hasAttribute('data-slate-editor')) {
+      try {
+        element.focus();
+        document.execCommand('selectAll', false);
+        document.execCommand('insertText', false, value);
+        return;
+      } catch {
+        /* fall through */
+      }
+    }
+
     // First check if we're dealing with a rich text editor
     const isRichEditor =
       element.closest('[class*="editor"]') !== null ||
@@ -1609,6 +1764,97 @@ const updateContentEditable = async (element: HTMLElement, value: string): Promi
       console.error('Even fallback approach failed:', fallbackError);
     }
   }
+};
+
+// ============================================================================
+// New Framework Handlers
+// ============================================================================
+
+const handleAlpineTextInput = async (element: HTMLElement, value: string): Promise<boolean> => {
+  // Alpine.js listens to standard DOM input events
+  if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
+    setNativeValue(element, value);
+    element.dispatchEvent(new Event('input', { bubbles: true }));
+    element.dispatchEvent(new Event('change', { bubbles: true }));
+    return element.value === value;
+  }
+  return false;
+};
+
+const handleHTMXTextInput = async (element: HTMLElement, value: string): Promise<boolean> => {
+  // HTMX listens to standard events, dispatch input event
+  if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
+    setNativeValue(element, value);
+    element.dispatchEvent(new Event('input', { bubbles: true }));
+    element.dispatchEvent(new Event('change', { bubbles: true }));
+    return element.value === value;
+  }
+  return false;
+};
+
+const handleKnockoutTextInput = async (element: HTMLElement, value: string): Promise<boolean> => {
+  // Knockout.js listens for change and input events
+  if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
+    setNativeValue(element, value);
+    element.dispatchEvent(new Event('change', { bubbles: true }));
+    element.dispatchEvent(new Event('input', { bubbles: true }));
+    return element.value === value;
+  }
+  return false;
+};
+
+const handleLitTextInput = async (element: HTMLElement, value: string): Promise<boolean> => {
+  // Lit elements may need requestUpdate after value change
+  if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
+    setNativeValue(element, value);
+    element.dispatchEvent(new Event('input', { bubbles: true }));
+    element.dispatchEvent(new Event('change', { bubbles: true }));
+    // Trigger Lit update if available
+    const litHost = element.closest('*');
+    if (litHost && 'requestUpdate' in litHost) {
+      (litHost as unknown as { requestUpdate: () => void }).requestUpdate();
+    }
+    return element.value === value;
+  }
+  return false;
+};
+
+const handlePreactTextInput = async (element: HTMLElement, value: string): Promise<boolean> => {
+  // Preact uses similar patterns to React but with __preactattr_
+  if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
+    setNativeValue(element, value);
+    element.dispatchEvent(new InputEvent('input', { bubbles: true, data: value, inputType: 'insertReplacementText' }));
+    element.dispatchEvent(new Event('change', { bubbles: true }));
+    if (element.value !== value) {
+      invokeReactOnChange(element); // Preact props structure is similar
+    }
+    return element.value === value;
+  }
+  return false;
+};
+
+const handleSolidTextInput = async (element: HTMLElement, value: string): Promise<boolean> => {
+  // Solid.js uses compile-time reactivity, standard DOM events work
+  if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
+    setNativeValue(element, value);
+    element.dispatchEvent(new InputEvent('input', { bubbles: true, data: value }));
+    element.dispatchEvent(new Event('change', { bubbles: true }));
+    return element.value === value;
+  }
+  return false;
+};
+
+const handleEmberTextInput = async (element: HTMLElement, value: string): Promise<boolean> => {
+  // Ember.js uses event delegation through the container
+  if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
+    ensureFocus(element);
+    setNativeValue(element, value);
+    element.dispatchEvent(new Event('input', { bubbles: true }));
+    element.dispatchEvent(new Event('change', { bubbles: true }));
+    element.blur();
+    return element.value === value;
+  }
+  return false;
 };
 
 // ============================================================================

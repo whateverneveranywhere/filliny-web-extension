@@ -1,6 +1,8 @@
 import { useFormElement, useOverlayPosition, useFormFill } from './hooks';
+import { useFormFillStore, selectProgress, StreamingPhase } from './stores';
 import { Button } from '../../ui';
-import { X, Wand2, Loader2 } from 'lucide-react';
+import * as Progress from '@radix-ui/react-progress';
+import { X, Wand2, Loader2, CheckCircle2 } from 'lucide-react';
 import { useRef } from 'react';
 import type { OverlayPosition } from './types';
 import type React from 'react';
@@ -13,23 +15,68 @@ interface OverlayProps {
 }
 
 /**
- * Pure presentation component for the loading state
+ * Streaming progress component that shows real-time fill status
  */
-const LoadingState: React.FC = () => (
-  <div
-    className="filliny-flex filliny-flex-col filliny-items-center filliny-gap-4 filliny-text-primary-foreground"
-    style={{ pointerEvents: 'auto' }}>
-    <div className="filliny-h-8 filliny-w-8 filliny-animate-spin">
-      <Loader2 className="filliny-h-full filliny-w-full" />
+const StreamingProgressState: React.FC = () => {
+  const phase = useFormFillStore(state => state.phase);
+  const progress = useFormFillStore(selectProgress);
+
+  const progressPercent =
+    progress.totalFields > 0 ? Math.round((progress.fieldsWithValues / progress.totalFields) * 100) : 0;
+
+  const isComplete = phase === StreamingPhase.COMPLETE;
+  const isError = phase === StreamingPhase.ERROR;
+
+  const getPhaseLabel = (): string => {
+    switch (phase) {
+      case StreamingPhase.STREAMING:
+        return progress.fieldsWithValues > 0
+          ? `Filling ${progress.fieldsWithValues} of ${progress.totalFields} fields...`
+          : 'Starting form fill...';
+      case StreamingPhase.FINALIZING:
+        return 'Verifying filled fields...';
+      case StreamingPhase.COMPLETE:
+        return 'Done!';
+      case StreamingPhase.ERROR:
+        return 'An error occurred';
+      default:
+        return 'Preparing...';
+    }
+  };
+
+  return (
+    <div
+      className="filliny-flex filliny-flex-col filliny-items-center filliny-gap-4 filliny-text-primary-foreground"
+      style={{ pointerEvents: 'auto' }}>
+      {isComplete ? (
+        <CheckCircle2 className="filliny-h-8 filliny-w-8 filliny-text-green-400" />
+      ) : (
+        <div className="filliny-h-8 filliny-w-8 filliny-animate-spin">
+          <Loader2 className="filliny-h-full filliny-w-full" />
+        </div>
+      )}
+      <div className="filliny-flex filliny-w-64 filliny-flex-col filliny-items-center filliny-gap-2">
+        <p className="filliny-text-lg filliny-font-semibold">{isComplete ? 'Form Filled!' : 'Filling Your Form'}</p>
+        <Progress.Root
+          className="filliny-relative filliny-h-2 filliny-w-full filliny-overflow-hidden filliny-rounded-full filliny-bg-white/20"
+          value={progressPercent}>
+          <Progress.Indicator
+            className={`filliny-h-full filliny-rounded-full filliny-transition-all filliny-duration-300 ${
+              isError ? 'filliny-bg-red-400' : isComplete ? 'filliny-bg-green-400' : 'filliny-bg-primary-foreground'
+            }`}
+            style={{ width: `${progressPercent}%` }}
+          />
+        </Progress.Root>
+        <p className="filliny-text-sm filliny-text-primary-foreground/80">{getPhaseLabel()}</p>
+        {progress.fieldsErrored > 0 && (
+          <p className="filliny-text-xs filliny-text-red-300">
+            {progress.fieldsErrored} field{progress.fieldsErrored > 1 ? 's' : ''} failed
+          </p>
+        )}
+      </div>
     </div>
-    <div className="filliny-text-center">
-      <p className="filliny-text-lg filliny-font-semibold">Filling Your Form</p>
-      <p className="filliny-text-sm filliny-text-primary-foreground/80">
-        AI is intelligently completing your form fields...
-      </p>
-    </div>
-  </div>
-);
+  );
+};
 
 interface ActionButtonsProps {
   loading: boolean;
@@ -166,7 +213,7 @@ const FormsOverlay: React.FC<OverlayProps> = ({ formId, initialPosition, onDismi
       isFormLikelyOutOfView={isFormLikelyOutOfView}
       onScrollToForm={scrollToForm}>
       {loading ? (
-        <LoadingState />
+        <StreamingProgressState />
       ) : (
         <ActionButtons
           loading={loading}

@@ -1,4 +1,4 @@
-import { createBaseField, findRelatedRadioButtons } from './utils';
+import { createBaseField, findRelatedRadioButtons, dispatchPointerClickSequence, ensureFocus } from './utils';
 import { getFieldLabel } from '../fieldUtils';
 import { createDebugLogger, isHTMLElement, isHTMLInputElement, queryInputElement } from '@extension/shared';
 import { z } from 'zod';
@@ -151,8 +151,35 @@ const matchesCheckboxValue = (optionValue: string, targetValue: unknown): boolea
  * Update a checkbox or radio button input
  * This is the main entry point for updating checkable fields
  */
-const updateCheckable = (element: HTMLElement, checked: boolean): void => {
+const updateCheckable = async (element: HTMLElement, checked: boolean): Promise<void> => {
   try {
+    // Headless UI Switch/Checkbox
+    if (element.closest('[data-headlessui-state]')) {
+      const result = await handleHeadlessUISwitch(element, checked);
+      if (result) return;
+    }
+
+    // Radix UI Checkbox/Switch
+    if (element.closest('[data-state]')) {
+      if (element.closest('[role="switch"]')) {
+        const result = await handleRadixSwitch(element, checked);
+        if (result) return;
+      } else {
+        const result = await handleRadixCheckbox(element, checked);
+        if (result) return;
+      }
+    }
+
+    // MUI Switch
+    if (
+      element.closest('.MuiSwitch-root') ||
+      element.closest('.Mui-checked') ||
+      element.closest('[class*="MuiSwitch"]')
+    ) {
+      const result = await handleMUISwitch(element, checked);
+      if (result) return;
+    }
+
     // Handle both native inputs and ARIA-based custom controls
     if (element instanceof HTMLInputElement && (element.type === 'checkbox' || element.type === 'radio')) {
       updateNativeCheckable(element, checked);
@@ -198,7 +225,7 @@ const updateNativeCheckable = (element: HTMLInputElement, checked: boolean): voi
 
   // Trigger click event only if state needs to change
   if (element.checked !== checked) {
-    element.click();
+    dispatchPointerClickSequence(element);
   }
 };
 
@@ -229,7 +256,7 @@ const updateAriaCheckable = (element: HTMLElement, checked: boolean): void => {
   }
 
   // If no controlled input, simulate a click to trigger any bound event handlers
-  element.click();
+  dispatchPointerClickSequence(element);
 
   // Update CSS classes based on common patterns
   if (checked) {
@@ -359,7 +386,7 @@ const updateCustomCheckable = (element: HTMLElement, checked: boolean): void => 
       element.classList.contains('active');
 
     if (currentChecked !== checked) {
-      element.click();
+      dispatchPointerClickSequence(element);
     }
   }
 };
@@ -1047,6 +1074,101 @@ const createSwitchField = async (element: HTMLElement, index: number, testMode: 
   return field;
 };
 
+/**
+ * Handle Headless UI Switch/Checkbox components
+ */
+const handleHeadlessUISwitch = async (element: HTMLElement, shouldBeChecked: boolean): Promise<boolean> => {
+  try {
+    const switchEl = element.closest('[data-headlessui-state]') || element;
+    const currentState =
+      switchEl.getAttribute('data-headlessui-state')?.includes('checked') ||
+      switchEl.getAttribute('aria-checked') === 'true';
+
+    if (currentState !== shouldBeChecked) {
+      dispatchPointerClickSequence(switchEl as HTMLElement);
+      // Verify state changed
+      await new Promise(resolve => setTimeout(resolve, 100));
+      const newState =
+        switchEl.getAttribute('data-headlessui-state')?.includes('checked') ||
+        switchEl.getAttribute('aria-checked') === 'true';
+      return newState === shouldBeChecked;
+    }
+    return true; // Already in desired state
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Handle Radix UI Checkbox components
+ */
+const handleRadixCheckbox = async (element: HTMLElement, shouldBeChecked: boolean): Promise<boolean> => {
+  try {
+    const checkEl = element.closest('[data-state]') || element;
+    const currentState = checkEl.getAttribute('data-state') === 'checked';
+
+    if (currentState !== shouldBeChecked) {
+      dispatchPointerClickSequence(checkEl as HTMLElement);
+      // Verify state changed
+      await new Promise(resolve => setTimeout(resolve, 100));
+      const newState = checkEl.getAttribute('data-state') === 'checked';
+      return newState === shouldBeChecked;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Handle Radix UI Switch components
+ */
+const handleRadixSwitch = async (element: HTMLElement, shouldBeChecked: boolean): Promise<boolean> => {
+  try {
+    const switchEl = element.closest('[data-state][role="switch"]') || element;
+    const currentState = switchEl.getAttribute('data-state') === 'checked';
+
+    if (currentState !== shouldBeChecked) {
+      dispatchPointerClickSequence(switchEl as HTMLElement);
+      await new Promise(resolve => setTimeout(resolve, 100));
+      const newState = switchEl.getAttribute('data-state') === 'checked';
+      return newState === shouldBeChecked;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Handle MUI Switch components
+ */
+const handleMUISwitch = async (element: HTMLElement, shouldBeChecked: boolean): Promise<boolean> => {
+  try {
+    // MUI Switch wraps the actual input in ripple containers
+    const input =
+      (element.querySelector('input[type="checkbox"]') as HTMLInputElement | null) ||
+      (element instanceof HTMLInputElement ? element : null);
+
+    if (!input) return false;
+
+    if (input.checked !== shouldBeChecked) {
+      ensureFocus(input);
+      dispatchPointerClickSequence(input);
+      await new Promise(resolve => setTimeout(resolve, 50));
+
+      if (input.checked !== shouldBeChecked) {
+        input.checked = shouldBeChecked;
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+    }
+    return input.checked === shouldBeChecked;
+  } catch {
+    return false;
+  }
+};
+
 // Testing utilities
 const __testing = {
   updateNativeCheckable,
@@ -1059,10 +1181,24 @@ const __testing = {
   groupCheckboxElements,
   createRadioGroupField,
   createCheckboxField,
+  handleHeadlessUISwitch,
+  handleRadixCheckbox,
+  handleRadixSwitch,
+  handleMUISwitch,
 };
 
 // ============================================================================
 // Exports (at end of file per ESLint import-x/exports-last rule)
 // ============================================================================
 
-export { isValueChecked, matchesCheckboxValue, updateCheckable, detectCheckableFields, __testing };
+export {
+  isValueChecked,
+  matchesCheckboxValue,
+  updateCheckable,
+  detectCheckableFields,
+  handleHeadlessUISwitch,
+  handleRadixCheckbox,
+  handleRadixSwitch,
+  handleMUISwitch,
+  __testing,
+};

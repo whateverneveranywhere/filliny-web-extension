@@ -268,8 +268,13 @@ const isElementEnabled = (element: HTMLElement): boolean =>
  * @param config - Optional configuration for the search
  * @returns FindResult with the element and the strategy that found it
  */
-export const findFieldElement = (field: Field, config: FindConfig = {}): FindResult => {
+export const findFieldElement = (field: Field, config: FindConfig = {}, element?: HTMLElement): FindResult => {
   const { container = document, strategies = DEFAULT_STRATEGIES, skipHidden = false, skipDisabled = false } = config;
+
+  // If the element reference is provided and still attached, use it
+  if (element && element.isConnected) {
+    return { element, strategy: null };
+  }
 
   for (const strategy of strategies) {
     try {
@@ -381,6 +386,63 @@ export const findOutermostFormContainer = (element: HTMLElement): HTMLElement =>
 };
 
 /**
+ * Find an input element by spatial proximity to a label or text element
+ *
+ * @param labelText - The text to search for in labels and text elements
+ * @param container - Optional container to search within
+ * @returns The closest input element near the matching label, or null
+ */
+const findByLabelProximity = (labelText: string, container: HTMLElement | Document = document): HTMLElement | null => {
+  try {
+    // Find all text nodes or labels matching the text
+    const labels = Array.from(container.querySelectorAll('label, span, div, p, th, dt'));
+
+    for (const label of labels) {
+      if (label instanceof HTMLElement && label.textContent?.trim().toLowerCase().includes(labelText.toLowerCase())) {
+        // Look for nearby inputs using spatial proximity
+        const labelRect = label.getBoundingClientRect();
+
+        // Check for `for` attribute first
+        if (label instanceof HTMLLabelElement && label.htmlFor) {
+          const forEl = document.getElementById(label.htmlFor);
+          if (forEl instanceof HTMLElement) return forEl;
+        }
+
+        // Check siblings and nearby elements
+        const nearbyInputs = Array.from(
+          container.querySelectorAll('input, select, textarea, [role="textbox"], [role="combobox"]'),
+        );
+
+        let closest: HTMLElement | null = null;
+        let closestDistance = Infinity;
+
+        for (const input of nearbyInputs) {
+          if (input instanceof HTMLElement) {
+            const inputRect = input.getBoundingClientRect();
+            // Calculate distance between label and input
+            const dx = inputRect.left - labelRect.right;
+            const dy = Math.abs(inputRect.top - labelRect.top);
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
+            // Only consider inputs that are to the right of or below the label
+            if (distance < closestDistance && distance < 300) {
+              closestDistance = distance;
+              closest = input;
+            }
+          }
+        }
+
+        if (closest) return closest;
+      }
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+};
+
+/**
  * Count form fields within an element
  */
 const countFormFields = (element: HTMLElement): number => {
@@ -417,6 +479,7 @@ export {
   findByType,
   findByPlaceholder,
   findByContentEditable,
+  findByLabelProximity,
   isElementVisible,
   isElementEnabled,
   countFormFields,

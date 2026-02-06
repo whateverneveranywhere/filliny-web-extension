@@ -1,14 +1,14 @@
 import { ProfileSelector } from './profile-selector';
 import { TokenDisplay } from '../components';
 import { Logo } from '../components/logo';
-import { getConfig, useExtensionAuth, useDashboardOverview, usePlanLimits } from '@extension/shared';
+import { getConfig, useAuthContext, useDashboardOverview, usePlanLimits } from '@extension/shared';
 
 const config = getConfig();
 // Dashboard path for the dashboard route
 const dashboardPath = '/dashboard';
 
 const Header = () => {
-  const { isAuthenticated } = useExtensionAuth();
+  const { isAuthenticated } = useAuthContext();
   const { data, refetch, isRefetching, isLoading } = useDashboardOverview(isAuthenticated);
   const { isPro, freeFormsRemaining } = usePlanLimits();
 

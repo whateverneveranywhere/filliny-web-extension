@@ -127,12 +127,13 @@ const isElementInteractive = (element: HTMLElement): boolean => {
     return false;
   }
 
-  // Check if element is disabled or read-only
+  // Check if element is disabled, read-only, or hidden from assistive technology
   if (
     element.hasAttribute('disabled') ||
     element.hasAttribute('readonly') ||
     element.getAttribute('aria-disabled') === 'true' ||
-    element.getAttribute('aria-readonly') === 'true'
+    element.getAttribute('aria-readonly') === 'true' ||
+    element.getAttribute('aria-hidden') === 'true'
   ) {
     return false;
   }
@@ -423,68 +424,545 @@ const findSelectOptions = (
   return options;
 };
 
+// ============================================================================
+// Native Value Setter - bypasses React/Vue/Angular controlled input mechanisms
+// Uses the native HTMLInputElement.prototype.value setter (technique from Playwright/Cypress)
+// ============================================================================
+
 /**
- * Simulate human-like typing with proper focus events and composition
+ * Set a value using the native prototype setter, bypassing framework interception.
+ * This is the most reliable technique for React controlled inputs.
+ */
+const setNativeValue = (element: HTMLElement, value: string): boolean => {
+  try {
+    let setter: ((v: string) => void) | undefined;
+
+    if (element instanceof HTMLInputElement) {
+      setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+    } else if (element instanceof HTMLTextAreaElement) {
+      setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
+    } else if (element instanceof HTMLSelectElement) {
+      setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')?.set;
+    }
+
+    if (setter) {
+      setter.call(element, value);
+      return true;
+    }
+
+    return false;
+  } catch {
+    return false;
+  }
+};
+
+// ============================================================================
+// React Props Extraction - extract __reactProps$ for direct onChange invocation
+// ============================================================================
+
+interface ReactSyntheticEvent {
+  target: HTMLElement;
+  currentTarget: HTMLElement;
+  type: string;
+  bubbles: boolean;
+  preventDefault: () => void;
+  stopPropagation: () => void;
+  nativeEvent: Event;
+}
+
+interface ReactProps {
+  onChange?: (event: ReactSyntheticEvent) => void;
+  onInput?: (event: ReactSyntheticEvent) => void;
+  onBlur?: (event: ReactSyntheticEvent) => void;
+  onFocus?: (event: ReactSyntheticEvent) => void;
+  value?: string;
+  checked?: boolean;
+  [key: string]: unknown;
+}
+
+/**
+ * Extract React props (__reactProps$) from an element for direct handler invocation.
+ */
+const getReactProps = (element: HTMLElement): ReactProps | null => {
+  try {
+    const propsKey = Object.keys(element).find(k => k.startsWith('__reactProps$'));
+    if (propsKey) {
+      return (element as unknown as Record<string, ReactProps>)[propsKey] ?? null;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Create a minimal React-compatible synthetic event for direct handler invocation.
+ */
+const createReactSyntheticEvent = (element: HTMLElement, type: string): ReactSyntheticEvent => ({
+  target: element,
+  currentTarget: element,
+  type,
+  bubbles: true,
+  preventDefault: () => {},
+  stopPropagation: () => {},
+  nativeEvent: new Event(type, { bubbles: true }),
+});
+
+/**
+ * Invoke React onChange directly via __reactProps$ as a fallback strategy.
+ */
+const invokeReactOnChange = (element: HTMLElement): boolean => {
+  try {
+    const props = getReactProps(element);
+    if (props?.onChange) {
+      props.onChange(createReactSyntheticEvent(element, 'change'));
+      return true;
+    }
+    if (props?.onInput) {
+      props.onInput(createReactSyntheticEvent(element, 'input'));
+      return true;
+    }
+    return false;
+  } catch {
+    return false;
+  }
+};
+
+// ============================================================================
+// Pointer Event Sequence - full modern pointer event chain for UI frameworks
+// ============================================================================
+
+/**
+ * Dispatch a full pointer+mouse click sequence as modern UI frameworks require.
+ * Sequence: pointerdown → mousedown → pointerup → mouseup → click
+ */
+const dispatchPointerClickSequence = (element: HTMLElement): void => {
+  try {
+    const rect = element.getBoundingClientRect();
+    const x = rect.left + rect.width / 2;
+    const y = rect.top + rect.height / 2;
+
+    const commonProps = {
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+      clientX: x,
+      clientY: y,
+      screenX: x,
+      screenY: y,
+    };
+
+    const pointerProps = {
+      ...commonProps,
+      pointerId: 1,
+      pointerType: 'mouse' as const,
+      isPrimary: true,
+      width: 1,
+      height: 1,
+      pressure: 0.5,
+    };
+
+    element.dispatchEvent(new PointerEvent('pointerdown', pointerProps));
+    element.dispatchEvent(new MouseEvent('mousedown', commonProps));
+    element.dispatchEvent(new PointerEvent('pointerup', { ...pointerProps, pressure: 0 }));
+    element.dispatchEvent(new MouseEvent('mouseup', commonProps));
+    element.dispatchEvent(new MouseEvent('click', commonProps));
+  } catch {
+    // Fallback to simple click
+    element.click();
+  }
+};
+
+// ============================================================================
+// Wait for Element - MutationObserver-based element appearance waiting
+// ============================================================================
+
+/**
+ * Wait for an element matching a selector to appear in the DOM.
+ * Uses MutationObserver for efficiency. Returns null on timeout.
+ */
+const waitForElement = (
+  selector: string,
+  timeout: number = 2000,
+  root: Element | Document = document,
+): Promise<HTMLElement | null> =>
+  new Promise(resolve => {
+    // Check if already present
+    const existing = root.querySelector<HTMLElement>(selector);
+    if (existing) {
+      resolve(existing);
+      return;
+    }
+
+    const observer = new MutationObserver(() => {
+      const found = root.querySelector<HTMLElement>(selector);
+      if (found) {
+        observer.disconnect();
+        clearTimeout(timer);
+        resolve(found);
+      }
+    });
+
+    const timer = setTimeout(() => {
+      observer.disconnect();
+      // One last check
+      resolve(root.querySelector<HTMLElement>(selector));
+    }, timeout);
+
+    observer.observe(root instanceof Document ? root.body : root, {
+      childList: true,
+      subtree: true,
+    });
+  });
+
+// ============================================================================
+// Honeypot Field Detection
+// ============================================================================
+
+/** Known honeypot field name patterns */
+const HONEYPOT_NAME_PATTERNS = [
+  /^hp_/i,
+  /^pot_/i,
+  /^honey/i,
+  /^trap_/i,
+  /^fax$/i,
+  /^website$/i,
+  /^url$/i,
+  /^company_url$/i,
+  /^zip_code_confirm$/i,
+  /^address2_confirm$/i,
+  /^leave.?blank/i,
+  /^do.?not.?fill/i,
+  /^phone_verify$/i,
+  /^address_confirm$/i,
+  /^captcha_/i,
+];
+
+/**
+ * Detect if an element is a honeypot field (spam trap).
+ * Filling honeypots causes silent form rejection.
+ */
+const isHoneypotField = (element: HTMLElement): boolean => {
+  try {
+    // Check name/id against known patterns
+    const name = (element.getAttribute('name') || '').toLowerCase();
+    const id = (element.getAttribute('id') || '').toLowerCase();
+    if (HONEYPOT_NAME_PATTERNS.some(p => p.test(name) || p.test(id))) {
+      // Only flag if the field is also hidden in some way
+      const style = window.getComputedStyle(element);
+      const isVisuallyHidden =
+        style.display === 'none' ||
+        style.visibility === 'hidden' ||
+        style.opacity === '0' ||
+        (parseInt(style.height) === 0 && style.overflow === 'hidden') ||
+        (parseInt(style.width) === 0 && style.overflow === 'hidden');
+
+      if (isVisuallyHidden) return true;
+    }
+
+    // Check for off-screen positioning
+    const style = window.getComputedStyle(element);
+    const rect = element.getBoundingClientRect();
+    const isOffScreen =
+      (style.position === 'absolute' || style.position === 'fixed') &&
+      (rect.left < -9000 || rect.top < -9000 || rect.right < 0 || rect.bottom < 0);
+
+    if (isOffScreen) {
+      // Off-screen + autocomplete="off" or "nope" is very suspicious
+      const autoComplete = element.getAttribute('autocomplete');
+      if (autoComplete === 'off' || autoComplete === 'nope') return true;
+      // Off-screen + tabindex="-1" is suspicious
+      if (element.getAttribute('tabindex') === '-1') return true;
+    }
+
+    // Check for clip:rect(0,0,0,0) pattern
+    if (style.clip === 'rect(0px, 0px, 0px, 0px)' || style.clipPath === 'inset(50%)') {
+      return true;
+    }
+
+    // Check for aria-hidden with zero dimensions
+    if (element.getAttribute('aria-hidden') === 'true' && element.getAttribute('tabindex') === '-1') {
+      return true;
+    }
+
+    return false;
+  } catch {
+    return false;
+  }
+};
+
+// ============================================================================
+// Improved Composition Events
+// ============================================================================
+
+/**
+ * Dispatch proper CompositionEvent (not CustomEvent) for IME-aware frameworks.
+ */
+const dispatchCompositionEvents = (element: HTMLElement, value: string): void => {
+  try {
+    element.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true, data: '' }));
+    element.dispatchEvent(new CompositionEvent('compositionupdate', { bubbles: true, data: value }));
+    element.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true, data: value }));
+  } catch {
+    // Fallback to CustomEvent if CompositionEvent not available
+    element.dispatchEvent(new CustomEvent('compositionstart', { bubbles: true, detail: { data: '' } }));
+    element.dispatchEvent(new CustomEvent('compositionend', { bubbles: true, detail: { data: value } }));
+  }
+};
+
+// ============================================================================
+// beforeinput Event
+// ============================================================================
+
+/**
+ * Dispatch beforeinput event with proper inputType.
+ */
+const dispatchBeforeInput = (element: HTMLElement, data: string, inputType: string = 'insertText'): boolean => {
+  try {
+    const event = new InputEvent('beforeinput', {
+      bubbles: true,
+      cancelable: true,
+      data,
+      inputType,
+    });
+    return element.dispatchEvent(event);
+  } catch {
+    return true;
+  }
+};
+
+// ============================================================================
+// Focus Management
+// ============================================================================
+
+/**
+ * Ensure an element is properly focused, handling focus traps in modals/dialogs.
+ */
+const ensureFocus = (element: HTMLElement): boolean => {
+  try {
+    element.focus();
+
+    // Verify focus was applied
+    if (document.activeElement === element) return true;
+
+    // If element is in Shadow DOM, check shadow root's activeElement
+    const root = element.getRootNode();
+    if (root instanceof ShadowRoot && root.activeElement === element) return true;
+
+    // Try clicking to focus (some elements need this)
+    element.click();
+    element.focus();
+
+    return document.activeElement === element;
+  } catch {
+    return false;
+  }
+};
+
+// ============================================================================
+// Clipboard Paste Simulation
+// ============================================================================
+
+/**
+ * Simulate a paste event with ClipboardEvent and DataTransfer.
+ * Useful as a fallback strategy for stubborn frameworks.
+ */
+const simulatePaste = (element: HTMLElement, value: string): boolean => {
+  try {
+    element.focus();
+
+    const dataTransfer = new DataTransfer();
+    dataTransfer.setData('text/plain', value);
+
+    const pasteEvent = new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    });
+
+    const notPrevented = element.dispatchEvent(pasteEvent);
+
+    if (notPrevented) {
+      // If paste wasn't prevented, apply the value
+      if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
+        setNativeValue(element, value);
+        element.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertFromPaste', data: value }));
+        element.dispatchEvent(new Event('change', { bubbles: true }));
+      } else if (element.isContentEditable) {
+        document.execCommand('insertText', false, value);
+      }
+    }
+
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+// ============================================================================
+// Stale Element Detection
+// ============================================================================
+
+/**
+ * Check if an element reference is still attached to the DOM.
+ */
+const isElementAttached = (element: HTMLElement): boolean => {
+  try {
+    return element.isConnected;
+  } catch {
+    return false;
+  }
+};
+
+// ============================================================================
+// Form State Snapshot for Undo
+// ============================================================================
+
+interface FormStateSnapshot {
+  values: Map<HTMLElement, { value: string; checked?: boolean; selectedIndex?: number }>;
+  timestamp: number;
+}
+
+/**
+ * Capture the current state of all form fields within a container.
+ */
+const captureFormState = (container: HTMLElement | Document): FormStateSnapshot => {
+  const values = new Map<HTMLElement, { value: string; checked?: boolean; selectedIndex?: number }>();
+  const elements = container.querySelectorAll<HTMLElement>('input, textarea, select, [contenteditable="true"]');
+
+  elements.forEach(el => {
+    if (el instanceof HTMLInputElement) {
+      values.set(el, {
+        value: el.value,
+        checked: el.checked,
+      });
+    } else if (el instanceof HTMLTextAreaElement) {
+      values.set(el, { value: el.value });
+    } else if (el instanceof HTMLSelectElement) {
+      values.set(el, { value: el.value, selectedIndex: el.selectedIndex });
+    } else if (el.isContentEditable) {
+      values.set(el, { value: el.textContent || '' });
+    }
+  });
+
+  return { values, timestamp: Date.now() };
+};
+
+/**
+ * Restore a previously captured form state.
+ */
+const restoreFormState = (snapshot: FormStateSnapshot): void => {
+  snapshot.values.forEach((state, element) => {
+    if (!isElementAttached(element)) return;
+
+    try {
+      if (element instanceof HTMLInputElement) {
+        setNativeValue(element, state.value);
+        if (state.checked !== undefined) element.checked = state.checked;
+        element.dispatchEvent(new Event('input', { bubbles: true }));
+        element.dispatchEvent(new Event('change', { bubbles: true }));
+      } else if (element instanceof HTMLTextAreaElement) {
+        setNativeValue(element, state.value);
+        element.dispatchEvent(new Event('input', { bubbles: true }));
+        element.dispatchEvent(new Event('change', { bubbles: true }));
+      } else if (element instanceof HTMLSelectElement) {
+        setNativeValue(element, state.value);
+        if (state.selectedIndex !== undefined) element.selectedIndex = state.selectedIndex;
+        element.dispatchEvent(new Event('change', { bubbles: true }));
+      } else if (element.isContentEditable) {
+        element.textContent = state.value;
+        element.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+    } catch {
+      // Skip elements that can't be restored
+    }
+  });
+};
+
+// ============================================================================
+// Natural Typing Delay
+// ============================================================================
+
+/**
+ * Get a randomized typing delay for anti-bot resilience.
+ */
+const getTypingDelay = (): number => {
+  // 15-80ms base delay with occasional 100-200ms pauses
+  if (Math.random() < 0.1) {
+    return 100 + Math.random() * 100; // occasional longer pause
+  }
+  return 15 + Math.random() * 65;
+};
+
+/**
+ * Simulate human-like typing with proper focus events, composition, and beforeinput.
+ * Enhanced with native value setter as primary strategy and natural typing delays.
  */
 const simulateTyping = async (element: HTMLElement, value: string): Promise<void> => {
   try {
-    // Focus the element
-    element.focus();
+    // Ensure proper focus
+    ensureFocus(element);
 
-    // Special handling for textareas to ensure they're properly focused
     const isTextarea = element instanceof HTMLTextAreaElement;
+    const isInput = element instanceof HTMLInputElement;
+
     if (isTextarea) {
-      // For textareas, we need to ensure we have focus and selection
       try {
-        element.focus();
-        // Select all existing text first
         element.select();
-      } catch (e) {
-        console.debug('Textarea focus/select error:', e);
+      } catch {
+        // Textarea focus/select error, continue
       }
     }
 
-    // Start composition (for IME-aware applications)
-    // Use CustomEvent for composition events with data
-    try {
-      const startEvent = new CustomEvent('compositionstart', {
-        bubbles: true,
-        cancelable: true,
-        detail: { data: '' },
-      });
-      element.dispatchEvent(startEvent);
-    } catch (e) {
-      console.debug('Custom composition event failed:', e);
-    }
+    // ---- PRIMARY: Native value setter (fastest, most reliable for React) ----
+    if (isInput || isTextarea) {
+      const nativeSet = setNativeValue(element, value);
+      if (nativeSet) {
+        // Dispatch beforeinput
+        dispatchBeforeInput(element, value, 'insertReplacementText');
 
-    // Make multiple attempts to set the value using different methods
-    // Method 1: Direct property assignment
-    if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
-      element.value = value;
+        // Dispatch input event with proper inputType
+        element.dispatchEvent(
+          new InputEvent('input', { bubbles: true, cancelable: true, data: value, inputType: 'insertReplacementText' }),
+        );
+        element.dispatchEvent(new Event('change', { bubbles: true, cancelable: true }));
 
-      // For textareas, immediately dispatch events after setting value
-      if (isTextarea) {
-        dispatchEvent(element, 'input');
-        dispatchEvent(element, 'change');
-
-        // Also try with native event constructors
-        try {
-          element.dispatchEvent(new InputEvent('input', { bubbles: true, cancelable: true }));
-          element.dispatchEvent(new Event('change', { bubbles: true, cancelable: true }));
-        } catch (e) {
-          console.debug('Native event creation failed:', e);
+        // Check if value persisted
+        if (element.value === value) {
+          element.blur();
+          return;
         }
       }
+
+      // ---- FALLBACK 1: Direct React props onChange ----
+      if (isInput || isTextarea) {
+        setNativeValue(element, value);
+        const invoked = invokeReactOnChange(element);
+        if (invoked && element.value === value) {
+          element.blur();
+          return;
+        }
+      }
+    }
+
+    // ---- FALLBACK 2: Composition events + direct assignment ----
+    // Start composition (proper CompositionEvent)
+    dispatchCompositionEvents(element, value);
+
+    // Direct property assignment
+    if (isInput || isTextarea) {
+      element.value = value;
+      dispatchEvent(element, 'input');
+      dispatchEvent(element, 'change');
     } else if (hasProperty(element, 'value') && typeof element.value === 'string') {
       element.value = value;
     } else if (element.isContentEditable) {
       element.textContent = value;
     }
 
-    // Method 2: Try using document.execCommand (for contentEditable and some frameworks)
+    // Try using document.execCommand (for contentEditable and some frameworks)
     try {
-      if (element.isContentEditable || element instanceof HTMLTextAreaElement) {
-        // Clear existing content first
+      if (element.isContentEditable || isTextarea) {
         const selection = window.getSelection();
         if (selection && element.contains(selection.anchorNode)) {
           document.execCommand('selectAll', false);
@@ -492,119 +970,79 @@ const simulateTyping = async (element: HTMLElement, value: string): Promise<void
           document.execCommand('insertText', false, value);
         }
       }
-    } catch (commandError) {
-      console.debug('execCommand method not supported:', commandError);
+    } catch {
+      // execCommand not supported, continue
     }
 
-    // Method 3: For React-style controlled components that monitor specific events
-    // Simulate individual keypresses for complex components
-    let previousValue = '';
-    for (let i = 0; i < value.length; i++) {
-      const char = value[i];
-      previousValue += char;
-
-      // Use CustomEvent for composition update
-      try {
-        const updateEvent = new CustomEvent('compositionupdate', {
-          bubbles: true,
-          cancelable: true,
-          detail: { data: previousValue },
-        });
-        element.dispatchEvent(updateEvent);
-      } catch (e) {
-        console.debug('Custom composition update event failed:', e);
-      }
-
-      // Some frameworks listen for keydown/keypress events
-      const keyEvent = {
-        key: char,
-        code: `Key${char.toUpperCase()}`,
-        bubbles: true,
-        cancelable: true,
-        composed: true,
-      };
-
-      try {
-        element.dispatchEvent(new KeyboardEvent('keydown', keyEvent));
-        element.dispatchEvent(new KeyboardEvent('keypress', keyEvent));
-        element.dispatchEvent(new KeyboardEvent('keyup', keyEvent));
-      } catch (keyError) {
-        console.debug('Keyboard event simulation error:', keyError);
-      }
-    }
-
-    // End composition with CustomEvent
-    try {
-      const endEvent = new CustomEvent('compositionend', {
-        bubbles: true,
-        cancelable: true,
-        detail: { data: value },
-      });
-      element.dispatchEvent(endEvent);
-    } catch (e) {
-      console.debug('Custom composition end event failed:', e);
-    }
-
-    // Fire standard events
-    dispatchEvent(element, 'input');
-    dispatchEvent(element, 'change');
-
-    // Check if value was actually set
+    // ---- FALLBACK 3: Character-by-character typing with natural delays ----
     let valueSet = false;
-    if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
+    if (isInput || isTextarea) {
       valueSet = element.value === value;
     } else if (element.isContentEditable) {
       valueSet = element.textContent === value;
     }
 
-    // If value wasn't set by previous methods, try more aggressive approaches
-    if (!valueSet) {
-      // Method 4: Use MutationObserver to detect if the value change was prevented
-      const observer = new MutationObserver(() => {
-        if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
-          if (element.value !== value) {
-            element.value = value;
-            dispatchEvent(element, 'input');
-            dispatchEvent(element, 'change');
-          }
-        }
-      });
+    if (!valueSet && (isInput || isTextarea)) {
+      // Reset and type character by character
+      setNativeValue(element, '');
+      element.dispatchEvent(new InputEvent('input', { bubbles: true, data: '', inputType: 'deleteContentBackward' }));
 
-      observer.observe(element, { attributes: true, childList: true, characterData: true });
+      for (let i = 0; i < value.length; i++) {
+        const char = value[i];
+        const newValue = value.substring(0, i + 1);
 
-      // Trigger an update to see if our value gets reverted
-      if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
-        element.value = value;
+        const keyEvent = {
+          key: char,
+          code: `Key${char.toUpperCase()}`,
+          bubbles: true,
+          cancelable: true,
+          composed: true,
+        };
+
+        element.dispatchEvent(new KeyboardEvent('keydown', keyEvent));
+        dispatchBeforeInput(element, char, 'insertText');
+        element.dispatchEvent(new KeyboardEvent('keypress', keyEvent));
+
+        setNativeValue(element, newValue);
+
+        element.dispatchEvent(
+          new InputEvent('input', { bubbles: true, cancelable: true, data: char, inputType: 'insertText' }),
+        );
+        element.dispatchEvent(new KeyboardEvent('keyup', keyEvent));
+
+        // Natural typing delay with randomization
+        await new Promise(resolve => setTimeout(resolve, getTypingDelay()));
       }
 
-      // Disconnect immediately rather than waiting
-      observer.disconnect();
+      element.dispatchEvent(new Event('change', { bubbles: true }));
     }
 
-    // No need to wait for auto-resize since we want maximum speed
+    // ---- FALLBACK 4: Paste simulation ----
+    if (isInput || isTextarea) {
+      if (element.value !== value) {
+        simulatePaste(element, value);
+      }
+    }
+
+    // Fire standard events
+    dispatchEvent(element, 'input');
+    dispatchEvent(element, 'change');
   } catch (error) {
     console.error('Error simulating typing:', error);
   } finally {
-    // No delay before blurring to maximize speed
-    // For textareas, we need to ensure we dispatch blur and focus events
-    // to trigger validation and change detection in frameworks
     if (element instanceof HTMLTextAreaElement) {
       try {
-        // Verify the value was set
         if (element.value !== value) {
-          console.log('Textarea value not set correctly, trying final approach');
-          element.value = value;
+          setNativeValue(element, value);
           dispatchEvent(element, 'input');
           dispatchEvent(element, 'change');
         }
-
-        // Some frameworks need blur+focus to detect changes
         element.blur();
         element.focus();
-      } catch (e) {
-        console.debug('Textarea finalization error:', e);
+      } catch {
+        // Textarea finalization error
       }
-    } else if (!(element instanceof HTMLTextAreaElement)) {
+    } else {
       element.blur();
     }
   }
@@ -770,4 +1208,22 @@ export {
   safeGetLowerString,
   safeGetAttributes,
   safeHasProperty,
+  // New exports - Phase 1+
+  setNativeValue,
+  getReactProps,
+  invokeReactOnChange,
+  createReactSyntheticEvent,
+  dispatchPointerClickSequence,
+  waitForElement,
+  isHoneypotField,
+  simulatePaste,
+  dispatchCompositionEvents,
+  dispatchBeforeInput,
+  ensureFocus,
+  isElementAttached,
+  captureFormState,
+  restoreFormState,
+  getTypingDelay,
 };
+
+export type { ReactProps, ReactSyntheticEvent, FormStateSnapshot };

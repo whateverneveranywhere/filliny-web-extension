@@ -178,6 +178,76 @@ const FRAMEWORK_SELECTORS = {
     ],
   },
 
+  // Alpine.js
+  ALPINE: {
+    components: ['[x-data]', '[x-model]', '[x-bind]', '[x-on]', '[@click]', '[@input]', '[@change]'],
+  },
+
+  // HTMX
+  HTMX: {
+    components: [
+      '[hx-post]',
+      '[hx-get]',
+      '[hx-put]',
+      '[hx-delete]',
+      '[hx-patch]',
+      '[hx-trigger]',
+      '[hx-target]',
+      '[hx-swap]',
+    ],
+  },
+
+  // Knockout.js
+  KNOCKOUT: {
+    components: ['[data-bind]', '[data-bind*="value"]', '[data-bind*="checked"]', '[data-bind*="textInput"]'],
+  },
+
+  // Date Pickers
+  DATE_PICKERS: {
+    flatpickr: ['.flatpickr-input', '[data-flatpickr]'],
+    reactDatePicker: ['.react-datepicker__input-container input', '.react-datepicker-wrapper input'],
+    muiDatePicker: ['.MuiDatePicker-root input', '.MuiDateTimePicker-root input'],
+    antDatePicker: ['.ant-picker-input input', '.ant-picker'],
+    pikaday: ['.pika-single input', '[data-pikaday]'],
+  },
+
+  // Phone Widgets
+  PHONE_WIDGETS: {
+    intlTelInput: ['.iti input', '.iti__tel-input', '[data-intl-tel-input]'],
+    reactPhoneInput: ['.react-tel-input input', '.phone-input input'],
+  },
+
+  // OTP / Verification Code Inputs
+  OTP_INPUTS: {
+    components: [
+      '[autocomplete="one-time-code"]',
+      '[inputmode="numeric"][maxlength="1"]',
+      '[class*="otp"]',
+      '[class*="verification-code"]',
+      '[class*="pin-input"]',
+      '[data-otp-input]',
+    ],
+  },
+
+  // Vuetify / Element Plus / Quasar
+  VUETIFY: {
+    inputs: ['.v-text-field input', '.v-textarea textarea', '.v-field input'],
+    selects: ['.v-select', '.v-autocomplete'],
+    checkboxes: ['.v-checkbox input', '.v-radio input', '.v-switch input'],
+  },
+
+  ELEMENT_PLUS: {
+    inputs: ['.el-input__inner', '.el-textarea__inner'],
+    selects: ['.el-select', '.el-select__input'],
+    checkboxes: ['.el-checkbox__input', '.el-radio__input'],
+  },
+
+  QUASAR: {
+    inputs: ['.q-field__native', '.q-input input'],
+    selects: ['.q-select', '.q-select__input'],
+    checkboxes: ['.q-checkbox__inner', '.q-radio__inner', '.q-toggle__inner'],
+  },
+
   // Rich Text Editors
   RICH_TEXT_EDITORS: {
     ckeditor: ['.ck-editor__editable', '.ck-editor__editable_inline', '.cke_editable'],
@@ -315,6 +385,67 @@ const UNIVERSAL_FORM_SELECTORS: SelectorWithConfidence[] = [
   createSelector('[data-sveltekit-form]', SelectorConfidence.MEDIUM_HIGH, 'SvelteKit form element'),
   createSelector('.svelte-input', SelectorConfidence.MEDIUM, 'Svelte input class'),
   createSelector('.svelte-select', SelectorConfidence.MEDIUM, 'Svelte select class'),
+
+  // ========================================
+  // FRAMEWORK-SPECIFIC: ALPINE.JS (MEDIUM-HIGH CONFIDENCE)
+  // ========================================
+  createSelector('[x-model]', SelectorConfidence.MEDIUM_HIGH, 'Alpine.js model-bound input'),
+  createSelector('[x-data] input', SelectorConfidence.MEDIUM, 'Input within Alpine.js component'),
+  createSelector('[x-data] select', SelectorConfidence.MEDIUM, 'Select within Alpine.js component'),
+  createSelector('[x-data] textarea', SelectorConfidence.MEDIUM, 'Textarea within Alpine.js component'),
+
+  // ========================================
+  // FRAMEWORK-SPECIFIC: HTMX (MEDIUM CONFIDENCE)
+  // ========================================
+  createSelector('[hx-post] input', SelectorConfidence.MEDIUM, 'Input within HTMX post form'),
+  createSelector('[hx-post] select', SelectorConfidence.MEDIUM, 'Select within HTMX post form'),
+  createSelector('[hx-post] textarea', SelectorConfidence.MEDIUM, 'Textarea within HTMX post form'),
+
+  // ========================================
+  // FRAMEWORK-SPECIFIC: KNOCKOUT.JS (MEDIUM CONFIDENCE)
+  // ========================================
+  createSelector('[data-bind*="value"]', SelectorConfidence.MEDIUM, 'Knockout.js value-bound element'),
+  createSelector('[data-bind*="checked"]', SelectorConfidence.MEDIUM, 'Knockout.js checked-bound element'),
+  createSelector('[data-bind*="textInput"]', SelectorConfidence.MEDIUM, 'Knockout.js textInput-bound element'),
+
+  // ========================================
+  // DATE PICKER SELECTORS (MEDIUM-HIGH CONFIDENCE)
+  // ========================================
+  createSelector('.flatpickr-input', SelectorConfidence.MEDIUM_HIGH, 'Flatpickr date input'),
+  createSelector('.react-datepicker__input-container input', SelectorConfidence.MEDIUM_HIGH, 'React DatePicker input'),
+  createSelector('.ant-picker-input input', SelectorConfidence.MEDIUM_HIGH, 'Ant Design date picker input'),
+  createSelector('.MuiDatePicker-root input', SelectorConfidence.MEDIUM_HIGH, 'MUI DatePicker input'),
+
+  // ========================================
+  // PHONE WIDGET SELECTORS (MEDIUM-HIGH CONFIDENCE)
+  // ========================================
+  createSelector('.iti input', SelectorConfidence.MEDIUM_HIGH, 'International telephone input'),
+  createSelector('.iti__tel-input', SelectorConfidence.MEDIUM_HIGH, 'ITI telephone input'),
+  createSelector('.react-tel-input input', SelectorConfidence.MEDIUM, 'React telephone input'),
+
+  // ========================================
+  // OTP / VERIFICATION CODE SELECTORS (MEDIUM CONFIDENCE)
+  // ========================================
+  createSelector('[autocomplete="one-time-code"]', SelectorConfidence.MEDIUM_HIGH, 'OTP autocomplete input'),
+  createSelector('[inputmode="numeric"][maxlength="1"]', SelectorConfidence.MEDIUM, 'Single digit numeric input (OTP)'),
+  createSelector('[class*="otp"]', SelectorConfidence.MEDIUM, 'OTP class-based input'),
+  createSelector('[class*="pin-input"]', SelectorConfidence.MEDIUM, 'PIN input component'),
+
+  // ========================================
+  // VUETIFY / ELEMENT PLUS / QUASAR (MEDIUM CONFIDENCE)
+  // ========================================
+  createSelector('.v-text-field input', SelectorConfidence.MEDIUM, 'Vuetify text field input'),
+  createSelector('.v-select', SelectorConfidence.MEDIUM, 'Vuetify select component'),
+  createSelector('.el-input__inner', SelectorConfidence.MEDIUM, 'Element Plus input'),
+  createSelector('.el-select', SelectorConfidence.MEDIUM, 'Element Plus select'),
+  createSelector('.q-field__native', SelectorConfidence.MEDIUM, 'Quasar field native input'),
+
+  // ========================================
+  // STAR RATING SELECTORS (MEDIUM-LOW CONFIDENCE)
+  // ========================================
+  createSelector('[class*="rating"]', SelectorConfidence.MEDIUM_LOW, 'Rating component'),
+  createSelector('[class*="star"]', SelectorConfidence.MEDIUM_LOW, 'Star rating component'),
+  createSelector('[role="slider"][aria-label*="rating"]', SelectorConfidence.MEDIUM, 'ARIA slider rating'),
 
   // ========================================
   // RICH TEXT EDITORS (MEDIUM-HIGH CONFIDENCE)

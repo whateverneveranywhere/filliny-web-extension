@@ -56,7 +56,7 @@ export const usePlanLimits = (options?: UsePlanLimitsOptions) => {
   // 1. If inside AuthProvider, only enable when authenticated
   // 2. If outside AuthProvider (authContext is null), use the enabled option (defaults to true for backward compat)
   const { enabled: explicitEnabled } = options ?? {};
-  const isAuthenticated = authContext?.isAuthenticated ?? true; // Default to true when outside provider for backward compat
+  const isAuthenticated = authContext?.isAuthenticated ?? false; // Default to false when outside provider to prevent unauthenticated requests
   const queryEnabled = explicitEnabled !== undefined ? explicitEnabled : isAuthenticated;
 
   const { data: healthCheck, isLoading: isHealthCheckLoading } = useAuthHealthCheckQuery(queryEnabled);

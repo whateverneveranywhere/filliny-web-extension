@@ -63,13 +63,13 @@ const CreditsFooterWarning = ({
   return (
     <div
       className={cn(
-        'filliny-flex filliny-items-center filliny-justify-between filliny-gap-3 filliny-rounded-lg filliny-border filliny-px-3 filliny-py-2.5',
+        'filliny-flex filliny-flex-col filliny-gap-2.5 filliny-rounded-lg filliny-border filliny-px-3 filliny-py-2.5',
         'filliny-border-warning/30 filliny-bg-warning/5 filliny-backdrop-blur-sm',
         className,
       )}>
-      <div className="filliny-flex filliny-items-center filliny-gap-2.5">
-        <AlertTriangle className="filliny-h-4 filliny-w-4 filliny-shrink-0 filliny-text-warning" />
-        <div className="filliny-flex filliny-flex-col">
+      <div className="filliny-flex filliny-items-start filliny-gap-2.5">
+        <AlertTriangle className="filliny-mt-0.5 filliny-h-4 filliny-w-4 filliny-shrink-0 filliny-text-warning" />
+        <div className="filliny-flex filliny-min-w-0 filliny-flex-1 filliny-flex-col">
           <span className="filliny-text-xs filliny-font-medium filliny-text-warning">{title}</span>
           <span className="filliny-text-xs filliny-text-muted-foreground">{description}</span>
         </div>
@@ -78,7 +78,7 @@ const CreditsFooterWarning = ({
         href={actionUrl}
         target="_blank"
         rel="noopener noreferrer"
-        className="filliny-flex filliny-items-center filliny-gap-1 filliny-rounded-md filliny-bg-warning filliny-px-2.5 filliny-py-1.5 filliny-text-xs filliny-font-medium filliny-text-warning-foreground filliny-transition-colors hover:filliny-bg-warning/90">
+        className="filliny-flex filliny-w-full filliny-items-center filliny-justify-center filliny-gap-1 filliny-rounded-md filliny-border filliny-border-warning/30 filliny-bg-warning filliny-px-2.5 filliny-py-1.5 filliny-text-xs filliny-font-medium filliny-text-warning-foreground filliny-transition-colors hover:filliny-bg-warning/90">
         {buttonText}
         <ExternalLink className="filliny-h-3 filliny-w-3" />
       </a>

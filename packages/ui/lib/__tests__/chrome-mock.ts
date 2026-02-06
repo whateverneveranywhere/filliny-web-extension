@@ -20,11 +20,29 @@ const mockChrome = {
       get: vi.fn(),
       set: vi.fn(),
       remove: vi.fn(),
+      onChanged: {
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+      },
     },
     sync: {
       get: vi.fn(),
       set: vi.fn(),
       remove: vi.fn(),
+      onChanged: {
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+      },
+    },
+    session: {
+      get: vi.fn(),
+      set: vi.fn(),
+      remove: vi.fn(),
+      setAccessLevel: vi.fn(),
+      onChanged: {
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+      },
     },
     onChanged: {
       addListener: vi.fn(),

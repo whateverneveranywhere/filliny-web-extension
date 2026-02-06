@@ -1,4 +1,4 @@
-import { processChunks, updateFieldWithRetry, ErrorCategory, FieldUpdateError } from './fieldUpdaterHelpers';
+import { processChunksLegacy, updateFieldWithRetry, ErrorCategory, FieldUpdateError } from './fieldUpdaterHelpers';
 import { unifiedFieldRegistry } from './unifiedFieldDetection';
 import {
   aiFillService,
@@ -236,7 +236,7 @@ export const handleFieldFill = async (field: Field): Promise<FieldUpdateResult> 
           // Pass ALL fields from the registry to processChunks for proper merging
           // Pass and track partial chunk data between calls to avoid data loss
           const allFields = unifiedFieldRegistry.getAllFields();
-          processChunks(message.data, allFields, partialChunk).then(newPartial => {
+          processChunksLegacy(message.data, allFields, partialChunk).then((newPartial: string) => {
             partialChunk = newPartial;
           });
         } catch (error) {

@@ -67,10 +67,8 @@ const ConfigEntrySchema = z.object({
   cookieName: z.string(),
   /** Web app URL for redirects and links - also where Better Auth sets cookies */
   baseURL: z.string(),
-  /** API URL for making requests */
+  /** API URL for making requests - always goes through the webapp proxy */
   apiURL: z.string(),
-  /** Fallback URL for cookie lookup (legacy - cookies are primarily at baseURL) */
-  apiOrigin: z.string(),
   webappEnv: WebappEnvsSchema,
 });
 type ConfigEntry = z.infer<typeof ConfigEntrySchema>;
@@ -131,90 +129,50 @@ type ViteImportMeta = z.infer<typeof _ViteImportMetaSchema>;
 // Better Auth uses underscores in cookie names: {prefix}.session_token
 // Dev uses non-secure cookies, preview/prod use __Secure- prefix
 //
-// IMPORTANT: Better Auth sets cookies on the FRONTEND domain (baseURL), NOT the backend API.
-// Cookie lookup checks baseURL FIRST (where cookies are set), then falls back to apiOrigin.
+// IMPORTANT: Better Auth sets cookies on the FRONTEND domain (baseURL).
+// All API requests go through the webapp proxy - the extension never talks to the backend directly.
 const config: Record<WebappEnvs, ConfigEntry> = {
   dev: {
     cookieName: 'filliny.session_token',
-    // Frontend URL - where Better Auth sets cookies (checked FIRST for cookie lookup)
     baseURL: 'http://localhost:5173',
-    // API requests go through the Vite proxy at the frontend
     apiURL: 'http://localhost:5173/api/v1',
-    // Backend URL - only used as fallback for cookie lookup (cookies are NOT set here)
-    apiOrigin: 'http://localhost:8787',
     webappEnv: WebappEnvs.DEV,
   },
   preview: {
     cookieName: '__Secure-filliny.session_token',
-    // Frontend URL - where Better Auth sets cookies
-    baseURL: 'https://preview.filliny.com',
-    // API requests go through the frontend proxy
-    apiURL: 'https://preview.filliny.com/api/v1',
-    // Same as baseURL - cookies are set on the frontend domain
-    apiOrigin: 'https://preview.filliny.com',
+    baseURL: 'https://preview.filliny.io',
+    apiURL: 'https://preview.filliny.io/api/v1',
     webappEnv: WebappEnvs.PREVIEW,
   },
   prod: {
     cookieName: '__Secure-filliny.session_token',
-    // Frontend URL - where Better Auth sets cookies
     baseURL: 'https://filliny.io',
-    // API requests go through the frontend proxy
     apiURL: 'https://filliny.io/api/v1',
-    // Same as baseURL - cookies are set on the frontend domain
-    apiOrigin: 'https://filliny.io',
     webappEnv: WebappEnvs.PROD,
   },
 };
 
 const handleGetAuthToken = (
-  envConfig: { apiOrigin: string; baseURL: string; cookieName: string },
+  envConfig: { baseURL: string; cookieName: string },
   sendResponse: (response: GetAuthTokenResponse) => void,
 ) => {
-  // Better Auth sets cookies on the FRONTEND domain (baseURL), so check there FIRST.
-  // The apiOrigin fallback is only for legacy compatibility.
-  // chrome.cookies.get matches by URL domain, so we check both origins to find the cookie.
-  const primaryConfig = { url: envConfig.baseURL, name: envConfig.cookieName };
+  // Better Auth sets cookies on the FRONTEND domain (baseURL).
+  const cookieConfig = { url: envConfig.baseURL, name: envConfig.cookieName };
 
-  console.log('[Auth] Looking for cookie:', `name="${primaryConfig.name}" url="${primaryConfig.url}"`);
+  console.log('[Auth] Looking for cookie:', `name="${cookieConfig.name}" url="${cookieConfig.url}"`);
 
-  chrome.cookies.get(primaryConfig, cookie => {
+  chrome.cookies.get(cookieConfig, cookie => {
     if (cookie) {
       console.log(
-        '[Auth] Cookie found at baseURL:',
+        '[Auth] Cookie found:',
         `name="${cookie.name}", domain="${cookie.domain}", secure=${cookie.secure}, httpOnly=${cookie.httpOnly}`,
         `value="${cookie.value.substring(0, 30)}..."`,
       );
       sendResponse({
         success: { token: cookie.value },
       });
-      return;
-    }
-
-    // Fallback: try apiOrigin (legacy compatibility - cookies should be at baseURL)
-    if (envConfig.apiOrigin && envConfig.apiOrigin !== envConfig.baseURL) {
-      const fallbackConfig = { url: envConfig.apiOrigin, name: envConfig.cookieName };
-      console.log('[Auth] Cookie not found at baseURL, trying apiOrigin:', `url="${fallbackConfig.url}"`);
-
-      chrome.cookies.get(fallbackConfig, fallbackCookie => {
-        if (fallbackCookie) {
-          console.log(
-            '[Auth] Cookie found at apiOrigin:',
-            `name="${fallbackCookie.name}", domain="${fallbackCookie.domain}", secure=${fallbackCookie.secure}, httpOnly=${fallbackCookie.httpOnly}`,
-            `value="${fallbackCookie.value.substring(0, 30)}..."`,
-          );
-        } else {
-          console.warn(
-            '[Auth] Cookie NOT found at either origin:',
-            `baseURL="${envConfig.baseURL}" apiOrigin="${envConfig.apiOrigin}"`,
-          );
-        }
-
-        sendResponse({
-          success: { token: fallbackCookie ? fallbackCookie.value : null },
-        });
-      });
     } else {
-      console.warn('[Auth] Cookie NOT found for:', `name="${primaryConfig.name}" at "${primaryConfig.url}"`);
+      console.warn('[Auth] Cookie NOT found for:', `name="${cookieConfig.name}" at "${cookieConfig.url}"`);
       sendResponse({
         success: { token: null },
       });
@@ -302,7 +260,7 @@ const getConfig = (): ConfigEntry => {
     if (typeof window !== 'undefined') {
       try {
         const hostname = window.location.hostname;
-        if (hostname === 'localhost' || hostname === '127.0.0.1') {
+        if (hostname === 'localhost') {
           console.log('Using DEV environment based on hostname:', hostname);
           const envConfig = config[WebappEnvs.DEV];
           extendedGlobal.__CACHED_ENV_CONFIG__ = envConfig;
@@ -344,7 +302,6 @@ const handleAuthTokenChanged = (
   envConfig: ReturnType<typeof getConfig>,
   sendResponse: (response: GetAuthTokenResponse) => void,
 ) => {
-  // Reuse handleGetAuthToken which already handles apiOrigin + baseURL fallback
   handleGetAuthToken(envConfig, sendResponse);
   return true; // Keep message channel open for async response
 };
@@ -387,33 +344,27 @@ const getCurrentVistingUrl = (): Promise<string> =>
     });
   });
 
-// Add a new function to listen for cookie changes
+// Listen for cookie changes on the webapp domain (where Better Auth sets cookies)
 const setupAuthTokenListener = () => {
   const envConfig = getConfig();
-  // Monitor both baseURL and apiOrigin hostnames for cookie changes.
-  // Better Auth sets cookies on the frontend domain (baseURL), but we also
-  // watch apiOrigin for legacy compatibility.
-  const apiHostname = new URL(envConfig.apiOrigin).hostname;
   const baseHostname = new URL(envConfig.baseURL).hostname;
 
   console.log(
     '[Auth] Setting up cookie listener for:',
-    `apiHostname="${apiHostname}" baseHostname="${baseHostname}" cookieName="${envConfig.cookieName}"`,
+    `hostname="${baseHostname}" cookieName="${envConfig.cookieName}"`,
   );
 
   // Listen for changes to the specific cookie
-  // Cookie domain may include leading dot for cross-subdomain cookies (e.g., '.filliny.com')
+  // Cookie domain may include leading dot for cross-subdomain cookies (e.g., '.filliny.io')
   chrome.cookies.onChanged.addListener(changeInfo => {
     const { cookie } = changeInfo;
     const cookieDomain = cookie.domain.startsWith('.') ? cookie.domain.slice(1) : cookie.domain;
 
-    // Match cookie if domain matches apiOrigin or baseURL (or subdomain cookies)
-    const matchesHostname = (hostname: string) =>
-      cookieDomain === hostname ||
-      hostname.endsWith(cookieDomain) ||
-      cookie.domain === `.${hostname.split('.').slice(-2).join('.')}`;
-
-    const domainMatches = matchesHostname(apiHostname) || matchesHostname(baseHostname);
+    // Match cookie if domain matches baseURL (or subdomain cookies)
+    const domainMatches =
+      cookieDomain === baseHostname ||
+      baseHostname.endsWith(cookieDomain) ||
+      cookie.domain === `.${baseHostname.split('.').slice(-2).join('.')}`;
 
     if (domainMatches && cookie.name === envConfig.cookieName) {
       console.log(
@@ -449,7 +400,6 @@ const setupAuthTokenListener = () => {
 };
 
 // Check auth state from cookie on startup (no storage needed)
-// Reuses handleGetAuthToken which tries baseURL first (where cookies are set)
 const syncAuthTokenFromCookie = () => {
   const envConfig = getConfig();
 
@@ -460,7 +410,7 @@ const syncAuthTokenFromCookie = () => {
     } else {
       console.warn(
         '[Auth] No session cookie found on startup for:',
-        `name="${envConfig.cookieName}" at apiOrigin="${envConfig.apiOrigin}" or baseURL="${envConfig.baseURL}"`,
+        `name="${envConfig.cookieName}" at "${envConfig.baseURL}"`,
       );
     }
   });

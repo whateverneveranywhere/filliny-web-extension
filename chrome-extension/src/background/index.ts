@@ -98,7 +98,7 @@ const storeEnvironmentInStorage = () => {
       // Check hostname (for local development)
       try {
         const hostname = window.location.hostname;
-        if (hostname === 'localhost' || hostname === '127.0.0.1') {
+        if (hostname === 'localhost') {
           env = WebappEnvs.DEV;
         } else {
           // Default to prod for non-dev environments
@@ -212,6 +212,7 @@ chrome.runtime.onMessageExternal.addListener((request, sender, sendResponse) => 
       'https://filliny.com',
       'https://www.filliny.io',
       'https://www.filliny.com',
+      'https://preview.filliny.io',
       'https://preview.filliny.com',
       'http://localhost:5173',
       'http://localhost:5174',

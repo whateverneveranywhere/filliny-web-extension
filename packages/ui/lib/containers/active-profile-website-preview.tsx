@@ -10,7 +10,6 @@ import { useToast } from '../hooks/use-toast';
 import { cn } from '../utils';
 import { usePOVListQuery, useTonesListQuery, useEditFillingProfileMutation } from '@extension/shared';
 import { profileStorage } from '@extension/storage';
-import { Label } from '@radix-ui/react-label';
 import { Check, X, Info, Pencil } from 'lucide-react';
 import { useState } from 'react';
 import type { DTOFillingPreferences, DTOFillingWebsite, DTOProfileFillingForm } from '@extension/storage';
@@ -29,9 +28,9 @@ interface PreferenceItemProps {
 }
 
 const PreferenceItem = ({ label, value, tooltip }: PreferenceItemProps) => (
-  <div className="filliny-flex filliny-items-center filliny-justify-between filliny-py-2">
-    <div className="filliny-flex filliny-items-center filliny-gap-2">
-      <Label className="filliny-font-medium">{label}</Label>
+  <div className="filliny-flex filliny-items-center filliny-justify-between filliny-py-1.5">
+    <div className="filliny-flex filliny-items-center filliny-gap-1.5">
+      <span className="filliny-text-sm filliny-font-medium filliny-leading-none">{label}</span>
       {tooltip && (
         <TooltipProvider>
           <Tooltip>
@@ -122,9 +121,7 @@ const ActiveProfileWebsitePreview: React.FC<Props> = ({ matchingWebsite, prefere
         <div className="filliny-flex filliny-flex-col filliny-gap-4">
           {/* Context Section */}
           <div className="filliny-flex filliny-flex-col filliny-gap-1.5">
-            <Label className="filliny-text-sm filliny-font-semibold filliny-text-muted-foreground">
-              Filling Context
-            </Label>
+            <span className="filliny-text-xs filliny-font-medium filliny-text-muted-foreground">Filling Context</span>
             <p className="filliny-rounded-lg filliny-bg-muted/50 filliny-p-3 filliny-text-sm filliny-break-words">
               {matchingWebsite.fillingContext || 'No context provided'}
             </p>

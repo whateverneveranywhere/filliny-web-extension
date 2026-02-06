@@ -1,9 +1,8 @@
-import { Button } from '../ui/button';
 import { Textarea } from '../ui/textarea';
 import { animationClasses } from '@/lib/animations';
 import { cn } from '@/lib/utils';
 import { extractTextFromFile, isAcceptedFileType, DEFAULT_ACCEPTED_FILE_TYPES } from '@/lib/utils/file-processing';
-import { FileText, Loader2, Upload } from 'lucide-react';
+import { Loader2, Upload } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { useController } from 'react-hook-form';
 import { toast } from 'sonner';
@@ -16,7 +15,6 @@ interface RHFShadcnFileDropProps {
   rows?: number;
   className?: string;
   accept?: string;
-  helperText?: string;
 }
 
 const RHFShadcnFileDrop = ({
@@ -26,11 +24,9 @@ const RHFShadcnFileDrop = ({
   rows = 4,
   className,
   accept = DEFAULT_ACCEPTED_FILE_TYPES,
-  helperText,
 }: RHFShadcnFileDropProps) => {
   const [isDragging, setIsDragging] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [isHovering, setIsHovering] = useState(false);
 
   const {
     field,
@@ -86,19 +82,6 @@ const RHFShadcnFileDrop = ({
     [accept, processFile],
   );
 
-  const handleFileClick = useCallback(() => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = accept;
-    input.onchange = async e => {
-      const file = (e.target as HTMLInputElement).files?.[0];
-      if (file) {
-        await processFile(file);
-      }
-    };
-    input.click();
-  }, [accept, processFile]);
-
   return (
     <div className="filliny-space-y-2">
       {title && (
@@ -111,15 +94,12 @@ const RHFShadcnFileDrop = ({
           'filliny-relative filliny-rounded-md filliny-border filliny-border-input',
           animationClasses.transitionSlow,
           isDragging && 'filliny-border-primary filliny-bg-accent/50 filliny-scale-[1.02] filliny-shadow-lg',
-          isHovering && !isDragging && 'filliny-border-muted-foreground filliny-shadow-sm',
           error && 'filliny-border-destructive',
           className,
         )}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-        onMouseEnter={() => setIsHovering(true)}
-        onMouseLeave={() => setIsHovering(false)}>
+        onDrop={handleDrop}>
         <Textarea
           {...field}
           rows={rows}
@@ -176,20 +156,6 @@ const RHFShadcnFileDrop = ({
           </div>
         )}
       </div>
-      <div className={cn('filliny-flex filliny-w-full filliny-justify-end', animationClasses.fadeInSlow)}>
-        <Button type="button" size="sm" variant="outline" className={cn('filliny-w-full')} onClick={handleFileClick}>
-          <FileText className="filliny-h-4 filliny-w-4" />
-          Upload file
-        </Button>
-      </div>
-      {!error && (helperText || accept) && (
-        <div className={cn('filliny-flex filliny-items-center filliny-mt-1', animationClasses.fadeIn)}>
-          <p className="filliny-text-xs filliny-text-muted-foreground">
-            {helperText || `Drag and drop files (${accept.replace(/\./g, '')}) to automatically extract content.`}
-          </p>
-        </div>
-      )}
-
       {error && (
         <p
           className={cn(

@@ -97,15 +97,15 @@ const UpgradePrompt = ({
   if (variant === 'inline') {
     return (
       <div
-        className={`filliny-flex filliny-items-center filliny-justify-between filliny-gap-2 filliny-rounded-lg filliny-border filliny-border-warning/20 filliny-bg-warning/5 filliny-backdrop-blur-sm filliny-px-3 filliny-py-2 ${className}`}>
-        <div className="filliny-flex filliny-items-center filliny-gap-2">
-          <Icon className="filliny-h-4 filliny-w-4 filliny-text-warning" />
+        className={`filliny-flex filliny-flex-col filliny-gap-2 filliny-rounded-lg filliny-border filliny-border-warning/20 filliny-bg-warning/5 filliny-backdrop-blur-sm filliny-px-3 filliny-py-2.5 ${className}`}>
+        <div className="filliny-flex filliny-items-start filliny-gap-2">
+          <Icon className="filliny-mt-0.5 filliny-h-4 filliny-w-4 filliny-shrink-0 filliny-text-warning" />
           <span className="filliny-text-xs filliny-text-muted-foreground">{content.description}</span>
         </div>
         <Button
           variant="warning"
           size="sm"
-          className="filliny-h-7 filliny-gap-1 filliny-px-2 filliny-text-xs"
+          className="filliny-w-full filliny-gap-1 filliny-text-xs"
           onClick={() => window.open(upgradeUrl, '_blank')}>
           <Crown className="filliny-h-3 filliny-w-3" />
           Pro

@@ -26,6 +26,14 @@ enum Framework {
   QWIK = 'qwik',
   VANILLA = 'vanilla',
   SELECT2 = 'select2',
+  ALPINE = 'alpine',
+  HTMX = 'htmx',
+  KNOCKOUT = 'knockout',
+  LIT = 'lit',
+  STENCIL = 'stencil',
+  PREACT = 'preact',
+  SOLID = 'solid',
+  EMBER = 'ember',
 }
 
 /**
@@ -398,14 +406,87 @@ const detectQwik = (element: Element): boolean =>
   '__qwik__' in element;
 
 /**
+ * Detect Alpine.js framework on an element
+ */
+const detectAlpine = (element: Element): boolean =>
+  element.hasAttribute('x-data') ||
+  element.hasAttribute('x-model') ||
+  element.hasAttribute('x-bind') ||
+  element.hasAttribute('x-on') ||
+  element.hasAttribute('@click') ||
+  element.hasAttribute('@input') ||
+  element.closest('[x-data]') !== null;
+
+/**
+ * Detect HTMX on an element
+ */
+const detectHTMX = (element: Element): boolean =>
+  element.hasAttribute('hx-post') ||
+  element.hasAttribute('hx-get') ||
+  element.hasAttribute('hx-put') ||
+  element.hasAttribute('hx-delete') ||
+  element.hasAttribute('hx-trigger') ||
+  element.closest('[hx-post], [hx-get], [hx-put], [hx-delete]') !== null;
+
+/**
+ * Detect Knockout.js on an element
+ */
+const detectKnockout = (element: Element): boolean =>
+  element.hasAttribute('data-bind') || element.closest('[data-bind]') !== null;
+
+/**
+ * Detect Lit element
+ */
+const detectLit = (element: Element): boolean =>
+  '__litElement' in element || (element.tagName.includes('-') && element.shadowRoot !== null);
+
+/**
+ * Detect Stencil component
+ */
+const detectStencil = (element: Element): boolean =>
+  element.hasAttribute('s-id') || element.hasAttribute('s-cr') || '__stencil' in element;
+
+/**
+ * Detect Preact on an element
+ */
+const detectPreact = (element: Element): boolean => {
+  const hasPreactAttr = Object.keys(element).some(key => key.startsWith('__preactattr_'));
+  if (hasPreactAttr) return true;
+  return '__c' in element && '__e' in element;
+};
+
+/**
+ * Detect Solid.js on an element
+ */
+const detectSolid = (element: Element): boolean =>
+  element.hasAttribute('data-hk') || element.hasAttribute('data-solid') || element.closest('[data-hk]') !== null;
+
+/**
+ * Detect Ember.js on an element
+ */
+const detectEmber = (element: Element): boolean =>
+  (element.id && element.id.startsWith('ember')) ||
+  element.classList.contains('ember-view') ||
+  element.closest('.ember-view') !== null;
+
+/**
  * Detect the framework used by an element
  */
 const detectFrameworkForElement = (element: Element): Framework => {
   if (detectReact(element)) return Framework.REACT;
+  // Check Preact before React since Preact elements may also pass React checks
+  if (detectPreact(element)) return Framework.PREACT;
   if (detectVue(element)) return Framework.VUE;
   if (detectAngular(element)) return Framework.ANGULAR;
   if (detectSvelte(element)) return Framework.SVELTE;
   if (detectQwik(element)) return Framework.QWIK;
+  if (detectAlpine(element)) return Framework.ALPINE;
+  if (detectHTMX(element)) return Framework.HTMX;
+  if (detectKnockout(element)) return Framework.KNOCKOUT;
+  if (detectLit(element)) return Framework.LIT;
+  if (detectStencil(element)) return Framework.STENCIL;
+  if (detectSolid(element)) return Framework.SOLID;
+  if (detectEmber(element)) return Framework.EMBER;
   return Framework.VANILLA;
 };
 
@@ -463,6 +544,49 @@ const detectDocumentFramework = (doc: Document = document): Framework => {
   // Qwik detection
   if (win.__QWIK_DEV__ || doc.querySelector('[q\\:container]') || doc.querySelector('script[src*="qwik"]')) {
     return Framework.QWIK;
+  }
+
+  // Alpine.js detection
+  if (doc.querySelector('[x-data]') || doc.querySelector('script[src*="alpine"]')) {
+    return Framework.ALPINE;
+  }
+
+  // HTMX detection
+  if (doc.querySelector('[hx-post], [hx-get]') || doc.querySelector('script[src*="htmx"]')) {
+    return Framework.HTMX;
+  }
+
+  // Knockout.js detection
+  if (
+    (win as unknown as Record<string, unknown>).ko ||
+    doc.querySelector('[data-bind]') ||
+    doc.querySelector('script[src*="knockout"]')
+  ) {
+    return Framework.KNOCKOUT;
+  }
+
+  // Lit detection
+  if (doc.querySelector('script[src*="lit"]')) {
+    return Framework.LIT;
+  }
+
+  // Preact detection
+  if (doc.querySelector('script[src*="preact"]')) {
+    return Framework.PREACT;
+  }
+
+  // Solid.js detection
+  if (doc.querySelector('[data-hk]') || doc.querySelector('script[src*="solid"]')) {
+    return Framework.SOLID;
+  }
+
+  // Ember.js detection
+  if (
+    (win as unknown as Record<string, unknown>).Ember ||
+    doc.querySelector('.ember-view') ||
+    doc.querySelector('script[src*="ember"]')
+  ) {
+    return Framework.EMBER;
   }
 
   return Framework.VANILLA;
@@ -701,6 +825,14 @@ export {
   detectAngular,
   detectSvelte,
   detectQwik,
+  detectAlpine,
+  detectHTMX,
+  detectKnockout,
+  detectLit,
+  detectStencil,
+  detectPreact,
+  detectSolid,
+  detectEmber,
   detectFrameworkForElement,
   detectDocumentFramework,
   detectUILibrary,
