@@ -54,9 +54,9 @@ const Stepper = ({
       </div>
 
       {/* Scrollable Content Area */}
-      <ScrollArea className="filliny-flex-1">
+      <ScrollArea className="filliny-flex-1 filliny-min-h-0">
         <div className="filliny-min-w-0 filliny-px-4 filliny-py-4">{steps[currentStep].content}</div>
-        <ScrollBar />
+        <ScrollBar orientation="vertical" />
       </ScrollArea>
 
       {/* Fixed Footer - Navigation Buttons */}

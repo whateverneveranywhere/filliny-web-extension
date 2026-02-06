@@ -109,10 +109,10 @@ const AuthorizedFilesSection = ({ profileId }: AuthorizedFilesSectionProps) => {
   }
 
   return (
-    <div className="filliny-space-y-4">
+    <div className="filliny-space-y-4 filliny-min-w-0">
       {/* Header */}
-      <div className="filliny-flex filliny-items-start filliny-justify-between">
-        <div>
+      <div className="filliny-flex filliny-items-start filliny-justify-between filliny-gap-2">
+        <div className="filliny-min-w-0 filliny-flex-1">
           <h3 className="filliny-text-sm filliny-font-medium">Authorized Files for Upload</h3>
           <p className="filliny-text-xs filliny-text-muted-foreground">
             Select a folder containing files AI can suggest when filling file upload fields

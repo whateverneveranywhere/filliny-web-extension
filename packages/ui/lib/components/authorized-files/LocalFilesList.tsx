@@ -84,8 +84,13 @@ const LocalFilesList = ({ files, className }: LocalFilesListProps) => {
   }
 
   return (
-    <ScrollArea className={cn('filliny-max-h-[200px] filliny-w-full filliny-rounded-md filliny-border', className)}>
-      <div className="filliny-p-2 filliny-space-y-1">
+    <ScrollArea
+      className={cn(
+        'filliny-h-[180px] filliny-w-full filliny-rounded-md filliny-border',
+        '[&>[data-radix-scroll-area-viewport]>div]:!filliny-block',
+        className,
+      )}>
+      <div className="filliny-p-2 filliny-space-y-1 filliny-w-full filliny-max-w-full">
         {files.map((file, index) => {
           const Icon = getFileIcon(file.extension, file.mimeType);
           const badgeClass = getBadgeClass(file.extension, file.mimeType);
@@ -94,7 +99,7 @@ const LocalFilesList = ({ files, className }: LocalFilesListProps) => {
             <div
               key={`${file.relativePath}-${index}`}
               className={cn(
-                'filliny-flex filliny-items-center filliny-gap-2 filliny-p-2 filliny-rounded-md',
+                'filliny-flex filliny-items-center filliny-gap-2 filliny-p-2 filliny-rounded-md filliny-overflow-hidden',
                 'hover:filliny-bg-muted/50 filliny-transition-colors',
               )}>
               {/* File Icon */}
@@ -108,7 +113,7 @@ const LocalFilesList = ({ files, className }: LocalFilesListProps) => {
               </div>
 
               {/* File Info */}
-              <div className="filliny-flex-1 filliny-min-w-0">
+              <div className="filliny-flex-1 filliny-min-w-0 filliny-overflow-hidden">
                 <p className="filliny-text-sm filliny-font-medium filliny-truncate" title={file.name}>
                   {file.name}
                 </p>
@@ -123,10 +128,10 @@ const LocalFilesList = ({ files, className }: LocalFilesListProps) => {
 
               {/* File Metadata */}
               <div className="filliny-flex filliny-items-center filliny-gap-2 filliny-shrink-0">
-                <Badge variant="outline" className="filliny-text-xs filliny-uppercase">
+                <Badge variant="outline" className="filliny-text-xs filliny-uppercase filliny-whitespace-nowrap">
                   {file.extension || '?'}
                 </Badge>
-                <span className="filliny-text-xs filliny-text-muted-foreground filliny-w-16 filliny-text-right">
+                <span className="filliny-text-xs filliny-text-muted-foreground filliny-w-14 filliny-text-right filliny-whitespace-nowrap">
                   {formatFileSize(file.size)}
                 </span>
               </div>
@@ -134,7 +139,7 @@ const LocalFilesList = ({ files, className }: LocalFilesListProps) => {
           );
         })}
       </div>
-      <ScrollBar />
+      <ScrollBar orientation="vertical" />
     </ScrollArea>
   );
 };

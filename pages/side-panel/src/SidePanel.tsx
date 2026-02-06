@@ -1,4 +1,4 @@
-import { useApiHealthCheck, useAuthContext, AuthProvider } from '@extension/shared';
+import { useApiHealthCheck, useAuthContext, AuthProvider, useUsageRefresh } from '@extension/shared';
 import { ApiDownState, Loading, QueryClientProvider, RouterProvider, SigninPage, withPageWrapper } from '@extension/ui';
 
 /**
@@ -13,6 +13,10 @@ const AppContent = () => {
     refetch: retryHealthCheck,
   } = useApiHealthCheck();
   const { isLoading: isAuthLoading, isAuthenticated } = useAuthContext();
+
+  // Listen for usage refresh messages from the background script
+  // to update the usage count immediately after form fills
+  useUsageRefresh();
 
   // Check API health first
   if (isHealthLoading) {

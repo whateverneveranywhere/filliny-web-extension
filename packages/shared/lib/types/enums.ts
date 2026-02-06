@@ -307,6 +307,8 @@ export enum MessageType {
   REMOVE_EXTENSION_UI = 'REMOVE_EXTENSION_UI',
   /** Request to open the extension side panel (from webapp) */
   OPEN_SIDE_PANEL = 'OPEN_SIDE_PANEL',
+  /** Notify side panel to refresh usage data after form fill */
+  REFRESH_USAGE = 'REFRESH_USAGE',
 }
 
 // NOTE: Framework is exported from utils/frameworkDetection.ts (single source of truth)

@@ -101,18 +101,20 @@ const WebsitePreviewCard = ({
                   )}
                 </div>
               </TooltipTrigger>
-            <TooltipContent side="top" className="filliny-max-w-xs">
-              <div className="filliny-flex filliny-flex-col filliny-gap-1">
-                <p className="filliny-break-all filliny-text-sm">{isValidURL ? websiteURL : 'No valid URL provided'}</p>
-                {isValidURL && (
-                  <p className="filliny-text-xs filliny-text-muted-foreground">
-                    {isRootLoad ? 'Applies to entire website' : 'Applies to this exact URL only'}
+              <TooltipContent side="top" className="filliny-max-w-xs">
+                <div className="filliny-flex filliny-flex-col filliny-gap-1">
+                  <p className="filliny-break-all filliny-text-sm">
+                    {isValidURL ? websiteURL : 'No valid URL provided'}
                   </p>
-                )}
-              </div>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+                  {isValidURL && (
+                    <p className="filliny-text-xs filliny-text-muted-foreground">
+                      {isRootLoad ? 'Applies to entire website' : 'Applies to this exact URL only'}
+                    </p>
+                  )}
+                </div>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
 
         {/* Actions Section */}

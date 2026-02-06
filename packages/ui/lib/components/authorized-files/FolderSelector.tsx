@@ -97,9 +97,7 @@ const getMimeType = (extension: string): string => {
 /**
  * Check if File System Access API is supported
  */
-const isFileSystemAccessSupported = (): boolean => {
-  return 'showDirectoryPicker' in window;
-};
+const isFileSystemAccessSupported = (): boolean => 'showDirectoryPicker' in window;
 
 /**
  * Recursively scan directory using File System Access API

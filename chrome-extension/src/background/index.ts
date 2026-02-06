@@ -502,6 +502,16 @@ const handleApiRequest = (
           chrome.tabs.sendMessage(tabId, {
             type: MessageType.STREAM_DONE,
           });
+
+          // Broadcast usage refresh to all extension contexts (side panel, popup)
+          // This allows them to update the usage count immediately after a form fill
+          chrome.runtime
+            .sendMessage({
+              type: MessageType.REFRESH_USAGE,
+            })
+            .catch(() => {
+              // Side panel might not be open, ignore the error
+            });
         } catch (error) {
           console.error('Background: Stream error:', error);
           const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
