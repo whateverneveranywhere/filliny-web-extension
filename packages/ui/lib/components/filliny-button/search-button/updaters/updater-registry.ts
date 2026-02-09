@@ -8,8 +8,8 @@
 import { getBuiltInFieldUpdaters } from './field-updaters';
 import { getBuiltInFrameworkUpdaters } from './framework-updaters';
 import { updateManager } from './update-manager';
-import type { FieldType } from '@extension/shared';
 import type { FieldUpdateStrategy, UpdateConfig } from '../core/types';
+import type { FieldType } from '@extension/shared';
 
 // ============================================================================
 // UPDATER REGISTRY
@@ -155,7 +155,7 @@ class UpdaterRegistry {
 // GLOBAL REGISTRY INSTANCE
 // ============================================================================
 
-export const updaterRegistry = new UpdaterRegistry();
+const updaterRegistry = new UpdaterRegistry();
 
 // ============================================================================
 // CONVENIENCE FUNCTIONS
@@ -164,32 +164,31 @@ export const updaterRegistry = new UpdaterRegistry();
 /**
  * Initialize the updater registry with all built-in updaters
  */
-export const initializeUpdaters = (): void => {
+const initializeUpdaters = (): void => {
   updaterRegistry.initialize();
 };
 
 /**
  * Register a custom field update strategy
  */
-export const registerUpdater = (strategy: FieldUpdateStrategy): void => {
+const registerUpdater = (strategy: FieldUpdateStrategy): void => {
   updaterRegistry.registerUpdater(strategy);
 };
 
 /**
  * Get all available updaters
  */
-export const getUpdaters = (): FieldUpdateStrategy[] => updaterRegistry.getAllUpdaters();
+const getUpdaters = (): FieldUpdateStrategy[] => updaterRegistry.getAllUpdaters();
 
 /**
  * Get updaters for a specific field type
  */
-export const getUpdatersByType = (fieldType: FieldType): FieldUpdateStrategy[] =>
-  updaterRegistry.getUpdatersByType(fieldType);
+const getUpdatersByType = (fieldType: FieldType): FieldUpdateStrategy[] => updaterRegistry.getUpdatersByType(fieldType);
 
 /**
  * Create a preset configuration for common scenarios
  */
-export const createPresetUpdateConfig = (preset: 'default' | 'fast' | 'thorough' | 'strict'): UpdateConfig => {
+const createPresetUpdateConfig = (preset: 'default' | 'fast' | 'thorough' | 'strict'): UpdateConfig => {
   const baseConfig = updaterRegistry.createUpdateConfig();
 
   switch (preset) {
@@ -249,3 +248,16 @@ if (typeof window !== 'undefined') {
     initializeUpdaters();
   }, 0);
 }
+
+// ============================================================================
+// EXPORTS
+// ============================================================================
+
+export {
+  updaterRegistry,
+  initializeUpdaters,
+  registerUpdater,
+  getUpdaters,
+  getUpdatersByType,
+  createPresetUpdateConfig,
+};

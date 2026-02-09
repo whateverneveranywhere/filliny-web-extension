@@ -1,0 +1,34 @@
+{
+  "name": "@extension/remotion-demo",
+  "version": "1.4.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "remotion studio src/index.ts",
+    "studio": "remotion studio src/index.ts",
+    "render": "remotion render src/index.ts FillinyDemo out/video.mp4",
+    "render:mp4": "remotion render src/index.ts FillinyDemo out/video.mp4",
+    "render:webm": "remotion render src/index.ts FillinyDemo out/video.webm",
+    "render:gif": "remotion render src/index.ts FillinyDemo out/video.gif --every-nth-frame 2",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@remotion/cli": "^4.0.0",
+    "@remotion/google-fonts": "^4.0.0",
+    "@remotion/noise": "^4.0.419",
+    "@remotion/three": "^4.0.419",
+    "@remotion/transitions": "^4.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "remotion": "^4.0.0",
+    "three": "^0.182.0"
+  },
+  "devDependencies": {
+    "@remotion/bundler": "^4.0.0",
+    "@remotion/renderer": "^4.0.0",
+    "@types/react": "^19.1.5",
+    "@types/react-dom": "^19.1.5",
+    "@types/three": "^0.182.0",
+    "typescript": "^5.8.3"
+  }
+}

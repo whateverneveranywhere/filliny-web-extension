@@ -336,11 +336,11 @@ class UnifiedRegistry {
 // GLOBAL REGISTRY INSTANCE
 // ============================================================================
 
-export const registry = new UnifiedRegistry();
+const registry = new UnifiedRegistry();
 
-// Export individual registries for direct access
-export const fieldRegistry = registry.fields;
-export const containerRegistry = registry.containers;
+// Individual registries for direct access
+const fieldRegistry = registry.fields;
+const containerRegistry = registry.containers;
 
 // ============================================================================
 // REGISTRY EVENT HANDLERS
@@ -352,3 +352,9 @@ if (process.env.NODE_ENV === 'development') {
     console.log('🔍 Field detection event:', event);
   });
 }
+
+// ============================================================================
+// EXPORTS (at end of file per ESLint import-x/exports-last rule)
+// ============================================================================
+
+export { registry, fieldRegistry, containerRegistry };

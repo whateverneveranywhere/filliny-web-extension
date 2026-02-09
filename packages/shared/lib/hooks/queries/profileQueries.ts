@@ -24,7 +24,7 @@ interface UseProfilesListQueryOptions {
  * @param options.enabled - Whether the query should be enabled (default: true)
  *                          Pass false when user is not authenticated to prevent 401 errors
  */
-export const useProfilesListQuery = (options?: UseProfilesListQueryOptions) => {
+const useProfilesListQuery = (options?: UseProfilesListQueryOptions) => {
   const { enabled = true } = options ?? {};
   return useQuery({
     queryKey: queryKeys.profile.list(),
@@ -55,7 +55,7 @@ interface UseSuggestedWebsitesOptions {
  * @param options.enabled - Whether the query should be enabled (default: true)
  *                          Pass false when user is not authenticated to prevent 401 errors
  */
-export const useSuggestedWebsites = (options?: UseSuggestedWebsitesOptions) => {
+const useSuggestedWebsites = (options?: UseSuggestedWebsitesOptions) => {
   const { enabled = true } = options ?? {};
   return useQuery({
     queryKey: queryKeys.profile.suggestedWebsites(),
@@ -99,7 +99,7 @@ interface UseFillingProfileByIdOptions {
  * @param options.enabled - Whether the query should be enabled (default: true)
  *                          Pass false when user is not authenticated to prevent 401 errors
  */
-export const useFillingProfileById = (id: string, options?: UseFillingProfileByIdOptions) => {
+const useFillingProfileById = (id: string, options?: UseFillingProfileByIdOptions) => {
   const { enabled = true } = options ?? {};
   return useQuery({
     queryKey: queryKeys.profile.detail(id),
@@ -130,7 +130,7 @@ interface UseTonesListQueryOptions {
  * @param options.enabled - Whether the query should be enabled (default: true)
  *                          Pass false when user is not authenticated to prevent 401 errors
  */
-export const useTonesListQuery = (options?: UseTonesListQueryOptions) => {
+const useTonesListQuery = (options?: UseTonesListQueryOptions) => {
   const { enabled = true } = options ?? {};
   return useQuery({
     queryKey: queryKeys.profile.tones(),
@@ -162,7 +162,7 @@ interface UsePOVListQueryOptions {
  * @param options.enabled - Whether the query should be enabled (default: true)
  *                          Pass false when user is not authenticated to prevent 401 errors
  */
-export const usePOVListQuery = (options?: UsePOVListQueryOptions) => {
+const usePOVListQuery = (options?: UsePOVListQueryOptions) => {
   const { enabled = true } = options ?? {};
   return useQuery({
     queryKey: queryKeys.profile.povs(),
@@ -178,3 +178,5 @@ export const usePOVListQuery = (options?: UsePOVListQueryOptions) => {
     },
   });
 };
+
+export { useProfilesListQuery, useSuggestedWebsites, useFillingProfileById, useTonesListQuery, usePOVListQuery };

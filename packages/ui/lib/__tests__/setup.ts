@@ -11,9 +11,11 @@ export { mockChrome };
 
 // Polyfill CSS.escape for jsdom (not available natively)
 if (typeof globalThis.CSS === 'undefined') {
-  (globalThis as unknown as { CSS: { escape: (s: string) => string } }).CSS = {
-    escape: (s: string) => s.replace(/([^\w-])/g, '\\$1'),
-  };
+  Object.defineProperty(globalThis, 'CSS', {
+    value: { escape: (s: string) => s.replace(/([^\w-])/g, '\\$1') },
+    writable: true,
+    configurable: true,
+  });
 } else if (typeof globalThis.CSS.escape !== 'function') {
   globalThis.CSS.escape = (s: string) => s.replace(/([^\w-])/g, '\\$1');
 }

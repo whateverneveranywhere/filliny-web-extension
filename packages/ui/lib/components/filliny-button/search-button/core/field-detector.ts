@@ -5,23 +5,17 @@
  * It coordinates multiple detection strategies and combines their results.
  */
 
-import { Framework } from '@extension/shared';
 import { withPerformanceMonitoring } from './event-system';
-import {
-  isElementInteractive,
-  generateUniqueSelectors,
-  getElementXPath,
-  normalizeConfidence,
-  combineConfidenceScores,
-  safeExecute,
-} from './utils';
+import { isElementInteractive, generateUniqueSelectors, getElementXPath, combineConfidenceScores } from './utils';
+import { Framework, FieldTypeSchema } from '@extension/shared';
 import type { DetectedField, FieldDetectionStrategy, DetectionConfig, ConfidenceScore } from './types';
+import type { FieldType } from '@extension/shared';
 
 // ============================================================================
 // FIELD DETECTOR IMPLEMENTATION
 // ============================================================================
 
-export class FieldDetector {
+class FieldDetector {
   private strategies: FieldDetectionStrategy[] = [];
   private config: DetectionConfig;
 
@@ -140,7 +134,7 @@ export class FieldDetector {
   private async mergeFieldResults(fieldsByElement: Map<HTMLElement, DetectedField[]>): Promise<DetectedField[]> {
     const mergedFields: DetectedField[] = [];
 
-    for (const [element, fields] of fieldsByElement.entries()) {
+    for (const [_element, fields] of fieldsByElement.entries()) {
       if (fields.length === 1) {
         // Single detection, use as-is
         mergedFields.push(fields[0]);
@@ -242,9 +236,18 @@ export class FieldDetector {
 // ============================================================================
 
 /**
+ * Validate and coerce a type string into a FieldType.
+ * Falls back to 'text' if the provided type is not a recognized FieldType value.
+ */
+const parseFieldType = (type: string): FieldType => {
+  const result = FieldTypeSchema.safeParse(type);
+  return result.success ? result.data : 'text';
+};
+
+/**
  * Create a base detected field from an HTML element
  */
-export const createBaseDetectedField = async (
+const createBaseDetectedField = async (
   element: HTMLElement,
   type: string,
   confidence: ConfidenceScore,
@@ -273,10 +276,13 @@ export const createBaseDetectedField = async (
     isRequired: !!(element.hasAttribute('required') || element.getAttribute('aria-required') === 'true'),
   };
 
+  // Validate the field type using Zod schema
+  const validatedType = parseFieldType(type);
+
   // Create the detected field
   const field: DetectedField = {
     id: fieldId,
-    type: type as any, // Type assertion for FieldType
+    type: validatedType,
     xpath,
     uniqueSelectors,
     value: '',
@@ -314,7 +320,7 @@ export const createBaseDetectedField = async (
 /**
  * Enhanced field label detection
  */
-export const getFieldLabel = async (element: HTMLElement): Promise<string> => {
+const getFieldLabel = async (element: HTMLElement): Promise<string> => {
   // Strategy 1: aria-label
   const ariaLabel = element.getAttribute('aria-label');
   if (ariaLabel?.trim()) return ariaLabel.trim();
@@ -376,10 +382,16 @@ export const getFieldLabel = async (element: HTMLElement): Promise<string> => {
 // GLOBAL DETECTOR INSTANCE
 // ============================================================================
 
-export const fieldDetector = new FieldDetector();
+const fieldDetector = new FieldDetector();
 
 // Add performance monitoring
-export const detectFieldsWithMonitoring = withPerformanceMonitoring(
+const detectFieldsWithMonitoring = withPerformanceMonitoring(
   fieldDetector.detectFields.bind(fieldDetector),
   'field-detection',
 );
+
+// ============================================================================
+// EXPORTS (at end of file per ESLint import-x/exports-last rule)
+// ============================================================================
+
+export { FieldDetector, createBaseDetectedField, getFieldLabel, fieldDetector, detectFieldsWithMonitoring };

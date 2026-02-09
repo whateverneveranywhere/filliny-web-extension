@@ -80,14 +80,6 @@ const NavItemSchema: z.ZodType<NavItem> = z.lazy(() =>
 );
 
 /**
- * Success response legacy schema - kept for backwards compatibility
- * Note: SuccessResponse is defined in services/schemas/index.ts
- */
-const SuccessResponseLegacySchema = z.object({
-  message: z.string(),
-});
-
-/**
  * Step schema for stepper components
  */
 const StepSchema = z.object({
@@ -105,8 +97,7 @@ const StepperPropsSchema = z.object({
   isLoading: z.boolean().optional(),
   handleNext: z.custom<() => void | Promise<void>>(),
   handlePrev: z.custom<() => void>(),
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  handleFinish: z.custom<(...args: any[]) => void | Promise<void>>(),
+  handleFinish: z.custom<(...args: unknown[]) => void | Promise<void>>(),
 });
 
 // ============================================================================
@@ -177,7 +168,6 @@ interface NavItem extends FormOption {
   children?: NavItem[] | [];
 }
 
-type SuccessResponseLegacy = z.infer<typeof SuccessResponseLegacySchema>;
 type Step = z.infer<typeof StepSchema>;
 type StepperProps = z.infer<typeof StepperPropsSchema>;
 
@@ -211,7 +201,6 @@ export {
   TextInputPropsSchema,
   WithOptionsPropsSchema,
   NavItemSchema,
-  SuccessResponseLegacySchema,
   StepSchema,
   StepperPropsSchema,
 };
@@ -234,7 +223,6 @@ export type {
   TextInputProps,
   WithOptionsProps,
   NavItem,
-  SuccessResponseLegacy,
   Step,
   StepperProps,
   GetAuthTokenRequest,

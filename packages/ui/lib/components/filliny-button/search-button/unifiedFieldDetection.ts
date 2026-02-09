@@ -34,7 +34,7 @@ const GroupedFieldOptionSchema = z.object({
 /**
  * Grouped field info schema
  */
-export const GroupedFieldInfoSchema = z.object({
+const GroupedFieldInfoSchema = z.object({
   groupId: z.string(),
   containerId: z.string(),
   groupType: z.enum(['radio', 'checkbox']),
@@ -49,7 +49,7 @@ export const GroupedFieldInfoSchema = z.object({
 /**
  * Detected container info schema
  */
-export const DetectedContainerInfoSchema = z.object({
+const DetectedContainerInfoSchema = z.object({
   containerId: z.string(),
   container: z.custom<HTMLElement>(val => val instanceof HTMLElement, { message: 'Expected HTMLElement' }),
   allFields: z.array(FieldSchema),
@@ -61,7 +61,7 @@ export const DetectedContainerInfoSchema = z.object({
 /**
  * Field button data schema
  */
-export const FieldButtonDataSchema = z.object({
+const FieldButtonDataSchema = z.object({
   field: FieldSchema,
   element: z.custom<HTMLElement>(val => val instanceof HTMLElement, { message: 'Expected HTMLElement' }),
   type: z.enum(['individual', 'grouped']),
@@ -72,16 +72,16 @@ export const FieldButtonDataSchema = z.object({
 // Type Exports (inferred from schemas)
 // ============================================================================
 
-export type DetectedFieldInfo = z.infer<typeof DetectedFieldInfoSchema>;
-export type GroupedFieldInfo = z.infer<typeof GroupedFieldInfoSchema>;
-export type DetectedContainerInfo = z.infer<typeof DetectedContainerInfoSchema>;
-export type FieldButtonData = z.infer<typeof FieldButtonDataSchema>;
+type DetectedFieldInfo = z.infer<typeof DetectedFieldInfoSchema>;
+type GroupedFieldInfo = z.infer<typeof GroupedFieldInfoSchema>;
+type DetectedContainerInfo = z.infer<typeof DetectedContainerInfoSchema>;
+type FieldButtonData = z.infer<typeof FieldButtonDataSchema>;
 
 // Performance limit: Maximum number of fields to process per container
 const MAX_FIELDS_PER_CONTAINER = 100;
 
 // Central field registry to ensure consistency across all strategies
-export class UnifiedFieldRegistry {
+class UnifiedFieldRegistry {
   private static instance: UnifiedFieldRegistry;
   private detectedFields: Map<string, DetectedFieldInfo> = new Map();
   private containers: Map<string, HTMLElement> = new Map();
@@ -662,4 +662,15 @@ const undoFormFill = (): boolean => {
   return false;
 };
 
-export { unifiedFieldRegistry, refreshStaleReferences, registerIncrementalField, saveFormSnapshot, undoFormFill };
+export {
+  GroupedFieldInfoSchema,
+  DetectedContainerInfoSchema,
+  FieldButtonDataSchema,
+  UnifiedFieldRegistry,
+  unifiedFieldRegistry,
+  refreshStaleReferences,
+  registerIncrementalField,
+  saveFormSnapshot,
+  undoFormFill,
+};
+export type { DetectedFieldInfo, GroupedFieldInfo, DetectedContainerInfo, FieldButtonData };

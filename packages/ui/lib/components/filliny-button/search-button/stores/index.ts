@@ -4,7 +4,9 @@ export {
   selectProgress,
   selectIsStreaming,
   selectIsFinalizing,
+  selectCurrentlyFillingField,
+  selectRecentlyFilledFields,
   FieldFillStatus,
   StreamingPhase,
 } from './formFillStore';
-export type { FieldFillState, StreamingProgress } from './formFillStore';
+export type { FieldFillState, StreamingProgress, PartialFieldValueMap } from './formFillStore';

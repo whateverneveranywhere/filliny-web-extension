@@ -96,8 +96,11 @@ if [[ -n "${VITE_WEBAPP_ENV}" ]]; then
   rm -f .env.bak
   echo "Updated VITE_WEBAPP_ENV to ${VITE_WEBAPP_ENV} in .env file"
 else
-  # Don't change the existing value if not set in environment
-  echo "Keeping existing VITE_WEBAPP_ENV in .env file"
+  # Default to prod when no explicit env is provided
+  VITE_WEBAPP_ENV=prod
+  sed -i.bak "s/^VITE_WEBAPP_ENV=.*/VITE_WEBAPP_ENV=${VITE_WEBAPP_ENV}/" .env
+  rm -f .env.bak
+  echo "No VITE_WEBAPP_ENV set, defaulting to prod in .env file"
 fi
 
 create_new_file

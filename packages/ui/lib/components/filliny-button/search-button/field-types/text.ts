@@ -36,6 +36,82 @@ import type {
 } from '@extension/shared';
 
 // ============================================================================
+// Rich Text Editor Interfaces
+// ============================================================================
+
+/**
+ * CKEditor 5 instance attached to an element via `ckeditorInstance`
+ */
+interface CKEditorInstance {
+  setData: (data: string) => void;
+  getData: () => string;
+}
+
+interface CKEditorHostElement extends HTMLElement {
+  ckeditorInstance?: CKEditorInstance;
+}
+
+/**
+ * TinyMCE editor instance returned by `tinymce.get(id)`
+ */
+interface TinyMCEEditorInstance {
+  setContent: (content: string) => void;
+  getContent: () => string;
+}
+
+interface TinyMCEStatic {
+  get: (id: string) => TinyMCEEditorInstance | null;
+}
+
+interface TinyMCEWindow extends Window {
+  tinymce?: TinyMCEStatic;
+}
+
+/**
+ * Quill editor instance attached to an element via `__quill`
+ */
+interface QuillInstance {
+  setText: (text: string) => void;
+  getText: () => string;
+}
+
+interface QuillHostElement extends HTMLElement {
+  __quill?: QuillInstance;
+}
+
+/**
+ * ProseMirror transaction returned by `state.tr.insertText(...)`
+ */
+interface ProseMirrorTransaction {
+  insertText: (text: string, from: number, to: number) => ProseMirrorTransaction;
+}
+
+interface ProseMirrorEditorState {
+  tr: ProseMirrorTransaction;
+  doc: { content: { size: number } };
+}
+
+interface ProseMirrorEditorView {
+  state: ProseMirrorEditorState;
+  dispatch: (tr: ProseMirrorTransaction) => void;
+}
+
+interface ProseMirrorViewDesc {
+  view: ProseMirrorEditorView;
+}
+
+interface ProseMirrorHostElement extends HTMLElement {
+  pmViewDesc?: ProseMirrorViewDesc;
+}
+
+/**
+ * Lit element with reactive update lifecycle
+ */
+interface LitElement extends Element {
+  requestUpdate: () => void;
+}
+
+// ============================================================================
 // Type Guards for Framework Detection
 // ============================================================================
 
@@ -778,24 +854,26 @@ const detectFormLibrary = (element: HTMLElement): ReactDetection['type'] => {
 /**
  * Detect Next.js application
  */
-const detectNextJs = (): boolean =>
+const detectNextJs = (): boolean => {
   // Check for Next.js specific elements and scripts
-  !!(
+  const win = window as NextJsWindow;
+  return !!(
     document.getElementById('__next') ||
     document.querySelector('script[src*="_next"]') ||
     document.querySelector('link[href*="_next"]') ||
     window.location.pathname.includes('/_next/') ||
     document.querySelector('meta[name="next-head-count"]') ||
-    (window as unknown as NextJsWindow).__NEXT_DATA__ ||
+    win.__NEXT_DATA__ ||
     document.querySelector('script[id="__NEXT_DATA__"]')
   );
+};
 /**
  * Detect React version from global objects or DOM
  */
 const detectReactVersion = (): string | undefined => {
   try {
     // Check for React DevTools version info
-    const reactDevTools = (window as unknown as ReactDevToolsWindow).__REACT_DEVTOOLS_GLOBAL_HOOK__;
+    const reactDevTools = (window as ReactDevToolsWindow).__REACT_DEVTOOLS_GLOBAL_HOOK__;
     if (reactDevTools?.renderers) {
       for (const renderer of reactDevTools.renderers.values()) {
         if (renderer.version) {
@@ -1652,8 +1730,11 @@ const updateContentEditable = async (element: HTMLElement, value: string): Promi
     // Try CKEditor 5 API
     if ('ckeditorInstance' in element) {
       try {
-        (element as unknown as { ckeditorInstance: { setData: (v: string) => void } }).ckeditorInstance.setData(value);
-        return;
+        const ckElement = element as CKEditorHostElement;
+        if (ckElement.ckeditorInstance) {
+          ckElement.ckeditorInstance.setData(value);
+          return;
+        }
       } catch {
         /* fall through */
       }
@@ -1663,10 +1744,8 @@ const updateContentEditable = async (element: HTMLElement, value: string): Promi
     const tinymceId = element.id || element.closest('[id]')?.id;
     if (tinymceId && 'tinymce' in window) {
       try {
-        const tinymceGlobal = (
-          window as unknown as { tinymce: { get: (id: string) => { setContent: (v: string) => void } | null } }
-        ).tinymce;
-        const editor = tinymceGlobal.get(tinymceId);
+        const tinymceWindow = window as TinyMCEWindow;
+        const editor = tinymceWindow.tinymce?.get(tinymceId);
         if (editor) {
           editor.setContent(value);
           return;
@@ -1679,8 +1758,11 @@ const updateContentEditable = async (element: HTMLElement, value: string): Promi
     // Try Quill API
     if ('__quill' in element) {
       try {
-        (element as unknown as { __quill: { setText: (v: string) => void } }).__quill.setText(value);
-        return;
+        const quillElement = element as QuillHostElement;
+        if (quillElement.__quill) {
+          quillElement.__quill.setText(value);
+          return;
+        }
       } catch {
         /* fall through */
       }
@@ -1689,20 +1771,8 @@ const updateContentEditable = async (element: HTMLElement, value: string): Promi
     // Try ProseMirror/Tiptap
     if (element.classList.contains('ProseMirror')) {
       try {
-        const pmDesc = (
-          element as unknown as {
-            pmViewDesc?: {
-              view: {
-                state: {
-                  tr: { insertText: (text: string, from: number, to: number) => unknown };
-                  doc: { content: { size: number } };
-                };
-                dispatch: (tr: unknown) => void;
-              };
-            };
-          }
-        ).pmViewDesc;
-        const view = pmDesc?.view;
+        const pmElement = element as ProseMirrorHostElement;
+        const view = pmElement.pmViewDesc?.view;
         if (view) {
           const tr = view.state.tr.insertText(value, 0, view.state.doc.content.size);
           view.dispatch(tr);
@@ -1812,7 +1882,7 @@ const handleLitTextInput = async (element: HTMLElement, value: string): Promise<
     // Trigger Lit update if available
     const litHost = element.closest('*');
     if (litHost && 'requestUpdate' in litHost) {
-      (litHost as unknown as { requestUpdate: () => void }).requestUpdate();
+      (litHost as LitElement).requestUpdate();
     }
     return element.value === value;
   }

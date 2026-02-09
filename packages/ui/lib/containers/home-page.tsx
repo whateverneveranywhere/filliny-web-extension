@@ -1,7 +1,7 @@
 import { ActiveProfileWebsitePreview } from './active-profile-website-preview';
 import { ProfileForm } from './profile-form';
 import { QuickAddWebsiteToProfile } from './quick-add-website';
-import { Loading, NoTokensAlert, CreditsFooterWarning, EmptyProfileState, UpgradePrompt } from '../components';
+import { Loading, NoTokensAlert, CreditsFooterWarning, EmptyProfileState } from '../components';
 import { Drawer } from '../components/drawer';
 import { useToast } from '../hooks/use-toast';
 import { PageLayout } from '../layout';
@@ -140,7 +140,6 @@ const HomePage = () => {
     currentPlan,
     maxWebsites,
     hasNoProfiles,
-    isPro: isPlanPro,
   } = useProfileManagement(activeTabUrl);
 
   // Handle profile form submission
@@ -218,11 +217,6 @@ const HomePage = () => {
 
           {/* Token/Free Forms exhausted - warning at bottom */}
           {!canFillForms && <NoTokensAlert isPro={isPro} />}
-
-          {/* Subtle upgrade prompt for free users who haven't hit limits yet */}
-          {canFillForms && !isPlanPro && freeFormsRemaining <= 2 && freeFormsRemaining > 0 && (
-            <UpgradePrompt reason="token-limit" variant="inline" />
-          )}
         </div>
       </>
     </PageLayout>

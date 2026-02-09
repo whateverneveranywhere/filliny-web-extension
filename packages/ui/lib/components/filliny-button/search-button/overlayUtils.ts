@@ -134,6 +134,24 @@ const findOrCreateShadowContainer = (shadowRoot: ShadowRoot): HTMLDivElement => 
   return container;
 };
 
+/**
+ * Walk up DOM and collect elements with overflow: auto|scroll
+ */
+const getScrollableAncestors = (el: HTMLElement): HTMLElement[] => {
+  const ancestors: HTMLElement[] = [];
+  let current = el.parentElement;
+  while (current) {
+    const style = window.getComputedStyle(current);
+    const overflowY = style.overflowY;
+    const overflowX = style.overflowX;
+    if (overflowY === 'auto' || overflowY === 'scroll' || overflowX === 'auto' || overflowX === 'scroll') {
+      ancestors.push(current);
+    }
+    current = current.parentElement;
+  }
+  return ancestors;
+};
+
 export {
   resetOverlays,
   addGlowingBorder,
@@ -142,4 +160,5 @@ export {
   createElementWithStyles,
   getFormPosition,
   findOrCreateShadowContainer,
+  getScrollableAncestors,
 };

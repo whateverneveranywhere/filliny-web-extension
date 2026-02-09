@@ -5,6 +5,7 @@ import { detectSelectFields } from './select';
 import { UNIVERSAL_FORM_SELECTORS } from './selectors';
 import { detectTextField } from './text';
 import { isHoneypotField } from './utils';
+import { hasProperty } from '@extension/shared';
 import type { SelectorWithConfidence } from './selectors';
 import type { Field, ShadowDOMHostElement, ElementWithEventListeners } from '@extension/shared';
 
@@ -710,9 +711,11 @@ const analyzeAdvancedInteractionPatterns = (el: HTMLElement): number => {
   // Check for modern event listeners (not just inline handlers)
   // Note: getEventListeners is a Chrome DevTools API, may not be available in all contexts
   try {
-    const listeners = (el as unknown as ElementWithEventListeners).getEventListeners?.();
-    if (listeners && Object.keys(listeners).length > 0) {
-      score += 3;
+    if (hasProperty(el, 'getEventListeners') && typeof el.getEventListeners === 'function') {
+      const listeners = (el as ElementWithEventListeners).getEventListeners?.();
+      if (listeners && Object.keys(listeners).length > 0) {
+        score += 3;
+      }
     }
   } catch {
     // Ignore if not available
@@ -1010,9 +1013,7 @@ const isCustomElementFormLike = (el: HTMLElement): boolean => {
 
   // Check for form-like methods
   const formLikeMethods = ['focus', 'blur', 'click', 'select'];
-  const hasFormMethods = formLikeMethods.some(
-    method => typeof (el as unknown as Record<string, unknown>)[method] === 'function',
-  );
+  const hasFormMethods = formLikeMethods.some(method => hasProperty(el, method) && typeof el[method] === 'function');
 
   // Check for form-like events
   const formLikeEvents = ['onchange', 'oninput', 'onfocus', 'onblur'];
@@ -1469,7 +1470,7 @@ const isUniversalFormFieldElement = (el: HTMLElement): boolean => {
  * @param testMode Whether to generate test values for fields
  * @returns An array of detected fields
  */
-export const detectFields = async (container: HTMLElement, testMode: boolean = false): Promise<Field[]> => {
+const detectFields = async (container: HTMLElement, testMode: boolean = false): Promise<Field[]> => {
   console.log(
     `🔍 Starting enhanced field detection in container: ${container.tagName}${container.className ? '.' + container.className : ''}, testMode: ${testMode}`,
   );
@@ -1581,7 +1582,7 @@ export const detectFields = async (container: HTMLElement, testMode: boolean = f
  * Enhanced form field detection with multiple strategies and robust error handling
  * Moved from detectionHelpers.ts to follow proper module organization
  */
-export const getFormFieldsRobust = (container: HTMLElement | ShadowRoot): HTMLElement[] => {
+const getFormFieldsRobust = (container: HTMLElement | ShadowRoot): HTMLElement[] => {
   // Defensive programming: ensure container is valid
   if (!container) {
     console.warn('getFormFieldsRobust: Invalid container provided');
@@ -1621,7 +1622,11 @@ const fallbackToBasicDetection = (container: HTMLElement | ShadowRoot): HTMLElem
   }
 };
 
-// Export all field type handlers
+// ============================================================================
+// Exports (at end of file per ESLint import-x/exports-last rule)
+// ============================================================================
+
+export { detectFields, getFormFieldsRobust };
 export * from './utils';
 export * from './text';
 export * from './checkable';

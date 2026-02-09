@@ -99,7 +99,7 @@ const createConsoleProxy = (): Console => {
 /**
  * Installs the console proxy globally
  */
-export const suppressConsoleInProduction = (): void => {
+const suppressConsoleInProduction = (): void => {
   if (isProduction()) {
     // Replace the global console with our proxy in a way that works with TypeScript
     Object.defineProperty(window, 'console', {
@@ -114,5 +114,7 @@ export const suppressConsoleInProduction = (): void => {
 if (typeof window !== 'undefined') {
   suppressConsoleInProduction();
 }
+
+export { suppressConsoleInProduction };
 
 export default suppressConsoleInProduction;

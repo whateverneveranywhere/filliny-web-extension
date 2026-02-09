@@ -1,3 +1,4 @@
+import { getScrollableAncestors } from '../overlayUtils';
 import { cn } from '@/lib/utils';
 import { getConfig, WebappEnvs } from '@extension/shared';
 import { Sparkles, Loader2, TestTube } from 'lucide-react';
@@ -85,11 +86,20 @@ export const FieldFillButton: React.FC<FieldFillButtonProps> = ({ fieldElement, 
     window.addEventListener('resize', handleWindowEvents);
     window.addEventListener('scroll', handleWindowEvents, { passive: true });
 
+    // Track scrollable ancestor containers
+    const scrollableAncestors = getScrollableAncestors(fieldElement);
+    for (const ancestor of scrollableAncestors) {
+      ancestor.addEventListener('scroll', handleWindowEvents, { passive: true });
+    }
+
     return () => {
       resizeObserverRef.current?.disconnect();
       mutationObserverRef.current?.disconnect();
       window.removeEventListener('resize', handleWindowEvents);
       window.removeEventListener('scroll', handleWindowEvents);
+      for (const ancestor of scrollableAncestors) {
+        ancestor.removeEventListener('scroll', handleWindowEvents);
+      }
     };
   }, [fieldElement, updateButtonPosition]);
 

@@ -72,8 +72,8 @@ const RHFShadcnComboBox = ({
         <FormItem className="filliny-flex filliny-w-full filliny-min-w-0 filliny-flex-col">
           {title && <FormLabel>{title}</FormLabel>}
           {/* Wrapper div to stop ALL event propagation to parent containers like drawers */}
-          {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events */}
           <div
+            role="presentation"
             className="filliny-w-full filliny-min-w-0"
             onPointerDown={stopAllPropagation}
             onPointerUp={stopAllPropagation}

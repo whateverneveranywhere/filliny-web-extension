@@ -5,8 +5,7 @@
  * the search-button system. All modules depend on these types.
  */
 
-import { Framework } from '@extension/shared';
-import type { Field, FieldType } from '@extension/shared';
+import type { Field, FieldType, Framework } from '@extension/shared';
 
 // ============================================================================
 // FIELD DETECTION TYPES
@@ -15,12 +14,12 @@ import type { Field, FieldType } from '@extension/shared';
 /**
  * Confidence score for field detection (0-1)
  */
-export type ConfidenceScore = number;
+type ConfidenceScore = number;
 
 /**
  * Field detection strategy interface
  */
-export interface FieldDetectionStrategy {
+interface FieldDetectionStrategy {
   readonly name: string;
   readonly priority: number;
   detect(container: HTMLElement): Promise<DetectedField[]>;
@@ -30,7 +29,7 @@ export interface FieldDetectionStrategy {
 /**
  * Detected field with metadata
  */
-export interface DetectedField extends Field {
+interface DetectedField extends Field {
   element: HTMLElement;
   confidence: ConfidenceScore;
   detectionStrategy: string;
@@ -40,7 +39,7 @@ export interface DetectedField extends Field {
 /**
  * Field metadata for enhanced detection
  */
-export interface FieldMetadata {
+interface FieldMetadata {
   framework: Framework;
   component?: string;
   container?: string;
@@ -70,7 +69,7 @@ export interface FieldMetadata {
 /**
  * Field update strategy interface
  */
-export interface FieldUpdateStrategy {
+interface FieldUpdateStrategy {
   readonly name: string;
   readonly supportedTypes: FieldType[];
   canUpdate(field: DetectedField): boolean;
@@ -80,7 +79,7 @@ export interface FieldUpdateStrategy {
 /**
  * Result of a field update operation
  */
-export interface UpdateResult {
+interface UpdateResult {
   success: boolean;
   error?: string;
   actualValue?: unknown;
@@ -94,7 +93,7 @@ export interface UpdateResult {
 /**
  * Form container with scoring
  */
-export interface FormContainer {
+interface FormContainer {
   element: HTMLElement;
   score: number;
   fieldCount: number;
@@ -105,7 +104,7 @@ export interface FormContainer {
 /**
  * Container detection strategy
  */
-export interface ContainerDetectionStrategy {
+interface ContainerDetectionStrategy {
   readonly name: string;
   readonly priority: number;
   detect(document: Document): Promise<FormContainer[]>;
@@ -118,7 +117,7 @@ export interface ContainerDetectionStrategy {
 /**
  * Event payload for field detection events
  */
-export interface FieldDetectionEvent {
+interface FieldDetectionEvent {
   type: 'field-detected' | 'field-updated' | 'container-detected';
   payload: {
     fields?: DetectedField[];
@@ -132,7 +131,7 @@ export interface FieldDetectionEvent {
 /**
  * Event listener function
  */
-export type EventListener<T = unknown> = (event: T) => void | Promise<void>;
+type EventListener<T = unknown> = (event: T) => void | Promise<void>;
 
 // ============================================================================
 // REGISTRY TYPES
@@ -141,7 +140,7 @@ export type EventListener<T = unknown> = (event: T) => void | Promise<void>;
 /**
  * Field registry interface for centralized field management
  */
-export interface FieldRegistry {
+interface FieldRegistry {
   register(field: DetectedField): void;
   unregister(fieldId: string): void;
   get(fieldId: string): DetectedField | undefined;
@@ -153,7 +152,7 @@ export interface FieldRegistry {
 /**
  * Container registry interface
  */
-export interface ContainerRegistry {
+interface ContainerRegistry {
   register(container: FormContainer, id: string): void;
   unregister(id: string): void;
   get(id: string): FormContainer | undefined;
@@ -168,7 +167,7 @@ export interface ContainerRegistry {
 /**
  * Detection configuration
  */
-export interface DetectionConfig {
+interface DetectionConfig {
   strategies: {
     field: FieldDetectionStrategy[];
     container: ContainerDetectionStrategy[];
@@ -186,7 +185,7 @@ export interface DetectionConfig {
 /**
  * Update configuration
  */
-export interface UpdateConfig {
+interface UpdateConfig {
   strategies: FieldUpdateStrategy[];
   retries: {
     maxAttempts: number;
@@ -205,7 +204,7 @@ export interface UpdateConfig {
 /**
  * Selector with confidence scoring
  */
-export interface SelectorWithConfidence {
+interface SelectorWithConfidence {
   selector: string;
   confidence: ConfidenceScore;
   description: string;
@@ -214,7 +213,7 @@ export interface SelectorWithConfidence {
 /**
  * Element position information
  */
-export interface ElementPosition {
+interface ElementPosition {
   top: number;
   left: number;
   width: number;
@@ -225,7 +224,7 @@ export interface ElementPosition {
 /**
  * Framework detection result
  */
-export interface FrameworkDetection {
+interface FrameworkDetection {
   framework: Framework;
   version?: string;
   confidence: ConfidenceScore;
@@ -237,13 +236,25 @@ export interface FrameworkDetection {
 // ============================================================================
 
 /**
+ * Contextual information attached to field detection errors
+ */
+interface FieldDetectionErrorContext {
+  element?: string;
+  strategy?: string;
+  containerId?: string;
+  fieldId?: string;
+  duration?: number;
+  reason?: string;
+}
+
+/**
  * Base error for field detection system
  */
-export class FieldDetectionError extends Error {
+class FieldDetectionError extends Error {
   constructor(
     message: string,
     public readonly code: string,
-    public readonly context?: Record<string, unknown>,
+    public readonly context?: FieldDetectionErrorContext,
   ) {
     super(message);
     this.name = 'FieldDetectionError';
@@ -253,7 +264,7 @@ export class FieldDetectionError extends Error {
 /**
  * Error codes for different failure scenarios
  */
-export enum ErrorCode {
+enum ErrorCode {
   DETECTION_FAILED = 'DETECTION_FAILED',
   UPDATE_FAILED = 'UPDATE_FAILED',
   ELEMENT_NOT_FOUND = 'ELEMENT_NOT_FOUND',
@@ -261,3 +272,30 @@ export enum ErrorCode {
   TIMEOUT = 'TIMEOUT',
   PERMISSION_DENIED = 'PERMISSION_DENIED',
 }
+
+// ============================================================================
+// EXPORTS (at end of file per ESLint import-x/exports-last rule)
+// ============================================================================
+
+export type { ConfidenceScore, EventListener };
+
+export type {
+  FieldDetectionStrategy,
+  DetectedField,
+  FieldMetadata,
+  FieldUpdateStrategy,
+  UpdateResult,
+  FormContainer,
+  ContainerDetectionStrategy,
+  FieldDetectionEvent,
+  FieldRegistry,
+  ContainerRegistry,
+  DetectionConfig,
+  UpdateConfig,
+  SelectorWithConfidence,
+  ElementPosition,
+  FrameworkDetection,
+  FieldDetectionErrorContext,
+};
+
+export { FieldDetectionError, ErrorCode };

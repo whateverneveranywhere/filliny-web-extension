@@ -27,4 +27,4 @@ const NewTab = () => {
   );
 };
 
-export default withErrorBoundary(withSuspense(NewTab, <Loading fullScreen />), ErrorDisplay);
+export default withErrorBoundary(withSuspense(NewTab, <Loading variant="fullscreen" />), ErrorDisplay);

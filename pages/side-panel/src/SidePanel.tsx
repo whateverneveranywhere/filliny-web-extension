@@ -20,7 +20,7 @@ const AppContent = () => {
 
   // Check API health first
   if (isHealthLoading) {
-    return <Loading fullScreen />;
+    return <Loading variant="fullscreen" />;
   }
 
   // Show blocking error if API is down
@@ -30,7 +30,7 @@ const AppContent = () => {
 
   // Normal auth flow
   if (isAuthLoading) {
-    return <Loading fullScreen />;
+    return <Loading variant="fullscreen" />;
   }
 
   return isAuthenticated ? <RouterProvider /> : <SigninPage />;

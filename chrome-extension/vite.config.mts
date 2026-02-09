@@ -3,7 +3,7 @@ import { defineConfig, type PluginOption } from 'vite';
 import libAssetsPlugin from '@laynezh/vite-plugin-lib-assets';
 import makeManifestPlugin from './utils/plugins/make-manifest-plugin.js';
 import { watchPublicPlugin, watchRebuildPlugin } from '@extension/hmr';
-import { watchOption } from '@extension/vite-config';
+import { watchOption, stripConsolePlugin } from '@extension/vite-config';
 import env, { IS_DEV, IS_PROD } from '@extension/env';
 import { nodePolyfills } from 'vite-plugin-node-polyfills';
 
@@ -30,6 +30,7 @@ export default defineConfig({
     makeManifestPlugin({ outDir }),
     IS_DEV && watchRebuildPlugin({ reload: true, id: 'chrome-extension-hmr' }),
     nodePolyfills(),
+    IS_PROD && stripConsolePlugin(),
   ],
   publicDir: resolve(rootDir, 'public'),
   build: {

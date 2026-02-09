@@ -1,5 +1,6 @@
-export type * from './auth.js';
-export type * from './dashboard.js';
-
-// Note: ai.ts and profiles.ts types are now centralized in ../schemas/index.ts
-// They are exported from the main shared package through services/index.ts -> schemas/index.ts
+/**
+ * Service types barrel file
+ *
+ * All types are centralized in services/schemas/index.ts
+ * Import types directly from schemas/index.ts or the main shared package.
+ */

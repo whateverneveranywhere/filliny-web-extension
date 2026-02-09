@@ -13,8 +13,8 @@ enum WebappEnvs {
 // Get environment from process.env
 const envFromEnv = process.env.VITE_WEBAPP_ENV || '';
 
-// Use the environment if it's valid, otherwise default to DEV
-const env = Object.values(WebappEnvs).includes(envFromEnv as WebappEnvs) ? (envFromEnv as WebappEnvs) : WebappEnvs.DEV;
+// Use the environment if it's valid, otherwise default to PROD
+const env = Object.values(WebappEnvs).includes(envFromEnv as WebappEnvs) ? (envFromEnv as WebappEnvs) : WebappEnvs.PROD;
 
 // Get the appropriate extension name message key based on the environment
 const getExtensionNameKey = (environment: WebappEnvs): string => {
@@ -26,8 +26,8 @@ const getExtensionNameKey = (environment: WebappEnvs): string => {
     case WebappEnvs.PROD:
       return '__MSG_extensionNameProd__';
     default:
-      // Default to DEV naming if an unknown environment is provided
-      return '__MSG_extensionNameDev__';
+      // Default to PROD naming if an unknown environment is provided
+      return '__MSG_extensionNameProd__';
   }
 };
 

@@ -1,9 +1,15 @@
 import { useFormElement, useOverlayPosition, useFormFill } from './hooks';
-import { useFormFillStore, selectProgress, StreamingPhase } from './stores';
+import {
+  useFormFillStore,
+  selectProgress,
+  selectCurrentlyFillingField,
+  selectRecentlyFilledFields,
+  StreamingPhase,
+} from './stores';
 import { Button } from '../../ui';
 import * as Progress from '@radix-ui/react-progress';
-import { X, Wand2, Loader2, CheckCircle2 } from 'lucide-react';
-import { useRef } from 'react';
+import { X, Wand2, Loader2, CheckCircle2, XCircle, AlertTriangle, Check } from 'lucide-react';
+import { useRef, useState, useEffect } from 'react';
 import type { OverlayPosition } from './types';
 import type React from 'react';
 
@@ -14,18 +20,82 @@ interface OverlayProps {
   testMode?: boolean;
 }
 
+const STREAMING_MESSAGES = [
+  'Analyzing form structure...',
+  'Reading field requirements...',
+  'Matching context to fields...',
+  'Generating values...',
+  'Almost there...',
+];
+
+const FINALIZING_MESSAGES = ['Verifying filled values...', 'Double-checking accuracy...'];
+
+/**
+ * Hook for cycling through contextual messages during streaming
+ */
+const useRotatingMessage = (phase: StreamingPhase) => {
+  const [index, setIndex] = useState(0);
+  const messages = phase === StreamingPhase.FINALIZING ? FINALIZING_MESSAGES : STREAMING_MESSAGES;
+
+  useEffect(() => {
+    if (phase !== StreamingPhase.STREAMING && phase !== StreamingPhase.FINALIZING) {
+      setIndex(0);
+      return;
+    }
+
+    const interval = setInterval(() => {
+      setIndex(prev => (prev + 1) % messages.length);
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [phase, messages.length]);
+
+  if (phase !== StreamingPhase.STREAMING && phase !== StreamingPhase.FINALIZING) return null;
+  return messages[index];
+};
+
 /**
  * Streaming progress component that shows real-time fill status
  */
 const StreamingProgressState: React.FC = () => {
   const phase = useFormFillStore(state => state.phase);
   const progress = useFormFillStore(selectProgress);
+  const currentField = useFormFillStore(selectCurrentlyFillingField);
+  const recentFields = useFormFillStore(selectRecentlyFilledFields);
+  const rotatingMessage = useRotatingMessage(phase);
 
   const progressPercent =
     progress.totalFields > 0 ? Math.round((progress.fieldsWithValues / progress.totalFields) * 100) : 0;
 
   const isComplete = phase === StreamingPhase.COMPLETE;
   const isError = phase === StreamingPhase.ERROR;
+  const isFullSuccess = isComplete && progress.fieldsErrored === 0;
+  const isPartialSuccess = isComplete && progress.fieldsErrored > 0;
+
+  const getBarColor = () => {
+    if (isError) return 'filliny-bg-red-400';
+    if (isPartialSuccess) return 'filliny-bg-amber-400';
+    if (isFullSuccess) return 'filliny-bg-green-400';
+    return 'filliny-bg-primary-foreground';
+  };
+
+  const getHeadingText = () => {
+    if (isFullSuccess) return 'Form Filled!';
+    if (isPartialSuccess) return 'Mostly Filled';
+    if (isError) return 'Fill Failed';
+    return 'Filling Your Form';
+  };
+
+  const getStatusIcon = () => {
+    if (isFullSuccess) return <CheckCircle2 className="filliny-h-8 filliny-w-8 filliny-text-green-400" />;
+    if (isPartialSuccess) return <AlertTriangle className="filliny-h-8 filliny-w-8 filliny-text-amber-400" />;
+    if (isError) return <XCircle className="filliny-h-8 filliny-w-8 filliny-text-red-400" />;
+    return (
+      <div className="filliny-h-8 filliny-w-8 filliny-animate-spin">
+        <Loader2 className="filliny-h-full filliny-w-full" />
+      </div>
+    );
+  };
 
   const getPhaseLabel = (): string => {
     switch (phase) {
@@ -36,7 +106,7 @@ const StreamingProgressState: React.FC = () => {
       case StreamingPhase.FINALIZING:
         return 'Verifying filled fields...';
       case StreamingPhase.COMPLETE:
-        return 'Done!';
+        return isPartialSuccess ? 'Completed with some issues' : 'Done!';
       case StreamingPhase.ERROR:
         return 'An error occurred';
       default:
@@ -48,27 +118,54 @@ const StreamingProgressState: React.FC = () => {
     <div
       className="filliny-flex filliny-flex-col filliny-items-center filliny-gap-4 filliny-text-primary-foreground"
       style={{ pointerEvents: 'auto' }}>
-      {isComplete ? (
-        <CheckCircle2 className="filliny-h-8 filliny-w-8 filliny-text-green-400" />
-      ) : (
-        <div className="filliny-h-8 filliny-w-8 filliny-animate-spin">
-          <Loader2 className="filliny-h-full filliny-w-full" />
-        </div>
-      )}
+      {getStatusIcon()}
       <div className="filliny-flex filliny-w-64 filliny-flex-col filliny-items-center filliny-gap-2">
-        <p className="filliny-text-lg filliny-font-semibold">{isComplete ? 'Form Filled!' : 'Filling Your Form'}</p>
+        <p className="filliny-text-lg filliny-font-semibold">{getHeadingText()}</p>
         <Progress.Root
           className="filliny-relative filliny-h-2 filliny-w-full filliny-overflow-hidden filliny-rounded-full filliny-bg-white/20"
           value={progressPercent}>
           <Progress.Indicator
-            className={`filliny-h-full filliny-rounded-full filliny-transition-all filliny-duration-300 ${
-              isError ? 'filliny-bg-red-400' : isComplete ? 'filliny-bg-green-400' : 'filliny-bg-primary-foreground'
-            }`}
+            className={`filliny-h-full filliny-rounded-full filliny-transition-all filliny-duration-300 ${getBarColor()}`}
             style={{ width: `${progressPercent}%` }}
           />
         </Progress.Root>
         <p className="filliny-text-sm filliny-text-primary-foreground/80">{getPhaseLabel()}</p>
-        {progress.fieldsErrored > 0 && (
+
+        {/* Rotating contextual message */}
+        {rotatingMessage && (
+          <p className="filliny-text-xs filliny-text-primary-foreground/60 filliny-transition-opacity filliny-duration-300">
+            {rotatingMessage}
+          </p>
+        )}
+
+        {/* Currently filling field */}
+        {currentField && !isComplete && !isError && (
+          <p className="filliny-text-xs filliny-text-primary-foreground/70 filliny-truncate filliny-max-w-full">
+            Filling: {currentField}
+          </p>
+        )}
+
+        {/* Recently filled fields with checkmarks */}
+        {recentFields.length > 0 && !isError && (
+          <div className="filliny-flex filliny-flex-col filliny-items-center filliny-gap-0.5 filliny-mt-1">
+            {recentFields.map((label, i) => (
+              <span
+                key={`${label}-${i}`}
+                className="filliny-flex filliny-items-center filliny-gap-1 filliny-text-xs filliny-text-green-300/80">
+                <Check className="filliny-h-3 filliny-w-3" />
+                <span className="filliny-truncate filliny-max-w-[200px]">{label}</span>
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* Error count */}
+        {isPartialSuccess && (
+          <p className="filliny-text-xs filliny-text-amber-300">
+            {progress.fieldsErrored} field{progress.fieldsErrored > 1 ? 's' : ''} couldn&apos;t be filled
+          </p>
+        )}
+        {isError && progress.fieldsErrored > 0 && (
           <p className="filliny-text-xs filliny-text-red-300">
             {progress.fieldsErrored} field{progress.fieldsErrored > 1 ? 's' : ''} failed
           </p>

@@ -15,6 +15,7 @@ import {
 } from './field-types/utils';
 import { unifiedFieldRegistry } from './unifiedFieldDetection.js';
 import { createDebugLogger } from '@extension/shared';
+import type { PartialFieldValueMap } from './stores';
 import type { Field } from '@extension/shared';
 
 const debug = createDebugLogger('FieldUpdater');
@@ -37,7 +38,7 @@ type FieldValue = string | string[] | boolean | number | undefined;
 /**
  * Enumeration of error categories for better error handling and user feedback
  */
-export enum ErrorCategory {
+enum ErrorCategory {
   DETECTION_FAILED = 'detection_failed',
   ELEMENT_NOT_FOUND = 'element_not_found',
   UPDATE_FAILED = 'update_failed',
@@ -49,7 +50,7 @@ export enum ErrorCategory {
 /**
  * Custom error class for field update errors with categorization
  */
-export class FieldUpdateError extends Error {
+class FieldUpdateError extends Error {
   public readonly category: ErrorCategory;
   public readonly fieldId: string;
   public readonly originalError?: Error;
@@ -66,7 +67,7 @@ export class FieldUpdateError extends Error {
 /**
  * Result of a field update operation
  */
-export interface FieldUpdateResult {
+interface FieldUpdateResult {
   success: boolean;
   fieldId: string;
   error?: FieldUpdateError;
@@ -172,7 +173,7 @@ const withTimeout = <T>(
  * @param timeoutMs - Timeout for each attempt in milliseconds (default: 10000)
  * @returns FieldUpdateResult with success status and any errors
  */
-export const updateFieldWithRetry = async (
+const updateFieldWithRetry = async (
   element: HTMLElement,
   field: Field,
   isTestMode: boolean,
@@ -356,7 +357,7 @@ const verifyFieldUpdate = async (element: HTMLElement, field: Field, isTestMode:
  * Update a form field with the provided value
  * This is the main entry point for field updates
  */
-export const updateField = async (element: HTMLElement, field: Field, isTestMode = false): Promise<void> => {
+const updateField = async (element: HTMLElement, field: Field, isTestMode = false): Promise<void> => {
   // Defensive programming: validate inputs
   if (!element || !field) {
     debug.warn('updateField: Invalid element or field provided');
@@ -693,7 +694,7 @@ const updateAriaElement = async (element: HTMLElement, field: Field, valueToUse:
 /**
  * Aggregated results from updating multiple form fields
  */
-export interface FormUpdateResults {
+interface FormUpdateResults {
   successful: number;
   failed: number;
   skipped: number;
@@ -748,7 +749,7 @@ const isChoiceFieldType = (fieldType: string): boolean =>
  * @param testMode - Whether this is a test mode fill
  * @returns FormUpdateResults with detailed statistics
  */
-export const updateFormFields = async (fields: Field[], testMode = false): Promise<FormUpdateResults> => {
+const updateFormFields = async (fields: Field[], testMode = false): Promise<FormUpdateResults> => {
   document.body.setAttribute('data-filliny-updating', 'true');
   debug.log(`Updating ${fields.length} form fields (testMode: ${testMode})`);
   const startTime = performance.now();
@@ -1272,90 +1273,6 @@ const updateCheckboxGroup = async (field: Field, value: unknown, _testMode: bool
   return successCount > 0;
 };
 
-/**
- * Process streaming response chunks (legacy - updates all fields per chunk)
- */
-export const processChunksLegacy = async (
-  text: string,
-  originalFields: Field[],
-  previousPartial = '',
-): Promise<string> => {
-  try {
-    // Combine with any previous partial data
-    const combinedText = previousPartial + text;
-    const lines = combinedText.split('\n');
-
-    // The last line might be incomplete, so save it for the next chunk
-    let partial = '';
-    if (combinedText[combinedText.length - 1] !== '\n') {
-      partial = lines.pop() || '';
-    }
-
-    // Process each complete JSON line
-    const fieldsToUpdate: Field[] = [];
-
-    for (const line of lines) {
-      if (!line.trim()) continue;
-
-      try {
-        const jsonResponse = JSON.parse(line);
-        if (jsonResponse?.data?.length) {
-          // Merge with original fields to maintain metadata
-          const mergedFields = jsonResponse.data.map((updatedField: Field) => {
-            const originalField = originalFields.find(f => f.id === updatedField.id);
-            return originalField ? { ...originalField, ...updatedField } : updatedField;
-          });
-
-          fieldsToUpdate.push(...mergedFields);
-        }
-      } catch (e) {
-        debug.warn('Failed to parse JSON line:', e);
-      }
-    }
-
-    // Update fields if we have any
-    if (fieldsToUpdate.length > 0) {
-      await updateFormFields(fieldsToUpdate);
-    }
-
-    return partial;
-  } catch (error) {
-    debug.error('Error processing chunks:', error);
-    return previousPartial;
-  }
-};
-
-/**
- * Process a stream response
- */
-export const processStreamResponse = async (response: ReadableStream, originalFields: Field[]): Promise<void> => {
-  try {
-    const reader = response.getReader();
-    const decoder = new TextDecoder();
-    let remainder = '';
-
-    const processText = async (result: ReadableStreamReadResult<Uint8Array>): Promise<void> => {
-      if (result.done) {
-        // Process any remaining text
-        if (remainder) {
-          await processChunksLegacy('\n', originalFields, remainder);
-        }
-        return;
-      }
-
-      const chunkText = decoder.decode(result.value, { stream: true });
-      remainder = await processChunksLegacy(chunkText, originalFields, remainder);
-
-      // Continue reading
-      await reader.read().then(processText);
-    };
-
-    await reader.read().then(processText);
-  } catch (error) {
-    debug.error('Error processing stream response:', error);
-  }
-};
-
 // ----------------------------------------
 // Diff-Aware Streaming Helpers
 // ----------------------------------------
@@ -1363,7 +1280,7 @@ export const processStreamResponse = async (response: ReadableStream, originalFi
 /**
  * Compare two field values (string or string[]) for equality
  */
-export const hasValueChanged = (prev: string | string[] | undefined, next: string | string[] | undefined): boolean => {
+const hasValueChanged = (prev: string | string[] | undefined, next: string | string[] | undefined): boolean => {
   if (prev === next) return false;
   if (prev === undefined || next === undefined) return true;
 
@@ -1381,7 +1298,7 @@ export const hasValueChanged = (prev: string | string[] | undefined, next: strin
  * - choice: only updates when value matches an available option
  * - file: skips streaming updates entirely
  */
-export const classifyFieldForStreaming = (fieldType: string): 'text-like' | 'choice' | 'file' => {
+const classifyFieldForStreaming = (fieldType: string): 'text-like' | 'choice' | 'file' => {
   switch (fieldType) {
     case 'select':
     case 'radio':
@@ -1398,7 +1315,7 @@ export const classifyFieldForStreaming = (fieldType: string): 'text-like' | 'cho
  * Lightweight DOM write for a single field during streaming.
  * Calls updateField() directly with no retry or verification.
  */
-export const immediateFieldSet = async (element: HTMLElement, field: Field): Promise<void> => {
+const immediateFieldSet = async (element: HTMLElement, field: Field): Promise<void> => {
   try {
     await updateField(element, field, false);
   } catch (error) {
@@ -1410,19 +1327,19 @@ export const immediateFieldSet = async (element: HTMLElement, field: Field): Pro
  * Diff-aware chunk processing for streaming form fill.
  * Only updates fields whose values have actually changed since the last partial.
  */
-export const processChunksDiffAware = async (
+const processChunksDiffAware = async (
   text: string,
   originalFields: Field[],
   previousPartial: string,
   store: {
     getState: () => {
-      lastPartialObject: Record<string, unknown> | null;
+      lastPartialObject: PartialFieldValueMap | null;
       fields: Record<string, { currentValue: string | string[] | undefined }>;
     };
     updateFieldValue: (id: string, value: string | string[] | undefined) => void;
     markFieldStable: (id: string) => void;
     markFieldFilled: (id: string) => void;
-    setLastPartialObject: (obj: Record<string, unknown> | null) => void;
+    setLastPartialObject: (obj: PartialFieldValueMap | null) => void;
   },
 ): Promise<string> => {
   try {
@@ -1454,10 +1371,10 @@ export const processChunksDiffAware = async (
     if (!latestParsed) return partial;
 
     const { lastPartialObject } = store.getState();
-    const previousLookup: Record<string, unknown> = lastPartialObject || {};
+    const previousLookup: PartialFieldValueMap = lastPartialObject || {};
 
     // Build lookup from current parsed data
-    const currentLookup: Record<string, unknown> = {};
+    const currentLookup: PartialFieldValueMap = {};
     for (const parsedField of latestParsed.data) {
       if (parsedField.id && parsedField.value !== undefined) {
         currentLookup[parsedField.id] = parsedField.value;
@@ -1472,8 +1389,8 @@ export const processChunksDiffAware = async (
       const originalField = originalFields.find(f => f.id === fieldId);
       if (!originalField) continue;
 
-      const newValue = parsedField.value as string | string[] | undefined;
-      const prevValue = previousLookup[fieldId] as string | string[] | undefined;
+      const newValue = parsedField.value;
+      const prevValue = previousLookup[fieldId];
 
       // Skip fields with no value
       if (newValue === undefined) continue;
@@ -1492,11 +1409,24 @@ export const processChunksDiffAware = async (
 
       // For choice fields, only update if value matches an available option
       if (fieldClass === 'choice' && originalField.options) {
-        const valueStr = String(newValue);
-        const matchesOption = originalField.options.some(
-          opt => opt.value === valueStr || opt.text.toLowerCase() === valueStr.toLowerCase(),
-        );
-        if (!matchesOption) continue;
+        if (Array.isArray(newValue)) {
+          // For arrays (checkbox groups, multi-selects), check if any element matches an option
+          // Empty arrays are allowed (clear all selections)
+          if (newValue.length > 0) {
+            const matchesAnyOption = newValue.some(val =>
+              originalField.options!.some(
+                opt => opt.value === String(val) || opt.text.toLowerCase() === String(val).toLowerCase(),
+              ),
+            );
+            if (!matchesAnyOption) continue;
+          }
+        } else {
+          const valueStr = String(newValue);
+          const matchesOption = originalField.options.some(
+            opt => opt.value === valueStr || opt.text.toLowerCase() === valueStr.toLowerCase(),
+          );
+          if (!matchesOption) continue;
+        }
       }
 
       // Value changed - update store and do immediate DOM write
@@ -1527,7 +1457,7 @@ export const processChunksDiffAware = async (
  * Uses updateFieldWithGroupHandling with full retry+verify for each field
  * that has a value in the store.
  */
-export const runFinalVerificationPass = async (
+const runFinalVerificationPass = async (
   originalFields: Field[],
   store: {
     getState: () => {
@@ -1595,4 +1525,20 @@ export const runFinalVerificationPass = async (
   return results;
 };
 
-export { _captureFormState as captureFormState, _restoreFormState as restoreFormState, _ensureFocus as ensureFocus };
+export {
+  ErrorCategory,
+  FieldUpdateError,
+  updateFieldWithRetry,
+  updateField,
+  updateFormFields,
+  hasValueChanged,
+  classifyFieldForStreaming,
+  immediateFieldSet,
+  processChunksDiffAware,
+  runFinalVerificationPass,
+  _captureFormState as captureFormState,
+  _restoreFormState as restoreFormState,
+  _ensureFocus as ensureFocus,
+};
+
+export type { FieldUpdateResult, FormUpdateResults };

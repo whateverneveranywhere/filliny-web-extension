@@ -68,7 +68,7 @@ const attachObserverToDocument = (doc: Document, observer: MutationObserver): vo
 };
 
 // Callback type for notifying about new forms
-export type FormDetectionCallback = (doc: Document) => void;
+type FormDetectionCallback = (doc: Document) => void;
 
 /**
  * Schema for dynamic content detector
@@ -185,7 +185,7 @@ const FORM_READY_INDICATORS = [
   '[tabindex]:not([tabindex="-1"])',
 ];
 
-export const getAllFrameDocuments = (onNewFrameLoaded?: FormDetectionCallback): Document[] => {
+const getAllFrameDocuments = (onNewFrameLoaded?: FormDetectionCallback): Document[] => {
   const docs: Document[] = [document];
   const processedFrames = new Set<string>();
   const maxRetries = 3;
@@ -431,7 +431,7 @@ type FormCandidate = z.infer<typeof _FormCandidateSchema>;
  * Gets all form containers from the unified registry.
  * This avoids re-running detection and ensures consistency.
  */
-export const getAllFormContainersFromRegistry = (): HTMLElement[] => unifiedFieldRegistry.getRegisteredContainers();
+const getAllFormContainersFromRegistry = (): HTMLElement[] => unifiedFieldRegistry.getRegisteredContainers();
 
 /**
  * Progressive detection strategy with multiple passes and intelligent timing
@@ -681,7 +681,7 @@ const shouldTerminateEarly = (
  * Enhanced form container detection with improved scoring for group detection
  * Now includes universal dynamic content detection, progressive strategy, and multi-step form detection
  */
-export const detectFormLikeContainers = async (): Promise<HTMLElement[]> => {
+const detectFormLikeContainers = async (): Promise<HTMLElement[]> => {
   debug.log('Starting enhanced form container detection with progressive strategy...');
 
   const documents = getAllFrameDocuments();
@@ -703,7 +703,7 @@ export const detectFormLikeContainers = async (): Promise<HTMLElement[]> => {
 };
 
 // --- Re-export shared helpers for convenience ---
-export { detectFields, unifiedFieldRegistry };
+// Re-exported at end of file: detectFields, unifiedFieldRegistry
 
 // --- Cross-origin handling ---
 const isInsideCrossOriginIframe = (): boolean => {
@@ -719,7 +719,7 @@ const isInsideCrossOriginIframe = (): boolean => {
 //   debug.warn("🚨 Filliny detected it's running inside a cross-origin iframe. Form detection may be limited.");
 // }
 
-export const openCrossOriginIframeInNewTabAndAlert = (): void => {
+const openCrossOriginIframeInNewTabAndAlert = (): void => {
   if (isInsideCrossOriginIframe()) {
     try {
       const currentUrl = window.location.href;
@@ -734,7 +734,7 @@ export const openCrossOriginIframeInNewTabAndAlert = (): void => {
 };
 
 // --- System Diagnostics ---
-export const diagnoseFillinySystem = async (): Promise<void> => {
+const diagnoseFillinySystem = async (): Promise<void> => {
   debug.group('Filliny System Diagnostics');
 
   try {
@@ -1005,7 +1005,7 @@ const waitForContentStability = async (documents: Document[], maxWaitTime = 5000
 /**
  * Enhanced form container detection with universal behavioral analysis
  */
-export const detectUniversalFormContainers = async (): Promise<HTMLElement[]> => {
+const detectUniversalFormContainers = async (): Promise<HTMLElement[]> => {
   debug.log('🔍 Starting universal form container detection...');
 
   const candidates: FormCandidate[] = [];
@@ -1245,7 +1245,7 @@ const analyzeVisualFormPattern = (_container: HTMLElement, fields: HTMLElement[]
 /**
  * Clean up dynamic content detection when no longer needed
  */
-export const cleanupDynamicContentDetection = (doc?: Document): void => {
+const cleanupDynamicContentDetection = (doc?: Document): void => {
   if (doc) {
     const detector = dynamicDetectors.get(doc);
     if (detector) {
@@ -1283,10 +1283,7 @@ export const cleanupDynamicContentDetection = (doc?: Document): void => {
 /**
  * Initialize API response monitoring for form definition detection
  */
-export const initializeAPIResponseMonitoring = (
-  doc: Document,
-  onFormDefinitionLoaded?: (data: unknown) => void,
-): void => {
+const initializeAPIResponseMonitoring = (doc: Document, onFormDefinitionLoaded?: (data: unknown) => void): void => {
   // Skip if already initialized
   if (apiResponseMonitors.has(doc)) {
     return;
@@ -1442,7 +1439,7 @@ const cleanupAPIResponseMonitoring = (doc?: Document): void => {
 /**
  * Check if form definition APIs have been detected and processed
  */
-export const hasFormDefinitionAPIsLoaded = (doc: Document): boolean => {
+const hasFormDefinitionAPIsLoaded = (doc: Document): boolean => {
   const monitor = apiResponseMonitors.get(doc);
   return monitor ? monitor.interceptedResponses.size > 0 : false;
 };
@@ -1450,7 +1447,7 @@ export const hasFormDefinitionAPIsLoaded = (doc: Document): boolean => {
 /**
  * Get intercepted form definition data
  */
-export const getInterceptedFormDefinitions = (doc: Document): Map<string, unknown> => {
+const getInterceptedFormDefinitions = (doc: Document): Map<string, unknown> => {
   const monitor = apiResponseMonitors.get(doc);
   return monitor?.interceptedResponses || new Map();
 };
@@ -2476,7 +2473,7 @@ const extractValidationFromData = (data: NormalizedAPIData): ValidationRules => 
 /**
  * Get processed form definitions for a document
  */
-export const getProcessedFormDefinitions = (doc: Document): ProcessedFormDefinition[] => {
+const getProcessedFormDefinitions = (doc: Document): ProcessedFormDefinition[] => {
   const monitor = apiResponseMonitors.get(doc);
   if (!monitor) return [];
 
@@ -2673,8 +2670,23 @@ const detectFormsInDialogsAndPopovers = (doc: Document = document): HTMLElement[
 };
 
 export {
+  getAllFrameDocuments,
+  getAllFormContainersFromRegistry,
+  detectFormLikeContainers,
+  detectFields,
+  unifiedFieldRegistry,
+  openCrossOriginIframeInNewTabAndAlert,
+  diagnoseFillinySystem,
+  detectUniversalFormContainers,
+  cleanupDynamicContentDetection,
+  initializeAPIResponseMonitoring,
+  hasFormDefinitionAPIsLoaded,
+  getInterceptedFormDefinitions,
+  getProcessedFormDefinitions,
   enhanceDetectionWithAPIData,
   initializeHTMXSwapListener,
   watchForConditionalFields,
   detectFormsInDialogsAndPopovers,
 };
+
+export type { FormDetectionCallback };

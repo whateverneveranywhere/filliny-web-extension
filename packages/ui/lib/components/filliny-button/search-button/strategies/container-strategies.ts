@@ -411,7 +411,6 @@ export class JobApplicationContainerStrategy implements ContainerDetectionStrate
     // Job application specific bonuses
     const className = element.className.toLowerCase();
     const id = element.id.toLowerCase();
-    const text = (element.textContent || '').toLowerCase();
 
     const jobKeywords = ['application', 'apply', 'job', 'career', 'position', 'role'];
 

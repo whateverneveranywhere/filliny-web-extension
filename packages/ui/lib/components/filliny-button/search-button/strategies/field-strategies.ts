@@ -6,7 +6,7 @@
  */
 
 import { createBaseDetectedField, getFieldLabel } from '../core/field-detector';
-import { isValidFormField, createFormElementSelectors, normalizeConfidence } from '../core/utils';
+import { isValidFormField } from '../core/utils';
 import type { FieldDetectionStrategy, DetectedField } from '../core/types';
 
 // ============================================================================

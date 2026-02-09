@@ -5,9 +5,9 @@
  * These strategies understand framework-specific patterns and components.
  */
 
-import { Framework } from '@extension/shared';
 import { createBaseDetectedField, getFieldLabel } from '../core/field-detector';
 import { isValidFormField, detectFramework } from '../core/utils';
+import { Framework } from '@extension/shared';
 import type { FieldDetectionStrategy, DetectedField } from '../core/types';
 
 // ============================================================================

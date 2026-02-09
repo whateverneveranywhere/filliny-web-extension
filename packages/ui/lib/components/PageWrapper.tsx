@@ -15,4 +15,4 @@ import type { ComponentType, JSX } from 'react';
  * export default withPageWrapper(MyPage);
  */
 export const withPageWrapper = <T extends JSX.IntrinsicAttributes>(Component: ComponentType<T>) =>
-  withErrorBoundary(withSuspense(Component, <Loading fullScreen size="xl" />), ErrorDisplay);
+  withErrorBoundary(withSuspense(Component, <Loading variant="fullscreen" size="xl" />), ErrorDisplay);

@@ -22,7 +22,11 @@ describe('formFillStore', () => {
   // ============================================================================
   describe('initSession', () => {
     it('should set phase to STREAMING and create field entries', () => {
-      formFillStore.getState().initSession(['f1', 'f2', 'f3']);
+      formFillStore.getState().initSession([
+        { id: 'f1', label: 'Field 1' },
+        { id: 'f2', label: 'Field 2' },
+        { id: 'f3', label: 'Field 3' },
+      ]);
 
       const state = formFillStore.getState();
       expect(state.phase).toBe(StreamingPhase.STREAMING);
@@ -34,7 +38,7 @@ describe('formFillStore', () => {
 
     it('should reset lastPartialObject on init', () => {
       formFillStore.getState().setLastPartialObject({ key: 'val' });
-      formFillStore.getState().initSession(['f1']);
+      formFillStore.getState().initSession([{ id: 'f1', label: 'Field 1' }]);
       expect(formFillStore.getState().lastPartialObject).toBeNull();
     });
   });
@@ -44,7 +48,7 @@ describe('formFillStore', () => {
   // ============================================================================
   describe('updateFieldValue', () => {
     it('should update currentValue and set previousValue', () => {
-      formFillStore.getState().initSession(['f1']);
+      formFillStore.getState().initSession([{ id: 'f1', label: 'Field 1' }]);
       formFillStore.getState().updateFieldValue('f1', 'hello');
 
       const field = formFillStore.getState().fields['f1'];
@@ -55,7 +59,7 @@ describe('formFillStore', () => {
     });
 
     it('should set previousValue on second update', () => {
-      formFillStore.getState().initSession(['f1']);
+      formFillStore.getState().initSession([{ id: 'f1', label: 'Field 1' }]);
       formFillStore.getState().updateFieldValue('f1', 'first');
       formFillStore.getState().updateFieldValue('f1', 'second');
 
@@ -65,7 +69,7 @@ describe('formFillStore', () => {
     });
 
     it('should ignore update for unknown field id', () => {
-      formFillStore.getState().initSession(['f1']);
+      formFillStore.getState().initSession([{ id: 'f1', label: 'Field 1' }]);
       formFillStore.getState().updateFieldValue('unknown', 'val');
       expect(formFillStore.getState().fields['unknown']).toBeUndefined();
     });
@@ -76,7 +80,7 @@ describe('formFillStore', () => {
   // ============================================================================
   describe('markFieldStable', () => {
     it('should set isValueStable to true', () => {
-      formFillStore.getState().initSession(['f1']);
+      formFillStore.getState().initSession([{ id: 'f1', label: 'Field 1' }]);
       formFillStore.getState().markFieldStable('f1');
       expect(formFillStore.getState().fields['f1'].isValueStable).toBe(true);
     });
@@ -87,7 +91,7 @@ describe('formFillStore', () => {
   // ============================================================================
   describe('markFieldFilled', () => {
     it('should set status to FILLED and isValueStable to true', () => {
-      formFillStore.getState().initSession(['f1']);
+      formFillStore.getState().initSession([{ id: 'f1', label: 'Field 1' }]);
       formFillStore.getState().markFieldFilled('f1');
 
       const field = formFillStore.getState().fields['f1'];
@@ -101,7 +105,7 @@ describe('formFillStore', () => {
   // ============================================================================
   describe('markFieldVerified', () => {
     it('should set status to VERIFIED', () => {
-      formFillStore.getState().initSession(['f1']);
+      formFillStore.getState().initSession([{ id: 'f1', label: 'Field 1' }]);
       formFillStore.getState().markFieldVerified('f1');
       expect(formFillStore.getState().fields['f1'].status).toBe(FieldFillStatus.VERIFIED);
     });
@@ -112,7 +116,7 @@ describe('formFillStore', () => {
   // ============================================================================
   describe('markFieldError', () => {
     it('should set status to ERROR with message', () => {
-      formFillStore.getState().initSession(['f1']);
+      formFillStore.getState().initSession([{ id: 'f1', label: 'Field 1' }]);
       formFillStore.getState().markFieldError('f1', 'Element not found');
 
       const field = formFillStore.getState().fields['f1'];
@@ -136,7 +140,10 @@ describe('formFillStore', () => {
   // ============================================================================
   describe('reset', () => {
     it('should return to initial state', () => {
-      formFillStore.getState().initSession(['f1', 'f2']);
+      formFillStore.getState().initSession([
+        { id: 'f1', label: 'Field 1' },
+        { id: 'f2', label: 'Field 2' },
+      ]);
       formFillStore.getState().updateFieldValue('f1', 'val');
       formFillStore.getState().setPhase(StreamingPhase.COMPLETE);
 
@@ -159,7 +166,11 @@ describe('selectProgress', () => {
   });
 
   it('should compute correct progress counters', () => {
-    formFillStore.getState().initSession(['f1', 'f2', 'f3']);
+    formFillStore.getState().initSession([
+      { id: 'f1', label: 'Field 1' },
+      { id: 'f2', label: 'Field 2' },
+      { id: 'f3', label: 'Field 3' },
+    ]);
     formFillStore.getState().updateFieldValue('f1', 'val1');
     formFillStore.getState().markFieldFilled('f1');
     formFillStore.getState().markFieldVerified('f2');

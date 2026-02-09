@@ -22,7 +22,7 @@ const ButtonWrapper: React.FC<ButtonWrapperProps> = ({ children, isHovered, isDr
     <div
       style={{
         willChange: 'transform, opacity',
-        transition: `transform ${durations.slow}ms ${easings.easeOut}, opacity ${durations.slow}ms ${easings.easeOut}`,
+        transition: `transform ${durations.slow}ms ${easings.out}, opacity ${durations.slow}ms ${easings.out}`,
       }}
       className={`filliny-z-[1000000000001] filliny-flex filliny-items-center ${animationClasses.transitionSlow} ${isVisible ? 'filliny-opacity-100 filliny-translate-x-0' : 'filliny-opacity-0 filliny-translate-x-4 filliny-pointer-events-none'}`}>
       <ShadowTooltipProvider delayDuration={0}>

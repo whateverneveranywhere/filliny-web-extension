@@ -1,9 +1,5 @@
 /**
- * Auth types - these are re-exported from the centralized schemas
+ * Auth types are centralized in services/schemas/index.ts
  *
- * IMPORTANT: All types should be inferred from Zod schemas in @extension/shared/lib/services/schemas
- * This file re-exports the types for backwards compatibility
+ * Import types directly from schemas/index.ts or the main shared package.
  */
-
-// Re-export types from centralized schemas
-export type { AuthHealthCheckResponse as AuthHealthCheck } from '../schemas/index.js';

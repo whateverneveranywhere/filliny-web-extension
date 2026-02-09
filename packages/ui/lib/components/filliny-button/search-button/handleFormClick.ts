@@ -22,6 +22,7 @@ import {
 } from '@extension/shared';
 import { profileStorage, localFilesStorage } from '@extension/storage';
 import type { FormUpdateResults } from './fieldUpdaterHelpers';
+import type { PartialFieldValueMap } from './stores';
 import type { Field, DTOFillingPreferences, DTOAuthorizedFileForAI } from '@extension/shared';
 import type { DTOProfileFillingForm } from '@extension/storage';
 
@@ -37,11 +38,22 @@ interface StreamMessage {
 const debug = createDebugLogger('FormClick');
 
 /**
- * Allowed fields for the API formData payload
- * Only includes fields that exist on both the extension's Field type AND the API schema
+ * Keys allowed in the API formData payload.
+ * Only includes keys that exist on both the extension's Field type AND the API schema.
  * Strips: xpath, uniqueSelectors, validation, title, testValue, metadata
  */
-const ALLOWED_FORM_DATA_FIELDS = [
+type AllowedFieldKey =
+  | 'id'
+  | 'name'
+  | 'type'
+  | 'placeholder'
+  | 'label'
+  | 'description'
+  | 'value'
+  | 'options'
+  | 'required';
+
+const ALLOWED_FORM_DATA_FIELDS: readonly AllowedFieldKey[] = [
   'id',
   'name',
   'type',
@@ -54,22 +66,29 @@ const ALLOWED_FORM_DATA_FIELDS = [
 ] as const;
 
 /**
- * Allowed fields for the API preferences payload
- * Strip id and profileId which the API doesn't accept
+ * Keys allowed in the API preferences payload.
+ * Strip id and profileId which the API doesn't accept.
  */
-const ALLOWED_PREFERENCES_FIELDS = ['isFormal', 'isGapFillingAllowed', 'toneId', 'povId'] as const;
+type AllowedPreferencesKey = 'isFormal' | 'isGapFillingAllowed' | 'toneId' | 'povId';
+
+const ALLOWED_PREFERENCES_FIELDS: readonly AllowedPreferencesKey[] = [
+  'isFormal',
+  'isGapFillingAllowed',
+  'toneId',
+  'povId',
+] as const;
 
 /**
  * Transform form field data to only include fields accepted by the API
  * Strips: xpath, uniqueSelectors, validation
  */
-const transformFormDataForApi = (fields: Field[]): Partial<Field>[] =>
+const transformFormDataForApi = (fields: Field[]): Pick<Field, AllowedFieldKey>[] =>
   fields.map(field => {
-    const transformed: Partial<Field> = {};
+    const transformed = {} as Pick<Field, AllowedFieldKey>;
     for (const key of ALLOWED_FORM_DATA_FIELDS) {
       if (key in field && field[key] !== undefined) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (transformed as any)[key] = field[key];
+        // Safe: key is typed as AllowedFieldKey which is a subset of keyof Field
+        Object.assign(transformed, { [key]: field[key] });
       }
     }
     return transformed;
@@ -84,11 +103,10 @@ const transformPreferencesForApi = (
 ): DTOFillingPreferences | undefined => {
   if (!preferences) return undefined;
 
-  const transformed: Partial<DTOFillingPreferences> = {};
+  const transformed = {} as Pick<DTOFillingPreferences, AllowedPreferencesKey>;
   for (const key of ALLOWED_PREFERENCES_FIELDS) {
     if (key in preferences && preferences[key] !== undefined) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (transformed as any)[key] = preferences[key];
+      Object.assign(transformed, { [key]: preferences[key] });
     }
   }
   return transformed as DTOFillingPreferences;
@@ -265,7 +283,7 @@ export const handleFormClick = async (
 
     // Initialize the Zustand store session for streaming tracking
     const storeActions = formFillStore.getState();
-    storeActions.initSession(fields.map(f => f.id));
+    storeActions.initSession(fields.map(f => ({ id: f.id, label: f.label || f.name || f.id })));
 
     // Create promise control for streaming
     let streamResolve: () => void;
@@ -297,7 +315,7 @@ export const handleFormClick = async (
       markFieldFilled: (id: string) => formFillStore.getState().markFieldFilled(id),
       markFieldVerified: (id: string) => formFillStore.getState().markFieldVerified(id),
       markFieldError: (id: string, msg: string) => formFillStore.getState().markFieldError(id, msg),
-      setLastPartialObject: (obj: Record<string, unknown> | null) => formFillStore.getState().setLastPartialObject(obj),
+      setLastPartialObject: (obj: PartialFieldValueMap | null) => formFillStore.getState().setLastPartialObject(obj),
     };
 
     // Set up message listener for streaming response using MessageType enum for consistency
@@ -343,8 +361,11 @@ export const handleFormClick = async (
 
     let updateResults: FormUpdateResults | null = null;
 
-    if (response instanceof ReadableStream) {
-      // Wait for all streaming chunks to be processed
+    // Check for streaming mode: either a ReadableStream or a streaming flag from background script
+    const isStreaming = response instanceof ReadableStream || ('streaming' in response && response.streaming);
+
+    if (isStreaming) {
+      // Wait for all streaming chunks to be processed via messageHandler
       await streamPromise;
 
       // Streaming complete - run final verification pass
@@ -431,14 +452,13 @@ export const handleFormClick = async (
 
     try {
       debug.log(`Total process took: ${((performance.now() - totalStartTime) / 1000).toFixed(2)}s`);
-      resetOverlays();
       // Notify the field manager to re-detect everything to prevent stale state
       document.dispatchEvent(new CustomEvent('filliny:bulkFillComplete'));
 
-      // Reset the store after a short delay to let UI show completion state
+      // Reset the store after a delay so overlay UI can read final state before reset
       setTimeout(() => {
         formFillStore.getState().reset();
-      }, 2000);
+      }, 3000);
     } catch (finallyError) {
       debug.error('Error in finally block:', finallyError);
     }

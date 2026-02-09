@@ -5,14 +5,9 @@
  * including support for Shadow DOM traversal and observation.
  */
 
+import { hasProperty } from './runtime-type-guards.js';
 import { z } from 'zod';
-import type {
-  VueVnodeElement,
-  SvelteMetaElement,
-  FrameworkDetectionWindow,
-  StateManagerDetectionWindow,
-  SSRDetectionWindow,
-} from '../types/dom.js';
+import type { FrameworkDetectionWindow, StateManagerDetectionWindow, SSRDetectionWindow } from '../types/dom.js';
 
 /**
  * Enum for supported frontend frameworks
@@ -325,7 +320,7 @@ const detectVue = (element: Element): boolean =>
   // Check for Vue 3 parent component
   '__vueParentComponent__' in element ||
   // Check for Vue 3 proxy
-  (element as unknown as VueVnodeElement).__vnode__ !== undefined ||
+  hasProperty(element, '__vnode__') ||
   // Check for data-v-* scoped style attributes (Vue SFC)
   Array.from(element.attributes).some(attr => attr.name.startsWith('data-v-'));
 
@@ -389,7 +384,7 @@ const detectSvelte = (element: Element): boolean =>
   Array.from(element.attributes).some(attr => attr.name.startsWith('class:')) ||
   // Check for Svelte component property
   '__svelte_component' in element ||
-  (element as unknown as SvelteMetaElement).__svelte_meta !== undefined;
+  hasProperty(element, '__svelte_meta');
 
 /**
  * Detect Qwik framework on an element
@@ -557,11 +552,7 @@ const detectDocumentFramework = (doc: Document = document): Framework => {
   }
 
   // Knockout.js detection
-  if (
-    (win as unknown as Record<string, unknown>).ko ||
-    doc.querySelector('[data-bind]') ||
-    doc.querySelector('script[src*="knockout"]')
-  ) {
+  if (win.ko || doc.querySelector('[data-bind]') || doc.querySelector('script[src*="knockout"]')) {
     return Framework.KNOCKOUT;
   }
 
@@ -581,11 +572,7 @@ const detectDocumentFramework = (doc: Document = document): Framework => {
   }
 
   // Ember.js detection
-  if (
-    (win as unknown as Record<string, unknown>).Ember ||
-    doc.querySelector('.ember-view') ||
-    doc.querySelector('script[src*="ember"]')
-  ) {
+  if (win.Ember || doc.querySelector('.ember-view') || doc.querySelector('script[src*="ember"]')) {
     return Framework.EMBER;
   }
 
@@ -798,12 +785,12 @@ const getRoot = (element: Element): Document | ShadowRoot => element.getRootNode
 /**
  * Traverse all shadow roots from an element
  */
-const traverseShadowRoots = (element: Element, callback: (shadowRoot: ShadowRoot) => void): void => {
-  const allElements = Array.from(element.querySelectorAll('*'));
+const traverseShadowRoots = (root: Element | ShadowRoot, callback: (shadowRoot: ShadowRoot) => void): void => {
+  const allElements = Array.from(root.querySelectorAll('*'));
   for (const el of allElements) {
     if (el instanceof HTMLElement && el.shadowRoot) {
       callback(el.shadowRoot);
-      traverseShadowRoots(el.shadowRoot as unknown as Element, callback);
+      traverseShadowRoots(el.shadowRoot, callback);
     }
   }
 };

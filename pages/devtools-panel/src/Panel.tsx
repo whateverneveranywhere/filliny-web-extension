@@ -42,4 +42,4 @@ const ToggleButton = (props: ComponentPropsWithoutRef<'button'>) => {
   );
 };
 
-export default withErrorBoundary(withSuspense(Panel, <Loading fullScreen />), ErrorDisplay);
+export default withErrorBoundary(withSuspense(Panel, <Loading variant="fullscreen" />), ErrorDisplay);

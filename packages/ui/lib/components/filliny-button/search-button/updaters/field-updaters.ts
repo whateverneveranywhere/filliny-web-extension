@@ -5,9 +5,8 @@
  * Each strategy implements the FieldUpdateStrategy interface.
  */
 
-import { safeExecute } from '../core/utils';
-import type { FieldType } from '@extension/shared';
 import type { FieldUpdateStrategy, DetectedField, UpdateResult } from '../core/types';
+import type { FieldType } from '@extension/shared';
 
 // ============================================================================
 // TEXT FIELD UPDATER
@@ -81,13 +80,14 @@ export class TextFieldUpdater implements FieldUpdateStrategy {
         }
         return value;
 
-      case 'tel':
+      case 'tel': {
         // Basic phone number formatting
         const digits = value.replace(/\D/g, '');
         if (digits.length < 10) {
           return '555' + digits.padEnd(7, '0');
         }
         return value;
+      }
 
       default:
         return value;
@@ -461,7 +461,7 @@ export class FileFieldUpdater implements FieldUpdateStrategy {
     return field.type === 'file' && field.element instanceof HTMLInputElement && field.element.type === 'file';
   }
 
-  async update(field: DetectedField, value: unknown): Promise<UpdateResult> {
+  async update(field: DetectedField, _value: unknown): Promise<UpdateResult> {
     // File inputs cannot be programmatically set for security reasons
     // We can only trigger the file picker or provide visual feedback
 

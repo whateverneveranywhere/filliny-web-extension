@@ -481,13 +481,40 @@ interface ReactProps {
 }
 
 /**
+ * Template literal type for React props keys attached to DOM elements.
+ * React attaches props using keys like `__reactProps$abc123`.
+ */
+type ReactPropsKey = `__reactProps$${string}`;
+
+/**
+ * Check whether a string is a valid React props key.
+ */
+const isReactPropsKey = (key: string): key is ReactPropsKey => key.startsWith('__reactProps$');
+
+/**
+ * Element with React props attached via __reactProps$ key
+ */
+interface ReactPropsElement extends HTMLElement {
+  [key: ReactPropsKey]: ReactProps;
+}
+
+/**
+ * Type guard to check if element has React props for a given key.
+ */
+const isReactPropsElement = (element: HTMLElement, key: ReactPropsKey): element is ReactPropsElement => {
+  if (!hasProperty(element, key)) return false;
+  const value: unknown = element[key];
+  return typeof value === 'object' && value !== null;
+};
+
+/**
  * Extract React props (__reactProps$) from an element for direct handler invocation.
  */
 const getReactProps = (element: HTMLElement): ReactProps | null => {
   try {
-    const propsKey = Object.keys(element).find(k => k.startsWith('__reactProps$'));
-    if (propsKey) {
-      return (element as unknown as Record<string, ReactProps>)[propsKey] ?? null;
+    const propsKey = Object.keys(element).find(isReactPropsKey);
+    if (propsKey && isReactPropsElement(element, propsKey)) {
+      return element[propsKey] ?? null;
     }
     return null;
   } catch {

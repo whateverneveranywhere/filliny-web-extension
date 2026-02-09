@@ -40,22 +40,8 @@ export interface ElementWithEventListeners {
 }
 
 // ============================================================================
-// Vue Framework Detection Extensions
+// Framework Detection Element Extensions
 // ============================================================================
-
-/**
- * Element with Vue 3 vnode property
- */
-export interface VueVnodeElement {
-  __vnode__?: unknown;
-}
-
-/**
- * Element with Svelte meta property
- */
-export interface SvelteMetaElement {
-  __svelte_meta?: unknown;
-}
 
 /**
  * Element with Angular context property
@@ -282,6 +268,12 @@ export interface FrameworkDetectionWindow extends Window {
 
   // Qwik
   __QWIK_DEV__?: unknown;
+
+  // Knockout
+  ko?: unknown;
+
+  // Ember
+  Ember?: unknown;
 
   // State managers
   __REDUX_DEVTOOLS_EXTENSION__?: unknown;

@@ -33,7 +33,6 @@ import {
 import { profileStorage } from '@extension/storage';
 import { Check, ChevronDown, ClipboardList, Edit, Loader2, Plus, Trash2 } from 'lucide-react';
 import { useCallback, useRef, useState } from 'react';
-import type { DTOFillingProfileItem, DTOProfileFillingForm } from '@extension/storage';
 
 const ProfileSelector = () => {
   const profileModal = useBoolean();
@@ -45,15 +44,7 @@ const ProfileSelector = () => {
 
   const { activeProfileId, activeProfile } = useActiveProfile();
   // Queries and Mutations
-  const {
-    data: profiles,
-    isLoading,
-    isFetching,
-  } = useProfilesListQuery() as {
-    data: DTOFillingProfileItem[] | undefined;
-    isLoading: boolean;
-    isFetching: boolean;
-  };
+  const { data: profiles, isLoading, isFetching } = useProfilesListQuery();
   const { mutateAsync: deleteProfile, isPending: isDeleting } = useDeleteProfileByIdMutation();
   const { mutateAsync: updateActiveProfile, isPending: isUpdating } = useChangeActiveFillingProfileMutation();
 
@@ -68,7 +59,7 @@ const ProfileSelector = () => {
         // Find the new active profile from the profiles list
         const newActiveProfile = profiles?.find(profile => String(profile.id) === nextActiveId);
         if (newActiveProfile) {
-          await profileStorage.setDefaultProfile(newActiveProfile as unknown as DTOProfileFillingForm);
+          await profileStorage.setDefaultProfile(newActiveProfile);
           // Notify content scripts about the profile update
           await notifyProfileUpdate(MessageType.PROFILE_UPDATED);
         }

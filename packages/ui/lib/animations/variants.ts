@@ -60,10 +60,6 @@ export const easings = {
   out: 'cubic-bezier(0.25, 0.46, 0.45, 0.94)',
   /** EaseInOut for bidirectional animations - matches parent project */
   inOut: 'cubic-bezier(0.4, 0, 0.2, 1)',
-  /** Legacy easeOut (different curve) */
-  easeOut: 'cubic-bezier(0.33, 1, 0.68, 1)',
-  easeIn: 'cubic-bezier(0.32, 0, 0.67, 0)',
-  easeInOut: 'cubic-bezier(0.65, 0, 0.35, 1)',
   spring: 'cubic-bezier(0.68, -0.55, 0.265, 1.55)',
   bounce: 'cubic-bezier(0.68, -0.6, 0.32, 1.6)',
 } as const;

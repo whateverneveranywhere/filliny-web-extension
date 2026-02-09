@@ -291,9 +291,9 @@ const getConfig = (): ConfigEntry => {
     console.error('Error determining environment:', error);
   }
 
-  // Default to DEV as last resort
-  console.log('Defaulting to DEV environment');
-  const defaultConfig = config[WebappEnvs.DEV];
+  // Default to PROD as last resort
+  console.log('Defaulting to PROD environment');
+  const defaultConfig = config[WebappEnvs.PROD];
   extendedGlobal.__CACHED_ENV_CONFIG__ = defaultConfig;
   return defaultConfig;
 };

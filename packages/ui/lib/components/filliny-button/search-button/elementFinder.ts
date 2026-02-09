@@ -11,7 +11,7 @@ import type { Field } from '@extension/shared';
 /**
  * Element finding strategy enum for clarity and consistency
  */
-export enum FindStrategy {
+enum FindStrategy {
   BY_DATA_FILLINY_ID = 'byDataFillinyId',
   BY_UNIQUE_SELECTORS = 'byUniqueSelectors',
   BY_NAME = 'byName',
@@ -30,7 +30,7 @@ export enum FindStrategy {
 /**
  * Find result schema
  */
-export const FindResultSchema = z.object({
+const FindResultSchema = z.object({
   element: z.custom<HTMLElement | null>(val => val === null || val instanceof HTMLElement, {
     message: 'Expected HTMLElement or null',
   }),
@@ -40,7 +40,7 @@ export const FindResultSchema = z.object({
 /**
  * Find config schema
  */
-export const FindConfigSchema = z.object({
+const FindConfigSchema = z.object({
   container: z
     .custom<HTMLElement | Document>(val => val instanceof HTMLElement || val instanceof Document, {
       message: 'Expected HTMLElement or Document',
@@ -58,12 +58,12 @@ export const FindConfigSchema = z.object({
 /**
  * Result of an element finding operation
  */
-export type FindResult = z.infer<typeof FindResultSchema>;
+type FindResult = z.infer<typeof FindResultSchema>;
 
 /**
  * Configuration for element finding
  */
-export type FindConfig = z.infer<typeof FindConfigSchema>;
+type FindConfig = z.infer<typeof FindConfigSchema>;
 
 const DEFAULT_STRATEGIES: FindStrategy[] = [
   FindStrategy.BY_DATA_FILLINY_ID,
@@ -268,7 +268,7 @@ const isElementEnabled = (element: HTMLElement): boolean =>
  * @param config - Optional configuration for the search
  * @returns FindResult with the element and the strategy that found it
  */
-export const findFieldElement = (field: Field, config: FindConfig = {}, element?: HTMLElement): FindResult => {
+const findFieldElement = (field: Field, config: FindConfig = {}, element?: HTMLElement): FindResult => {
   const { container = document, strategies = DEFAULT_STRATEGIES, skipHidden = false, skipDisabled = false } = config;
 
   // If the element reference is provided and still attached, use it
@@ -309,7 +309,7 @@ export const findFieldElement = (field: Field, config: FindConfig = {}, element?
  * @param container - Optional container to search within
  * @returns The found element or null
  */
-export const findElement = (field: Field, container?: HTMLElement | Document): HTMLElement | null =>
+const findElement = (field: Field, container?: HTMLElement | Document): HTMLElement | null =>
   findFieldElement(field, { container }).element;
 
 /**
@@ -320,7 +320,7 @@ export const findElement = (field: Field, container?: HTMLElement | Document): H
  * @param container - Optional container to search within
  * @returns FindResult with the element and the strategy that found it
  */
-export const findElementWithStrategies = (
+const findElementWithStrategies = (
   field: Field,
   strategies: FindStrategy[],
   container?: HTMLElement | Document,
@@ -332,7 +332,7 @@ export const findElementWithStrategies = (
  * @param formId - The form ID to find
  * @returns The form element or null
  */
-export const findFormElement = (formId: string): HTMLElement | null => {
+const findFormElement = (formId: string): HTMLElement | null => {
   const strategies = [
     () => document.querySelector<HTMLElement>(`form[data-form-id="${formId}"]`),
     () => document.querySelector<HTMLElement>(`[data-filliny-form-container][data-form-id="${formId}"]`),
@@ -365,7 +365,7 @@ export const findFormElement = (formId: string): HTMLElement | null => {
  * @param element - The starting element
  * @returns The outermost container with the most form fields
  */
-export const findOutermostFormContainer = (element: HTMLElement): HTMLElement => {
+const findOutermostFormContainer = (element: HTMLElement): HTMLElement => {
   let bestContainer = element;
   let maxFieldCount = countFormFields(element);
 
@@ -468,8 +468,15 @@ const countFormFields = (element: HTMLElement): number => {
   return count;
 };
 
-// Export individual strategy functions for direct use if needed
 export {
+  FindStrategy,
+  FindResultSchema,
+  FindConfigSchema,
+  findFieldElement,
+  findElement,
+  findElementWithStrategies,
+  findFormElement,
+  findOutermostFormContainer,
   findByDataFillinyId,
   findByUniqueSelectors,
   findByName,
@@ -484,3 +491,5 @@ export {
   isElementEnabled,
   countFormFields,
 };
+
+export type { FindResult, FindConfig };

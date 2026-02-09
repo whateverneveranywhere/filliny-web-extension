@@ -153,7 +153,7 @@ class EventBus {
 // GLOBAL EVENT BUS INSTANCE
 // ============================================================================
 
-export const eventBus = new EventBus();
+const eventBus = new EventBus();
 
 // ============================================================================
 // TYPED EVENT EMITTERS
@@ -162,7 +162,7 @@ export const eventBus = new EventBus();
 /**
  * Emit field detection events
  */
-export const emitFieldDetectionEvent = async (
+const emitFieldDetectionEvent = async (
   type: FieldDetectionEvent['type'],
   payload: FieldDetectionEvent['payload'],
 ): Promise<void> => {
@@ -179,13 +179,13 @@ export const emitFieldDetectionEvent = async (
 /**
  * Subscribe to field detection events
  */
-export const onFieldDetectionEvent = (listener: EventListener<FieldDetectionEvent>): (() => void) =>
+const onFieldDetectionEvent = (listener: EventListener<FieldDetectionEvent>): (() => void) =>
   eventBus.on('field-detection', listener);
 
 /**
  * Subscribe to specific field detection event types
  */
-export const onFieldDetectionEventType = (
+const onFieldDetectionEventType = (
   type: FieldDetectionEvent['type'],
   listener: EventListener<FieldDetectionEvent>,
 ): (() => void) => eventBus.on(`field-detection:${type}`, listener);
@@ -194,20 +194,31 @@ export const onFieldDetectionEventType = (
 // PERFORMANCE MONITORING EVENTS
 // ============================================================================
 
-export interface PerformanceEvent {
+/**
+ * Metadata associated with a performance monitoring event
+ */
+interface PerformanceEventMetadata {
+  success?: boolean;
+  error?: string;
+  args?: number;
+  fieldCount?: number;
+  strategyName?: string;
+}
+
+interface PerformanceEvent {
   operation: string;
   duration: number;
-  metadata?: Record<string, unknown>;
+  metadata?: PerformanceEventMetadata;
   timestamp: number;
 }
 
 /**
  * Emit performance monitoring events
  */
-export const emitPerformanceEvent = async (
+const emitPerformanceEvent = async (
   operation: string,
   duration: number,
-  metadata?: Record<string, unknown>,
+  metadata?: PerformanceEventMetadata,
 ): Promise<void> => {
   const event: PerformanceEvent = {
     operation,
@@ -222,28 +233,35 @@ export const emitPerformanceEvent = async (
 /**
  * Subscribe to performance events
  */
-export const onPerformanceEvent = (listener: EventListener<PerformanceEvent>): (() => void) =>
+const onPerformanceEvent = (listener: EventListener<PerformanceEvent>): (() => void) =>
   eventBus.on('performance', listener);
 
 // ============================================================================
 // ERROR EVENTS
 // ============================================================================
 
-export interface ErrorEvent {
+/**
+ * Metadata associated with an error event
+ */
+interface ErrorEventMetadata {
+  strategy?: string;
+  fieldId?: string;
+  containerId?: string;
+  element?: string;
+  attemptCount?: number;
+}
+
+interface ErrorEvent {
   error: Error;
   context: string;
-  metadata?: Record<string, unknown>;
+  metadata?: ErrorEventMetadata;
   timestamp: number;
 }
 
 /**
  * Emit error events
  */
-export const emitErrorEvent = async (
-  error: Error,
-  context: string,
-  metadata?: Record<string, unknown>,
-): Promise<void> => {
+const emitErrorEvent = async (error: Error, context: string, metadata?: ErrorEventMetadata): Promise<void> => {
   const event: ErrorEvent = {
     error,
     context,
@@ -257,7 +275,7 @@ export const emitErrorEvent = async (
 /**
  * Subscribe to error events
  */
-export const onErrorEvent = (listener: EventListener<ErrorEvent>): (() => void) => eventBus.on('error', listener);
+const onErrorEvent = (listener: EventListener<ErrorEvent>): (() => void) => eventBus.on('error', listener);
 
 // ============================================================================
 // UTILITY FUNCTIONS
@@ -266,8 +284,12 @@ export const onErrorEvent = (listener: EventListener<ErrorEvent>): (() => void) 
 /**
  * Create a performance-monitored function
  */
-export const withPerformanceMonitoring = <T extends (...args: any[]) => any>(fn: T, operationName: string): T =>
-  (async (...args: Parameters<T>) => {
+const withPerformanceMonitoring =
+  <TArgs extends unknown[], TReturn>(
+    fn: (...args: TArgs) => Promise<TReturn> | TReturn,
+    operationName: string,
+  ): ((...args: TArgs) => Promise<TReturn>) =>
+  async (...args: TArgs): Promise<TReturn> => {
     const startTime = performance.now();
 
     try {
@@ -282,21 +304,22 @@ export const withPerformanceMonitoring = <T extends (...args: any[]) => any>(fn:
       return result;
     } catch (error) {
       const duration = performance.now() - startTime;
+      const errorInstance = error instanceof Error ? error : new Error(String(error));
 
       await emitPerformanceEvent(operationName, duration, {
         success: false,
-        error: (error as Error).message,
+        error: errorInstance.message,
       });
 
-      await emitErrorEvent(error as Error, operationName);
+      await emitErrorEvent(errorInstance, operationName);
       throw error;
     }
-  }) as T;
+  };
 
 /**
  * Create a debounced event emitter
  */
-export const createDebouncedEmitter = <T>(eventName: string, delay: number = 300): ((data: T) => void) => {
+const createDebouncedEmitter = <T>(eventName: string, delay: number = 300): ((data: T) => void) => {
   let timeout: NodeJS.Timeout;
   let latestData: T;
 
@@ -308,4 +331,23 @@ export const createDebouncedEmitter = <T>(eventName: string, delay: number = 300
       eventBus.emit(eventName, latestData);
     }, delay);
   };
+};
+
+// ============================================================================
+// EXPORTS (at end of file per ESLint import-x/exports-last rule)
+// ============================================================================
+
+export type { PerformanceEventMetadata, PerformanceEvent, ErrorEventMetadata, ErrorEvent };
+
+export {
+  eventBus,
+  emitFieldDetectionEvent,
+  onFieldDetectionEvent,
+  onFieldDetectionEventType,
+  emitPerformanceEvent,
+  onPerformanceEvent,
+  emitErrorEvent,
+  onErrorEvent,
+  withPerformanceMonitoring,
+  createDebouncedEmitter,
 };

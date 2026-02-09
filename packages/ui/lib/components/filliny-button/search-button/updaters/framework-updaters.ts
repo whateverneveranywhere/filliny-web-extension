@@ -5,10 +5,49 @@
  * These updaters understand framework-specific patterns and event handling.
  */
 
-import { Framework } from '@extension/shared';
 import { detectFramework } from '../core/utils';
-import type { FieldType } from '@extension/shared';
+import { Framework, hasProperty } from '@extension/shared';
 import type { FieldUpdateStrategy, DetectedField, UpdateResult } from '../core/types';
+import type { FieldType, FrameworkDetectionWindow } from '@extension/shared';
+
+// ============================================================================
+// FRAMEWORK RUNTIME TYPE INTERFACES
+// ============================================================================
+
+/**
+ * Angular NgZone interface for triggering change detection
+ */
+interface NgZone {
+  run: (fn: () => void) => void;
+}
+
+/**
+ * Angular component with NgZone
+ */
+interface AngularComponentWithZone {
+  ngZone?: NgZone;
+}
+
+/**
+ * Angular `ng` global with getComponent helper
+ */
+interface AngularNgGlobal {
+  getComponent?: (element: HTMLElement) => AngularComponentWithZone | null;
+}
+
+/**
+ * Vue 2 instance with $forceUpdate
+ */
+interface Vue2Instance {
+  $forceUpdate?: () => void;
+}
+
+/**
+ * Element with Vue 2 instance attached
+ */
+interface VueElement extends HTMLElement {
+  __vue__?: Vue2Instance;
+}
 
 // ============================================================================
 // REACT FIELD UPDATER
@@ -267,11 +306,15 @@ export class AngularFieldUpdater implements FieldUpdateStrategy {
 
     // Trigger Angular's zone detection
     try {
-      const ngZone = (window as any).ng?.getComponent?.(element)?.ngZone;
-      if (ngZone) {
-        ngZone.run(() => {
-          // Force change detection
-        });
+      const fwWindow = window as unknown as FrameworkDetectionWindow;
+      if (fwWindow.ng && hasProperty(fwWindow.ng, 'getComponent')) {
+        const ngGlobal = fwWindow.ng as unknown as AngularNgGlobal;
+        const component = ngGlobal.getComponent?.(element);
+        if (component?.ngZone) {
+          component.ngZone.run(() => {
+            // Force change detection
+          });
+        }
       }
     } catch {
       // Ignore if Angular zone is not available
@@ -341,9 +384,11 @@ export class VueFieldUpdater implements FieldUpdateStrategy {
 
     // Try to trigger Vue's reactivity system
     try {
-      const vueInstance = (element as any).__vue__;
-      if (vueInstance && vueInstance.$forceUpdate) {
-        vueInstance.$forceUpdate();
+      if (hasProperty(element, '__vue__')) {
+        const vueElement = element as VueElement;
+        if (vueElement.__vue__?.$forceUpdate) {
+          vueElement.__vue__.$forceUpdate();
+        }
       }
     } catch {
       // Ignore if Vue instance is not available

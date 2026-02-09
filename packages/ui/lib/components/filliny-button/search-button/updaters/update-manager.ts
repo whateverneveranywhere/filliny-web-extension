@@ -6,7 +6,7 @@
  */
 
 import { emitFieldDetectionEvent, withPerformanceMonitoring } from '../core/event-system';
-import { retry, safeExecute } from '../core/utils';
+import { retry } from '../core/utils';
 import type { FieldUpdateStrategy, DetectedField, UpdateResult, UpdateConfig } from '../core/types';
 
 // ============================================================================
@@ -98,7 +98,7 @@ export class UpdateManager {
 
     const results = await Promise.allSettled(updates.map(({ field, value }) => this.updateField(field, value)));
 
-    const updateResults = results.map((result, index) => {
+    const updateResults = results.map((result, _index) => {
       if (result.status === 'fulfilled') {
         return result.value;
       } else {

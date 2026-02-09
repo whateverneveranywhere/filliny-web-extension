@@ -44,7 +44,7 @@ const PopupContent = () => {
   }, []);
 
   if (isLoading) {
-    return <Loading fullScreen />;
+    return <Loading variant="fullscreen" />;
   }
 
   return (

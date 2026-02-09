@@ -92,11 +92,10 @@
     "vite": "^6.3.6",
     "vite-plugin-node-polyfills": "^0.23.0"
   },
-  "lint-staged": {
-    "*.{js,jsx,ts,tsx,json}": [
-      "prettier --write",
-      "eslint --fix"
-    ]
+  "pnpm": {
+    "overrides": {
+      "zod": "^3.25.76"
+    }
   },
   "packageManager": "pnpm@10.11.0",
   "engines": {

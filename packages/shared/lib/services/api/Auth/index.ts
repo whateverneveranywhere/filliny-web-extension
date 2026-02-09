@@ -1,7 +1,6 @@
 import { apiEndpoints } from '../../endpoints.js';
 import { httpService } from '../../httpService.js';
-import type { PublicHealthCheckResponse } from '../../schemas/index.js';
-import type { AuthHealthCheck } from '../../types/auth.js';
+import type { AuthHealthCheckResponse, PublicHealthCheckResponse } from '../../schemas/index.js';
 
 const {
   healthCheck,
@@ -9,7 +8,7 @@ const {
   // auth: { healthCheck },
 } = apiEndpoints;
 
-export const authHealthCheckService = (): Promise<AuthHealthCheck> => httpService.get(healthCheck);
+export const authHealthCheckService = (): Promise<AuthHealthCheckResponse> => httpService.get(healthCheck);
 
 /**
  * Public API health check - does not require authentication

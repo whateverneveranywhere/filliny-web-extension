@@ -5,7 +5,7 @@ import { Loader2 } from 'lucide-react';
 type LoadingSize = 'sm' | 'md' | 'lg' | 'xl';
 
 /** Variant presets for different use cases */
-type LoadingVariant = 'spinner' | 'page' | 'inline';
+type LoadingVariant = 'spinner' | 'page' | 'fullscreen' | 'inline';
 
 interface LoadingProps {
   /** Custom class name for the spinner */
@@ -18,8 +18,6 @@ interface LoadingProps {
   message?: string;
   /** Color of the spinner (defaults to current text color) */
   color?: string;
-  /** Whether to show a centered full-screen spinner (legacy support) */
-  fullScreen?: boolean;
 }
 
 const sizeClasses: Record<LoadingSize, string> = {
@@ -32,6 +30,8 @@ const sizeClasses: Record<LoadingSize, string> = {
 const variantClasses: Record<LoadingVariant, string> = {
   spinner: 'filliny-m-auto filliny-flex filliny-size-full filliny-items-center filliny-justify-center',
   page: 'filliny-flex filliny-flex-col filliny-items-center filliny-justify-center filliny-min-h-[200px] filliny-w-full filliny-gap-4',
+  fullscreen:
+    'filliny-flex filliny-flex-col filliny-items-center filliny-justify-center filliny-min-h-screen filliny-w-full filliny-gap-4',
   inline: 'filliny-inline-flex filliny-items-center filliny-gap-2',
 };
 
@@ -52,32 +52,18 @@ const variantClasses: Record<LoadingVariant, string> = {
  * // Inline loading (for buttons, text, etc.)
  * <Loading variant="inline" size="sm" message="Saving..." />
  *
- * // Full screen (legacy support for LoadingSpinner)
- * <Loading fullScreen size="xl" />
+ * // Full screen loading
+ * <Loading variant="fullscreen" size="xl" />
  */
-const Loading = ({ className, size = 'md', variant = 'spinner', message, color, fullScreen = false }: LoadingProps) => {
-  // Legacy full-screen support
-  if (fullScreen) {
-    return (
-      <div className="filliny-flex filliny-min-h-screen filliny-items-center filliny-justify-center">
-        <Loader2
-          className={cn('filliny-animate-spin', sizeClasses.xl, className)}
-          style={color ? { color } : undefined}
-        />
-      </div>
-    );
-  }
-
-  return (
-    <div className={variantClasses[variant]}>
-      <Loader2
-        className={cn('filliny-animate-spin', sizeClasses[size], className)}
-        style={color ? { color } : undefined}
-      />
-      {message && <span className="filliny-text-sm filliny-text-muted-foreground">{message}</span>}
-    </div>
-  );
-};
+const Loading = ({ className, size = 'md', variant = 'spinner', message, color }: LoadingProps) => (
+  <div className={variantClasses[variant]}>
+    <Loader2
+      className={cn('filliny-animate-spin', sizeClasses[size], className)}
+      style={color ? { color } : undefined}
+    />
+    {message && <span className="filliny-text-sm filliny-text-muted-foreground">{message}</span>}
+  </div>
+);
 
 export { Loading };
 export type { LoadingProps, LoadingSize, LoadingVariant };

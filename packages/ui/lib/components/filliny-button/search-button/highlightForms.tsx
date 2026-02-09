@@ -5,10 +5,7 @@ import { unifiedFieldRegistry } from './unifiedFieldDetection';
 import { createRoot } from 'react-dom/client';
 import type { HighlightFormsOptions } from './types';
 
-export const highlightForms = async ({
-  visionOnly = false,
-  testMode = false,
-}: HighlightFormsOptions): Promise<void> => {
+const highlightForms = async ({ visionOnly = false, testMode = false }: HighlightFormsOptions): Promise<void> => {
   const shadowRoot = document.querySelector('#chrome-extension-filliny-all')?.shadowRoot;
 
   if (!shadowRoot) {
@@ -385,3 +382,5 @@ const removeFormHighlights = async (form: HTMLElement): Promise<void> => {
     console.error('Error removing form highlights:', error);
   }
 };
+
+export { highlightForms };

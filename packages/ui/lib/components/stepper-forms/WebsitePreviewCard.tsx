@@ -1,5 +1,3 @@
-/* eslint-disable jsx-a11y/no-static-element-interactions */
-/* eslint-disable jsx-a11y/click-events-have-key-events */
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui';
 import { Button } from '../ui/button';
 import { Skeleton } from '../ui/skeleton';
@@ -54,6 +52,13 @@ const WebsitePreviewCard = ({
     }
   };
 
+  const handleVisitKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      handleVisitWebsite();
+    }
+  };
+
   return (
     <div
       className={cn(
@@ -92,7 +97,10 @@ const WebsitePreviewCard = ({
                     'filliny-inline-flex filliny-max-w-full filliny-items-center filliny-gap-1',
                     isValidURL && 'filliny-cursor-pointer hover:filliny-text-primary',
                   )}
-                  onClick={handleVisitWebsite}>
+                  role={isValidURL ? 'link' : undefined}
+                  tabIndex={isValidURL ? 0 : undefined}
+                  onClick={handleVisitWebsite}
+                  onKeyDown={handleVisitKeyDown}>
                   <span className="filliny-truncate filliny-text-sm filliny-font-medium">
                     {formattedURL || 'Enter website URL'}
                   </span>

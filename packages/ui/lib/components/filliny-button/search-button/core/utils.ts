@@ -7,6 +7,7 @@
 
 import { Framework } from '@extension/shared';
 import type { ConfidenceScore, ElementPosition, FrameworkDetection, SelectorWithConfidence } from './types';
+import type { FrameworkDetectionWindow } from '@extension/shared';
 
 // ============================================================================
 // ELEMENT UTILITIES
@@ -15,7 +16,7 @@ import type { ConfidenceScore, ElementPosition, FrameworkDetection, SelectorWith
 /**
  * Check if an element is visible and interactive
  */
-export const isElementInteractive = (element: HTMLElement): boolean => {
+const isElementInteractive = (element: HTMLElement): boolean => {
   if (!element || !element.isConnected) return false;
 
   const style = window.getComputedStyle(element);
@@ -49,7 +50,7 @@ export const isElementInteractive = (element: HTMLElement): boolean => {
 /**
  * Get element position relative to viewport
  */
-export const getElementPosition = (element: HTMLElement): ElementPosition => {
+const getElementPosition = (element: HTMLElement): ElementPosition => {
   const rect = element.getBoundingClientRect();
   const style = window.getComputedStyle(element);
 
@@ -65,7 +66,7 @@ export const getElementPosition = (element: HTMLElement): ElementPosition => {
 /**
  * Generate unique selectors for an element
  */
-export const generateUniqueSelectors = (element: HTMLElement): string[] => {
+const generateUniqueSelectors = (element: HTMLElement): string[] => {
   const selectors: string[] = [];
 
   // ID selector (highest priority)
@@ -98,7 +99,7 @@ export const generateUniqueSelectors = (element: HTMLElement): string[] => {
 /**
  * Get XPath for an element
  */
-export const getElementXPath = (element: HTMLElement): string => {
+const getElementXPath = (element: HTMLElement): string => {
   if (!element.parentElement) return '';
 
   const idx =
@@ -117,12 +118,12 @@ export const getElementXPath = (element: HTMLElement): string => {
 /**
  * Normalize confidence score to 0-1 range
  */
-export const normalizeConfidence = (score: number, max = 100): ConfidenceScore => Math.max(0, Math.min(1, score / max));
+const normalizeConfidence = (score: number, max = 100): ConfidenceScore => Math.max(0, Math.min(1, score / max));
 
 /**
  * Combine multiple confidence scores using weighted average
  */
-export const combineConfidenceScores = (scores: Array<{ score: ConfidenceScore; weight: number }>): ConfidenceScore => {
+const combineConfidenceScores = (scores: Array<{ score: ConfidenceScore; weight: number }>): ConfidenceScore => {
   if (scores.length === 0) return 0;
 
   const totalWeight = scores.reduce((sum, { weight }) => sum + weight, 0);
@@ -139,16 +140,18 @@ export const combineConfidenceScores = (scores: Array<{ score: ConfidenceScore; 
 /**
  * Detect JavaScript framework used on the page
  */
-export const detectFramework = (element?: HTMLElement): FrameworkDetection => {
+const detectFramework = (element?: HTMLElement): FrameworkDetection => {
   const indicators: string[] = [];
   let framework: FrameworkDetection['framework'] = Framework.VANILLA;
   let confidence: ConfidenceScore = 0;
   let version: string | undefined;
 
+  const fwWindow = window as unknown as FrameworkDetectionWindow;
+
   // React detection
   const reactIndicators = [
-    () => !!(window as any).__REACT_DEVTOOLS_GLOBAL_HOOK__,
-    () => !!(window as any).React,
+    () => !!fwWindow.__REACT_DEVTOOLS_GLOBAL_HOOK__,
+    () => !!fwWindow.React,
     () => !!document.querySelector('[data-reactroot]'),
     () => !!document.querySelector('#root'),
     () => element && Object.keys(element).some(key => key.startsWith('__reactFiber')),
@@ -170,7 +173,7 @@ export const detectFramework = (element?: HTMLElement): FrameworkDetection => {
 
     // Try to detect React version
     try {
-      const reactGlobal = (window as any).React;
+      const reactGlobal = fwWindow.React;
       if (reactGlobal?.version) {
         version = reactGlobal.version;
       }
@@ -181,8 +184,8 @@ export const detectFramework = (element?: HTMLElement): FrameworkDetection => {
 
   // Angular detection
   const angularIndicators = [
-    () => !!(window as any).ng,
-    () => !!(window as any).angular,
+    () => !!fwWindow.ng,
+    () => !!fwWindow.angular,
     () => !!document.querySelector('[ng-app]'),
     () => !!document.querySelector('[ng-controller]'),
     () => element && element.hasAttribute('ng-model'),
@@ -205,7 +208,7 @@ export const detectFramework = (element?: HTMLElement): FrameworkDetection => {
 
   // Vue detection
   const vueIndicators = [
-    () => !!(window as any).Vue,
+    () => !!fwWindow.Vue,
     () => !!document.querySelector('[v-app]'),
     () => !!document.querySelector('[v-model]'),
     () => element && Array.from(element.attributes).some(attr => attr.name.startsWith('v-')),
@@ -240,7 +243,7 @@ export const detectFramework = (element?: HTMLElement): FrameworkDetection => {
 /**
  * Create selectors with confidence scoring for form elements
  */
-export const createFormElementSelectors = (): SelectorWithConfidence[] => [
+const createFormElementSelectors = (): SelectorWithConfidence[] => [
   // Standard form elements (highest confidence)
   {
     selector: 'input:not([type="hidden"]):not([type="submit"]):not([type="button"]):not([type="reset"])',
@@ -312,7 +315,7 @@ export const createFormElementSelectors = (): SelectorWithConfidence[] => [
 /**
  * Validate that an element is a valid form field
  */
-export const isValidFormField = (element: HTMLElement): boolean => {
+const isValidFormField = (element: HTMLElement): boolean => {
   // Skip non-interactive elements
   if (!isElementInteractive(element)) return false;
 
@@ -335,13 +338,13 @@ export const isValidFormField = (element: HTMLElement): boolean => {
 /**
  * Create a debounced function
  */
-export const debounce = <T extends (...args: any[]) => void>(
-  func: T,
+const debounce = <TArgs extends unknown[]>(
+  func: (...args: TArgs) => void,
   wait: number,
-): ((...args: Parameters<T>) => void) => {
+): ((...args: TArgs) => void) => {
   let timeout: NodeJS.Timeout;
 
-  return (...args: Parameters<T>) => {
+  return (...args: TArgs) => {
     clearTimeout(timeout);
     timeout = setTimeout(() => func(...args), wait);
   };
@@ -350,13 +353,13 @@ export const debounce = <T extends (...args: any[]) => void>(
 /**
  * Create a throttled function
  */
-export const throttle = <T extends (...args: any[]) => void>(
-  func: T,
+const throttle = <TArgs extends unknown[]>(
+  func: (...args: TArgs) => void,
   limit: number,
-): ((...args: Parameters<T>) => void) => {
+): ((...args: TArgs) => void) => {
   let inThrottle: boolean;
 
-  return (...args: Parameters<T>) => {
+  return (...args: TArgs) => {
     if (!inThrottle) {
       func(...args);
       inThrottle = true;
@@ -372,7 +375,7 @@ export const throttle = <T extends (...args: any[]) => void>(
 /**
  * Safe function execution with error handling
  */
-export const safeExecute = async <T>(fn: () => Promise<T> | T, fallback: T, context?: string): Promise<T> => {
+const safeExecute = async <T>(fn: () => Promise<T> | T, fallback: T, context?: string): Promise<T> => {
   try {
     return await fn();
   } catch (error) {
@@ -384,7 +387,7 @@ export const safeExecute = async <T>(fn: () => Promise<T> | T, fallback: T, cont
 /**
  * Retry function with exponential backoff
  */
-export const retry = async <T>(fn: () => Promise<T>, maxAttempts: number = 3, baseDelay: number = 1000): Promise<T> => {
+const retry = async <T>(fn: () => Promise<T>, maxAttempts: number = 3, baseDelay: number = 1000): Promise<T> => {
   let lastError: Error;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -403,4 +406,24 @@ export const retry = async <T>(fn: () => Promise<T>, maxAttempts: number = 3, ba
   }
 
   throw lastError!;
+};
+
+// ============================================================================
+// EXPORTS (at end of file per ESLint import-x/exports-last rule)
+// ============================================================================
+
+export {
+  isElementInteractive,
+  getElementPosition,
+  generateUniqueSelectors,
+  getElementXPath,
+  normalizeConfidence,
+  combineConfidenceScores,
+  detectFramework,
+  createFormElementSelectors,
+  isValidFormField,
+  debounce,
+  throttle,
+  safeExecute,
+  retry,
 };

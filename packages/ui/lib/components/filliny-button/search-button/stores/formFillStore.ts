@@ -4,7 +4,7 @@ import { createStore } from 'zustand/vanilla';
 /**
  * Status of an individual field during the streaming fill process
  */
-export enum FieldFillStatus {
+enum FieldFillStatus {
   PENDING = 'PENDING',
   STREAMING = 'STREAMING',
   FILLED = 'FILLED',
@@ -15,7 +15,7 @@ export enum FieldFillStatus {
 /**
  * Phase of the overall streaming fill session
  */
-export enum StreamingPhase {
+enum StreamingPhase {
   IDLE = 'IDLE',
   STREAMING = 'STREAMING',
   FINALIZING = 'FINALIZING',
@@ -26,7 +26,8 @@ export enum StreamingPhase {
 /**
  * Per-field state tracked during streaming
  */
-export interface FieldFillState {
+interface FieldFillState {
+  label: string;
   status: FieldFillStatus;
   currentValue: string | string[] | undefined;
   previousValue: string | string[] | undefined;
@@ -37,7 +38,7 @@ export interface FieldFillState {
 /**
  * Progress counters for the streaming session
  */
-export interface StreamingProgress {
+interface StreamingProgress {
   totalFields: number;
   fieldsWithValues: number;
   fieldsFilled: number;
@@ -46,29 +47,36 @@ export interface StreamingProgress {
 }
 
 /**
+ * Mapping from field IDs to their partial streaming values.
+ * Used to track the most recent AI response during streaming
+ * so subsequent chunks can be diffed against previous values.
+ */
+type PartialFieldValueMap = Record<string, string | string[] | undefined>;
+
+/**
  * Shape of the form fill store state
  */
 interface FormFillState {
   phase: StreamingPhase;
   fields: Record<string, FieldFillState>;
-  lastPartialObject: Record<string, unknown> | null;
+  lastPartialObject: PartialFieldValueMap | null;
 
   // Actions
-  initSession: (fieldIds: string[]) => void;
+  initSession: (fields: Array<{ id: string; label: string }>) => void;
   updateFieldValue: (id: string, value: string | string[] | undefined) => void;
   markFieldStable: (id: string) => void;
   markFieldFilled: (id: string) => void;
   markFieldVerified: (id: string) => void;
   markFieldError: (id: string, message: string) => void;
   setPhase: (phase: StreamingPhase) => void;
-  setLastPartialObject: (obj: Record<string, unknown> | null) => void;
+  setLastPartialObject: (obj: PartialFieldValueMap | null) => void;
   reset: () => void;
 }
 
 const initialState = {
   phase: StreamingPhase.IDLE as StreamingPhase,
   fields: {} as Record<string, FieldFillState>,
-  lastPartialObject: null as Record<string, unknown> | null,
+  lastPartialObject: null as PartialFieldValueMap | null,
 };
 
 /**
@@ -76,13 +84,14 @@ const initialState = {
  * Vanilla store allows imperative access via getState()/setState()
  * from non-React code (e.g., Chrome message listeners).
  */
-export const formFillStore = createStore<FormFillState>((set, get) => ({
+const formFillStore = createStore<FormFillState>((set, get) => ({
   ...initialState,
 
-  initSession: (fieldIds: string[]) => {
+  initSession: (fieldDefs: Array<{ id: string; label: string }>) => {
     const fields: Record<string, FieldFillState> = {};
-    for (const id of fieldIds) {
+    for (const { id, label } of fieldDefs) {
       fields[id] = {
+        label,
         status: FieldFillStatus.PENDING,
         currentValue: undefined,
         previousValue: undefined,
@@ -185,7 +194,7 @@ export const formFillStore = createStore<FormFillState>((set, get) => ({
     set({ phase });
   },
 
-  setLastPartialObject: (obj: Record<string, unknown> | null) => {
+  setLastPartialObject: (obj: PartialFieldValueMap | null) => {
     set({ lastPartialObject: obj });
   },
 
@@ -198,12 +207,12 @@ export const formFillStore = createStore<FormFillState>((set, get) => ({
  * React hook to use the form fill store in components.
  * Accepts an optional selector for granular subscriptions.
  */
-export const useFormFillStore = <T>(selector: (state: FormFillState) => T): T => useStore(formFillStore, selector);
+const useFormFillStore = <T>(selector: (state: FormFillState) => T): T => useStore(formFillStore, selector);
 
 /**
  * Selector: compute streaming progress counters from fields state
  */
-export const selectProgress = (state: FormFillState): StreamingProgress => {
+const selectProgress = (state: FormFillState): StreamingProgress => {
   const entries = Object.values(state.fields);
   return {
     totalFields: entries.length,
@@ -218,9 +227,47 @@ export const selectProgress = (state: FormFillState): StreamingProgress => {
 /**
  * Selector: is the session currently streaming?
  */
-export const selectIsStreaming = (state: FormFillState): boolean => state.phase === StreamingPhase.STREAMING;
+const selectIsStreaming = (state: FormFillState): boolean => state.phase === StreamingPhase.STREAMING;
 
 /**
  * Selector: is the session finalizing (verification pass)?
  */
-export const selectIsFinalizing = (state: FormFillState): boolean => state.phase === StreamingPhase.FINALIZING;
+const selectIsFinalizing = (state: FormFillState): boolean => state.phase === StreamingPhase.FINALIZING;
+
+/**
+ * Selector: label of the most recently STREAMING field
+ */
+const selectCurrentlyFillingField = (state: FormFillState): string | null => {
+  const entries = Object.values(state.fields);
+  const streaming = entries.filter(f => f.status === FieldFillStatus.STREAMING);
+  return streaming.length > 0 ? streaming[streaming.length - 1].label : null;
+};
+
+/**
+ * Selector: labels of last 3 FILLED or VERIFIED fields
+ */
+const selectRecentlyFilledFields = (state: FormFillState): string[] => {
+  const entries = Object.values(state.fields);
+  return entries
+    .filter(f => f.status === FieldFillStatus.FILLED || f.status === FieldFillStatus.VERIFIED)
+    .map(f => f.label)
+    .slice(-3);
+};
+
+// ============================================================================
+// All exports at end of file to comply with import-x/exports-last
+// ============================================================================
+
+export {
+  FieldFillStatus,
+  StreamingPhase,
+  formFillStore,
+  useFormFillStore,
+  selectProgress,
+  selectIsStreaming,
+  selectIsFinalizing,
+  selectCurrentlyFillingField,
+  selectRecentlyFilledFields,
+};
+
+export type { FieldFillState, StreamingProgress, PartialFieldValueMap };

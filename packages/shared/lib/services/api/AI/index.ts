@@ -2,7 +2,9 @@ import { MessageType } from '../../../types/enums.js';
 import { getConfig } from '../../../utils/helpers.js';
 import { apiEndpoints } from '../../endpoints.js';
 import { ApiUnauthorizedError, ApiQuotaExceededError, detectQuotaErrorType } from '../../httpService.js';
+import { FieldSchema } from '../../schemas/index.js';
 import { authStorage } from '@extension/storage';
+import { z } from 'zod';
 import type { DTOFillPayload, Field } from '../../schemas/index.js';
 
 const { ai } = apiEndpoints;
@@ -18,7 +20,7 @@ const { ai } = apiEndpoints;
  */
 export const aiFillService = async (
   fillPayLoad: DTOFillPayload,
-): Promise<{ data: Field[] } | ReadableStream<Uint8Array>> => {
+): Promise<{ data: Field[]; streaming?: boolean } | ReadableStream<Uint8Array>> => {
   const config = getConfig();
   // Use apiURL which already includes /api/v1, then append the endpoint path
   const fullUrl = `${config.apiURL}${ai.fill}`;
@@ -113,16 +115,23 @@ export const aiFillService = async (
         return;
       }
 
-      // If it's a regular response with data, return it in the expected format
+      // If it's a regular response with data, validate and return it in the expected format
       if (response?.data && typeof response.data === 'object') {
-        resolve({ data: response.data as Field[] });
+        const parseResult = z.array(FieldSchema).safeParse(response.data);
+        if (parseResult.success) {
+          resolve({ data: parseResult.data });
+        } else {
+          console.warn('[AI Service] Response validation failed, using raw data:', parseResult.error.errors);
+          // Fallback: use the data as-is if it's an array (schema may be stricter than actual response)
+          resolve({ data: Array.isArray(response.data) ? (response.data as Field[]) : [] });
+        }
         return;
       }
 
-      // If we got a success response from streaming, return an empty data array
-      // This is fine because the streaming data has already been processed
+      // If we got a success response from streaming, signal streaming mode
+      // The actual data arrives via chrome.tabs.sendMessage (STREAM_CHUNK messages)
       if (response?.success === true) {
-        resolve({ data: [] });
+        resolve({ data: [], streaming: true });
         return;
       }
 

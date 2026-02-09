@@ -184,7 +184,7 @@ class StrategyRegistry {
 // GLOBAL REGISTRY INSTANCE
 // ============================================================================
 
-export const strategyRegistry = new StrategyRegistry();
+const strategyRegistry = new StrategyRegistry();
 
 // ============================================================================
 // CONVENIENCE FUNCTIONS
@@ -193,38 +193,38 @@ export const strategyRegistry = new StrategyRegistry();
 /**
  * Initialize the strategy registry with all built-in strategies
  */
-export const initializeStrategies = (): void => {
+const initializeStrategies = (): void => {
   strategyRegistry.initialize();
 };
 
 /**
  * Register a custom field detection strategy
  */
-export const registerFieldStrategy = (strategy: FieldDetectionStrategy): void => {
+const registerFieldStrategy = (strategy: FieldDetectionStrategy): void => {
   strategyRegistry.registerFieldStrategy(strategy);
 };
 
 /**
  * Register a custom container detection strategy
  */
-export const registerContainerStrategy = (strategy: ContainerDetectionStrategy): void => {
+const registerContainerStrategy = (strategy: ContainerDetectionStrategy): void => {
   strategyRegistry.registerContainerStrategy(strategy);
 };
 
 /**
  * Get all available field strategies
  */
-export const getFieldStrategies = (): FieldDetectionStrategy[] => strategyRegistry.getAllFieldStrategies();
+const getFieldStrategies = (): FieldDetectionStrategy[] => strategyRegistry.getAllFieldStrategies();
 
 /**
  * Get all available container strategies
  */
-export const getContainerStrategies = (): ContainerDetectionStrategy[] => strategyRegistry.getAllContainerStrategies();
+const getContainerStrategies = (): ContainerDetectionStrategy[] => strategyRegistry.getAllContainerStrategies();
 
 /**
  * Create a preset configuration for common scenarios
  */
-export const createPresetConfig = (preset: 'default' | 'fast' | 'thorough' | 'job-application'): DetectionConfig => {
+const createPresetConfig = (preset: 'default' | 'fast' | 'thorough' | 'job-application'): DetectionConfig => {
   const baseConfig = strategyRegistry.createDetectionConfig();
 
   switch (preset) {
@@ -284,3 +284,17 @@ if (typeof window !== 'undefined') {
     initializeStrategies();
   }, 0);
 }
+
+// ============================================================================
+// EXPORTS
+// ============================================================================
+
+export {
+  strategyRegistry,
+  initializeStrategies,
+  registerFieldStrategy,
+  registerContainerStrategy,
+  getFieldStrategies,
+  getContainerStrategies,
+  createPresetConfig,
+};

@@ -1,8 +1,7 @@
 import { handleFormClick } from '../handleFormClick';
-import { disableOtherButtons, showLoadingIndicator } from '../overlayUtils';
-import { useFormFillStore } from '../stores';
-import { useState, useCallback } from 'react';
-import type { StreamingPhase } from '../stores';
+import { disableOtherButtons, resetOverlays, showLoadingIndicator } from '../overlayUtils';
+import { useFormFillStore, StreamingPhase } from '../stores';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import type React from 'react';
 
 interface UseFormFillProps {
@@ -24,6 +23,31 @@ interface UseFormFillReturn {
 export const useFormFill = ({ formId, testMode, onDismiss }: UseFormFillProps): UseFormFillReturn => {
   const [loading, setLoading] = useState(false);
   const phase = useFormFillStore(state => state.phase);
+  const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Phase-based auto-dismissal
+  useEffect(() => {
+    if (phase === StreamingPhase.COMPLETE) {
+      dismissTimerRef.current = setTimeout(() => {
+        setLoading(false);
+        resetOverlays();
+        onDismiss();
+      }, 2500);
+    } else if (phase === StreamingPhase.ERROR) {
+      dismissTimerRef.current = setTimeout(() => {
+        setLoading(false);
+        resetOverlays();
+        onDismiss();
+      }, 3500);
+    }
+
+    return () => {
+      if (dismissTimerRef.current) {
+        clearTimeout(dismissTimerRef.current);
+        dismissTimerRef.current = null;
+      }
+    };
+  }, [phase, onDismiss]);
 
   const handleFillClick = useCallback(
     async (event: React.MouseEvent<HTMLButtonElement>) => {
@@ -43,9 +67,9 @@ export const useFormFill = ({ formId, testMode, onDismiss }: UseFormFillProps): 
 
       try {
         await handleFormClick(event, formId, testMode);
-      } finally {
-        setLoading(false);
-        onDismiss();
+      } catch {
+        // Error handling is done inside handleFormClick.
+        // Phase will be set to ERROR, triggering auto-dismiss via useEffect above.
       }
     },
     [loading, formId, testMode, onDismiss],

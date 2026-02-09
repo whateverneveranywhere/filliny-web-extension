@@ -1,4 +1,5 @@
-import { processChunksLegacy, updateFieldWithRetry, ErrorCategory, FieldUpdateError } from './fieldUpdaterHelpers';
+import { processChunksDiffAware, updateFieldWithRetry, ErrorCategory, FieldUpdateError } from './fieldUpdaterHelpers';
+import { formFillStore } from './stores';
 import { unifiedFieldRegistry } from './unifiedFieldDetection';
 import {
   aiFillService,
@@ -11,15 +12,27 @@ import {
 } from '@extension/shared';
 import { profileStorage } from '@extension/storage';
 import type { FieldUpdateResult, FormUpdateResults } from './fieldUpdaterHelpers';
+import type { PartialFieldValueMap } from './stores';
 import type { Field, DTOFillingPreferences } from '@extension/shared';
 import type { DTOProfileFillingForm } from '@extension/storage';
 
 /**
- * Allowed fields for the API formData payload
- * Only includes fields that exist on both the extension's Field type AND the API schema
+ * Keys allowed in the API formData payload.
+ * Only includes keys that exist on both the extension's Field type AND the API schema.
  * Strips: xpath, uniqueSelectors, validation, title, testValue, metadata
  */
-const ALLOWED_FORM_DATA_FIELDS = [
+type AllowedFieldKey =
+  | 'id'
+  | 'name'
+  | 'type'
+  | 'placeholder'
+  | 'label'
+  | 'description'
+  | 'value'
+  | 'options'
+  | 'required';
+
+const ALLOWED_FORM_DATA_FIELDS: readonly AllowedFieldKey[] = [
   'id',
   'name',
   'type',
@@ -32,21 +45,27 @@ const ALLOWED_FORM_DATA_FIELDS = [
 ] as const;
 
 /**
- * Allowed fields for the API preferences payload
- * Strip id and profileId which the API doesn't accept
+ * Keys allowed in the API preferences payload.
+ * Strip id and profileId which the API doesn't accept.
  */
-const ALLOWED_PREFERENCES_FIELDS = ['isFormal', 'isGapFillingAllowed', 'toneId', 'povId'] as const;
+type AllowedPreferencesKey = 'isFormal' | 'isGapFillingAllowed' | 'toneId' | 'povId';
+
+const ALLOWED_PREFERENCES_FIELDS: readonly AllowedPreferencesKey[] = [
+  'isFormal',
+  'isGapFillingAllowed',
+  'toneId',
+  'povId',
+] as const;
 
 /**
  * Transform form field data to only include fields accepted by the API
  * Strips: xpath, uniqueSelectors, validation, title, testValue, metadata
  */
-const transformFieldForApi = (field: Field): Partial<Field> => {
-  const transformed: Partial<Field> = {};
+const transformFieldForApi = (field: Field): Pick<Field, AllowedFieldKey> => {
+  const transformed = {} as Pick<Field, AllowedFieldKey>;
   for (const key of ALLOWED_FORM_DATA_FIELDS) {
     if (key in field && field[key] !== undefined) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (transformed as any)[key] = field[key];
+      Object.assign(transformed, { [key]: field[key] });
     }
   }
   return transformed;
@@ -61,11 +80,10 @@ const transformPreferencesForApi = (
 ): DTOFillingPreferences | undefined => {
   if (!preferences) return undefined;
 
-  const transformed: Partial<DTOFillingPreferences> = {};
+  const transformed = {} as Pick<DTOFillingPreferences, AllowedPreferencesKey>;
   for (const key of ALLOWED_PREFERENCES_FIELDS) {
     if (key in preferences && preferences[key] !== undefined) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (transformed as any)[key] = preferences[key];
+      Object.assign(transformed, { [key]: preferences[key] });
     }
   }
   return transformed as DTOFillingPreferences;
@@ -228,15 +246,29 @@ export const handleFieldFill = async (field: Field): Promise<FieldUpdateResult> 
       streamReject(error);
     }, FIELD_FILL_TIMEOUT);
 
+    // Initialize the Zustand store session for streaming tracking (single field)
+    const storeActions = formFillStore.getState();
+    storeActions.initSession([{ id: field.id, label: field.label || field.name || field.id }]);
+
+    // Store adapter for diff-aware processing
+    const storeAdapter = {
+      getState: () => formFillStore.getState(),
+      updateFieldValue: (id: string, value: string | string[] | undefined) =>
+        formFillStore.getState().updateFieldValue(id, value),
+      markFieldStable: (id: string) => formFillStore.getState().markFieldStable(id),
+      markFieldFilled: (id: string) => formFillStore.getState().markFieldFilled(id),
+      setLastPartialObject: (obj: PartialFieldValueMap | null) => formFillStore.getState().setLastPartialObject(obj),
+    };
+
     // Set up message listener for streaming response using MessageType enum for consistency
     messageHandler = (message: StreamMessage) => {
       if (message.type === MessageType.STREAM_CHUNK && message.data) {
         try {
           debug.log('Received stream chunk:', message.data.substring(0, 100) + '...');
-          // Pass ALL fields from the registry to processChunks for proper merging
+          // Pass ALL fields from the registry to processChunksDiffAware for proper merging
           // Pass and track partial chunk data between calls to avoid data loss
           const allFields = unifiedFieldRegistry.getAllFields();
-          processChunksLegacy(message.data, allFields, partialChunk).then((newPartial: string) => {
+          processChunksDiffAware(message.data, allFields, partialChunk, storeAdapter).then((newPartial: string) => {
             partialChunk = newPartial;
           });
         } catch (error) {
