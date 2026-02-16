@@ -100,96 +100,63 @@ const getMimeType = (extension: string): string => {
 const isFileSystemAccessSupported = (): boolean => 'showDirectoryPicker' in window;
 
 /**
- * Recursively scan directory using File System Access API
- * This is much safer than webkitdirectory as it iterates lazily
+ * Scan top-level files in a directory using File System Access API.
+ * Subdirectories are intentionally skipped to prevent browser crashes
+ * when users select large folders (e.g., home dir, projects with node_modules).
  */
-async function scanDirectoryHandle(
+const scanDirectoryHandle = async (
   dirHandle: FileSystemDirectoryHandle,
-  basePath: string = '',
-): Promise<{ files: LocalFileInfo[]; reachedLimit: boolean }> {
+): Promise<{ files: LocalFileInfo[]; reachedLimit: boolean }> => {
   const files: LocalFileInfo[] = [];
   let reachedLimit = false;
 
   try {
     for await (const entry of dirHandle.values()) {
-      // Stop if we've reached the limit
       if (files.length >= MAX_FILES_LIMIT) {
         reachedLimit = true;
         break;
       }
 
-      if (entry.kind === 'file') {
-        const fileHandle = entry as FileSystemFileHandle;
-        const fileName = fileHandle.name;
+      // Only process files at the top level — skip directories entirely
+      if (entry.kind !== 'file') continue;
 
-        // Skip hidden files and system files
-        if (fileName.startsWith('.') || fileName.startsWith('__') || fileName.startsWith('~')) {
+      const fileHandle = entry as FileSystemFileHandle;
+      const fileName = fileHandle.name;
+
+      // Skip hidden files and system files
+      if (fileName.startsWith('.') || fileName.startsWith('__') || fileName.startsWith('~')) {
+        continue;
+      }
+
+      // Get extension
+      const nameParts = fileName.split('.');
+      const extension = nameParts.length > 1 ? (nameParts.pop() || '').toLowerCase() : '';
+
+      // Skip non-allowed file types
+      if (!ALLOWED_EXTENSIONS.has(extension)) {
+        continue;
+      }
+
+      try {
+        // Get file to access metadata (this is lazy - only loads metadata, not content)
+        const file = await fileHandle.getFile();
+
+        // Skip very large files (> 50MB)
+        if (file.size > 50 * 1024 * 1024) {
           continue;
         }
 
-        // Get extension
-        const nameParts = fileName.split('.');
-        const extension = nameParts.length > 1 ? (nameParts.pop() || '').toLowerCase() : '';
-
-        // Skip non-allowed file types
-        if (!ALLOWED_EXTENSIONS.has(extension)) {
-          continue;
-        }
-
-        try {
-          // Get file to access metadata (this is lazy - only loads metadata, not content)
-          const file = await fileHandle.getFile();
-
-          // Skip very large files (> 50MB)
-          if (file.size > 50 * 1024 * 1024) {
-            continue;
-          }
-
-          const relativePath = basePath ? `${basePath}/${fileName}` : fileName;
-
-          files.push({
-            name: fileName,
-            relativePath,
-            extension,
-            size: file.size,
-            lastModified: file.lastModified,
-            mimeType: file.type || getMimeType(extension),
-          });
-        } catch {
-          // Skip files we can't access
-          continue;
-        }
-      } else if (entry.kind === 'directory') {
-        // Skip if we're already at limit
-        if (files.length >= MAX_FILES_LIMIT) {
-          reachedLimit = true;
-          break;
-        }
-
-        const subDirHandle = entry as FileSystemDirectoryHandle;
-        const subDirName = subDirHandle.name;
-
-        // Skip hidden directories
-        if (subDirName.startsWith('.') || subDirName.startsWith('__')) {
-          continue;
-        }
-
-        // Recursively scan subdirectory
-        const subPath = basePath ? `${basePath}/${subDirName}` : subDirName;
-        const subResult = await scanDirectoryHandle(subDirHandle, subPath);
-
-        // Add files from subdirectory up to the limit
-        for (const subFile of subResult.files) {
-          if (files.length >= MAX_FILES_LIMIT) {
-            reachedLimit = true;
-            break;
-          }
-          files.push(subFile);
-        }
-
-        if (subResult.reachedLimit) {
-          reachedLimit = true;
-        }
+        files.push({
+          name: fileName,
+          relativePath: fileName,
+          extension,
+          size: file.size,
+          lastModified: file.lastModified,
+          mimeType: file.type || getMimeType(extension),
+        });
+      } catch {
+        // Skip files we can't access
+        continue;
       }
     }
   } catch (err) {
@@ -197,7 +164,7 @@ async function scanDirectoryHandle(
   }
 
   return { files, reachedLimit };
-}
+};
 
 const FolderSelector = ({ currentFolder, onFolderSelected, disabled }: FolderSelectorProps) => {
   const [isProcessing, setIsProcessing] = useState(false);
@@ -235,7 +202,7 @@ const FolderSelector = ({ currentFolder, onFolderSelected, disabled }: FolderSel
           variant: 'destructive',
           title: 'No valid files found',
           description:
-            'The folder contains no supported files (PDF, images, documents). Try a folder with your resumes, photos, or certificates.',
+            'No supported files (PDF, images, documents) found at the top level. Subfolders are not scanned — place files directly in the selected folder.',
         });
         return;
       }
@@ -249,7 +216,7 @@ const FolderSelector = ({ currentFolder, onFolderSelected, disabled }: FolderSel
       if (reachedLimit) {
         toast({
           title: 'Some files skipped',
-          description: `Only the first ${MAX_FILES_LIMIT} supported files were imported. Consider using a smaller, dedicated folder.`,
+          description: `Only the first ${MAX_FILES_LIMIT} top-level files were imported. Subfolders are not scanned. Consider using a smaller, dedicated folder.`,
         });
       }
     } catch (err) {

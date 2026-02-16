@@ -115,7 +115,8 @@ const AuthorizedFilesSection = ({ profileId }: AuthorizedFilesSectionProps) => {
         <div className="filliny-min-w-0 filliny-flex-1">
           <h3 className="filliny-text-sm filliny-font-medium">Authorized Files for Upload</h3>
           <p className="filliny-text-xs filliny-text-muted-foreground">
-            Select a folder containing files AI can suggest when filling file upload fields
+            Select a folder containing files AI can suggest when filling file upload fields. Only top-level files are
+            scanned.
           </p>
         </div>
         {folderData && (
@@ -147,7 +148,9 @@ const AuthorizedFilesSection = ({ profileId }: AuthorizedFilesSectionProps) => {
           <p className="filliny-text-xs filliny-text-muted-foreground/70 filliny-mt-1 filliny-text-center filliny-px-4">
             Create a folder with your files (resumes, photos, certificates)
             <br />
-            and select it here for AI to use when filling upload fields
+            and select it here for AI to use when filling upload fields.
+            <br />
+            Only top-level files are scanned — subfolders are not included.
           </p>
         </div>
       )}
