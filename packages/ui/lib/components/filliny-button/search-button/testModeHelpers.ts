@@ -430,6 +430,9 @@ export const runTestModeFill = async (fields: Field[]): Promise<void> => {
     console.log('Test mode fill completed successfully.');
   } catch (error) {
     console.error('Error during test mode fill:', error);
-    alert('Test mode failed to update fields. See console for details.');
+    // Dynamic import to avoid circular dependency
+    import('./toastHelpers').then(({ showFillErrorToast }) => {
+      showFillErrorToast('Test mode failed to update fields. Please check the console for details.');
+    });
   }
 };

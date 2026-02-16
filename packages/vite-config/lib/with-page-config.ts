@@ -5,7 +5,10 @@ import react from '@vitejs/plugin-react-swc';
 import deepmerge from 'deepmerge';
 import { defineConfig } from 'vite';
 import { nodePolyfills } from 'vite-plugin-node-polyfills';
+import { resolve } from 'node:path';
 import type { UserConfig } from 'vite';
+
+const monorepoRoot = resolve(import.meta.dirname, '..', '..', '..');
 
 export const watchOption = IS_DEV
   ? {
@@ -19,6 +22,7 @@ export const withPageConfig = (config: UserConfig) =>
   defineConfig(
     deepmerge(
       {
+        envDir: monorepoRoot,
         define: {
           'process.env': env,
         },

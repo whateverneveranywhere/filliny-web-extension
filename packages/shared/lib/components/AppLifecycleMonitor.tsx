@@ -1,6 +1,6 @@
 import { MessageType } from '../types/enums.js';
 import { getShadowAppCleanup } from '../utils/init-app-with-shadow.js';
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import type { ReactNode } from 'react';
 
 interface AppLifecycleMonitorProps {
@@ -15,13 +15,13 @@ interface AppLifecycleMonitorProps {
 }
 
 /**
- * Component that monitors the extension's lifecycle and triggers cleanup
- * when the extension should no longer be displayed on the current page.
+ * Component that monitors the extension's lifecycle and toggles visibility
+ * of the shadow DOM host element based on whether the extension should be shown.
  *
- * This handles cases like:
- * - Website removed from the supported list
- * - User logs out
- * - Profile changes that affect website support
+ * Visibility changes (e.g. website removed/added from profile) hide/show the
+ * shadow DOM container but keep the React app alive so it can re-appear when
+ * the profile is updated again. Only an explicit REMOVE_EXTENSION_UI message
+ * will fully destroy the shadow DOM and unmount React.
  */
 export const AppLifecycleMonitor = ({
   shadowAppId,
@@ -29,44 +29,18 @@ export const AppLifecycleMonitor = ({
   children,
   onCleanup,
 }: AppLifecycleMonitorProps): ReactNode => {
-  const hasTriggeredCleanup = useRef(false);
-  const previousVisibility = useRef(shouldBeVisible);
-
-  // Monitor visibility changes and trigger cleanup when needed
+  // Toggle the shadow DOM host element's display so it takes no space when hidden
   useEffect(() => {
-    // If visibility changed from true to false, trigger cleanup
-    if (previousVisibility.current && !shouldBeVisible && !hasTriggeredCleanup.current) {
-      hasTriggeredCleanup.current = true;
-
-      console.log(`[Filliny] Visibility changed to false for ${shadowAppId}, triggering cleanup`);
-
-      // Call optional cleanup callback
-      if (onCleanup) {
-        onCleanup();
-      }
-
-      // Delay cleanup slightly to allow any animations or state updates
-      const cleanupTimeout = setTimeout(() => {
-        const cleanup = getShadowAppCleanup(shadowAppId);
-        if (cleanup) {
-          cleanup();
-        }
-      }, 100);
-
-      return () => {
-        clearTimeout(cleanupTimeout);
-      };
+    const hostElement = document.getElementById(shadowAppId);
+    if (hostElement) {
+      hostElement.style.display = shouldBeVisible ? 'block' : 'none';
     }
+  }, [shouldBeVisible, shadowAppId]);
 
-    previousVisibility.current = shouldBeVisible;
-    return undefined;
-  }, [shouldBeVisible, shadowAppId, onCleanup]);
-
-  // Listen for external cleanup requests via chrome messaging
+  // Listen for explicit cleanup requests via chrome messaging (e.g. extension uninstall)
   useEffect(() => {
     const handleMessage = (message: { type: MessageType }) => {
-      if (message.type === MessageType.REMOVE_EXTENSION_UI && !hasTriggeredCleanup.current) {
-        hasTriggeredCleanup.current = true;
+      if (message.type === MessageType.REMOVE_EXTENSION_UI) {
         console.log(`[Filliny] Received REMOVE_EXTENSION_UI message for ${shadowAppId}`);
 
         if (onCleanup) {
@@ -80,7 +54,6 @@ export const AppLifecycleMonitor = ({
       }
     };
 
-    // Only add listener if chrome.runtime is available
     if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
       chrome.runtime.onMessage.addListener(handleMessage);
       return () => {
@@ -90,14 +63,7 @@ export const AppLifecycleMonitor = ({
     return undefined;
   }, [shadowAppId, onCleanup]);
 
-  // Reset cleanup flag if visibility becomes true again
-  useEffect(() => {
-    if (shouldBeVisible) {
-      hasTriggeredCleanup.current = false;
-    }
-  }, [shouldBeVisible]);
-
-  // Render children only when visible
+  // Don't render children when not visible — React stays mounted but idle
   if (!shouldBeVisible) {
     return null;
   }

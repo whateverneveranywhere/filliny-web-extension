@@ -1,4 +1,5 @@
 import { highlightForms } from '../search-button/highlightForms';
+import { showQuotaExceededToast } from '../search-button/toastHelpers';
 import { animationClasses } from '@/lib/animations';
 import { cn } from '@/lib/utils';
 import { useDOMReady } from '@/lib/utils/dom-utils';
@@ -6,8 +7,22 @@ import { Wand2 } from 'lucide-react';
 import type { ButtonComponentProps } from '../button-wrapper';
 import type React from 'react';
 
-const LogoButton: React.FC<ButtonComponentProps> = () => {
+interface LogoButtonProps extends ButtonComponentProps {
+  canFillForms?: boolean;
+  disabledReason?: string | null;
+}
+
+const LogoButton: React.FC<LogoButtonProps> = ({ canFillForms = true, disabledReason = null }) => {
   const isDOMReady = useDOMReady();
+  const isDisabled = !isDOMReady || !canFillForms;
+
+  const handleClick = () => {
+    if (!canFillForms) {
+      showQuotaExceededToast();
+      return;
+    }
+    highlightForms({ visionOnly: false });
+  };
 
   return (
     <div className={cn(animationClasses.transitionFast, 'hover:filliny-scale-105 active:filliny-scale-95')}>
@@ -25,12 +40,14 @@ const LogoButton: React.FC<ButtonComponentProps> = () => {
           // Hover state - subtle bg change only, icon stays white
           'hover:filliny-bg-zinc-700/95 hover:filliny-border-white/15',
           'hover:filliny-shadow-xl',
-          'disabled:filliny-opacity-50 disabled:filliny-cursor-not-allowed',
+          // Disabled: no opacity change, just cursor + muted border
+          'disabled:filliny-cursor-not-allowed disabled:hover:filliny-scale-100',
           animationClasses.transition,
         )}
-        onClick={() => highlightForms({ visionOnly: false })}
-        disabled={!isDOMReady}>
-        <Wand2 className="filliny-size-6 filliny-text-white" />
+        onClick={handleClick}
+        disabled={isDisabled}
+        title={!canFillForms ? disabledReason || 'Form filling unavailable' : 'Autofill with AI'}>
+        <Wand2 className={cn('filliny-size-6', !canFillForms ? 'filliny-text-white/50' : 'filliny-text-white')} />
       </button>
     </div>
   );

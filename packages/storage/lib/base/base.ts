@@ -148,10 +148,19 @@ export const createStorage = <D = string>(
     chrome?.storage[storageEnum].onChanged.addListener(_updateFromStorageOnChanged);
   }
 
+  const refresh = async (): Promise<void> => {
+    const newValue = await get();
+    if (cache !== newValue) {
+      cache = newValue;
+      _emitChange();
+    }
+  };
+
   return {
     get,
     set,
     getSnapshot,
     subscribe,
+    refresh,
   };
 };

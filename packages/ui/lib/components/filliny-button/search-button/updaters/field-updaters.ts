@@ -137,15 +137,67 @@ export class SelectFieldUpdater implements FieldUpdateStrategy {
   readonly supportedTypes: FieldType[] = ['select'];
 
   canUpdate(field: DetectedField): boolean {
-    return field.type === 'select' && field.element instanceof HTMLSelectElement;
+    if (field.type !== 'select') return false;
+
+    // Support native selects
+    if (field.element instanceof HTMLSelectElement) return true;
+
+    // Support custom select components (React Select, MUI, Headless UI, Radix, etc.)
+    const role = field.element.getAttribute('role');
+    if (role === 'combobox' || role === 'listbox') return true;
+
+    // Support elements with select/dropdown class patterns
+    const className = (field.element.className || '').toLowerCase();
+    if (
+      className.includes('select') ||
+      className.includes('dropdown') ||
+      className.includes('combobox') ||
+      className.includes('picker')
+    ) {
+      return true;
+    }
+
+    // Support elements with select-related ARIA attributes
+    if (
+      field.element.getAttribute('aria-haspopup') === 'listbox' ||
+      field.element.getAttribute('aria-expanded') !== null
+    ) {
+      return true;
+    }
+
+    return false;
   }
 
   async update(field: DetectedField, value: unknown): Promise<UpdateResult> {
     const stringValue = String(value || '');
-    const selectElement = field.element as HTMLSelectElement;
 
+    // For native selects, use the direct DOM approach
+    if (field.element instanceof HTMLSelectElement) {
+      return this.updateNativeSelect(field.element, stringValue);
+    }
+
+    // For custom selects, delegate to the comprehensive updateSelect handler
+    // which handles React Select, MUI, Headless UI, Radix, ARIA, and more.
+    // Import is handled at runtime to avoid circular dependencies.
     try {
-      // Find matching option
+      const { updateSelect } = await import('../field-types/select');
+      await updateSelect(field.element, stringValue);
+      return {
+        success: true,
+        actualValue: stringValue,
+        strategy: this.name,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        strategy: this.name,
+        error: (error as Error).message,
+      };
+    }
+  }
+
+  private updateNativeSelect(selectElement: HTMLSelectElement, stringValue: string): UpdateResult {
+    try {
       const option = this.findMatchingOption(selectElement, stringValue);
 
       if (!option) {
@@ -156,11 +208,9 @@ export class SelectFieldUpdater implements FieldUpdateStrategy {
         };
       }
 
-      // Select the option
       selectElement.value = option.value;
       option.selected = true;
 
-      // Dispatch events
       this.dispatchEvent(selectElement, 'change');
       this.dispatchEvent(selectElement, 'input');
 

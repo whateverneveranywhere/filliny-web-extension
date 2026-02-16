@@ -1,6 +1,6 @@
 {
   "name": "react-hook-form-zod-example",
-  "version": "1.0.0",
+  "version": "1.4.1",
   "description": "Example project demonstrating React Hook Form + Zod validation",
   "private": true,
   "dependencies": {

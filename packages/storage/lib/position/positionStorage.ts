@@ -40,6 +40,7 @@ const positionStorage: PositionStorage = {
   set: async value => storage?.set(value),
   getSnapshot: () => storage?.getSnapshot() ?? defaultPosition,
   subscribe: listener => storage?.subscribe(listener) ?? (() => {}),
+  refresh: async () => storage?.refresh(),
   setPosition: async position => storage?.set(position),
   resetPosition: async () => storage?.set(defaultPosition),
 };

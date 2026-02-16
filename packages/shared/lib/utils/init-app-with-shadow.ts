@@ -34,8 +34,27 @@ const initAppWithShadow = ({
 
   const rootElement = document.createElement('div');
   rootElement.id = id;
+  // Do NOT set `all: initial` inline — it overrides the `:host` CSS rule's font-family
+  // because inline styles have higher specificity than `:host`.
+  // The `:host { all: initial; font-family: 'Inter', …; }` rule in global.css
+  // handles both the style reset and font enforcement correctly.
+  rootElement.style.cssText =
+    'display: block; position: relative; z-index: 2147483647; contain: style; font-size: 16px; line-height: 1.5;';
 
   document.body.append(rootElement);
+
+  // Inject Inter font <link> into document.head if not already present.
+  // CSSStyleSheet.replaceSync() silently drops @import rules, so the
+  // @import url('…Inter…') in global.css never actually loads the font.
+  // Fonts are global (not scoped by shadow DOM), so loading once in <head> is enough.
+  const fontLinkId = 'filliny-inter-font';
+  if (!document.getElementById(fontLinkId)) {
+    const fontLink = document.createElement('link');
+    fontLink.id = fontLinkId;
+    fontLink.rel = 'stylesheet';
+    fontLink.href = 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap';
+    document.head.appendChild(fontLink);
+  }
 
   const rootIntoShadow = document.createElement('div');
   rootIntoShadow.id = `shadow-root-${id}`;

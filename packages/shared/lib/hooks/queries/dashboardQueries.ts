@@ -15,6 +15,7 @@ export const useDashboardOverview = (enabled: boolean = false) =>
     // Only run query when enabled (user is authenticated)
     enabled,
     staleTime: 15 * 1000, // 15 seconds - extension needs fresh data
+    gcTime: 60 * 1000, // 1 minute - don't retain stale usage data
     refetchOnWindowFocus: true, // Refetch when user returns to extension
     retry: false, // Don't retry on 401 - user likely isn't authenticated
     meta: {

@@ -1,5 +1,6 @@
+import { transformFieldForApi, transformPreferencesForApi } from './apiTransformHelpers';
 import { processChunksDiffAware, updateFieldWithRetry, ErrorCategory, FieldUpdateError } from './fieldUpdaterHelpers';
-import { formFillStore } from './stores';
+import { showQuotaExceededToast, showAuthErrorToast } from './toastHelpers';
 import { unifiedFieldRegistry } from './unifiedFieldDetection';
 import {
   aiFillService,
@@ -7,96 +8,13 @@ import {
   createDebugLogger,
   ApiQuotaExceededError,
   ApiUnauthorizedError,
-  getConfig,
   MessageType,
 } from '@extension/shared';
 import { profileStorage } from '@extension/storage';
+import type { StreamMessage } from './apiTransformHelpers';
 import type { FieldUpdateResult, FormUpdateResults } from './fieldUpdaterHelpers';
-import type { PartialFieldValueMap } from './stores';
-import type { Field, DTOFillingPreferences } from '@extension/shared';
+import type { Field } from '@extension/shared';
 import type { DTOProfileFillingForm } from '@extension/storage';
-
-/**
- * Keys allowed in the API formData payload.
- * Only includes keys that exist on both the extension's Field type AND the API schema.
- * Strips: xpath, uniqueSelectors, validation, title, testValue, metadata
- */
-type AllowedFieldKey =
-  | 'id'
-  | 'name'
-  | 'type'
-  | 'placeholder'
-  | 'label'
-  | 'description'
-  | 'value'
-  | 'options'
-  | 'required';
-
-const ALLOWED_FORM_DATA_FIELDS: readonly AllowedFieldKey[] = [
-  'id',
-  'name',
-  'type',
-  'placeholder',
-  'label',
-  'description',
-  'value',
-  'options',
-  'required',
-] as const;
-
-/**
- * Keys allowed in the API preferences payload.
- * Strip id and profileId which the API doesn't accept.
- */
-type AllowedPreferencesKey = 'isFormal' | 'isGapFillingAllowed' | 'toneId' | 'povId';
-
-const ALLOWED_PREFERENCES_FIELDS: readonly AllowedPreferencesKey[] = [
-  'isFormal',
-  'isGapFillingAllowed',
-  'toneId',
-  'povId',
-] as const;
-
-/**
- * Transform form field data to only include fields accepted by the API
- * Strips: xpath, uniqueSelectors, validation, title, testValue, metadata
- */
-const transformFieldForApi = (field: Field): Pick<Field, AllowedFieldKey> => {
-  const transformed = {} as Pick<Field, AllowedFieldKey>;
-  for (const key of ALLOWED_FORM_DATA_FIELDS) {
-    if (key in field && field[key] !== undefined) {
-      Object.assign(transformed, { [key]: field[key] });
-    }
-  }
-  return transformed;
-};
-
-/**
- * Transform preferences to only include fields accepted by the API
- * Strips: id, profileId
- */
-const transformPreferencesForApi = (
-  preferences: DTOFillingPreferences | undefined,
-): DTOFillingPreferences | undefined => {
-  if (!preferences) return undefined;
-
-  const transformed = {} as Pick<DTOFillingPreferences, AllowedPreferencesKey>;
-  for (const key of ALLOWED_PREFERENCES_FIELDS) {
-    if (key in preferences && preferences[key] !== undefined) {
-      Object.assign(transformed, { [key]: preferences[key] });
-    }
-  }
-  return transformed as DTOFillingPreferences;
-};
-
-/**
- * Type for stream message from background script
- */
-interface StreamMessage {
-  type: string;
-  data?: string;
-  error?: string;
-}
 
 const debug = createDebugLogger('FieldFill');
 
@@ -180,6 +98,8 @@ export const handleFieldFill = async (field: Field): Promise<FieldUpdateResult> 
   let timeoutId: ReturnType<typeof setTimeout> | null = null;
   // Track partial chunk data between stream messages
   let partialChunk = '';
+  // Serialized queue for chunk processing to ensure sequential field updates
+  let chunkQueue: Promise<void> = Promise.resolve();
 
   const cleanup = (): void => {
     // Remove message listener if it exists
@@ -246,35 +166,40 @@ export const handleFieldFill = async (field: Field): Promise<FieldUpdateResult> 
       streamReject(error);
     }, FIELD_FILL_TIMEOUT);
 
-    // Initialize the Zustand store session for streaming tracking (single field)
-    const storeActions = formFillStore.getState();
-    storeActions.initSession([{ id: field.id, label: field.label || field.name || field.id }]);
-
-    // Store adapter for diff-aware processing
-    const storeAdapter = {
-      getState: () => formFillStore.getState(),
-      updateFieldValue: (id: string, value: string | string[] | undefined) =>
-        formFillStore.getState().updateFieldValue(id, value),
-      markFieldStable: (id: string) => formFillStore.getState().markFieldStable(id),
-      markFieldFilled: (id: string) => formFillStore.getState().markFieldFilled(id),
-      setLastPartialObject: (obj: PartialFieldValueMap | null) => formFillStore.getState().setLastPartialObject(obj),
-    };
+    // NOTE: We intentionally do NOT call formFillStore.initSession() here.
+    // The global store is only for bulk form fills (handleFormClick).
+    // Single-field fills use local component state for loading/error UI,
+    // preventing all per-field buttons from entering loading state when
+    // only one field is being filled.
 
     // Set up message listener for streaming response using MessageType enum for consistency
     messageHandler = (message: StreamMessage) => {
       if (message.type === MessageType.STREAM_CHUNK && message.data) {
+        // Check if the chunk contains a server-side error
         try {
-          debug.log('Received stream chunk:', message.data.substring(0, 100) + '...');
-          // Pass ALL fields from the registry to processChunksDiffAware for proper merging
-          // Pass and track partial chunk data between calls to avoid data loss
-          const allFields = unifiedFieldRegistry.getAllFields();
-          processChunksDiffAware(message.data, allFields, partialChunk, storeAdapter).then((newPartial: string) => {
-            partialChunk = newPartial;
-          });
-        } catch (error) {
-          debug.error('Field Fill: Error processing chunk:', error);
-          // Don't reject on chunk errors - continue processing
+          const parsed = JSON.parse(message.data);
+          if (parsed?.error) {
+            debug.error('Server streaming error:', parsed.error.message || parsed.error);
+            streamReject(
+              new FieldUpdateError(
+                parsed.error.message || 'Server streaming error',
+                ErrorCategory.NETWORK_ERROR,
+                field.id,
+              ),
+            );
+            return;
+          }
+        } catch {
+          // Not a single JSON object - processChunksDiffAware handles multi-line parsing
         }
+
+        // Enqueue chunk processing to ensure sequential field updates
+        const allFields = unifiedFieldRegistry.getAllFields();
+        chunkQueue = chunkQueue
+          .then(async () => {
+            partialChunk = await processChunksDiffAware(message.data!, allFields, partialChunk);
+          })
+          .catch(err => debug.error('Chunk processing error:', err));
       } else if (message.type === MessageType.STREAM_DONE) {
         debug.log('Stream processing complete for field:', field.id);
         streamResolve();
@@ -304,6 +229,11 @@ export const handleFieldFill = async (field: Field): Promise<FieldUpdateResult> 
 
     if (response instanceof ReadableStream) {
       debug.log('Received ReadableStream response, waiting for stream processing');
+      await streamPromise;
+    } else if ('streaming' in response && response.streaming) {
+      // Streaming via background script message passing (content script path)
+      // Chunks arrive via STREAM_CHUNK messages and are processed by the messageHandler above
+      debug.log('Streaming via message passing, waiting for stream completion');
       await streamPromise;
     } else if ('data' in response && Array.isArray(response.data) && response.data.length > 0) {
       const updatedField = response.data[0];
@@ -336,20 +266,13 @@ export const handleFieldFill = async (field: Field): Promise<FieldUpdateResult> 
 
     // Handle unauthorized errors - user needs to log in again
     if (error instanceof ApiUnauthorizedError) {
-      const config = getConfig();
-      const loginUrl = `${config.baseURL}/sign-in`;
-
       debug.error('Unauthorized error:', error.message);
 
       const authMessage = 'Session expired. Please log in again.';
       showErrorFeedback(element, authMessage);
       restoreStyles(5000);
 
-      // Prompt user to log in
-      const shouldRedirect = confirm(`${error.message}\n\nWould you like to log in again?`);
-      if (shouldRedirect) {
-        window.open(loginUrl, '_blank');
-      }
+      showAuthErrorToast(error.message);
 
       return {
         success: false,
@@ -360,9 +283,6 @@ export const handleFieldFill = async (field: Field): Promise<FieldUpdateResult> 
 
     // Handle quota exceeded errors specially
     if (error instanceof ApiQuotaExceededError) {
-      const config = getConfig();
-      const pricingUrl = `${config.baseURL}/pricing`;
-
       debug.error('Quota exceeded:', error.message);
 
       // Show user-friendly error on the field
@@ -374,15 +294,7 @@ export const handleFieldFill = async (field: Field): Promise<FieldUpdateResult> 
       showErrorFeedback(element, quotaMessage);
       restoreStyles(5000);
 
-      // Prompt user to subscribe
-      if (error.shouldPromptSubscription) {
-        const shouldRedirect = confirm(
-          `${error.message}\n\nWould you like to subscribe to Pro for unlimited form filling?`,
-        );
-        if (shouldRedirect) {
-          window.open(pricingUrl, '_blank');
-        }
-      }
+      showQuotaExceededToast(error.message);
 
       return {
         success: false,

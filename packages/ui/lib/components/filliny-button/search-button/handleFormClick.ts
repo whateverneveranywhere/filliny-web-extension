@@ -1,3 +1,4 @@
+import { transformFormDataForApi, transformPreferencesForApi } from './apiTransformHelpers';
 import { getAllFormContainersFromRegistry } from './detectionHelpers';
 import {
   processChunksDiffAware,
@@ -10,6 +11,7 @@ import { highlightForms } from './highlightForms';
 import { disableOtherButtons, resetOverlays, showLoadingIndicator } from './overlayUtils';
 import { formFillStore, StreamingPhase } from './stores';
 import { runTestModeFill } from './testModeHelpers';
+import { showQuotaExceededToast, showAuthErrorToast, showFillErrorToast, showInfoToast } from './toastHelpers';
 import { unifiedFieldRegistry } from './unifiedFieldDetection';
 import {
   aiFillService,
@@ -17,100 +19,15 @@ import {
   createDebugLogger,
   ApiQuotaExceededError,
   ApiUnauthorizedError,
-  getConfig,
   MessageType,
 } from '@extension/shared';
 import { profileStorage, localFilesStorage } from '@extension/storage';
+import type { StreamMessage } from './apiTransformHelpers';
 import type { FormUpdateResults } from './fieldUpdaterHelpers';
-import type { PartialFieldValueMap } from './stores';
-import type { Field, DTOFillingPreferences, DTOAuthorizedFileForAI } from '@extension/shared';
+import type { Field, DTOAuthorizedFileForAI } from '@extension/shared';
 import type { DTOProfileFillingForm } from '@extension/storage';
 
-/**
- * Type for stream message from background script
- */
-interface StreamMessage {
-  type: string;
-  data?: string;
-  error?: string;
-}
-
 const debug = createDebugLogger('FormClick');
-
-/**
- * Keys allowed in the API formData payload.
- * Only includes keys that exist on both the extension's Field type AND the API schema.
- * Strips: xpath, uniqueSelectors, validation, title, testValue, metadata
- */
-type AllowedFieldKey =
-  | 'id'
-  | 'name'
-  | 'type'
-  | 'placeholder'
-  | 'label'
-  | 'description'
-  | 'value'
-  | 'options'
-  | 'required';
-
-const ALLOWED_FORM_DATA_FIELDS: readonly AllowedFieldKey[] = [
-  'id',
-  'name',
-  'type',
-  'placeholder',
-  'label',
-  'description',
-  'value',
-  'options',
-  'required',
-] as const;
-
-/**
- * Keys allowed in the API preferences payload.
- * Strip id and profileId which the API doesn't accept.
- */
-type AllowedPreferencesKey = 'isFormal' | 'isGapFillingAllowed' | 'toneId' | 'povId';
-
-const ALLOWED_PREFERENCES_FIELDS: readonly AllowedPreferencesKey[] = [
-  'isFormal',
-  'isGapFillingAllowed',
-  'toneId',
-  'povId',
-] as const;
-
-/**
- * Transform form field data to only include fields accepted by the API
- * Strips: xpath, uniqueSelectors, validation
- */
-const transformFormDataForApi = (fields: Field[]): Pick<Field, AllowedFieldKey>[] =>
-  fields.map(field => {
-    const transformed = {} as Pick<Field, AllowedFieldKey>;
-    for (const key of ALLOWED_FORM_DATA_FIELDS) {
-      if (key in field && field[key] !== undefined) {
-        // Safe: key is typed as AllowedFieldKey which is a subset of keyof Field
-        Object.assign(transformed, { [key]: field[key] });
-      }
-    }
-    return transformed;
-  });
-
-/**
- * Transform preferences to only include fields accepted by the API
- * Strips: id, profileId
- */
-const transformPreferencesForApi = (
-  preferences: DTOFillingPreferences | undefined,
-): DTOFillingPreferences | undefined => {
-  if (!preferences) return undefined;
-
-  const transformed = {} as Pick<DTOFillingPreferences, AllowedPreferencesKey>;
-  for (const key of ALLOWED_PREFERENCES_FIELDS) {
-    if (key in preferences && preferences[key] !== undefined) {
-      Object.assign(transformed, { [key]: preferences[key] });
-    }
-  }
-  return transformed as DTOFillingPreferences;
-};
 
 /**
  * Default timeout for form fill operations
@@ -188,7 +105,7 @@ export const handleFormClick = async (
   const formContainers = getAllFormContainersFromRegistry();
 
   if (formContainers.length === 0) {
-    alert('No forms found. Please try again.');
+    showInfoToast('No Forms Found', 'No forms were detected on this page. Please try again.');
     try {
       resetOverlays();
       // Re-run detection if no containers were found in the registry
@@ -216,6 +133,8 @@ export const handleFormClick = async (
   let timeoutId: ReturnType<typeof setTimeout> | null = null;
   // Track partial chunk data between stream messages
   let partialChunk = '';
+  // Serialized queue for chunk processing to ensure sequential field updates
+  let chunkQueue: Promise<void> = Promise.resolve();
 
   const cleanup = (): void => {
     if (messageHandler) {
@@ -237,7 +156,7 @@ export const handleFormClick = async (
     const fields = unifiedFieldRegistry.getAllFields();
 
     if (fields.length === 0) {
-      alert('Unable to detect form fields in any container. Please refresh the page and try again.');
+      showInfoToast('No Fields Detected', 'Unable to detect form fields. Please refresh the page and try again.');
       return;
     }
 
@@ -306,31 +225,35 @@ export const handleFormClick = async (
       );
     }, FORM_FILL_TIMEOUT);
 
-    // Store adapter for diff-aware processing
-    const storeAdapter = {
-      getState: () => formFillStore.getState(),
-      updateFieldValue: (id: string, value: string | string[] | undefined) =>
-        formFillStore.getState().updateFieldValue(id, value),
-      markFieldStable: (id: string) => formFillStore.getState().markFieldStable(id),
-      markFieldFilled: (id: string) => formFillStore.getState().markFieldFilled(id),
-      markFieldVerified: (id: string) => formFillStore.getState().markFieldVerified(id),
-      markFieldError: (id: string, msg: string) => formFillStore.getState().markFieldError(id, msg),
-      setLastPartialObject: (obj: PartialFieldValueMap | null) => formFillStore.getState().setLastPartialObject(obj),
-    };
-
     // Set up message listener for streaming response using MessageType enum for consistency
     messageHandler = (message: StreamMessage) => {
       try {
         if (message.type === MessageType.STREAM_CHUNK && message.data) {
+          // Check if the chunk contains a server-side error
           try {
-            // Use diff-aware processing for incremental updates
-            processChunksDiffAware(message.data, fields, partialChunk, storeAdapter).then(newPartial => {
-              partialChunk = newPartial;
-            });
-          } catch (error) {
-            debug.error('Form Click: Error processing chunk:', error);
-            // Don't reject here, continue processing other chunks
+            const parsed = JSON.parse(message.data);
+            if (parsed?.error) {
+              debug.error('Server streaming error:', parsed.error.message || parsed.error);
+              formFillStore.getState().setPhase(StreamingPhase.ERROR);
+              streamReject(
+                new FieldUpdateError(
+                  parsed.error.message || 'Server streaming error',
+                  ErrorCategory.NETWORK_ERROR,
+                  'form',
+                ),
+              );
+              return;
+            }
+          } catch {
+            // Not a single JSON object - that's fine, processChunksDiffAware handles multi-line parsing
           }
+
+          // Enqueue chunk processing to ensure sequential field updates
+          chunkQueue = chunkQueue
+            .then(async () => {
+              partialChunk = await processChunksDiffAware(message.data!, fields, partialChunk);
+            })
+            .catch(err => debug.error('Chunk processing error:', err));
         } else if (message.type === MessageType.STREAM_DONE) {
           debug.log('Stream processing complete');
           streamResolve();
@@ -368,9 +291,12 @@ export const handleFormClick = async (
       // Wait for all streaming chunks to be processed via messageHandler
       await streamPromise;
 
+      // Wait for all queued chunks to finish processing
+      await chunkQueue;
+
       // Streaming complete - run final verification pass
       formFillStore.getState().setPhase(StreamingPhase.FINALIZING);
-      updateResults = await runFinalVerificationPass(fields, storeAdapter);
+      updateResults = await runFinalVerificationPass(fields);
 
       // Update phase based on verification results
       formFillStore.getState().setPhase(StreamingPhase.COMPLETE);
@@ -407,33 +333,14 @@ export const handleFormClick = async (
 
     // Handle unauthorized errors - user needs to log in again
     if (error instanceof ApiUnauthorizedError) {
-      const config = getConfig();
-      const loginUrl = `${config.baseURL}/sign-in`;
-
       debug.error('Unauthorized error:', error.message);
-
-      const shouldRedirect = confirm(`${error.message}\n\nWould you like to log in again?`);
-      if (shouldRedirect) {
-        window.open(loginUrl, '_blank');
-      }
+      showAuthErrorToast(error.message);
       return;
     }
 
     // Handle quota exceeded errors specially
     if (error instanceof ApiQuotaExceededError) {
-      const config = getConfig();
-      const pricingUrl = `${config.baseURL}/pricing`;
-
-      if (error.shouldPromptSubscription) {
-        const shouldRedirect = confirm(
-          `${error.message}\n\nWould you like to subscribe to Pro for unlimited form filling?`,
-        );
-        if (shouldRedirect) {
-          window.open(pricingUrl, '_blank');
-        }
-      } else {
-        alert(`${error.message}\n\nPlease upgrade your subscription at ${pricingUrl}`);
-      }
+      showQuotaExceededToast(error.message);
       return;
     }
 
@@ -442,10 +349,8 @@ export const handleFormClick = async (
         ? error.message
         : error instanceof Error
           ? error.message
-          : typeof error === 'object'
-            ? JSON.stringify(error)
-            : 'Unknown error occurred';
-    alert(`Failed to fill form: ${errorMessage}`);
+          : 'Unknown error occurred';
+    showFillErrorToast(errorMessage);
   } finally {
     // Ensure cleanup happens in finally block
     cleanup();
@@ -454,11 +359,6 @@ export const handleFormClick = async (
       debug.log(`Total process took: ${((performance.now() - totalStartTime) / 1000).toFixed(2)}s`);
       // Notify the field manager to re-detect everything to prevent stale state
       document.dispatchEvent(new CustomEvent('filliny:bulkFillComplete'));
-
-      // Reset the store after a delay so overlay UI can read final state before reset
-      setTimeout(() => {
-        formFillStore.getState().reset();
-      }, 3000);
     } catch (finallyError) {
       debug.error('Error in finally block:', finallyError);
     }

@@ -8,10 +8,16 @@ import { Button } from '../components/ui/button';
 import { Separator } from '../components/ui/separator';
 import { useToast } from '../hooks/use-toast';
 import { cn } from '../utils';
-import { usePOVListQuery, useTonesListQuery, useEditFillingProfileMutation } from '@extension/shared';
+import {
+  usePOVListQuery,
+  useTonesListQuery,
+  useEditFillingProfileMutation,
+  notifyProfileUpdate,
+  MessageType,
+} from '@extension/shared';
 import { profileStorage } from '@extension/storage';
-import { Check, X, Info, Pencil } from 'lucide-react';
-import { useState } from 'react';
+import { Check, X, Info, Pencil, ChevronDown } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { DTOFillingPreferences, DTOFillingWebsite, DTOProfileFillingForm } from '@extension/storage';
 import type React from 'react';
 
@@ -60,6 +66,60 @@ const StatusBadge = ({ condition }: { condition: boolean }) => (
   </Badge>
 );
 
+const CONTEXT_COLLAPSED_HEIGHT = 72;
+
+const FillingContextPreview = ({ context }: { context: string }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [isOverflowing, setIsOverflowing] = useState(false);
+  const contentRef = useRef<HTMLParagraphElement>(null);
+
+  const checkOverflow = useCallback(() => {
+    const el = contentRef.current;
+    if (el) {
+      setIsOverflowing(el.scrollHeight > CONTEXT_COLLAPSED_HEIGHT);
+    }
+  }, []);
+
+  useEffect(() => {
+    checkOverflow();
+  }, [context, checkOverflow]);
+
+  const displayText = context || 'No context provided';
+
+  return (
+    <div className="filliny-flex filliny-flex-col filliny-gap-1">
+      <span className="filliny-text-xs filliny-font-medium filliny-text-muted-foreground">Filling Context</span>
+      <div className="filliny-relative">
+        <p
+          ref={contentRef}
+          className={cn(
+            'filliny-text-sm filliny-leading-relaxed filliny-text-foreground/80 filliny-break-words filliny-overflow-hidden filliny-transition-all filliny-duration-200',
+            !isExpanded && isOverflowing && 'filliny-max-h-[72px]',
+          )}>
+          {displayText}
+        </p>
+        {isOverflowing && !isExpanded && (
+          <div className="filliny-pointer-events-none filliny-absolute filliny-inset-x-0 filliny-bottom-0 filliny-h-10 filliny-bg-gradient-to-t filliny-from-card filliny-to-transparent" />
+        )}
+      </div>
+      {isOverflowing && (
+        <button
+          type="button"
+          onClick={() => setIsExpanded(prev => !prev)}
+          className="filliny-inline-flex filliny-items-center filliny-gap-1 filliny-self-start filliny-text-xs filliny-text-muted-foreground filliny-transition-colors hover:filliny-text-foreground">
+          <ChevronDown
+            className={cn(
+              'filliny-h-3 filliny-w-3 filliny-transition-transform filliny-duration-200',
+              isExpanded && 'filliny-rotate-180',
+            )}
+          />
+          {isExpanded ? 'Show less' : 'Show more'}
+        </button>
+      )}
+    </div>
+  );
+};
+
 const ActiveProfileWebsitePreview: React.FC<Props> = ({ matchingWebsite, preferences, profile }) => {
   const { websiteUrl, isRootLoad } = matchingWebsite;
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -88,6 +148,8 @@ const ActiveProfileWebsitePreview: React.FC<Props> = ({ matchingWebsite, prefere
       });
 
       await profileStorage.setDefaultProfile(updatedProfile);
+      // Notify content scripts about the profile update so they re-evaluate visibility
+      await notifyProfileUpdate(MessageType.PROFILE_UPDATED);
 
       toast({ title: 'Settings Saved', description: 'Your website settings have been updated.' });
     } catch (error) {
@@ -120,12 +182,7 @@ const ActiveProfileWebsitePreview: React.FC<Props> = ({ matchingWebsite, prefere
         }>
         <div className="filliny-flex filliny-flex-col filliny-gap-4">
           {/* Context Section */}
-          <div className="filliny-flex filliny-flex-col filliny-gap-1.5">
-            <span className="filliny-text-xs filliny-font-medium filliny-text-muted-foreground">Filling Context</span>
-            <p className="filliny-rounded-lg filliny-bg-muted/50 filliny-p-3 filliny-text-sm filliny-break-words">
-              {matchingWebsite.fillingContext || 'No context provided'}
-            </p>
-          </div>
+          <FillingContextPreview context={matchingWebsite.fillingContext} />
 
           <Separator />
 

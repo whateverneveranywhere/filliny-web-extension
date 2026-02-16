@@ -29,6 +29,7 @@ import {
   useProfilesListQuery,
   notifyProfileUpdate,
   MessageType,
+  getFillingProfileByIdService,
 } from '@extension/shared';
 import { profileStorage } from '@extension/storage';
 import { Check, ChevronDown, ClipboardList, Edit, Loader2, Plus, Trash2 } from 'lucide-react';
@@ -56,17 +57,20 @@ const ProfileSelector = () => {
       try {
         await updateActiveProfile({ activeProfileId: nextActiveId });
 
-        // Find the new active profile from the profiles list
-        const newActiveProfile = profiles?.find(profile => String(profile.id) === nextActiveId);
-        if (newActiveProfile) {
-          await profileStorage.setDefaultProfile(newActiveProfile);
-          // Notify content scripts about the profile update
-          await notifyProfileUpdate(MessageType.PROFILE_UPDATED);
+        // Fetch the full profile (with fillingWebsites) before storing,
+        // so content scripts can immediately evaluate website matching
+        const fullProfile = await getFillingProfileByIdService(nextActiveId);
+        if (fullProfile) {
+          await profileStorage.setDefaultProfile(fullProfile);
         }
+        // Notify content scripts about the profile update
+        await notifyProfileUpdate(MessageType.PROFILE_UPDATED);
 
+        const profileName =
+          fullProfile?.profileName || profiles?.find(profile => String(profile.id) === nextActiveId)?.name;
         toast({
           title: 'Profile switched',
-          description: `Now using "${newActiveProfile?.name || 'selected profile'}"`,
+          description: `Now using "${profileName || 'selected profile'}"`,
         });
       } catch (error) {
         console.error('Failed to change profile:', error);
@@ -95,9 +99,15 @@ const ProfileSelector = () => {
           await notifyProfileUpdate(MessageType.PROFILE_UPDATED);
         } else {
           const deletedIndex = profiles.findIndex(profile => String(profile.id) === deletingId);
-          const newActiveProfile = remainingProfiles[deletedIndex] || remainingProfiles[deletedIndex - 1];
-          if (newActiveProfile) {
-            await updateActiveProfile({ activeProfileId: String(newActiveProfile.id) });
+          const newActiveListItem = remainingProfiles[deletedIndex] || remainingProfiles[deletedIndex - 1];
+          if (newActiveListItem) {
+            const newActiveId = String(newActiveListItem.id);
+            await updateActiveProfile({ activeProfileId: newActiveId });
+            // Fetch full profile (with fillingWebsites) before storing
+            const fullProfile = await getFillingProfileByIdService(newActiveId);
+            if (fullProfile) {
+              await profileStorage.setDefaultProfile(fullProfile);
+            }
             // Notify content scripts about the profile update
             await notifyProfileUpdate(MessageType.PROFILE_UPDATED);
           }

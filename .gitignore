@@ -25,3 +25,4 @@ tsconfig.tsbuildinfo
 # compiled
 **/tailwind-output.css
 
+.claude/.cache/**/*

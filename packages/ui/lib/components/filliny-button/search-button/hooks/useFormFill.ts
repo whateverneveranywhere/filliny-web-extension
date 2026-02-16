@@ -1,6 +1,6 @@
 import { handleFormClick } from '../handleFormClick';
 import { disableOtherButtons, resetOverlays, showLoadingIndicator } from '../overlayUtils';
-import { useFormFillStore, StreamingPhase } from '../stores';
+import { formFillStore, useFormFillStore, StreamingPhase } from '../stores';
 import { useState, useCallback, useEffect, useRef } from 'react';
 import type React from 'react';
 
@@ -25,19 +25,23 @@ export const useFormFill = ({ formId, testMode, onDismiss }: UseFormFillProps): 
   const phase = useFormFillStore(state => state.phase);
   const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Phase-based auto-dismissal
+  // Phase-based auto-dismissal.
+  // Dismiss order matters: call onDismiss first to unmount the component,
+  // then reset store state. This prevents a brief flash of the action buttons.
   useEffect(() => {
     if (phase === StreamingPhase.COMPLETE) {
       dismissTimerRef.current = setTimeout(() => {
         setLoading(false);
         resetOverlays();
         onDismiss();
+        formFillStore.getState().reset();
       }, 2500);
     } else if (phase === StreamingPhase.ERROR) {
       dismissTimerRef.current = setTimeout(() => {
         setLoading(false);
         resetOverlays();
         onDismiss();
+        formFillStore.getState().reset();
       }, 3500);
     }
 

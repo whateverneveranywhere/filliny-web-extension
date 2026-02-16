@@ -24,6 +24,12 @@ const resetOverlays = (): void => {
     element.style.removeProperty('box-shadow');
     delete element.dataset.fillinyHighlighted;
   });
+
+  // Re-enable any buttons that were disabled by disableOtherButtons()
+  const disabledButtons = document.querySelectorAll<HTMLButtonElement>('button[data-form-id]:disabled');
+  disabledButtons.forEach(button => {
+    button.disabled = false;
+  });
 };
 
 const addGlowingBorder = (element: HTMLElement, color: string = 'green'): void => {

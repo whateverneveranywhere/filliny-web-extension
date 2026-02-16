@@ -6,4 +6,5 @@ export * from './useStorage.js';
 export * from './useExtensionAuth.js';
 export * from './AuthContext.js';
 export * from './useUsageRefresh.js';
+export * from './useQuotaCheck.js';
 // queryKeys are re-exported from queries/index.js - no need to duplicate here

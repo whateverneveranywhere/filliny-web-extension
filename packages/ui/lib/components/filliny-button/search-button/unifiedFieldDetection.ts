@@ -105,15 +105,15 @@ class UnifiedFieldRegistry {
 
   // Register a container and its fields
   async registerContainer(container: HTMLElement, containerId: string): Promise<DetectedContainerInfo> {
-    console.log(`🔍 UnifiedFieldRegistry: Registering container ${containerId}`);
+    console.debug(`UnifiedFieldRegistry: Registering container ${containerId}`);
 
     this.containers.set(containerId, container);
 
     // Detect all fields in container with performance limit
     const allFields = await detectFields(container, false);
     const fields = allFields.slice(0, MAX_FIELDS_PER_CONTAINER);
-    console.log(
-      `📋 UnifiedFieldRegistry: Detected ${fields.length} fields in container ${containerId}${allFields.length > MAX_FIELDS_PER_CONTAINER ? ` (limited from ${allFields.length})` : ''}`,
+    console.debug(
+      `UnifiedFieldRegistry: Detected ${fields.length} fields in container ${containerId}${allFields.length > MAX_FIELDS_PER_CONTAINER ? ` (limited from ${allFields.length})` : ''}`,
     );
 
     // Register each field
@@ -126,7 +126,7 @@ class UnifiedFieldRegistry {
       // Skip if element not found or already processed in another container
       if (!element || this.processedElements.has(element)) {
         if (element) {
-          console.log(`UnifiedFieldRegistry: Skipping already processed element for field ${field.id}`);
+          console.debug(`UnifiedFieldRegistry: Skipping already processed element for field ${field.id}`);
         }
         continue;
       }
@@ -214,7 +214,7 @@ class UnifiedFieldRegistry {
       }
     }
 
-    console.warn(`⚠️ Could not find element for field ${field.id}`);
+    console.warn(`Could not find element for field ${field.id}`);
     return null;
   }
 
@@ -242,24 +242,9 @@ class UnifiedFieldRegistry {
   }
 
   private shouldHaveIndividualButton(fieldInfo: DetectedFieldInfo): boolean {
-    // Individual buttons should be created for:
-    // 1. Non-grouped fields (text, select, single checkboxes, etc.)
-    // 2. Single grouped fields (one button per group, not per option)
-    if (!fieldInfo.isGrouped) {
-      return true; // All non-grouped fields get buttons
-    }
-
-    // For grouped fields, only create one button per group
-    // We'll identify the "primary" field in each group
-    const groupId = fieldInfo.groupId!;
-    const groupInfo = this.groupedFields.get(groupId);
-
-    if (groupInfo) {
-      // Only the first field in the group gets the button
-      return groupInfo.fields[0].field.id === fieldInfo.field.id;
-    }
-
-    return false;
+    // Grouped fields get their buttons from getGroupedFields() section in getFieldButtonsData().
+    // Returning true here for grouped fields would cause double-counting.
+    return !fieldInfo.isGrouped;
   }
 
   private handleGroupedField(fieldInfo: DetectedFieldInfo, groupedFields: GroupedFieldInfo[]): void {
@@ -293,51 +278,59 @@ class UnifiedFieldRegistry {
   // Enhanced to ensure all fields get buttons with comprehensive fallback strategies
   getFieldButtonsData(containerId?: string): FieldButtonData[] {
     const buttonData: FieldButtonData[] = [];
+    const seenFillinyIds = new Set<string>();
     let processedCount = 0;
     let skippedCount = 0;
 
-    console.log(`🔍 Getting field button data for container: ${containerId || 'all'}`);
+    console.debug(`Getting field button data for container: ${containerId || 'all'}`);
 
     // Add individual (non-grouped) fields with enhanced element finding
     const individualFields = this.getIndividualFields(containerId);
-    console.log(`📋 Found ${individualFields.length} individual fields`);
+    console.debug(`Found ${individualFields.length} individual fields`);
 
     for (const fieldInfo of individualFields) {
       let element = fieldInfo.element;
 
       // If no element found, try enhanced search strategies
       if (!element) {
-        console.log(`🔍 No element found for field ${fieldInfo.field.id}, trying enhanced search...`);
+        console.debug(`No element found for field ${fieldInfo.field.id}, trying enhanced search`);
         element = this.findFieldElementEnhanced(fieldInfo.container, fieldInfo.field);
 
         if (element) {
           // Update the field info with the found element
           fieldInfo.element = element;
           element.setAttribute('data-filliny-id', fieldInfo.field.id);
-          console.log(`✅ Found element for field ${fieldInfo.field.id} using enhanced search`);
+          console.debug(`Found element for field ${fieldInfo.field.id} using enhanced search`);
         }
       }
 
       if (element) {
-        buttonData.push({
-          field: fieldInfo.field,
-          element: element,
-          type: fieldInfo.isGrouped ? 'grouped' : 'individual',
-          groupId: fieldInfo.groupId,
-        });
-        processedCount++;
-        console.log(
-          `✅ Added ${fieldInfo.isGrouped ? 'grouped' : 'individual'} field button: ${fieldInfo.field.id} (${fieldInfo.field.type})`,
-        );
+        const fillinyId = element.getAttribute('data-filliny-id') || fieldInfo.field.id;
+        if (seenFillinyIds.has(fillinyId)) {
+          skippedCount++;
+          console.debug(`Skipping duplicate field button for: ${fillinyId}`);
+        } else {
+          seenFillinyIds.add(fillinyId);
+          buttonData.push({
+            field: fieldInfo.field,
+            element: element,
+            type: fieldInfo.isGrouped ? 'grouped' : 'individual',
+            groupId: fieldInfo.groupId,
+          });
+          processedCount++;
+          console.debug(
+            `Added ${fieldInfo.isGrouped ? 'grouped' : 'individual'} field button: ${fieldInfo.field.id} (${fieldInfo.field.type})`,
+          );
+        }
       } else {
         skippedCount++;
-        console.warn(`⚠️ No element found for field: ${fieldInfo.field.id} after enhanced search`);
+        console.warn(`No element found for field: ${fieldInfo.field.id} after enhanced search`);
       }
     }
 
     // Add buttons for grouped fields (one button per group, not per option)
     const groupedFields = this.getGroupedFields(containerId);
-    console.log(`📋 Found ${groupedFields.length} grouped fields`);
+    console.debug(`Found ${groupedFields.length} grouped fields`);
 
     for (const groupInfo of groupedFields) {
       // Find the best element to attach the button to
@@ -365,24 +358,31 @@ class UnifiedFieldRegistry {
       }
 
       if (buttonElement) {
-        // Create one button for the entire group
-        buttonData.push({
-          field: groupInfo.fields[0].field, // Use the first field as representative
-          element: buttonElement,
-          type: 'grouped',
-          groupId: groupInfo.groupId,
-        });
-        processedCount++;
-        console.log(
-          `✅ Added grouped field button: ${groupInfo.groupId} (${groupInfo.groupType}) with ${groupInfo.fields.length} fields`,
-        );
+        const groupFillinyId = buttonElement.getAttribute('data-filliny-id') || groupInfo.groupId;
+        if (seenFillinyIds.has(groupFillinyId)) {
+          skippedCount++;
+          console.debug(`Skipping duplicate grouped button for: ${groupFillinyId}`);
+        } else {
+          seenFillinyIds.add(groupFillinyId);
+          // Create one button for the entire group
+          buttonData.push({
+            field: groupInfo.fields[0].field, // Use the first field as representative
+            element: buttonElement,
+            type: 'grouped',
+            groupId: groupInfo.groupId,
+          });
+          processedCount++;
+          console.debug(
+            `Added grouped field button: ${groupInfo.groupId} (${groupInfo.groupType}) with ${groupInfo.fields.length} fields`,
+          );
+        }
       } else {
         skippedCount++;
-        console.warn(`⚠️ No element found for grouped field: ${groupInfo.groupId}`);
+        console.warn(`No element found for grouped field: ${groupInfo.groupId}`);
       }
     }
 
-    console.log(`📊 Field button summary: ${processedCount} processed, ${skippedCount} skipped`);
+    console.debug(`Field button summary: ${processedCount} processed, ${skippedCount} skipped`);
 
     // Enhanced logging for debugging
     const fieldTypes = buttonData.reduce(
@@ -394,7 +394,7 @@ class UnifiedFieldRegistry {
       {} as Record<string, number>,
     );
 
-    console.log(`📊 Button type distribution:`, fieldTypes);
+    console.debug(`Button type distribution:`, fieldTypes);
 
     return buttonData;
   }
@@ -501,7 +501,7 @@ class UnifiedFieldRegistry {
       this.handleGroupedField(fieldInfo, groupedFields);
     }
 
-    console.log(`UnifiedFieldRegistry: Incrementally registered field ${field.id} (${field.type})`);
+    console.debug(`UnifiedFieldRegistry: Incrementally registered field ${field.id} (${field.type})`);
   }
 
   // Infer field type from an HTML element
@@ -620,7 +620,7 @@ class UnifiedFieldRegistry {
       try {
         const element = strategies[i]();
         if (element) {
-          console.log(`✅ Found field element using enhanced strategy ${i + 1} for ${field.id}`);
+          console.debug(`Found field element using enhanced strategy ${i + 1} for ${field.id}`);
           return element;
         }
       } catch (error) {

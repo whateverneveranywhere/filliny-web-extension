@@ -309,6 +309,8 @@ export enum MessageType {
   OPEN_SIDE_PANEL = 'OPEN_SIDE_PANEL',
   /** Notify side panel to refresh usage data after form fill */
   REFRESH_USAGE = 'REFRESH_USAGE',
+  /** Request quota status from background script */
+  GET_QUOTA_STATUS = 'GET_QUOTA_STATUS',
 }
 
 // NOTE: Framework is exported from utils/frameworkDetection.ts (single source of truth)

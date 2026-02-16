@@ -13,6 +13,7 @@ import {
   restoreFormState,
   ensureFocus,
 } from './field-types/utils';
+import { formFillStore } from './stores';
 import { unifiedFieldRegistry } from './unifiedFieldDetection.js';
 import { createDebugLogger } from '@extension/shared';
 import type { PartialFieldValueMap } from './stores';
@@ -419,12 +420,13 @@ const updateField = async (element: HTMLElement, field: Field, isTestMode = fals
       }
     }
 
-    // Handle each element type with enhanced error handling
+    // Handle each element type with enhanced error handling.
+    // Priority: native element type checks first, then field.type-based routing
+    // for custom components (e.g. React Select, MUI Select) that use <div> elements.
     if (element instanceof HTMLInputElement) {
       await updateInputElement(element, field, valueToUse, isTestMode);
     } else if (element instanceof HTMLSelectElement) {
       debug.log(`Processing select ${element.id || element.name || 'unnamed'}`);
-      // Ensure we pass a non-undefined value to updateSelect
       const selectValue = valueToUse !== undefined ? valueToUse : '';
       await updateSelect(element, selectValue);
     } else if (element instanceof HTMLTextAreaElement) {
@@ -437,6 +439,13 @@ const updateField = async (element: HTMLElement, field: Field, isTestMode = fals
     } else if (element.hasAttribute('contenteditable')) {
       debug.log(`Processing contentEditable element ${element.id || 'unnamed'}`);
       await updateContentEditable(element, getStringValue(valueToUse));
+    } else if (field.type === 'select') {
+      // Custom select components (React Select, MUI, Headless UI, Radix, etc.)
+      // that use <div> elements instead of native <select>.
+      // Route to updateSelect() which handles all custom select libraries.
+      debug.log(`Processing custom select component for field ${field.id}`);
+      const selectValue = valueToUse !== undefined ? valueToUse : '';
+      await updateSelect(element, selectValue);
     } else if (element.hasAttribute('role')) {
       await updateAriaElement(element, field, valueToUse);
     } else {
@@ -1327,20 +1336,21 @@ const immediateFieldSet = async (element: HTMLElement, field: Field): Promise<vo
  * Diff-aware chunk processing for streaming form fill.
  * Only updates fields whose values have actually changed since the last partial.
  */
+/**
+ * Wait for the next animation frame - used to batch DOM writes
+ * for smoother visual updates during streaming.
+ */
+const rafDelay = (): Promise<void> => new Promise(resolve => requestAnimationFrame(() => resolve()));
+
+/**
+ * Diff-aware chunk processing for streaming form fill.
+ * Uses formFillStore directly for state management - no adapter needed.
+ * Only updates fields whose values have actually changed since the last partial.
+ */
 const processChunksDiffAware = async (
   text: string,
   originalFields: Field[],
   previousPartial: string,
-  store: {
-    getState: () => {
-      lastPartialObject: PartialFieldValueMap | null;
-      fields: Record<string, { currentValue: string | string[] | undefined }>;
-    };
-    updateFieldValue: (id: string, value: string | string[] | undefined) => void;
-    markFieldStable: (id: string) => void;
-    markFieldFilled: (id: string) => void;
-    setLastPartialObject: (obj: PartialFieldValueMap | null) => void;
-  },
 ): Promise<string> => {
   try {
     const combinedText = previousPartial + text;
@@ -1360,6 +1370,14 @@ const processChunksDiffAware = async (
 
       try {
         const jsonResponse = JSON.parse(line);
+
+        // Handle streaming error from backend
+        if (jsonResponse?.error) {
+          debug.error('Streaming error from server:', jsonResponse.error.message || jsonResponse.error);
+          // Don't return - continue processing any valid data we received before the error
+          continue;
+        }
+
         if (jsonResponse?.data?.length) {
           latestParsed = jsonResponse;
         }
@@ -1370,8 +1388,8 @@ const processChunksDiffAware = async (
 
     if (!latestParsed) return partial;
 
-    const { lastPartialObject } = store.getState();
-    const previousLookup: PartialFieldValueMap = lastPartialObject || {};
+    const storeState = formFillStore.getState();
+    const previousLookup: PartialFieldValueMap = storeState.lastPartialObject || {};
 
     // Build lookup from current parsed data
     const currentLookup: PartialFieldValueMap = {};
@@ -1381,7 +1399,9 @@ const processChunksDiffAware = async (
       }
     }
 
-    // Process each field in the parsed data
+    // Collect changed fields first, then apply with RAF-batched updates
+    const changedFields: Array<{ fieldId: string; mergedField: Field; element: HTMLElement }> = [];
+
     for (const parsedField of latestParsed.data) {
       const fieldId = parsedField.id;
       if (!fieldId) continue;
@@ -1403,15 +1423,13 @@ const processChunksDiffAware = async (
       // Check if the value actually changed
       if (!hasValueChanged(prevValue, newValue)) {
         // Value unchanged - mark as stable
-        store.markFieldStable(fieldId);
+        formFillStore.getState().markFieldStable(fieldId);
         continue;
       }
 
       // For choice fields, only update if value matches an available option
       if (fieldClass === 'choice' && originalField.options) {
         if (Array.isArray(newValue)) {
-          // For arrays (checkbox groups, multi-selects), check if any element matches an option
-          // Empty arrays are allowed (clear all selections)
           if (newValue.length > 0) {
             const matchesAnyOption = newValue.some(val =>
               originalField.options!.some(
@@ -1429,21 +1447,37 @@ const processChunksDiffAware = async (
         }
       }
 
-      // Value changed - update store and do immediate DOM write
-      store.updateFieldValue(fieldId, newValue);
+      // Value changed - update store value immediately for reactive UI
+      formFillStore.getState().updateFieldValue(fieldId, newValue);
 
       const mergedField = { ...originalField, ...parsedField };
       const fieldInfo = unifiedFieldRegistry.getField(fieldId);
       const element = fieldInfo?.element || (document.querySelector(`[data-filliny-id="${fieldId}"]`) as HTMLElement);
 
       if (element) {
-        store.markFieldFilled(fieldId);
-        await immediateFieldSet(element, mergedField);
+        changedFields.push({ fieldId, mergedField, element });
       }
     }
 
+    // Apply DOM updates using requestAnimationFrame for smoother visual feedback.
+    for (let i = 0; i < changedFields.length; i++) {
+      const { fieldId, mergedField, element } = changedFields[i];
+
+      // Wait for next animation frame before DOM write
+      await rafDelay();
+
+      // Update DOM, then mark in store so UI reflects actual state
+      await immediateFieldSet(element, mergedField);
+      formFillStore.getState().markFieldFilled(fieldId);
+
+      // Persistent green outline during streaming - cleared after streaming completes
+      element.style.outline = '2px solid #10b981';
+      element.style.outlineOffset = '1px';
+      element.style.transition = 'outline 0.2s ease';
+    }
+
     // Save current partial object for next diff
-    store.setLastPartialObject(currentLookup);
+    formFillStore.getState().setLastPartialObject(currentLookup);
 
     return partial;
   } catch (error) {
@@ -1457,22 +1491,13 @@ const processChunksDiffAware = async (
  * Uses updateFieldWithGroupHandling with full retry+verify for each field
  * that has a value in the store.
  */
-const runFinalVerificationPass = async (
-  originalFields: Field[],
-  store: {
-    getState: () => {
-      fields: Record<
-        string,
-        {
-          status: string;
-          currentValue: string | string[] | undefined;
-        }
-      >;
-    };
-    markFieldVerified: (id: string) => void;
-    markFieldError: (id: string, message: string) => void;
-  },
-): Promise<FormUpdateResults> => {
+/**
+ * Run a final verification pass after streaming completes.
+ * Uses formFillStore directly for state access - no adapter needed.
+ * Uses updateFieldWithGroupHandling with full retry+verify for each field
+ * that has a value in the store.
+ */
+const runFinalVerificationPass = async (originalFields: Field[]): Promise<FormUpdateResults> => {
   const results: FormUpdateResults = {
     successful: 0,
     failed: 0,
@@ -1481,7 +1506,7 @@ const runFinalVerificationPass = async (
     totalRetries: 0,
   };
 
-  const storeFields = store.getState().fields;
+  const storeFields = formFillStore.getState().fields;
 
   for (const originalField of originalFields) {
     const storeField = storeFields[originalField.id];
@@ -1512,15 +1537,28 @@ const runFinalVerificationPass = async (
     if (updateResult.success) {
       results.successful++;
       results.totalRetries += updateResult.retryCount || 0;
-      store.markFieldVerified(originalField.id);
+      formFillStore.getState().markFieldVerified(originalField.id);
     } else {
       results.failed++;
       if (updateResult.error) {
         results.errors.push(updateResult.error);
-        store.markFieldError(originalField.id, updateResult.error.message);
+        formFillStore.getState().markFieldError(originalField.id, updateResult.error.message);
       }
     }
   }
+
+  // Clean up streaming outlines from all filled fields after a brief delay
+  setTimeout(() => {
+    for (const field of originalFields) {
+      const fieldInfo = unifiedFieldRegistry.getField(field.id);
+      const element = fieldInfo?.element;
+      if (element) {
+        element.style.outline = '';
+        element.style.outlineOffset = '';
+        element.style.transition = '';
+      }
+    }
+  }, 1500);
 
   return results;
 };

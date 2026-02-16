@@ -149,18 +149,87 @@ const storeEnvironmentInStorage = () => {
 // Initialize environment storage
 storeEnvironmentInStorage();
 
-// Function to notify active tab about profile updates
-const notifyActiveTabAboutProfileUpdate = async () => {
+// Function to notify all tabs about profile updates
+const notifyAllTabsAboutProfileUpdate = async () => {
   try {
-    const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (activeTab?.id) {
-      chrome.tabs.sendMessage(activeTab.id, { type: MessageType.PROFILE_UPDATED }).catch(() => {
-        // Content script might not be listening, ignore the error
-      });
+    const tabs = await chrome.tabs.query({});
+    for (const tab of tabs) {
+      if (tab.id) {
+        chrome.tabs.sendMessage(tab.id, { type: MessageType.PROFILE_UPDATED }).catch(() => {
+          // Content script might not be listening, ignore the error
+        });
+      }
     }
   } catch (error) {
-    console.error('[Background] Failed to notify active tab about profile update:', error);
+    console.error('[Background] Failed to notify tabs about profile update:', error);
   }
+};
+
+// --- Quota status cache ---
+interface QuotaStatus {
+  canFillForms: boolean;
+  freeFormsRemaining: number;
+  isPro: boolean;
+  tokensRemaining: number;
+}
+
+let quotaCache: { data: QuotaStatus; timestamp: number } | null = null;
+const QUOTA_CACHE_TTL = 30000; // 30 seconds
+
+const fetchQuotaStatus = async (): Promise<QuotaStatus> => {
+  // Return cached result if still fresh
+  if (quotaCache && Date.now() - quotaCache.timestamp < QUOTA_CACHE_TTL) {
+    return quotaCache.data;
+  }
+
+  const configToUse = getConfig();
+
+  // Get auth token: try bearer token first, fall back to session cookie
+  let authToken = '';
+  const tokenResult = await chrome.storage.local.get('bearer_token');
+  if (tokenResult.bearer_token) {
+    authToken = tokenResult.bearer_token;
+  } else {
+    // Fall back to session cookie (same approach as handleGetAuthToken)
+    const cookie = await chrome.cookies.get({
+      url: configToUse.baseURL,
+      name: configToUse.cookieName,
+    });
+    if (cookie?.value) {
+      authToken = cookie.value;
+    }
+  }
+
+  if (!authToken) {
+    return { canFillForms: false, freeFormsRemaining: 0, isPro: false, tokensRemaining: 0 };
+  }
+
+  const url = `${configToUse.apiURL}/auth-health`;
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${authToken}`,
+  };
+
+  const response = await fetch(url, { headers, credentials: 'include' });
+  if (!response.ok) {
+    throw new Error(`Health check failed: ${response.status}`);
+  }
+
+  const data = await response.json();
+  const limitations = data?.limitations;
+
+  const tokensRemaining = limitations?.tokensRemaining ?? 0;
+  const freeFormsRemaining = limitations?.freeFormsRemaining ?? 0;
+  const maxFillingProfiles = limitations?.maxFillingProfiles ?? 1;
+  // Use the same robust Pro detection as the rest of the codebase:
+  // isProSubscriber flag, or has tokens allocated, or has multiple profile slots
+  const isPro = limitations?.isProSubscriber === true || tokensRemaining > 0 || maxFillingProfiles > 1;
+  const canFillForms = isPro ? tokensRemaining > 0 : freeFormsRemaining > 0;
+
+  const status: QuotaStatus = { canFillForms, freeFormsRemaining, isPro, tokensRemaining };
+  quotaCache = { data: status, timestamp: Date.now() };
+  return status;
 };
 
 // Listen for messages from other parts of the extension
@@ -173,9 +242,26 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
   // Handle profile update notifications
   if (request.type === MessageType.PROFILE_UPDATED) {
-    notifyActiveTabAboutProfileUpdate();
+    notifyAllTabsAboutProfileUpdate();
     sendResponse({ success: true });
     return true;
+  }
+
+  // Handle quota status check
+  if (request.type === MessageType.GET_QUOTA_STATUS) {
+    fetchQuotaStatus()
+      .then(status => sendResponse({ success: true, ...status }))
+      .catch(error => {
+        console.error('[Background] Quota check failed:', error);
+        // Return a permissive default so buttons aren't disabled on network errors
+        sendResponse({ success: false, canFillForms: true, freeFormsRemaining: 0, isPro: false, tokensRemaining: 0 });
+      });
+    return true; // Keep the message channel open for async response
+  }
+
+  // Invalidate quota cache when usage refreshes
+  if (request.type === MessageType.REFRESH_USAGE) {
+    quotaCache = null;
   }
 
   return handleAction(request, sender, sendResponse);
@@ -229,10 +315,23 @@ chrome.runtime.onMessageExternal.addListener((request, sender, sendResponse) => 
           console.log('[Background] Bearer token stored successfully');
           sendResponse({ success: true });
 
-          // Broadcast to all extension contexts
+          // Invalidate quota cache so next check fetches fresh data
+          quotaCache = null;
+
+          // Broadcast to extension pages (popup, side panel)
           chrome.runtime.sendMessage({
             type: MessageType.SET_BEARER_TOKEN,
             token: request.token,
+          });
+
+          // Also broadcast to all content scripts (runtime.sendMessage
+          // does NOT reach content scripts)
+          chrome.tabs.query({}, tabs => {
+            for (const tab of tabs) {
+              if (tab.id) {
+                chrome.tabs.sendMessage(tab.id, { type: MessageType.SET_BEARER_TOKEN }).catch(() => {});
+              }
+            }
           });
         }
       });
@@ -246,13 +345,25 @@ chrome.runtime.onMessageExternal.addListener((request, sender, sendResponse) => 
 
   // Handle bearer token clear (logout from web app)
   if (request.type === MessageType.CLEAR_BEARER_TOKEN) {
+    // Invalidate quota cache immediately on logout
+    quotaCache = null;
+
     chrome.storage.local.remove('bearer_token', () => {
       console.log('[Background] Bearer token cleared');
       sendResponse({ success: true });
 
-      // Broadcast to all extension contexts
+      // Broadcast to extension pages (popup, side panel)
       chrome.runtime.sendMessage({
         type: MessageType.CLEAR_BEARER_TOKEN,
+      });
+
+      // Also broadcast to all content scripts
+      chrome.tabs.query({}, tabs => {
+        for (const tab of tabs) {
+          if (tab.id) {
+            chrome.tabs.sendMessage(tab.id, { type: MessageType.CLEAR_BEARER_TOKEN }).catch(() => {});
+          }
+        }
       });
     });
     return true;
@@ -467,7 +578,10 @@ const handleApiRequest = (
         const errorData = await response.json().catch(() => ({ message: response.statusText }));
         console.error('Background: API error:', errorData);
         sendResponse({
-          error: typeof errorData === 'object' ? errorData.message || JSON.stringify(errorData) : 'Request failed',
+          error:
+            typeof errorData === 'object'
+              ? errorData?.error?.message || errorData?.message || 'Request failed'
+              : 'Request failed',
         });
         return;
       }
@@ -504,8 +618,11 @@ const handleApiRequest = (
             type: MessageType.STREAM_DONE,
           });
 
-          // Broadcast usage refresh to all extension contexts (side panel, popup)
-          // This allows them to update the usage count immediately after a form fill
+          // Invalidate quota cache directly since the background's own
+          // onMessage listener won't receive its own runtime.sendMessage()
+          quotaCache = null;
+
+          // Broadcast usage refresh to extension pages (side panel, popup)
           chrome.runtime
             .sendMessage({
               type: MessageType.REFRESH_USAGE,
@@ -513,6 +630,14 @@ const handleApiRequest = (
             .catch(() => {
               // Side panel might not be open, ignore the error
             });
+
+          // Also notify the content script in the sender tab (runtime.sendMessage
+          // does NOT reach content scripts — chrome.tabs.sendMessage is required)
+          if (tabId) {
+            chrome.tabs.sendMessage(tabId, { type: MessageType.REFRESH_USAGE }).catch(() => {
+              // Content script might not be listening, ignore
+            });
+          }
         } catch (error) {
           console.error('Background: Stream error:', error);
           const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';

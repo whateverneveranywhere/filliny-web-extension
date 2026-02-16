@@ -1004,7 +1004,7 @@ const handleReactTextInput = async (element: HTMLElement, value: string, detecti
     console.log(`Handling React ${detection.type} component`);
 
     // Focus the element first
-    element.focus();
+    ensureFocus(element);
 
     // Try native value setter as a fast path before dispatching to specific handlers
     if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
@@ -1014,7 +1014,8 @@ const handleReactTextInput = async (element: HTMLElement, value: string, detecti
       );
       element.dispatchEvent(new Event('change', { bubbles: true }));
 
-      if (element.value === value) {
+      // Wait for React to process before checking if the value stuck
+      if (await waitAndVerifyValue(element, value)) {
         return;
       }
 
@@ -1022,7 +1023,7 @@ const handleReactTextInput = async (element: HTMLElement, value: string, detecti
       setNativeValue(element, value);
       invokeReactOnChange(element);
 
-      if (element.value === value) {
+      if (await waitAndVerifyValue(element, value)) {
         return;
       }
     }
@@ -1107,9 +1108,10 @@ const handleUncontrolledComponent = async (
   value: string,
   _detection: ReactDetection,
 ): Promise<void> => {
-  // For uncontrolled components, direct DOM manipulation should work
-  if (element instanceof HTMLInputElement) {
-    element.value = value;
+  // For uncontrolled components, direct DOM manipulation works but
+  // we still use setNativeValue for consistency with ref-based reads
+  if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
+    setNativeValue(element, value);
     await triggerReactEvents(element, ['input', 'change']);
   }
 };
@@ -1125,8 +1127,9 @@ const handleMaterialUIComponent = async (
   // Material-UI uses controlled components with special event handling
   const muiContainer = element.closest('[class*="MuiInputBase"], [class*="MuiTextField"], [class*="MuiInput"]');
 
-  if (element instanceof HTMLInputElement) {
-    element.value = value;
+  if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
+    // Use native setter to bypass React's controlled input mechanism
+    setNativeValue(element, value);
 
     // Trigger events on both the input and container
     await triggerReactEvents(element, ['focus', 'input', 'change', 'blur']);
@@ -1148,12 +1151,11 @@ const handleAntDesignComponent = async (
 ): Promise<void> => {
   const antContainer = element.closest('[class*="ant-input"], [class*="ant-form-item"]');
 
-  if (element instanceof HTMLInputElement) {
-    element.value = value;
+  if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
+    setNativeValue(element, value);
     await triggerReactEvents(element, ['focus', 'input', 'change', 'blur']);
 
     if (antContainer && antContainer instanceof HTMLElement) {
-      // Ant Design often uses data attributes for state
       antContainer.setAttribute('data-value', value);
       await triggerReactEvents(antContainer, ['input', 'change']);
     }
@@ -1168,8 +1170,8 @@ const handleChakraUIComponent = async (
   value: string,
   _detection: ReactDetection,
 ): Promise<void> => {
-  if (element instanceof HTMLInputElement) {
-    element.value = value;
+  if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
+    setNativeValue(element, value);
     await triggerReactEvents(element, ['focus', 'input', 'change', 'blur']);
   }
 };
@@ -1182,22 +1184,24 @@ const handleFormikComponent = async (
   value: string,
   _detection: ReactDetection,
 ): Promise<void> => {
-  if (element instanceof HTMLInputElement) {
-    element.value = value;
+  if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
+    setNativeValue(element, value);
 
     // Formik listens to specific events for validation
     await triggerReactEvents(element, ['input', 'change', 'blur']);
 
-    // Also try to trigger Formik's setFieldValue if available
-    try {
-      if (hasFormikBag(element) && element.__formik?.setFieldValue) {
-        const fieldName = element.name || element.id;
-        if (fieldName) {
-          element.__formik.setFieldValue(fieldName, value);
+    // Also try to trigger Formik's setFieldValue if available (input elements only)
+    if (element instanceof HTMLInputElement) {
+      try {
+        if (hasFormikBag(element) && element.__formik?.setFieldValue) {
+          const fieldName = element.name || element.id;
+          if (fieldName) {
+            element.__formik.setFieldValue(fieldName, value);
+          }
         }
+      } catch (error) {
+        console.debug('Could not access Formik bag:', error);
       }
-    } catch (error) {
-      console.debug('Could not access Formik bag:', error);
     }
   }
 };
@@ -1210,22 +1214,24 @@ const handleReactHookFormComponent = async (
   value: string,
   _detection: ReactDetection,
 ): Promise<void> => {
-  if (element instanceof HTMLInputElement) {
-    element.value = value;
+  if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
+    setNativeValue(element, value);
 
     // React Hook Form uses register() which attaches specific event handlers
     await triggerReactEvents(element, ['input', 'change', 'blur']);
 
-    // Try to trigger React Hook Form's setValue if available
-    try {
-      if (hasReactHookFormController(element) && element.__reactHookForm?.setValue) {
-        const fieldName = element.name || element.id;
-        if (fieldName) {
-          element.__reactHookForm.setValue(fieldName, value);
+    // Try to trigger React Hook Form's setValue if available (input elements only)
+    if (element instanceof HTMLInputElement) {
+      try {
+        if (hasReactHookFormController(element) && element.__reactHookForm?.setValue) {
+          const fieldName = element.name || element.id;
+          if (fieldName) {
+            element.__reactHookForm.setValue(fieldName, value);
+          }
         }
+      } catch (error) {
+        console.debug('Could not access React Hook Form controller:', error);
       }
-    } catch (error) {
-      console.debug('Could not access React Hook Form controller:', error);
     }
   }
 };
@@ -1238,8 +1244,8 @@ const handleGenericReactComponent = async (
   value: string,
   _detection: ReactDetection,
 ): Promise<void> => {
-  if (element instanceof HTMLInputElement) {
-    element.value = value;
+  if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
+    setNativeValue(element, value);
   } else if (element.isContentEditable) {
     element.textContent = value;
   }
@@ -1251,6 +1257,21 @@ const handleGenericReactComponent = async (
 /**
  * Trigger React state updates using synthetic events
  */
+/**
+ * Wait for React's reconciler to process and verify the value stuck.
+ * React processes events in microtasks, so we wait a frame + microtask
+ * to check if the value survived React's re-render.
+ */
+const waitAndVerifyValue = async (
+  element: HTMLInputElement | HTMLTextAreaElement,
+  expectedValue: string,
+): Promise<boolean> => {
+  // Wait for React's microtask queue to flush + one animation frame for re-render
+  await new Promise(resolve => setTimeout(resolve, 0));
+  await new Promise(resolve => requestAnimationFrame(() => resolve(undefined)));
+  return element.value === expectedValue;
+};
+
 const triggerReactStateUpdate = async (
   element: HTMLElement,
   value: string,
@@ -1258,24 +1279,42 @@ const triggerReactStateUpdate = async (
 ): Promise<void> => {
   // For controlled components, we need to simulate user input to trigger state updates
   if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
-    // PRIMARY: Use native value setter + dispatch input event
+    // Focus first to ensure event handlers are active
+    ensureFocus(element);
+
+    // PRIMARY: Use native value setter + dispatch InputEvent with insertReplacementText.
+    // This is the technique used by Playwright and Cypress for React controlled inputs.
     setNativeValue(element, value);
     element.dispatchEvent(new InputEvent('input', { bubbles: true, data: value, inputType: 'insertReplacementText' }));
     element.dispatchEvent(new Event('change', { bubbles: true }));
 
-    if (element.value === value) {
+    // Wait for React to process the event before checking
+    if (await waitAndVerifyValue(element, value)) {
       return;
     }
 
     // FALLBACK 1: Native setter + direct React onChange invocation
+    // This bypasses the synthetic event system and calls the handler directly
     setNativeValue(element, value);
     invokeReactOnChange(element);
 
-    if (element.value === value) {
+    if (await waitAndVerifyValue(element, value)) {
       return;
     }
 
-    // FALLBACK 2: Character-by-character typing (last resort)
+    // FALLBACK 2: Native setter + compositionend event.
+    // Some frameworks (especially CJK IME-aware ones) respond to compositionend.
+    setNativeValue(element, value);
+    element.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
+    element.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true, data: value }));
+    element.dispatchEvent(new InputEvent('input', { bubbles: true, data: value, inputType: 'insertCompositionText' }));
+    element.dispatchEvent(new Event('change', { bubbles: true }));
+
+    if (await waitAndVerifyValue(element, value)) {
+      return;
+    }
+
+    // FALLBACK 3: Character-by-character typing (last resort, slowest but most compatible)
     element.value = '';
     await triggerReactEvents(element, ['focus']);
 
@@ -1283,7 +1322,8 @@ const triggerReactStateUpdate = async (
       const char = value[i];
       const newValue = value.substring(0, i + 1);
 
-      element.value = newValue;
+      // Use native setter for each character to properly trigger React's onChange
+      setNativeValue(element, newValue);
 
       const inputEvent = new InputEvent('input', {
         bubbles: true,

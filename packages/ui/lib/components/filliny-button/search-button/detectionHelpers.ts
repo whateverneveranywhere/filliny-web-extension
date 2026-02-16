@@ -724,9 +724,13 @@ const openCrossOriginIframeInNewTabAndAlert = (): void => {
     try {
       const currentUrl = window.location.href;
       window.open(currentUrl, '_blank');
-      alert(
-        "This page is embedded in a cross-origin iframe which limits Filliny's functionality. We've opened it in a new tab where Filliny can work properly.",
-      );
+      // Dynamic import to avoid circular dependency - toast is module-level, not a hook
+      import('./toastHelpers').then(({ showInfoToast }) => {
+        showInfoToast(
+          'Cross-Origin Iframe',
+          "This page is embedded in a cross-origin iframe which limits Filliny's functionality. We've opened it in a new tab where Filliny can work properly.",
+        );
+      });
     } catch (error) {
       debug.error('Could not open page in new tab:', error);
     }

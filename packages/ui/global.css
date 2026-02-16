@@ -1,3 +1,6 @@
+/* This @import works for extension pages (popup, side-panel, options) where CSS
+   is loaded normally via Vite. For shadow DOM (content-ui), CSSStyleSheet.replaceSync()
+   silently drops @import rules, so init-app-with-shadow.ts injects a <link> tag instead. */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
 @tailwind base;
@@ -128,9 +131,19 @@ body {
 }
 
 /* Shadow DOM specific styles - :host applies to the shadow root container */
-/* This ensures content inside shadow DOM gets the same base styles as body */
+/* CRITICAL: `all: initial` resets ALL inherited CSS properties from the host page.
+   Without this, sites like LinkedIn inject CSS resets that shrink our buttons,
+   override font sizes, change line heights, etc. through CSS inheritance.
+   We then re-apply our own base styles to rebuild from a clean slate. */
 :host {
+  all: initial;
   display: block;
+  box-sizing: border-box;
+  contain: style;
+  min-width: 0;
+  min-height: 0;
+  font-size: 16px;
+  line-height: 1.5;
   color: oklch(var(--foreground));
 
   font-family:
@@ -151,24 +164,41 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Apply base styles to elements inside shadow DOM root container */
+/* Re-establish base styles inside Shadow DOM after the `all: initial` reset */
 :host > * {
   font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
   color: inherit;
+  box-sizing: border-box;
 }
 
 code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
 }
 
-/* Base Layer Styles */
-* {
+/* Base Layer Styles - ensure consistent box model and borders inside Shadow DOM */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
   border-color: oklch(var(--border));
+  min-width: 0;
+  min-height: 0;
 }
 
 button:not([disabled]),
 [role='button']:not([disabled]) {
   cursor: pointer;
+}
+
+/* Prevent host page CSS from collapsing button/interactive element sizes */
+button,
+[role='button'] {
+  font-size: 16px;
+  line-height: 1.5;
+  min-width: 0;
+  min-height: 0;
 }
 
 /* Smooth Scrolling */

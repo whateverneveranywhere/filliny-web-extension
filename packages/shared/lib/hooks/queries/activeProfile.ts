@@ -5,23 +5,13 @@ import { useMemo } from 'react';
 import type { DTOFillingProfileItem } from '@extension/storage';
 
 /**
- * Options for useActiveProfile hook
+ * Hook to get the active profile and profiles list.
+ * Auth-awareness is handled automatically by the underlying query hooks
+ * via AuthContext — no explicit `enabled` flag needed.
  */
-interface UseActiveProfileOptions {
-  /** Whether to enable the underlying queries. Pass false when user is not authenticated. */
-  enabled?: boolean;
-}
-
-/**
- * Hook to get the active profile and profiles list
- *
- * @param options.enabled - Whether to enable the underlying queries (default: true)
- *                          Pass false when user is not authenticated to prevent 401 errors
- */
-export const useActiveProfile = (options?: UseActiveProfileOptions) => {
-  const { enabled = true } = options ?? {};
+export const useActiveProfile = () => {
   const defaultStorageProfile = useStorage(profileStorage);
-  const { data: profiles } = useProfilesListQuery({ enabled });
+  const { data: profiles } = useProfilesListQuery();
 
   const activeProfileId = useMemo(
     () =>
@@ -31,11 +21,7 @@ export const useActiveProfile = (options?: UseActiveProfileOptions) => {
     [profiles, defaultStorageProfile],
   );
 
-  // Only fetch profile by ID when we have a valid ID and queries are enabled
-  const { data: activeProfile } = useFillingProfileById(activeProfileId, { enabled });
-
-  // We don't need to set the profile in storage here since it's already done in the home-page component
-  // This avoids duplicate storage operations and potential race conditions
+  const { data: activeProfile } = useFillingProfileById(activeProfileId);
 
   return {
     activeProfile,

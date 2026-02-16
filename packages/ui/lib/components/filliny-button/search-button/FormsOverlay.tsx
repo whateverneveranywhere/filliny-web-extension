@@ -9,7 +9,7 @@ import {
 import { Button } from '../../ui';
 import * as Progress from '@radix-ui/react-progress';
 import { X, Wand2, Loader2, CheckCircle2, XCircle, AlertTriangle, Check } from 'lucide-react';
-import { useRef, useState, useEffect } from 'react';
+import { useRef } from 'react';
 import type { OverlayPosition } from './types';
 import type React from 'react';
 
@@ -20,49 +20,16 @@ interface OverlayProps {
   testMode?: boolean;
 }
 
-const STREAMING_MESSAGES = [
-  'Analyzing form structure...',
-  'Reading field requirements...',
-  'Matching context to fields...',
-  'Generating values...',
-  'Almost there...',
-];
-
-const FINALIZING_MESSAGES = ['Verifying filled values...', 'Double-checking accuracy...'];
-
 /**
- * Hook for cycling through contextual messages during streaming
+ * Compact floating progress card shown during streaming.
+ * Renders as a fixed-position card in the bottom-right of the viewport,
+ * independent of the form overlay so users can see fields being filled.
  */
-const useRotatingMessage = (phase: StreamingPhase) => {
-  const [index, setIndex] = useState(0);
-  const messages = phase === StreamingPhase.FINALIZING ? FINALIZING_MESSAGES : STREAMING_MESSAGES;
-
-  useEffect(() => {
-    if (phase !== StreamingPhase.STREAMING && phase !== StreamingPhase.FINALIZING) {
-      setIndex(0);
-      return;
-    }
-
-    const interval = setInterval(() => {
-      setIndex(prev => (prev + 1) % messages.length);
-    }, 3000);
-
-    return () => clearInterval(interval);
-  }, [phase, messages.length]);
-
-  if (phase !== StreamingPhase.STREAMING && phase !== StreamingPhase.FINALIZING) return null;
-  return messages[index];
-};
-
-/**
- * Streaming progress component that shows real-time fill status
- */
-const StreamingProgressState: React.FC = () => {
+const CompactStreamingProgress: React.FC = () => {
   const phase = useFormFillStore(state => state.phase);
   const progress = useFormFillStore(selectProgress);
   const currentField = useFormFillStore(selectCurrentlyFillingField);
   const recentFields = useFormFillStore(selectRecentlyFilledFields);
-  const rotatingMessage = useRotatingMessage(phase);
 
   const progressPercent =
     progress.totalFields > 0 ? Math.round((progress.fieldsWithValues / progress.totalFields) * 100) : 0;
@@ -76,107 +43,85 @@ const StreamingProgressState: React.FC = () => {
     if (isError) return 'filliny-bg-red-400';
     if (isPartialSuccess) return 'filliny-bg-amber-400';
     if (isFullSuccess) return 'filliny-bg-green-400';
-    return 'filliny-bg-primary-foreground';
-  };
-
-  const getHeadingText = () => {
-    if (isFullSuccess) return 'Form Filled!';
-    if (isPartialSuccess) return 'Mostly Filled';
-    if (isError) return 'Fill Failed';
-    return 'Filling Your Form';
+    return 'filliny-bg-white';
   };
 
   const getStatusIcon = () => {
-    if (isFullSuccess) return <CheckCircle2 className="filliny-h-8 filliny-w-8 filliny-text-green-400" />;
-    if (isPartialSuccess) return <AlertTriangle className="filliny-h-8 filliny-w-8 filliny-text-amber-400" />;
-    if (isError) return <XCircle className="filliny-h-8 filliny-w-8 filliny-text-red-400" />;
-    return (
-      <div className="filliny-h-8 filliny-w-8 filliny-animate-spin">
-        <Loader2 className="filliny-h-full filliny-w-full" />
-      </div>
-    );
+    if (isFullSuccess) return <CheckCircle2 className="filliny-h-4 filliny-w-4 filliny-text-green-400" />;
+    if (isPartialSuccess) return <AlertTriangle className="filliny-h-4 filliny-w-4 filliny-text-amber-400" />;
+    if (isError) return <XCircle className="filliny-h-4 filliny-w-4 filliny-text-red-400" />;
+    return <Loader2 className="filliny-h-4 filliny-w-4 filliny-animate-spin filliny-text-white" />;
   };
 
-  const getPhaseLabel = (): string => {
-    switch (phase) {
-      case StreamingPhase.STREAMING:
-        return progress.fieldsWithValues > 0
-          ? `Filling ${progress.fieldsWithValues} of ${progress.totalFields} fields...`
-          : 'Starting form fill...';
-      case StreamingPhase.FINALIZING:
-        return 'Verifying filled fields...';
-      case StreamingPhase.COMPLETE:
-        return isPartialSuccess ? 'Completed with some issues' : 'Done!';
-      case StreamingPhase.ERROR:
-        return 'An error occurred';
-      default:
-        return 'Preparing...';
-    }
+  const getStatusText = (): string => {
+    if (isFullSuccess) return 'Form Filled!';
+    if (isPartialSuccess) return 'Mostly Filled';
+    if (isError) return 'Fill Failed';
+    if (phase === StreamingPhase.FINALIZING) return 'Verifying...';
+    return `${progress.fieldsWithValues}/${progress.totalFields} fields`;
   };
 
   return (
     <div
-      className="filliny-flex filliny-flex-col filliny-items-center filliny-gap-4 filliny-text-primary-foreground"
-      style={{ pointerEvents: 'auto' }}>
-      {getStatusIcon()}
-      <div className="filliny-flex filliny-w-64 filliny-flex-col filliny-items-center filliny-gap-2">
-        <p className="filliny-text-lg filliny-font-semibold">{getHeadingText()}</p>
-        <Progress.Root
-          className="filliny-relative filliny-h-2 filliny-w-full filliny-overflow-hidden filliny-rounded-full filliny-bg-white/20"
-          value={progressPercent}>
-          <Progress.Indicator
-            className={`filliny-h-full filliny-rounded-full filliny-transition-all filliny-duration-300 ${getBarColor()}`}
-            style={{ width: `${progressPercent}%` }}
-          />
-        </Progress.Root>
-        <p className="filliny-text-sm filliny-text-primary-foreground/80">{getPhaseLabel()}</p>
-
-        {/* Rotating contextual message */}
-        {rotatingMessage && (
-          <p className="filliny-text-xs filliny-text-primary-foreground/60 filliny-transition-opacity filliny-duration-300">
-            {rotatingMessage}
-          </p>
-        )}
-
-        {/* Currently filling field */}
-        {currentField && !isComplete && !isError && (
-          <p className="filliny-text-xs filliny-text-primary-foreground/70 filliny-truncate filliny-max-w-full">
-            Filling: {currentField}
-          </p>
-        )}
-
-        {/* Recently filled fields with checkmarks */}
-        {recentFields.length > 0 && !isError && (
-          <div className="filliny-flex filliny-flex-col filliny-items-center filliny-gap-0.5 filliny-mt-1">
-            {recentFields.map((label, i) => (
-              <span
-                key={`${label}-${i}`}
-                className="filliny-flex filliny-items-center filliny-gap-1 filliny-text-xs filliny-text-green-300/80">
-                <Check className="filliny-h-3 filliny-w-3" />
-                <span className="filliny-truncate filliny-max-w-[200px]">{label}</span>
-              </span>
-            ))}
-          </div>
-        )}
-
-        {/* Error count */}
-        {isPartialSuccess && (
-          <p className="filliny-text-xs filliny-text-amber-300">
-            {progress.fieldsErrored} field{progress.fieldsErrored > 1 ? 's' : ''} couldn&apos;t be filled
-          </p>
-        )}
-        {isError && progress.fieldsErrored > 0 && (
-          <p className="filliny-text-xs filliny-text-red-300">
-            {progress.fieldsErrored} field{progress.fieldsErrored > 1 ? 's' : ''} failed
-          </p>
-        )}
+      style={{
+        position: 'fixed',
+        bottom: '16px',
+        right: '16px',
+        zIndex: 10000001,
+        pointerEvents: 'auto',
+      }}
+      className="filliny-w-[220px] filliny-rounded-lg filliny-bg-zinc-900/95 filliny-backdrop-blur-xl filliny-border filliny-border-white/10 filliny-shadow-lg filliny-p-3 filliny-transition-all filliny-duration-300">
+      {/* Header row: icon + status + counter */}
+      <div className="filliny-flex filliny-items-center filliny-gap-2 filliny-mb-2">
+        {getStatusIcon()}
+        <span className="filliny-text-sm filliny-font-medium filliny-text-white">{getStatusText()}</span>
       </div>
+
+      {/* Mini progress bar */}
+      <Progress.Root
+        className="filliny-relative filliny-h-1.5 filliny-w-full filliny-overflow-hidden filliny-rounded-full filliny-bg-white/10 filliny-mb-2"
+        value={progressPercent}>
+        <Progress.Indicator
+          className={`filliny-h-full filliny-rounded-full filliny-transition-all filliny-duration-300 ${getBarColor()}`}
+          style={{ width: `${progressPercent}%` }}
+        />
+      </Progress.Root>
+
+      {/* Currently filling field */}
+      {currentField && !isComplete && !isError && (
+        <p className="filliny-text-xs filliny-text-white/60 filliny-truncate">Filling: {currentField}</p>
+      )}
+
+      {/* Recently filled fields (last 2) */}
+      {recentFields.length > 0 && !isError && (
+        <div className="filliny-flex filliny-flex-col filliny-gap-0.5 filliny-mt-1">
+          {recentFields.slice(-2).map((label, i) => (
+            <span
+              key={`${label}-${i}`}
+              className="filliny-flex filliny-items-center filliny-gap-1 filliny-text-xs filliny-text-green-400/70">
+              <Check className="filliny-h-3 filliny-w-3 filliny-shrink-0" />
+              <span className="filliny-truncate">{label}</span>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Error info */}
+      {isPartialSuccess && (
+        <p className="filliny-text-xs filliny-text-amber-300 filliny-mt-1">
+          {progress.fieldsErrored} field{progress.fieldsErrored > 1 ? 's' : ''} couldn&apos;t be filled
+        </p>
+      )}
+      {isError && progress.fieldsErrored > 0 && (
+        <p className="filliny-text-xs filliny-text-red-300 filliny-mt-1">
+          {progress.fieldsErrored} field{progress.fieldsErrored > 1 ? 's' : ''} failed
+        </p>
+      )}
     </div>
   );
 };
 
 interface ActionButtonsProps {
-  loading: boolean;
   testMode: boolean;
   isFormLikelyOutOfView: boolean;
   onFillClick: (event: React.MouseEvent<HTMLButtonElement>) => Promise<void>;
@@ -188,7 +133,6 @@ interface ActionButtonsProps {
  * Pure presentation component for action buttons
  */
 const ActionButtons: React.FC<ActionButtonsProps> = ({
-  loading,
   testMode,
   isFormLikelyOutOfView,
   onFillClick,
@@ -199,14 +143,7 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
     <div
       className="filliny-fixed filliny-left-1/2 filliny-top-1/2 filliny-z-[10000001] filliny-flex filliny-w-full filliny-max-w-fit filliny--translate-x-1/2 filliny--translate-y-1/2 filliny-flex-col filliny-items-center filliny-gap-3"
       style={{ pointerEvents: 'auto' }}>
-      <Button
-        ref={buttonRef}
-        loading={loading}
-        disabled={loading}
-        type="button"
-        size="lg"
-        variant="default"
-        onClick={onFillClick}>
+      <Button ref={buttonRef} type="button" size="lg" variant="default" onClick={onFillClick}>
         <Wand2 className="filliny-h-5 filliny-w-5" />
         {testMode ? 'Test Fill Form' : 'Auto-Fill Form'}
       </Button>
@@ -232,7 +169,6 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
 
 interface OverlayContainerProps {
   overlayPosition: OverlayPosition;
-  loading: boolean;
   formId: string;
   isFormLikelyOutOfView: boolean;
   onScrollToForm: () => void;
@@ -240,11 +176,11 @@ interface OverlayContainerProps {
 }
 
 /**
- * Pure presentation component for the overlay container
+ * Pure presentation component for the overlay container.
+ * Only renders the dimmed overlay when showing action buttons (pre-fill state).
  */
 const OverlayContainer: React.FC<OverlayContainerProps> = ({
   overlayPosition,
-  loading,
   formId,
   isFormLikelyOutOfView,
   onScrollToForm,
@@ -258,7 +194,6 @@ const OverlayContainer: React.FC<OverlayContainerProps> = ({
     left: `${overlayPosition.left}px`,
     width: `${overlayPosition.width}px`,
     height: `${overlayPosition.height}px`,
-    pointerEvents: loading ? ('auto' as const) : ('none' as const),
     contain: 'layout style paint' as const,
     zIndex: 999999,
     transition: 'all 0.3s ease',
@@ -267,11 +202,7 @@ const OverlayContainer: React.FC<OverlayContainerProps> = ({
   return (
     <div
       ref={overlayRef}
-      className={`filliny-pointer-events-auto filliny-fixed filliny-flex filliny-items-center filliny-justify-center filliny-transition-all filliny-duration-300 ${
-        loading
-          ? 'filliny-bg-foreground/40 filliny-backdrop-blur-sm'
-          : 'filliny-rounded-lg filliny-bg-foreground/30 filliny-backdrop-blur-md hover:filliny-bg-foreground/40'
-      } `}
+      className="filliny-pointer-events-auto filliny-fixed filliny-flex filliny-items-center filliny-justify-center filliny-transition-all filliny-duration-300 filliny-rounded-lg filliny-bg-foreground/30 filliny-backdrop-blur-md hover:filliny-bg-foreground/40"
       style={overlayStyle}
       data-highlight-overlay="true"
       data-form-id={formId}
@@ -288,11 +219,13 @@ const OverlayContainer: React.FC<OverlayContainerProps> = ({
 /**
  * FormsOverlay - Container component that composes logic hooks and presentation components
  *
- * This component follows separation of concerns:
- * - useFormElement: handles form element finding and scrolling
- * - useOverlayPosition: handles overlay position tracking
- * - useFormFill: handles form fill logic
- * - LoadingState, ActionButtons, OverlayContainer: pure presentation components
+ * Three-phase rendering:
+ * 1. Pre-fill: Shows dimmed overlay over form with "Auto-Fill Form" button
+ * 2. Streaming: Keeps a subtle overlay with floating progress card while fields fill gradually
+ * 3. Complete/Error: Shows completion state briefly before auto-dismissing
+ *
+ * The overlay remains visible during streaming to maintain layout stability
+ * and signal to the user that a background process is active.
  */
 const FormsOverlay: React.FC<OverlayProps> = ({ formId, initialPosition, onDismiss, testMode = false }) => {
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -302,25 +235,48 @@ const FormsOverlay: React.FC<OverlayProps> = ({ formId, initialPosition, onDismi
   const { overlayPosition, isFormLikelyOutOfView } = useOverlayPosition({ formRef, initialPosition });
   const { loading, handleFillClick } = useFormFill({ formId, testMode, onDismiss });
 
+  // During streaming: show a minimal overlay with the progress card
+  // The overlay stays visible but semi-transparent so users can see fields being filled
+  if (loading) {
+    return (
+      <>
+        {/* Minimal overlay to signal active process - pointer-events none so fields remain visible */}
+        <div
+          className="filliny-pointer-events-none filliny-fixed filliny-rounded-lg filliny-transition-all filliny-duration-500"
+          style={{
+            position: 'fixed',
+            top: `${overlayPosition.top}px`,
+            left: `${overlayPosition.left}px`,
+            width: `${overlayPosition.width}px`,
+            height: `${overlayPosition.height}px`,
+            zIndex: 999998,
+            border: '2px solid rgba(16, 185, 129, 0.3)',
+            borderRadius: '8px',
+            background: 'rgba(16, 185, 129, 0.03)',
+            transition: 'all 0.3s ease',
+          }}
+          data-highlight-overlay="true"
+          data-form-id={formId}
+        />
+        <CompactStreamingProgress />
+      </>
+    );
+  }
+
+  // Pre-fill state: show dimmed overlay with action buttons
   return (
     <OverlayContainer
       overlayPosition={overlayPosition}
-      loading={loading}
       formId={formId}
       isFormLikelyOutOfView={isFormLikelyOutOfView}
       onScrollToForm={scrollToForm}>
-      {loading ? (
-        <StreamingProgressState />
-      ) : (
-        <ActionButtons
-          loading={loading}
-          testMode={testMode}
-          isFormLikelyOutOfView={isFormLikelyOutOfView}
-          onFillClick={handleFillClick}
-          onDismiss={onDismiss}
-          buttonRef={buttonRef}
-        />
-      )}
+      <ActionButtons
+        testMode={testMode}
+        isFormLikelyOutOfView={isFormLikelyOutOfView}
+        onFillClick={handleFillClick}
+        onDismiss={onDismiss}
+        buttonRef={buttonRef}
+      />
     </OverlayContainer>
   );
 };

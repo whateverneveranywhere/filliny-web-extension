@@ -1,3 +1,4 @@
+import { MessageType } from '../types/enums.js';
 import { clearUserStorage } from '../utils/helpers.js';
 import { BackgroundActions, GetAuthTokenResponseSchema } from '../utils/types.js';
 import { authStorage } from '@extension/storage';
@@ -88,8 +89,14 @@ export const useExtensionAuth = (): ExtensionAuthState => {
     initializeAuth();
 
     // Listen for auth token changes from background worker
+    // Handles both cookie-based (AUTH_TOKEN_CHANGED) and webapp-based (SET/CLEAR_BEARER_TOKEN) messages
     const handleMessage = (
-      message: { action: BackgroundActions; payload?: { success?: { token?: string | null } } },
+      message: {
+        action?: BackgroundActions;
+        type?: string;
+        token?: string;
+        payload?: { success?: { token?: string | null } };
+      },
       _sender: chrome.runtime.MessageSender,
       _sendResponse: (response?: unknown) => void,
     ) => {
@@ -97,6 +104,7 @@ export const useExtensionAuth = (): ExtensionAuthState => {
         return;
       }
 
+      // Handle cookie-based auth change
       if (message.action === BackgroundActions.AUTH_TOKEN_CHANGED) {
         console.log('[useExtensionAuth] AUTH_TOKEN_CHANGED message received');
 
@@ -115,6 +123,20 @@ export const useExtensionAuth = (): ExtensionAuthState => {
           clearUserStorage();
           setToken(null);
         }
+      }
+
+      // Handle webapp-based bearer token set (login from webapp)
+      if (message.type === MessageType.SET_BEARER_TOKEN) {
+        console.log('[useExtensionAuth] SET_BEARER_TOKEN message received');
+        // Re-initialize auth to pick up the new token
+        initializeAuth();
+      }
+
+      // Handle webapp-based bearer token clear (logout from webapp)
+      if (message.type === MessageType.CLEAR_BEARER_TOKEN) {
+        console.log('[useExtensionAuth] CLEAR_BEARER_TOKEN message received');
+        clearUserStorage();
+        setToken(null);
       }
     };
 

@@ -12,9 +12,10 @@ import type { Field } from '@extension/shared';
 const debug = createDebugLogger('Select');
 
 /**
- * Enhanced React Select handler for all React Select variants
+ * Enhanced React Select handler for all React Select variants.
+ * Async to properly await dropdown rendering before selecting an option.
  */
-const handleReactSelect = (element: HTMLElement, normalizedValues: string[]): boolean => {
+const handleReactSelect = async (element: HTMLElement, normalizedValues: string[]): Promise<boolean> => {
   try {
     debug.log('🔍 Handling React Select component...', element);
 
@@ -44,10 +45,39 @@ const handleReactSelect = (element: HTMLElement, normalizedValues: string[]): bo
       return false;
     }
 
-    // Wait briefly for the dropdown to render
-    setTimeout(() => {
-      selectReactSelectOption(normalizedValues[0], element);
-    }, 50);
+    // Wait for the dropdown menu to render with retry logic.
+    // React Select renders the menu asynchronously, so we need to poll for it.
+    const menuSelectors = [
+      '[class*="react-select__menu"]',
+      '[class*="select__menu"]',
+      '[class*="css-"][class*="menu"]',
+      '[role="listbox"]',
+      '.react-select__menu-list',
+      '.select__menu-list',
+    ];
+
+    let menu: HTMLElement | null = null;
+    for (let attempt = 0; attempt < 10; attempt++) {
+      await new Promise(resolve => setTimeout(resolve, 50));
+      for (const selector of menuSelectors) {
+        const found = document.querySelector(selector);
+        if (found instanceof HTMLElement && window.getComputedStyle(found).display !== 'none') {
+          menu = found;
+          break;
+        }
+      }
+      if (menu) break;
+    }
+
+    if (!menu) {
+      debug.warn('❌ React Select menu did not appear after waiting');
+      // Close dropdown by clicking outside
+      document.body.click();
+      return false;
+    }
+
+    // Select the option now that the menu is visible
+    selectReactSelectOption(normalizedValues[0], element);
 
     return true;
   } catch (error) {
@@ -328,9 +358,10 @@ const findMatchingReactSelectOption = (options: HTMLElement[], value: string): H
 };
 
 /**
- * Enhanced Material-UI Select handler
+ * Enhanced Material-UI Select handler.
+ * Async to properly await dropdown rendering before selecting an option.
  */
-const handleMaterialUISelect = (element: HTMLElement, normalizedValues: string[]): boolean => {
+const handleMaterialUISelect = async (element: HTMLElement, normalizedValues: string[]): Promise<boolean> => {
   try {
     debug.log('🔍 Handling Material-UI Select component...', element);
 
@@ -360,10 +391,39 @@ const handleMaterialUISelect = (element: HTMLElement, normalizedValues: string[]
       return false;
     }
 
-    // Wait briefly for the dropdown to render
-    setTimeout(() => {
-      selectMaterialUIOption(normalizedValues[0], element);
-    }, 100);
+    // Wait for the MUI dropdown to render (uses Popover/Menu portals).
+    // MUI renders menu items in a portal at the end of document.body,
+    // so we poll for it with a short timeout.
+    const muiMenuSelectors = [
+      '[class*="MuiMenu-paper"] [role="listbox"]',
+      '[class*="MuiMenu-paper"] [role="presentation"]',
+      '[class*="MuiPopover-paper"] [role="listbox"]',
+      '[class*="MuiMenu-list"]',
+      '[role="listbox"]',
+      '[role="presentation"] [role="option"]',
+    ];
+
+    let menuFound = false;
+    for (let attempt = 0; attempt < 10; attempt++) {
+      await new Promise(resolve => setTimeout(resolve, 50));
+      for (const selector of muiMenuSelectors) {
+        const found = document.querySelector(selector);
+        if (found instanceof HTMLElement && window.getComputedStyle(found).display !== 'none') {
+          menuFound = true;
+          break;
+        }
+      }
+      if (menuFound) break;
+    }
+
+    if (!menuFound) {
+      debug.warn('❌ Material-UI dropdown menu did not appear after waiting');
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      return false;
+    }
+
+    // Select the option now that the menu is visible
+    selectMaterialUIOption(normalizedValues[0], element);
 
     return true;
   } catch (error) {
@@ -918,13 +978,13 @@ const updateSelect = async (element: HTMLElement, value: string | string[] | unk
     // Enhanced framework-specific handling
 
     // 1. Try React Select first (most common modern pattern)
-    if (handleReactSelect(element, normalizedValues)) {
+    if (await handleReactSelect(element, normalizedValues)) {
       debug.log('✅ Successfully handled as React Select');
       return;
     }
 
     // 2. Try Material-UI Select
-    if (handleMaterialUISelect(element, normalizedValues)) {
+    if (await handleMaterialUISelect(element, normalizedValues)) {
       debug.log('✅ Successfully handled as Material-UI Select');
       return;
     }
