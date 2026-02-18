@@ -121,8 +121,11 @@ const ProfileForm = ({ id, onFormSubmit, onDirtyChange }: Props) => {
           description: `"${formData.profileName}" has been saved with ${websiteCount} website${websiteCount !== 1 ? 's' : ''}.`,
         });
       } else {
-        const newProfile = await createProfile({ data: transformedData });
-        await profileStorage.setDefaultProfile(newProfile);
+        const createdResponse = await createProfile({ data: transformedData });
+        // The mutation's onSuccess already stores the full merged profile in storage.
+        // Construct the same full profile here for the notification to be consistent.
+        const fullProfile: DTOProfileFillingForm = { ...transformedData, id: createdResponse.id };
+        await profileStorage.setDefaultProfile(fullProfile);
         // Notify content scripts about the profile update
         await notifyProfileUpdate(MessageType.PROFILE_UPDATED);
         toast({

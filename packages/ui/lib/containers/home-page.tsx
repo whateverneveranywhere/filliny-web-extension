@@ -29,15 +29,21 @@ const useProfileManagement = (url: string) => {
   const { mutateAsync: editProfile, isPending: isUpdating } = useEditFillingProfileMutation();
 
   const isLoading = isCreatingProfile || isUpdating;
-  const hasNoProfiles = !profiles?.length;
+  // Check both the profiles list AND the active profile from storage.
+  // After a create mutation, the list may still be stale-empty while the
+  // active profile is already set via storage — don't flash the empty state.
+  const hasNoProfiles = !profiles?.length && !activeProfile;
 
-  // Set the default profile in storage whenever it changes
+  // Sync the active profile to chrome storage so content scripts can evaluate
+  // website matching. Only clear storage when we are certain there are no
+  // profiles (profiles is an explicit empty array, not undefined/loading) AND
+  // there is no active profile from a recent mutation (prevents race condition
+  // where the stale empty list clears storage right after a create mutation).
   useEffect(() => {
-    // Clear default profile if there are no profiles left
-    if (!profiles?.length) {
-      profileStorage.setDefaultProfile(undefined);
-    } else if (activeProfile) {
+    if (activeProfile?.id) {
       profileStorage.setDefaultProfile(activeProfile);
+    } else if (Array.isArray(profiles) && profiles.length === 0) {
+      profileStorage.setDefaultProfile(undefined);
     }
   }, [activeProfile, profiles]);
 

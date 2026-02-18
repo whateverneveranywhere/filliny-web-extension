@@ -300,6 +300,19 @@ const DTOProfileFillingFormSchema = z.object({
   fillingWebsites: z.array(DTOFillingWebsiteSchema),
 });
 
+/**
+ * Create profile response schema (lightweight response from POST /profiles)
+ *
+ * The create endpoint returns only { id, profileName, isActive } — NOT the full profile.
+ * Callers must merge this response with the original input data to reconstruct
+ * the complete profile for storage and cache.
+ */
+const CreateProfileResponseSchema = z.object({
+  id: z.union([z.string(), z.number()]).transform(val => (typeof val === 'string' ? val : String(val))),
+  profileName: z.string(),
+  isActive: z.boolean().optional(),
+});
+
 // ============================================================================
 // Authorized Files Schemas
 // ============================================================================
@@ -977,6 +990,7 @@ type DTOCompletionRateData = z.infer<typeof DTOCompletionRateDataSchema>;
 type DTOProfileStats = z.infer<typeof DTOProfileStatsSchema>;
 
 // Profile types (with Response suffix for API responses, without for storage)
+type CreateProfileResponse = z.infer<typeof CreateProfileResponseSchema>;
 type DTOFillingProfileItem = z.infer<typeof DTOFillingProfileItemSchema>;
 type DTOFillingProfileItemResponse = z.infer<typeof DTOFillingProfileItemSchema>;
 type DTOSuggestedWebsite = z.infer<typeof DTOSuggestedWebsiteSchema>;
@@ -1073,6 +1087,7 @@ export {
   DTOFillingWebsiteSchema,
   DTOFillingPreferencesSchema,
   DTOProfileFillingFormSchema,
+  CreateProfileResponseSchema,
 };
 
 // Authorized Files Schemas
@@ -1165,6 +1180,7 @@ export type {
   DTOFillingWebsiteResponse,
   DTOFillingPreferences,
   DTOFillingPreferencesResponse,
+  CreateProfileResponse,
   DTOProfileFillingForm,
   DTOProfileFillingFormResponse,
   InputFieldType,

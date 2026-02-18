@@ -6,11 +6,17 @@ import {
   DTOToneSchema,
   DTOPovSchema,
   DTOProfileFillingFormSchema,
+  CreateProfileResponseSchema,
   SuccessResponseSchema,
   EditProfileResponseSchema,
 } from '../../schemas/index.js';
 import { z } from 'zod';
-import type { EditProfileResponse, ChangeActiveProfileResponse, DeleteProfileResponse } from '../../schemas/index.js';
+import type {
+  CreateProfileResponse,
+  EditProfileResponse,
+  ChangeActiveProfileResponse,
+  DeleteProfileResponse,
+} from '../../schemas/index.js';
 import type {
   DTOFillingProfileItem,
   DTOPov,
@@ -53,8 +59,8 @@ export const getTonesListService = (): Promise<DTOTone[]> =>
   httpService.get(profiles.tones, { schema: z.array(DTOToneSchema) });
 export const getPOVsListService = (): Promise<DTOPov[]> =>
   httpService.get(profiles.povs, { schema: z.array(DTOPovSchema) });
-export const createFillingProfileService = (data: DTOProfileFillingForm): Promise<DTOProfileFillingForm> =>
-  httpService.post(profiles.create, transformProfileForApi(data), { schema: DTOProfileFillingFormSchema });
+export const createFillingProfileService = (data: DTOProfileFillingForm): Promise<CreateProfileResponse> =>
+  httpService.post(profiles.create, transformProfileForApi(data), { schema: CreateProfileResponseSchema });
 export const editFillingProfileService = (
   profileId: string,
   data: DTOProfileFillingForm,

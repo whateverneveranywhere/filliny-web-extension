@@ -64,6 +64,11 @@ export const useDeleteProfileByIdMutation = () => {
  * Mutation hook for creating a new filling profile
  * Immediately updates query cache for UI reactivity, then invalidates for eventual consistency
  * Returns the created profile data for immediate use
+ *
+ * NOTE: The create API returns a lightweight response { id, profileName, isActive }
+ * without fillingWebsites, preferences, etc. The onSuccess handler merges the
+ * original input data with the API response to reconstruct the full profile
+ * for storage and cache, ensuring content scripts can evaluate website matching.
  */
 export const useCreateFillingProfileMutation = () => {
   const queryClient = useQueryClient();
@@ -71,24 +76,33 @@ export const useCreateFillingProfileMutation = () => {
   return useMutation({
     mutationFn: ({ data }: { data: DTOProfileFillingForm }) => createFillingProfileService(data),
     retry: false, // Don't retry on 401 - user needs to re-authenticate
-    onSuccess: async createdProfile => {
+    onSuccess: async (createdProfile, { data }) => {
       if (createdProfile?.id) {
         const profileId = String(createdProfile.id);
 
+        // Merge input data with API response to get a full profile object
+        // The API only returns { id, profileName, isActive } — we need
+        // fillingWebsites, preferences, defaultFillingContext for content scripts
+        const fullProfile: DTOProfileFillingForm = {
+          ...data,
+          id: profileId,
+        };
+
         // 1. Set in query cache for immediate detail access
-        queryClient.setQueryData(queryKeys.profile.detail(profileId), createdProfile);
+        queryClient.setQueryData(queryKeys.profile.detail(profileId), fullProfile);
 
         // 2. Set in chrome storage BEFORE invalidation so useActiveProfile's
-        //    storage fallback works immediately when queries re-render
-        await profileStorage.setDefaultProfile(createdProfile);
+        //    storage fallback works immediately when queries re-render.
+        //    Content scripts need fillingWebsites to evaluate website matching.
+        await profileStorage.setDefaultProfile(fullProfile);
 
         // 3. Set as active on server so refetched list returns isActive: true
         await changeActiveFillingProfileService(profileId).catch(err => {
           console.warn('Failed to set new profile as active:', err);
         });
       }
-      // 4. Invalidate for eventual consistency (list, dashboard)
-      await invalidateProfileMutationQueries(queryClient);
+      // 4. Invalidate for eventual consistency (list, dashboard, detail)
+      await invalidateProfileMutationQueries(queryClient, createdProfile?.id ? String(createdProfile.id) : undefined);
     },
     onError: (error: Error) => {
       console.error('Failed to create profile:', error.message);
