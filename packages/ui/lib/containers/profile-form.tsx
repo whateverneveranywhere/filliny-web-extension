@@ -90,7 +90,7 @@ const ProfileForm = ({ id, onFormSubmit, onDirtyChange }: Props) => {
       ...formData,
       // filter out the user side isNew variable before sending to api
 
-      fillingWebsites: formData.fillingWebsites.map(({ isNew: _, ...rest }) => rest),
+      fillingWebsites: formData.fillingWebsites.map(({ isNew, ...rest }) => rest),
       preferences: {
         ...formData.preferences,
         povId: Number(formData.preferences?.povId),

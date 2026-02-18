@@ -56,9 +56,9 @@ const useProfileManagement = (url: string) => {
       fillingWebsites: [{ fillingContext: '', isRootLoad: true, websiteUrl: url }],
     };
 
-    const createdProfile = await createProfile({ data: newProfileData });
-    await profileStorage.setDefaultProfile(createdProfile);
+    await createProfile({ data: newProfileData });
     // Notify content scripts about the profile update so they can show the UI
+    // (storage is already set in the mutation's onSuccess before query invalidation)
     await notifyProfileUpdate(MessageType.PROFILE_UPDATED);
     toast({
       title: 'Profile created!',

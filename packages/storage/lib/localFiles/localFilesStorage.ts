@@ -78,8 +78,8 @@ const localFilesStorage: LocalFilesStorageType = {
 
   clearProfileFolder: async (profileId: string) => {
     const current = await storage.get();
-    const { [profileId]: _, ...rest } = current;
-    await storage.set(rest);
+    const updated = Object.fromEntries(Object.entries(current).filter(([key]) => key !== profileId));
+    await storage.set(updated);
   },
 
   getProfileFiles: async (profileId: string) => {

@@ -59,16 +59,12 @@ const useSuggestedWebsites = (options?: ProfileQueryOptions) => {
     queryKey: queryKeys.profile.suggestedWebsites(),
     queryFn: getSuggestedWebsitesService,
     enabled,
-    select: (data: DTOSuggestedWebsite[] | null | undefined) => {
-      if (!Array.isArray(data)) {
-        return [];
-      }
-      return data.map((item: DTOSuggestedWebsite) => ({
+    select: (data: DTOSuggestedWebsite[]) =>
+      data.map((item: DTOSuggestedWebsite) => ({
         id: item.id,
         label: item.label,
         value: item.value,
-      }));
-    },
+      })),
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
     refetchOnWindowFocus: false,

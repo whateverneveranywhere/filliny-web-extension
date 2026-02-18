@@ -15,9 +15,9 @@ import {
 } from './field-types/utils';
 import { formFillStore } from './stores';
 import { unifiedFieldRegistry } from './unifiedFieldDetection.js';
-import { createDebugLogger } from '@extension/shared';
+import { createDebugLogger, StreamingErrorSchema, StreamingFieldDataSchema } from '@extension/shared';
 import type { PartialFieldValueMap } from './stores';
-import type { Field } from '@extension/shared';
+import type { Field, StreamingFieldData } from '@extension/shared';
 
 const debug = createDebugLogger('FieldUpdater');
 
@@ -1363,23 +1363,26 @@ const processChunksDiffAware = async (
     }
 
     // Parse all complete lines, take the last valid JSON object
-    let latestParsed: { data: Field[] } | null = null;
+    let latestParsed: StreamingFieldData | null = null;
 
     for (const line of lines) {
       if (!line.trim()) continue;
 
       try {
-        const jsonResponse = JSON.parse(line);
+        const jsonResponse: unknown = JSON.parse(line);
 
         // Handle streaming error from backend
-        if (jsonResponse?.error) {
-          debug.error('Streaming error from server:', jsonResponse.error.message || jsonResponse.error);
+        const errorResult = StreamingErrorSchema.safeParse(jsonResponse);
+        if (errorResult.success) {
+          debug.error('Streaming error from server:', errorResult.data.error.message);
           // Don't return - continue processing any valid data we received before the error
           continue;
         }
 
-        if (jsonResponse?.data?.length) {
-          latestParsed = jsonResponse;
+        // Validate as field data
+        const dataResult = StreamingFieldDataSchema.safeParse(jsonResponse);
+        if (dataResult.success && dataResult.data.data.length > 0) {
+          latestParsed = dataResult.data;
         }
       } catch {
         debug.warn('Failed to parse JSON line during diff-aware processing');

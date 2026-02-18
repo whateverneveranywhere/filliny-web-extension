@@ -1,3 +1,9 @@
+import {
+  unwrapApiEnvelope,
+  parseApiError,
+  detectQuotaErrorFromResponse,
+  detectQuotaErrorFromMessage,
+} from './schemas/index.js';
 import { getConfig } from '../utils/index.js';
 import { authStorage } from '@extension/storage';
 import { z } from 'zod';
@@ -115,20 +121,9 @@ class ApiQuotaExceededError extends Error {
 
 /**
  * Detect quota error type from error message
+ * @deprecated Use detectQuotaErrorFromMessage from schemas instead
  */
-const detectQuotaErrorType = (message: string): 'no_tokens' | 'no_free_forms' | 'limit_exceeded' | null => {
-  const lowerMessage = message.toLowerCase();
-  if (lowerMessage.includes('no tokens') || lowerMessage.includes('insufficient tokens')) {
-    return 'no_tokens';
-  }
-  if (lowerMessage.includes('no free forms') || lowerMessage.includes('free forms remaining')) {
-    return 'no_free_forms';
-  }
-  if (lowerMessage.includes('limit') || lowerMessage.includes('subscribe')) {
-    return 'limit_exceeded';
-  }
-  return null;
-};
+const detectQuotaErrorType = detectQuotaErrorFromMessage;
 
 const appConfig = getConfig();
 
@@ -201,12 +196,20 @@ class HttpService {
         const requestStatus = response.status;
 
         // Safely parse error response - it might not be JSON
-        let errorData: ApiErrorResponse = { message: 'An unexpected error occurred' };
+        let errorMessage = 'An unexpected error occurred';
+        let errorCode: string | undefined;
         try {
-          errorData = await response.json();
+          const errorJson: unknown = await response.json();
+          const structured = parseApiError(errorJson);
+          if (structured) {
+            errorMessage = structured.message;
+            errorCode = structured.code;
+          } else if (errorJson && typeof errorJson === 'object' && 'message' in errorJson) {
+            errorMessage = (errorJson as { message: string }).message;
+          }
         } catch {
           // If parsing fails, use response status text as message
-          errorData = { message: response.statusText || `HTTP ${requestStatus} error` };
+          errorMessage = response.statusText || `HTTP ${requestStatus} error`;
         }
 
         if (requestStatus === 401) {
@@ -225,20 +228,20 @@ class HttpService {
             }
           }
 
-          throw new ApiUnauthorizedError(errorData.message || 'Unauthorized: Please log in again', 401);
+          throw new ApiUnauthorizedError(errorMessage || 'Unauthorized: Please log in again', 401);
         }
 
         if (requestStatus === 403) {
-          // Check if this is a quota/limit error
-          const quotaErrorType = detectQuotaErrorType(errorData.message || '');
+          // Check if this is a quota/limit error using structured code + message fallback
+          const quotaErrorType = detectQuotaErrorFromResponse({ code: errorCode, message: errorMessage });
           if (quotaErrorType) {
-            throw new ApiQuotaExceededError(errorData.message || 'Quota exceeded', quotaErrorType);
+            throw new ApiQuotaExceededError(errorMessage || 'Quota exceeded', quotaErrorType);
           }
           // Otherwise treat as authorization error
-          throw new ApiUnauthorizedError(errorData.message || 'Forbidden: Access denied', 403);
+          throw new ApiUnauthorizedError(errorMessage || 'Forbidden: Access denied', 403);
         }
 
-        throw new Error(errorData.message || 'An unexpected error occurred');
+        throw new Error(errorMessage || 'An unexpected error occurred');
       }
 
       if (config?.isStream) {
@@ -247,14 +250,11 @@ class HttpService {
         return response.body as T;
       }
 
-      const jsonResponse = await response.json();
+      const jsonResponse: unknown = await response.json();
 
       // Unwrap the API response envelope - the API wraps all responses in { data, meta, success }
-      // Extract the 'data' property if it exists, otherwise use the full response
-      const unwrappedData =
-        jsonResponse && typeof jsonResponse === 'object' && 'data' in jsonResponse && 'success' in jsonResponse
-          ? jsonResponse.data
-          : jsonResponse;
+      // Uses Zod schema-based parsing to extract 'data' if envelope matches
+      const unwrappedData = unwrapApiEnvelope(jsonResponse);
 
       // Validate response with schema if provided - throw on validation failure
       if (config?.schema) {
@@ -357,13 +357,20 @@ class HttpService {
           reject(new Error(response.error));
         } else {
           // Unwrap the API response envelope (same as request() does)
-          // The API wraps responses in { data, success }, extract 'data' if present
-          const rawData = response.data;
-          const unwrappedData =
-            rawData && typeof rawData === 'object' && 'data' in rawData && 'success' in rawData
-              ? rawData.data
-              : rawData;
-          resolve(unwrappedData);
+          // Uses Zod schema-based parsing to extract 'data' if envelope matches
+          const unwrapped = unwrapApiEnvelope(response.data);
+
+          // Validate with schema if provided (same as request() does)
+          if (config?.schema) {
+            const result = config.schema.safeParse(unwrapped);
+            if (!result.success) {
+              reject(new ApiValidationError('API response validation failed', result.error.errors));
+              return;
+            }
+            resolve(result.data as T);
+          } else {
+            resolve(unwrapped as T);
+          }
         }
       });
     });

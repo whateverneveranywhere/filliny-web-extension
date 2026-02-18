@@ -75,39 +75,40 @@ export type QueryKeyFactory = typeof queryKeys;
 
 /**
  * Invalidate all profile-related queries (list, details, etc.)
+ * Uses refetchType 'all' to ensure even inactive queries are refetched
  */
 export const invalidateProfileQueries = (queryClient: QueryClient): Promise<void> =>
-  queryClient.invalidateQueries({ queryKey: queryKeys.profile.all });
+  queryClient.invalidateQueries({ queryKey: queryKeys.profile.all, refetchType: 'all' });
 
 /**
  * Invalidate the profile list query
  */
 export const invalidateProfileList = (queryClient: QueryClient): Promise<void> =>
-  queryClient.invalidateQueries({ queryKey: queryKeys.profile.list() });
+  queryClient.invalidateQueries({ queryKey: queryKeys.profile.list(), refetchType: 'all' });
 
 /**
  * Invalidate all profile detail queries
  */
 export const invalidateProfileDetails = (queryClient: QueryClient): Promise<void> =>
-  queryClient.invalidateQueries({ queryKey: queryKeys.profile.details() });
+  queryClient.invalidateQueries({ queryKey: queryKeys.profile.details(), refetchType: 'all' });
 
 /**
  * Invalidate a specific profile detail query
  */
 export const invalidateProfileDetail = (queryClient: QueryClient, id: string): Promise<void> =>
-  queryClient.invalidateQueries({ queryKey: queryKeys.profile.detail(id) });
+  queryClient.invalidateQueries({ queryKey: queryKeys.profile.detail(id), refetchType: 'all' });
 
 /**
  * Invalidate all dashboard-related queries
  */
 export const invalidateDashboardQueries = (queryClient: QueryClient): Promise<void> =>
-  queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all });
+  queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all, refetchType: 'all' });
 
 /**
  * Invalidate all auth-related queries
  */
 export const invalidateAuthQueries = (queryClient: QueryClient): Promise<void> =>
-  queryClient.invalidateQueries({ queryKey: queryKeys.auth.all });
+  queryClient.invalidateQueries({ queryKey: queryKeys.auth.all, refetchType: 'all' });
 
 /**
  * Centralized query invalidation helper for profile mutations

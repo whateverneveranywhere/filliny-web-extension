@@ -18,7 +18,6 @@ import {
   initializeShadowDOMObservation,
   cleanupShadowDOMObservation,
   querySelectorAllDeep,
-  isInShadowDOM as _isInShadowDOM, // Available for future use
   hasProperty,
 } from '@extension/shared';
 import { z } from 'zod';
@@ -40,25 +39,14 @@ const isElement = (node: Node): node is Element => node.nodeType === Node.ELEMEN
 // ============================================================================
 
 /**
- * Schema for document with observer extension
+ * Document with observer extension properties
  * Note: Document is a native type, so we define the extension properties
  */
-// Zod schema for type inference - not used at runtime
+interface DocumentWithObserverProps {
+  __fillinyFrameObserver?: MutationObserver;
+}
 
-const _DocumentWithObserverPropsSchema = z.object({
-  __fillinyFrameObserver: z.custom<MutationObserver>(val => val instanceof MutationObserver).optional(),
-});
-
-type DocumentWithObserverProps = z.infer<typeof _DocumentWithObserverPropsSchema>;
 type DocumentWithObserver = Document & DocumentWithObserverProps;
-
-/**
- * Type guard to check if a document has the observer extension
- * This allows safely accessing the __fillinyFrameObserver property
- */
-
-const _isDocumentWithObserver = (doc: Document): doc is DocumentWithObserver =>
-  '__fillinyFrameObserver' in doc || doc instanceof Document;
 
 /**
  * Safely attach observer to document
@@ -71,41 +59,29 @@ const attachObserverToDocument = (doc: Document, observer: MutationObserver): vo
 type FormDetectionCallback = (doc: Document) => void;
 
 /**
- * Schema for dynamic content detector
+ * Dynamic content detector interface
  */
-
-const _DynamicContentDetectorSchema = z.object({
-  observer: z.custom<MutationObserver>(val => val instanceof MutationObserver, {
-    message: 'Expected MutationObserver',
-  }),
-  confidence: z.number(),
-  lastDetectionTime: z.number(),
-  stableStateTimeout: z.number(),
-  onStableCallback: z.function().returns(z.void()).optional(),
-});
-
-type DynamicContentDetector = z.infer<typeof _DynamicContentDetectorSchema>;
+interface DynamicContentDetector {
+  observer: MutationObserver;
+  confidence: number;
+  lastDetectionTime: number;
+  stableStateTimeout: number;
+  onStableCallback?: () => void;
+}
 
 // Global registry for dynamic content detection
 const dynamicDetectors = new Map<Document, DynamicContentDetector>();
 
 /**
- * Schema for API response monitor
+ * API response monitor interface
  */
-
-const _APIResponseMonitorSchema = z.object({
-  originalFetch: z.custom<typeof fetch>(val => typeof val === 'function', { message: 'Expected fetch function' }),
-  originalXHROpen: z.custom<typeof XMLHttpRequest.prototype.open>(val => typeof val === 'function', {
-    message: 'Expected XHR open function',
-  }),
-  interceptedResponses: z.custom<Map<string, unknown>>(val => val instanceof Map, {
-    message: 'Expected Map<string, unknown>',
-  }),
-  formDefinitionPatterns: z.array(z.custom<RegExp>(val => val instanceof RegExp, { message: 'Expected RegExp' })),
-  onFormDefinitionLoaded: z.function().args(z.unknown()).returns(z.void()).optional(),
-});
-
-type APIResponseMonitor = z.infer<typeof _APIResponseMonitorSchema>;
+interface APIResponseMonitor {
+  originalFetch: typeof fetch;
+  originalXHROpen: typeof XMLHttpRequest.prototype.open;
+  interceptedResponses: Map<string, unknown>;
+  formDefinitionPatterns: RegExp[];
+  onFormDefinitionLoaded?: (data: unknown) => void;
+}
 
 // API response monitoring registry
 const apiResponseMonitors = new Map<Document, APIResponseMonitor>();
@@ -415,17 +391,14 @@ const getAllFrameDocuments = (onNewFrameLoaded?: FormDetectionCallback): Documen
 // --- Form Container Detection ---
 
 /**
- * Schema for form candidate detection results
+ * Form candidate detection results interface
  */
-
-const _FormCandidateSchema = z.object({
-  element: z.custom<HTMLElement>(val => val instanceof HTMLElement, { message: 'Expected HTMLElement' }),
-  score: z.number(),
-  fieldCount: z.number(),
-  reasons: z.array(z.string()),
-});
-
-type FormCandidate = z.infer<typeof _FormCandidateSchema>;
+interface FormCandidate {
+  element: HTMLElement;
+  score: number;
+  fieldCount: number;
+  reasons: string[];
+}
 
 /**
  * Gets all form containers from the unified registry.
@@ -1930,9 +1903,6 @@ const ValidationRuleSchema = z.object({
   maxLength: z.number().optional(),
   required: z.boolean().optional(),
 });
-// Type alias used in ValidationRulesSchema union type
-
-type _ValidationRule = z.infer<typeof ValidationRuleSchema>;
 
 const ValidationRulesSchema = z.record(
   z.string(),
@@ -2483,7 +2453,7 @@ const getProcessedFormDefinitions = (doc: Document): ProcessedFormDefinition[] =
 
   const definitions: ProcessedFormDefinition[] = [];
 
-  for (const [_url, responseData] of monitor.interceptedResponses) {
+  for (const [, responseData] of monitor.interceptedResponses) {
     if (
       responseData &&
       typeof responseData === 'object' &&

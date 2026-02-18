@@ -1,22 +1,16 @@
 import { useExtensionAuth } from './useExtensionAuth.js';
 import { createContext, useContext, useMemo } from 'react';
-import { z } from 'zod';
 import type { ReactNode } from 'react';
 
 // ============================================================================
-// Auth Context Value Schema
+// Auth Context Value
 // ============================================================================
 
-/**
- * Schema for auth context value
- */
-const _AuthContextValueSchema = z.object({
-  isAuthenticated: z.boolean(),
-  isLoading: z.boolean(),
-  token: z.string().nullable(),
-});
-
-type AuthContextValue = z.infer<typeof _AuthContextValueSchema>;
+interface AuthContextValue {
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  token: string | null;
+}
 
 // ============================================================================
 // Auth Context
@@ -25,14 +19,12 @@ type AuthContextValue = z.infer<typeof _AuthContextValueSchema>;
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 // ============================================================================
-// Auth Provider Props Schema
+// Auth Provider Props
 // ============================================================================
 
-const _AuthProviderPropsSchema = z.object({
-  children: z.custom<ReactNode>(),
-});
-
-type AuthProviderProps = z.infer<typeof _AuthProviderPropsSchema>;
+interface AuthProviderProps {
+  children: ReactNode;
+}
 
 /**
  * AuthProvider - Provides authentication state to all child components.

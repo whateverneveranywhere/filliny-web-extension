@@ -25,13 +25,9 @@ import {
 import type {
   Field,
   NextJsWindow,
-  ReactDevToolsWindow,
-  ReactGlobalWindow,
-  ReduxDevToolsWindow,
   AngularContextElement,
   FormikInputElement,
   ReactHookFormInputElement,
-  ReactFiberProps,
   DOMEventHandler,
 } from '@extension/shared';
 
@@ -131,32 +127,6 @@ const hasFormikBag = (element: HTMLInputElement): element is FormikInputElement 
  */
 const hasReactHookFormController = (element: HTMLInputElement): element is ReactHookFormInputElement =>
   hasProperty(element, '__reactHookForm');
-
-/**
- * Type guard to check if value is ReactFiberProps
- */
-const isReactFiberProps = (value: unknown): value is ReactFiberProps => {
-  if (!value || typeof value !== 'object') {
-    return false;
-  }
-  return hasProperty(value, 'memoizedProps') || hasProperty(value, 'pendingProps');
-};
-
-/**
- * Safely get React fiber from element
- */
-const getReactFiber = (element: HTMLElement): ReactFiberProps | null => {
-  const fiberKey = Object.keys(element).find(
-    key => key.startsWith('__reactFiber') || key.startsWith('__reactInternalInstance'),
-  );
-  if (fiberKey && hasProperty(element, fiberKey)) {
-    const fiber = element[fiberKey];
-    if (isReactFiberProps(fiber)) {
-      return fiber;
-    }
-  }
-  return null;
-};
 
 /**
  * Type guard for event handler functions
@@ -629,38 +599,26 @@ const updateTextField = async (element: HTMLElement, value: string): Promise<voi
 };
 
 /**
- * Valid state manager types for React detection
- */
-const STATE_MANAGER_TYPES = ['redux-toolkit', 'zustand', 'jotai', 'recoil', 'react-query'] as const;
-
-type _StateManagerType = (typeof STATE_MANAGER_TYPES)[number];
-
-/**
  * All valid React detection types
  */
-const REACT_DETECTION_TYPES = [
-  'controlled',
-  'uncontrolled',
-  'hook-based',
-  'class-based',
-  'material-ui',
-  'ant-design',
-  'chakra-ui',
-  'formik',
-  'react-hook-form',
-  'nextjs',
-  'react-18-concurrent',
-  ...STATE_MANAGER_TYPES,
-  'unknown',
-] as const;
-
-type ReactDetectionType = (typeof REACT_DETECTION_TYPES)[number];
-
-/**
- * Type guard for valid React detection type
- */
-const isValidReactDetectionType = (value: string): value is ReactDetectionType =>
-  REACT_DETECTION_TYPES.includes(value as ReactDetectionType);
+type ReactDetectionType =
+  | 'controlled'
+  | 'uncontrolled'
+  | 'hook-based'
+  | 'class-based'
+  | 'material-ui'
+  | 'ant-design'
+  | 'chakra-ui'
+  | 'formik'
+  | 'react-hook-form'
+  | 'nextjs'
+  | 'react-18-concurrent'
+  | 'redux-toolkit'
+  | 'zustand'
+  | 'jotai'
+  | 'recoil'
+  | 'react-query'
+  | 'unknown';
 
 /**
  * Enhanced React component detection with state management patterns
@@ -678,155 +636,6 @@ interface ReactDetection {
   fiber?: unknown;
   props?: unknown;
 }
-
-const _detectReactComponent = (element: HTMLElement): ReactDetection => {
-  const detection: ReactDetection = {
-    isReact: false,
-    type: 'unknown',
-    isNextJs: detectNextJs(),
-    reactVersion: detectReactVersion(),
-    isConcurrentMode: detectConcurrentMode(),
-    hasStateManager: detectStateManager().length > 0,
-  };
-
-  // Check for React Fiber (React 16+)
-  const fiber = getReactFiber(element);
-
-  if (fiber) {
-    detection.isReact = true;
-    detection.type = detectReactComponentType(element, fiber, detection);
-    detection.fiber = fiber;
-    detection.props = fiber.memoizedProps ?? fiber.pendingProps;
-
-    return detection;
-  }
-
-  // Enhanced Next.js detection
-  if (detection.isNextJs) {
-    detection.isReact = true;
-    detection.type = 'nextjs';
-
-    // Check for Next.js specific patterns
-    const nextjsComponentType = detectNextjsComponentType(element);
-    if (nextjsComponentType !== 'unknown') {
-      detection.type = nextjsComponentType;
-    }
-
-    return detection;
-  }
-
-  // Check for React 18+ concurrent features
-  if (detection.isConcurrentMode) {
-    detection.isReact = true;
-    detection.type = 'react-18-concurrent';
-    return detection;
-  }
-
-  // Check for state management libraries
-  if (detection.hasStateManager) {
-    const stateManagers = detectStateManager();
-    detection.isReact = true;
-    // Validate that the state manager is a valid detection type
-    if (stateManagers.length > 0 && isValidReactDetectionType(stateManagers[0])) {
-      detection.type = stateManagers[0];
-    }
-    detection.stateManager = stateManagers.join(', ');
-    return detection;
-  }
-
-  // Check for React DevTools markers
-  if (element.hasAttribute('data-reactid') || element.hasAttribute('data-react-class')) {
-    detection.isReact = true;
-    detection.type = 'class-based';
-    return detection;
-  }
-
-  // Check for React root markers
-  if (document.querySelector('[data-reactroot], #root, [id*="react"], [class*="react-root"], #__next')) {
-    detection.isReact = true;
-
-    // Check for specific component library patterns
-    const componentType = detectComponentLibrary(element);
-    if (componentType !== 'unknown') {
-      detection.type = componentType;
-      return detection;
-    }
-  }
-
-  // Check for React event handlers
-  const hasReactEvents = Object.keys(element).some(key => key.startsWith('__reactEventHandlers'));
-  if (hasReactEvents) {
-    detection.isReact = true;
-    detection.type = 'hook-based';
-    return detection;
-  }
-
-  // Check for React class patterns
-  const className = element.className || '';
-  if (/\breact-/i.test(className)) {
-    detection.isReact = true;
-    detection.type = 'class-based';
-    return detection;
-  }
-
-  return detection;
-};
-
-const detectReactComponentType = (
-  element: HTMLElement,
-  fiber: ReactFiberProps | null,
-  _detection: ReactDetection,
-): ReactDetection['type'] => {
-  // Check for controlled vs uncontrolled
-  if (element instanceof HTMLInputElement && fiber) {
-    // Controlled components have value prop managed by React
-    if (fiber.memoizedProps?.value !== undefined || fiber.pendingProps?.value !== undefined) {
-      return 'controlled';
-    }
-    // Uncontrolled components use defaultValue
-    if (fiber.memoizedProps?.defaultValue !== undefined || fiber.pendingProps?.defaultValue !== undefined) {
-      return 'uncontrolled';
-    }
-  }
-
-  // Check for component library patterns
-  const componentType = detectComponentLibrary(element);
-  if (componentType !== 'unknown') {
-    return componentType;
-  }
-
-  // Check for form library patterns
-  const formLibrary = detectFormLibrary(element);
-  if (formLibrary !== 'unknown') {
-    return formLibrary;
-  }
-
-  // Default to hook-based for modern React
-  return 'hook-based';
-};
-
-const detectComponentLibrary = (element: HTMLElement): ReactDetection['type'] => {
-  const className = element.className || '';
-  const parentClasses = element.parentElement?.className || '';
-  const combinedClasses = `${className} ${parentClasses}`.toLowerCase();
-
-  // Material-UI patterns
-  if (/\bmui|\bmaterial-ui/i.test(combinedClasses) || element.closest('[class*="Mui"]')) {
-    return 'material-ui';
-  }
-
-  // Ant Design patterns
-  if (/\bant-|\bantd/i.test(combinedClasses) || element.closest('[class*="ant-"]')) {
-    return 'ant-design';
-  }
-
-  // Chakra UI patterns
-  if (/\bchakra|\bchakra-ui/i.test(combinedClasses) || element.closest('[class*="chakra"]')) {
-    return 'chakra-ui';
-  }
-
-  return 'unknown';
-};
 
 const detectFormLibrary = (element: HTMLElement): ReactDetection['type'] => {
   // Check for Formik patterns
@@ -846,151 +655,6 @@ const detectFormLibrary = (element: HTMLElement): ReactDetection['type'] => {
     if (/\b(formik|react-hook-form|final-form)\b/i.test(formName)) {
       return 'formik';
     }
-  }
-
-  return 'unknown';
-};
-
-/**
- * Detect Next.js application
- */
-const detectNextJs = (): boolean => {
-  // Check for Next.js specific elements and scripts
-  const win = window as NextJsWindow;
-  return !!(
-    document.getElementById('__next') ||
-    document.querySelector('script[src*="_next"]') ||
-    document.querySelector('link[href*="_next"]') ||
-    window.location.pathname.includes('/_next/') ||
-    document.querySelector('meta[name="next-head-count"]') ||
-    win.__NEXT_DATA__ ||
-    document.querySelector('script[id="__NEXT_DATA__"]')
-  );
-};
-/**
- * Detect React version from global objects or DOM
- */
-const detectReactVersion = (): string | undefined => {
-  try {
-    // Check for React DevTools version info
-    const reactDevTools = (window as ReactDevToolsWindow).__REACT_DEVTOOLS_GLOBAL_HOOK__;
-    if (reactDevTools?.renderers) {
-      for (const renderer of reactDevTools.renderers.values()) {
-        if (renderer.version) {
-          return renderer.version;
-        }
-      }
-    }
-
-    // Check for React in window object
-    const reactGlobal = (window as ReactGlobalWindow).React;
-    if (reactGlobal?.version) {
-      return reactGlobal.version;
-    }
-
-    // Check for React version in bundle comments or scripts
-    const scripts = Array.from(document.querySelectorAll('script[src*="react"]'));
-    for (const script of scripts) {
-      const src = script.getAttribute('src') || '';
-      const versionMatch = src.match(/react@([\d.]+)/);
-      if (versionMatch) {
-        return versionMatch[1];
-      }
-    }
-  } catch (error) {
-    console.debug('Error detecting React version:', error);
-  }
-
-  return undefined;
-};
-
-/**
- * Detect React 18+ concurrent mode features
- */
-const detectConcurrentMode = (): boolean => {
-  try {
-    // Check for concurrent mode APIs
-    const hasConcurrentFeatures = !!(
-      (window as ReactGlobalWindow).createRoot ||
-      document.querySelector('[data-react-concurrent="true"]') ||
-      document.querySelector('.react-concurrent-mode')
-    );
-
-    // Check for Suspense boundaries
-    const hasSuspense = !!(
-      document.querySelector('[data-react-suspense]') || document.querySelector('.react-suspense')
-    );
-
-    // Check for startTransition usage indicators
-    const hasTransitions = !!(
-      document.querySelector('[data-react-transition]') || document.querySelector('.react-transition')
-    );
-
-    return hasConcurrentFeatures || hasSuspense || hasTransitions;
-  } catch (error) {
-    console.debug('Error detecting concurrent mode:', error);
-    return false;
-  }
-};
-
-/**
- * Detect state management libraries
- */
-const detectStateManager = (): string[] => {
-  const stateManagers: string[] = [];
-
-  try {
-    // Redux/Redux Toolkit
-    if (
-      (window as ReduxDevToolsWindow).__REDUX_DEVTOOLS_EXTENSION__ ||
-      document.querySelector('[data-redux]') ||
-      document.querySelector('.redux-store')
-    ) {
-      stateManagers.push('redux-toolkit');
-    }
-
-    // Zustand
-    if (document.querySelector('[data-zustand]') || document.querySelector('.zustand-store')) {
-      stateManagers.push('zustand');
-    }
-
-    // Jotai
-    if (document.querySelector('[data-jotai]') || document.querySelector('.jotai-atom')) {
-      stateManagers.push('jotai');
-    }
-
-    // Recoil
-    if (document.querySelector('[data-recoil]') || document.querySelector('.recoil-root')) {
-      stateManagers.push('recoil');
-    }
-
-    // React Query/TanStack Query
-    if (document.querySelector('[data-react-query]') || document.querySelector('.react-query-client')) {
-      stateManagers.push('react-query');
-    }
-  } catch (error) {
-    console.debug('Error detecting state managers:', error);
-  }
-
-  return stateManagers;
-};
-
-/**
- * Detect Next.js specific component types
- */
-const detectNextjsComponentType = (element: HTMLElement): ReactDetection['type'] => {
-  // Check for Next.js specific patterns
-  const nextPatterns = ['[data-nextjs]', '.next-component', '[class*="__next"]', '[id*="__next"]'];
-
-  for (const pattern of nextPatterns) {
-    if (element.matches(pattern) || element.closest(pattern)) {
-      return 'nextjs';
-    }
-  }
-
-  // Check for Next.js form patterns
-  if (element.closest('form[action*="/_next/"]') || element.closest('[data-next-form]')) {
-    return 'nextjs';
   }
 
   return 'unknown';
@@ -1031,51 +695,51 @@ const handleReactTextInput = async (element: HTMLElement, value: string, detecti
     // Handle different React component types
     switch (detection.type) {
       case 'controlled':
-        await handleControlledComponent(element, value, detection);
+        await handleControlledComponent(element, value);
         break;
       case 'uncontrolled':
-        await handleUncontrolledComponent(element, value, detection);
+        await handleUncontrolledComponent(element, value);
         break;
       case 'material-ui':
-        await handleMaterialUIComponent(element, value, detection);
+        await handleMaterialUIComponent(element, value);
         break;
       case 'ant-design':
-        await handleAntDesignComponent(element, value, detection);
+        await handleAntDesignComponent(element, value);
         break;
       case 'chakra-ui':
-        await handleChakraUIComponent(element, value, detection);
+        await handleChakraUIComponent(element, value);
         break;
       case 'formik':
-        await handleFormikComponent(element, value, detection);
+        await handleFormikComponent(element, value);
         break;
       case 'react-hook-form':
-        await handleReactHookFormComponent(element, value, detection);
+        await handleReactHookFormComponent(element, value);
         break;
       case 'nextjs':
-        await handleNextjsComponent(element, value, detection);
+        await handleNextjsComponent(element, value);
         break;
       case 'react-18-concurrent':
-        await handleReact18ConcurrentComponent(element, value, detection);
+        await handleReact18ConcurrentComponent(element, value);
         break;
       case 'react-query':
-        await handleReactQueryComponent(element, value, detection);
+        await handleReactQueryComponent(element, value);
         break;
       case 'redux-toolkit':
-        await handleReduxToolkitComponent(element, value, detection);
+        await handleReduxToolkitComponent(element, value);
         break;
       case 'zustand':
-        await handleZustandComponent(element, value, detection);
+        await handleZustandComponent(element, value);
         break;
       case 'jotai':
-        await handleJotaiComponent(element, value, detection);
+        await handleJotaiComponent(element, value);
         break;
       case 'recoil':
-        await handleRecoilComponent(element, value, detection);
+        await handleRecoilComponent(element, value);
         break;
       case 'hook-based':
       case 'class-based':
       default:
-        await handleGenericReactComponent(element, value, detection);
+        await handleGenericReactComponent(element, value);
         break;
     }
   } catch (error) {
@@ -1088,26 +752,18 @@ const handleReactTextInput = async (element: HTMLElement, value: string, detecti
 /**
  * Handle controlled React components
  */
-const handleControlledComponent = async (
-  element: HTMLElement,
-  value: string,
-  detection: ReactDetection,
-): Promise<void> => {
+const handleControlledComponent = async (element: HTMLElement, value: string): Promise<void> => {
   // For controlled components, we need to update the state, not just the DOM
   if (element instanceof HTMLInputElement) {
     // Try to trigger state update through React's synthetic event system
-    await triggerReactStateUpdate(element, value, detection);
+    await triggerReactStateUpdate(element, value);
   }
 };
 
 /**
  * Handle uncontrolled React components
  */
-const handleUncontrolledComponent = async (
-  element: HTMLElement,
-  value: string,
-  _detection: ReactDetection,
-): Promise<void> => {
+const handleUncontrolledComponent = async (element: HTMLElement, value: string): Promise<void> => {
   // For uncontrolled components, direct DOM manipulation works but
   // we still use setNativeValue for consistency with ref-based reads
   if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
@@ -1119,11 +775,7 @@ const handleUncontrolledComponent = async (
 /**
  * Handle Material-UI components
  */
-const handleMaterialUIComponent = async (
-  element: HTMLElement,
-  value: string,
-  _detection: ReactDetection,
-): Promise<void> => {
+const handleMaterialUIComponent = async (element: HTMLElement, value: string): Promise<void> => {
   // Material-UI uses controlled components with special event handling
   const muiContainer = element.closest('[class*="MuiInputBase"], [class*="MuiTextField"], [class*="MuiInput"]');
 
@@ -1144,11 +796,7 @@ const handleMaterialUIComponent = async (
 /**
  * Handle Ant Design components
  */
-const handleAntDesignComponent = async (
-  element: HTMLElement,
-  value: string,
-  _detection: ReactDetection,
-): Promise<void> => {
+const handleAntDesignComponent = async (element: HTMLElement, value: string): Promise<void> => {
   const antContainer = element.closest('[class*="ant-input"], [class*="ant-form-item"]');
 
   if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
@@ -1165,11 +813,7 @@ const handleAntDesignComponent = async (
 /**
  * Handle Chakra UI components
  */
-const handleChakraUIComponent = async (
-  element: HTMLElement,
-  value: string,
-  _detection: ReactDetection,
-): Promise<void> => {
+const handleChakraUIComponent = async (element: HTMLElement, value: string): Promise<void> => {
   if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
     setNativeValue(element, value);
     await triggerReactEvents(element, ['focus', 'input', 'change', 'blur']);
@@ -1179,11 +823,7 @@ const handleChakraUIComponent = async (
 /**
  * Handle Formik components
  */
-const handleFormikComponent = async (
-  element: HTMLElement,
-  value: string,
-  _detection: ReactDetection,
-): Promise<void> => {
+const handleFormikComponent = async (element: HTMLElement, value: string): Promise<void> => {
   if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
     setNativeValue(element, value);
 
@@ -1209,11 +849,7 @@ const handleFormikComponent = async (
 /**
  * Handle React Hook Form components
  */
-const handleReactHookFormComponent = async (
-  element: HTMLElement,
-  value: string,
-  _detection: ReactDetection,
-): Promise<void> => {
+const handleReactHookFormComponent = async (element: HTMLElement, value: string): Promise<void> => {
   if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
     setNativeValue(element, value);
 
@@ -1239,11 +875,7 @@ const handleReactHookFormComponent = async (
 /**
  * Handle generic React components
  */
-const handleGenericReactComponent = async (
-  element: HTMLElement,
-  value: string,
-  _detection: ReactDetection,
-): Promise<void> => {
+const handleGenericReactComponent = async (element: HTMLElement, value: string): Promise<void> => {
   if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
     setNativeValue(element, value);
   } else if (element.isContentEditable) {
@@ -1251,7 +883,7 @@ const handleGenericReactComponent = async (
   }
 
   // Try to trigger state update through React's synthetic event system
-  await triggerReactStateUpdate(element, value, _detection);
+  await triggerReactStateUpdate(element, value);
 };
 
 /**
@@ -1272,11 +904,7 @@ const waitAndVerifyValue = async (
   return element.value === expectedValue;
 };
 
-const triggerReactStateUpdate = async (
-  element: HTMLElement,
-  value: string,
-  _detection: ReactDetection,
-): Promise<void> => {
+const triggerReactStateUpdate = async (element: HTMLElement, value: string): Promise<void> => {
   // For controlled components, we need to simulate user input to trigger state updates
   if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
     // Focus first to ensure event handlers are active
@@ -1547,7 +1175,7 @@ const handleQwikTextInput = async (element: HTMLElement, value: string): Promise
 /**
  * Handle Next.js components with enhanced SSR/hydration support
  */
-const handleNextjsComponent = async (element: HTMLElement, value: string, detection: ReactDetection): Promise<void> => {
+const handleNextjsComponent = async (element: HTMLElement, value: string): Promise<void> => {
   try {
     console.log('Handling Next.js component with enhanced SSR support');
 
@@ -1581,18 +1209,14 @@ const handleNextjsComponent = async (element: HTMLElement, value: string, detect
     }
   } catch (error) {
     console.error('Error in Next.js input handler:', error);
-    await handleGenericReactComponent(element, value, detection);
+    await handleGenericReactComponent(element, value);
   }
 };
 
 /**
  * Handle React 18+ concurrent mode components
  */
-const handleReact18ConcurrentComponent = async (
-  element: HTMLElement,
-  value: string,
-  detection: ReactDetection,
-): Promise<void> => {
+const handleReact18ConcurrentComponent = async (element: HTMLElement, value: string): Promise<void> => {
   try {
     console.log('Handling React 18+ concurrent component');
 
@@ -1625,18 +1249,14 @@ const handleReact18ConcurrentComponent = async (
     }
   } catch (error) {
     console.error('Error in React 18+ concurrent input handler:', error);
-    await handleGenericReactComponent(element, value, detection);
+    await handleGenericReactComponent(element, value);
   }
 };
 
 /**
  * Handle React Query/TanStack Query components
  */
-const handleReactQueryComponent = async (
-  element: HTMLElement,
-  value: string,
-  detection: ReactDetection,
-): Promise<void> => {
+const handleReactQueryComponent = async (element: HTMLElement, value: string): Promise<void> => {
   try {
     console.log('Handling React Query component');
 
@@ -1650,18 +1270,14 @@ const handleReactQueryComponent = async (
     }
   } catch (error) {
     console.error('Error in React Query input handler:', error);
-    await handleGenericReactComponent(element, value, detection);
+    await handleGenericReactComponent(element, value);
   }
 };
 
 /**
  * Handle Redux Toolkit components
  */
-const handleReduxToolkitComponent = async (
-  element: HTMLElement,
-  value: string,
-  detection: ReactDetection,
-): Promise<void> => {
+const handleReduxToolkitComponent = async (element: HTMLElement, value: string): Promise<void> => {
   try {
     console.log('Handling Redux Toolkit component');
 
@@ -1676,18 +1292,14 @@ const handleReduxToolkitComponent = async (
     }
   } catch (error) {
     console.error('Error in Redux Toolkit input handler:', error);
-    await handleGenericReactComponent(element, value, detection);
+    await handleGenericReactComponent(element, value);
   }
 };
 
 /**
  * Handle Zustand components
  */
-const handleZustandComponent = async (
-  element: HTMLElement,
-  value: string,
-  detection: ReactDetection,
-): Promise<void> => {
+const handleZustandComponent = async (element: HTMLElement, value: string): Promise<void> => {
   try {
     console.log('Handling Zustand component');
 
@@ -1697,14 +1309,14 @@ const handleZustandComponent = async (
     }
   } catch (error) {
     console.error('Error in Zustand input handler:', error);
-    await handleGenericReactComponent(element, value, detection);
+    await handleGenericReactComponent(element, value);
   }
 };
 
 /**
  * Handle Jotai components
  */
-const handleJotaiComponent = async (element: HTMLElement, value: string, detection: ReactDetection): Promise<void> => {
+const handleJotaiComponent = async (element: HTMLElement, value: string): Promise<void> => {
   try {
     console.log('Handling Jotai component');
 
@@ -1714,14 +1326,14 @@ const handleJotaiComponent = async (element: HTMLElement, value: string, detecti
     }
   } catch (error) {
     console.error('Error in Jotai input handler:', error);
-    await handleGenericReactComponent(element, value, detection);
+    await handleGenericReactComponent(element, value);
   }
 };
 
 /**
  * Handle Recoil components
  */
-const handleRecoilComponent = async (element: HTMLElement, value: string, detection: ReactDetection): Promise<void> => {
+const handleRecoilComponent = async (element: HTMLElement, value: string): Promise<void> => {
   try {
     console.log('Handling Recoil component');
 
@@ -1731,7 +1343,7 @@ const handleRecoilComponent = async (element: HTMLElement, value: string, detect
     }
   } catch (error) {
     console.error('Error in Recoil input handler:', error);
-    await handleGenericReactComponent(element, value, detection);
+    await handleGenericReactComponent(element, value);
   }
 };
 

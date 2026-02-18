@@ -86,13 +86,16 @@ const UserSchema = z.object({
 /**
  * Limitations schema for user plan limitations
  * All limits are returned dynamically from the API based on user's subscription.
+ *
+ * Both freeFormsRemaining and isProSubscriber are always returned by the API
+ * (required fields in the API's PlanLimitationsSchema).
  */
 const LimitationsSchema = z.object({
   maxFillingProfiles: z.number(),
   maxWebsitesPerProfile: z.number(),
   tokensRemaining: z.number(),
-  freeFormsRemaining: z.number().optional(), // Only for free tier users
-  isProSubscriber: z.boolean().optional(), // True if user has Pro subscription
+  freeFormsRemaining: z.number(),
+  isProSubscriber: z.boolean(),
 });
 
 /**
@@ -111,8 +114,8 @@ const AuthHealthCheckSchema = z.object({
  */
 const PublicHealthCheckSchema = z.object({
   status: z.enum(['healthy', 'unhealthy']),
-  ok: z.boolean(),
-  version: z.string(),
+  ok: z.boolean().optional(),
+  version: z.string().optional(),
   timestamp: z.number(),
 });
 
@@ -121,18 +124,97 @@ const PublicHealthCheckSchema = z.object({
 // ============================================================================
 
 /**
+ * Time series data schema for fill counts over time
+ */
+const DTOTimeSeriesDataSchema = z.object({
+  date: z.string(),
+  count: z.number(),
+});
+
+/**
+ * Website activity data schema
+ */
+const DTOWebsiteActivityDataSchema = z.object({
+  url: z.string(),
+  count: z.number(),
+  domain: z.string(),
+  timeSaved: z.number(),
+  faviconUrl: z.string(),
+  successRate: z.number(),
+  firstUsed: z.string(),
+  lastUsed: z.string(),
+  averageTime: z.number(),
+});
+
+/**
+ * Success rate data schema
+ */
+const DTOSuccessRateDataSchema = z.object({
+  successRate: z.number(),
+  successCount: z.number(),
+  failureCount: z.number(),
+  pendingCount: z.number(),
+  totalCount: z.number(),
+});
+
+/**
+ * Fastest completion data schema
+ */
+const DTOFastestCompletionDataSchema = z.object({
+  url: z.string(),
+  domain: z.string(),
+  avgTokens: z.number(),
+  count: z.number(),
+  faviconUrl: z.string(),
+});
+
+/**
+ * Forms left data schema
+ */
+const DTOFormsLeftDataSchema = z.object({
+  count: z.number(),
+  percent: z.number(),
+});
+
+/**
+ * Completion rate by hour schema
+ */
+const DTOCompletionRateDataSchema = z.object({
+  hour: z.number(),
+  count: z.number(),
+  successCount: z.number(),
+  successRate: z.number(),
+});
+
+/**
+ * Profile stats schema
+ */
+const DTOProfileStatsSchema = z.object({
+  profileId: z.number(),
+  profileName: z.string(),
+  websiteCount: z.number(),
+});
+
+/**
  * Dashboard overview response schema
- *
- * For free users: remainingTokens = 0, freeFormsRemaining >= 0
- * For Pro users: remainingTokens > 0, freeFormsRemaining = undefined
+ * Matches the API's OverviewDataSchema from /overview endpoint
  */
 const DTOOverviewSchema = z.object({
   aiHistoryCount: z.number(),
-  fillingProfilesCount: z.number(),
-  fillingWebsitesCount: z.number(),
   remainingTokens: z.number(),
-  freeFormsRemaining: z.number().optional(), // Only for free tier users
-  isProSubscriber: z.boolean().optional(), // True if user has Pro subscription
+  formsLeftData: DTOFormsLeftDataSchema,
+  fillsOverTime: z.array(DTOTimeSeriesDataSchema),
+  enhancedWebsites: z.array(DTOWebsiteActivityDataSchema),
+  averageTokensPerFill: z.number(),
+  maxTokensPerFill: z.number(),
+  minTokensPerFill: z.number(),
+  totalTokensUsed: z.number(),
+  successRate: DTOSuccessRateDataSchema,
+  totalTimeSaved: z.number(),
+  fastestCompletions: z.array(DTOFastestCompletionDataSchema),
+  profileStats: z.array(DTOProfileStatsSchema),
+  periodChange: z.number(),
+  hourlyCompletionRate: z.array(DTOCompletionRateDataSchema),
 });
 
 // ============================================================================
@@ -486,25 +568,47 @@ const FieldSchema = z.object({
 });
 
 /**
+ * API-compatible form field schema
+ * Matches the API's FormFieldSchema with flat validation constraints.
+ * Used in DTOFillPayloadSchema for data sent to the AI fill endpoint.
+ *
+ * Key differences from FieldSchema (internal representation):
+ * - No title, testValue, validation (nested), metadata, xpath, uniqueSelectors
+ * - Validation constraints (minLength, maxLength, min, max, pattern) are top-level
+ * - acceptTypes is a comma-separated string (extracted from metadata)
+ */
+const ApiFormFieldSchema = z.object({
+  id: z.string(),
+  name: z.string().optional(),
+  type: InputFieldTypeSchema,
+  label: z.string().optional(),
+  description: z.string().optional(),
+  placeholder: z.string().optional(),
+  value: z.union([z.string(), z.array(z.string())]).optional(),
+  required: z.boolean().optional(),
+  options: z.array(FieldOptionSchema).optional(),
+  acceptTypes: z.string().optional(),
+  minLength: z.number().optional(),
+  maxLength: z.number().optional(),
+  min: z.number().optional(),
+  max: z.number().optional(),
+  pattern: z.string().optional(),
+});
+
+/**
  * DTO Fill Payload schema for AI form filling requests
- *
- * Note on preferences field:
- * - preferences is optional because the API server has default preferences
- * - When a user profile is loaded, preferences will always be provided
- *   (see handleFormClick.ts and handleFieldFill.ts for usage patterns)
- * - If no profile is available (edge case), the server will use sensible defaults
- * - The profileStorage can return undefined, making defaultProfile?.preferences also undefined
- *
- * Note on authorizedFiles field:
- * - authorizedFiles is optional and contains user pre-authorized files
- * - These files can be used by AI to fill file upload fields
- * - When present, AI can select appropriate files based on field context
+ * Matches the API's FillRequestSchema constraints:
+ * - contextText must be non-empty (min 1 char)
+ * - formData must have at least one field
+ * - websiteUrl must be a valid URL
+ * - preferences is required (defaults provided by transform layer when profile is missing)
+ * - authorizedFiles is optional
  */
 const DTOFillPayloadSchema = z.object({
-  contextText: z.string(),
-  formData: z.array(FieldSchema),
-  websiteUrl: z.string(),
-  preferences: DTOFillingPreferencesSchema.optional(),
+  contextText: z.string().min(1),
+  formData: z.array(ApiFormFieldSchema).min(1),
+  websiteUrl: z.string().url(),
+  preferences: DTOFillingPreferencesSchema,
   authorizedFiles: z.array(DTOAuthorizedFileForAISchema).optional(),
 });
 
@@ -562,6 +666,143 @@ const HighlightFormsOptionsSchema = z.object({
   visionOnly: z.boolean().optional(),
   testMode: z.boolean().optional(),
 });
+
+// ============================================================================
+// API Response Envelope Schemas
+// ============================================================================
+
+/**
+ * Meta information attached to every API response
+ */
+const ResponseMetaSchema = z
+  .object({
+    requestId: z.string().optional(),
+    timestamp: z.string().optional(),
+    version: z.string().optional(),
+    duration: z.number().optional(),
+  })
+  .passthrough();
+
+/**
+ * API success envelope - all successful responses are wrapped in this shape.
+ * The API wraps all responses in { success: true, data: T, meta?: {...} }
+ */
+const ApiSuccessEnvelopeSchema = z.object({
+  success: z.literal(true),
+  data: z.unknown(),
+  meta: ResponseMetaSchema.optional(),
+});
+
+/**
+ * API error envelope - all error responses follow this shape.
+ * { success: false, error: { code, message, ... }, meta?: {...} }
+ */
+const ApiErrorEnvelopeSchema = z.object({
+  success: z.literal(false),
+  error: z.object({
+    code: z.string(),
+    message: z.string(),
+    details: z.record(z.string(), z.unknown()).optional(),
+    validation: z
+      .array(
+        z.object({
+          field: z.string(),
+          message: z.string(),
+          code: z.string().optional(),
+        }),
+      )
+      .optional(),
+  }),
+  meta: ResponseMetaSchema.optional(),
+});
+
+/**
+ * Streaming error chunk from server-sent events
+ */
+const StreamingErrorSchema = z.object({
+  error: z.object({
+    message: z.string(),
+    code: z.string().optional(),
+  }),
+});
+
+/**
+ * Streaming data chunk containing field array
+ */
+const StreamingFieldDataSchema = z.object({
+  data: z.array(FieldSchema),
+});
+
+/**
+ * Unwrap an API response envelope.
+ * If the response matches { success: true, data: T }, returns the data.
+ * Otherwise, returns the original value (for raw/non-envelope responses).
+ */
+const unwrapApiEnvelope = (json: unknown): unknown => {
+  const result = ApiSuccessEnvelopeSchema.safeParse(json);
+  return result.success ? result.data.data : json;
+};
+
+/**
+ * Parse an API error response.
+ * Returns the structured error if it matches the envelope, or null.
+ */
+const parseApiError = (json: unknown): z.infer<typeof ApiErrorEnvelopeSchema>['error'] | null => {
+  const result = ApiErrorEnvelopeSchema.safeParse(json);
+  return result.success ? result.data.error : null;
+};
+
+/**
+ * Detect quota error type from a structured API error code.
+ * Falls back to message string matching for backward compatibility.
+ */
+const detectQuotaErrorFromResponse = (
+  error: { code?: string; message?: string } | string,
+): 'no_tokens' | 'no_free_forms' | 'limit_exceeded' | null => {
+  // If passed a string directly, fall back to message matching
+  if (typeof error === 'string') {
+    return detectQuotaErrorFromMessage(error);
+  }
+
+  // Primary: check structured error code
+  if (error.code) {
+    const code = error.code.toUpperCase();
+    if (code === 'NO_TOKENS' || code === 'INSUFFICIENT_TOKENS' || code === 'TOKEN_LIMIT_EXCEEDED') {
+      return 'no_tokens';
+    }
+    if (code === 'NO_FREE_FORMS') {
+      return 'no_free_forms';
+    }
+    if (code === 'QUOTA_EXCEEDED' || code === 'LIMIT_EXCEEDED' || code === 'FORBIDDEN') {
+      return 'limit_exceeded';
+    }
+  }
+
+  // Fallback: check message text
+  if (error.message) {
+    return detectQuotaErrorFromMessage(error.message);
+  }
+
+  return null;
+};
+
+/**
+ * Detect quota error type from an error message string.
+ * Used as fallback when structured error codes are not available.
+ */
+const detectQuotaErrorFromMessage = (message: string): 'no_tokens' | 'no_free_forms' | 'limit_exceeded' | null => {
+  const lower = message.toLowerCase();
+  if (lower.includes('no tokens') || lower.includes('insufficient tokens')) {
+    return 'no_tokens';
+  }
+  if (lower.includes('no free forms') || lower.includes('free forms remaining')) {
+    return 'no_free_forms';
+  }
+  if (lower.includes('quota') || lower.includes('limit exceeded')) {
+    return 'limit_exceeded';
+  }
+  return null;
+};
 
 // ============================================================================
 // Validation Helpers
@@ -687,27 +928,21 @@ const ProfileSelectorSchema = z.object({
  * Used by UI components to determine what features are available
  *
  * All limits come from the API dynamically based on the user's subscription.
- * isPro is computed based on: isProSubscriber flag OR tokensRemaining > 0
+ * isPro is derived directly from the API's isProSubscriber flag
  */
 const UserStatusSchema = z.object({
   tokensRemaining: z.number(),
-  freeFormsRemaining: z.number().optional(), // Only for free tier users
+  freeFormsRemaining: z.number(),
   maxProfiles: z.number(),
   maxWebsitesPerProfile: z.number(),
   isPro: z.boolean(),
 });
 
 /**
- * Helper to compute isPro status from limitations
- * A user is considered Pro if they have the isProSubscriber flag OR tokens remaining
+ * Helper to compute isPro status from limitations.
+ * Trusts the isProSubscriber flag from the API which checks the active subscription directly.
  */
-const computeIsPro = (limitations: {
-  tokensRemaining: number;
-  isProSubscriber?: boolean;
-  maxFillingProfiles: number;
-}): boolean =>
-  // User is Pro if they have explicit subscription flag, tokens, or subscription-level limits
-  limitations.isProSubscriber === true || limitations.tokensRemaining > 0 || limitations.maxFillingProfiles > 1;
+const computeIsPro = (limitations: { isProSubscriber: boolean }): boolean => limitations.isProSubscriber;
 /**
  * Transform AuthHealthCheckResponse limitations into UserStatus
  */
@@ -733,6 +968,13 @@ type UserStatus = z.infer<typeof UserStatusSchema>;
 
 // Dashboard types
 type DTOOverviewResponse = z.infer<typeof DTOOverviewSchema>;
+type DTOTimeSeriesData = z.infer<typeof DTOTimeSeriesDataSchema>;
+type DTOWebsiteActivityData = z.infer<typeof DTOWebsiteActivityDataSchema>;
+type DTOSuccessRateData = z.infer<typeof DTOSuccessRateDataSchema>;
+type DTOFastestCompletionData = z.infer<typeof DTOFastestCompletionDataSchema>;
+type DTOFormsLeftData = z.infer<typeof DTOFormsLeftDataSchema>;
+type DTOCompletionRateData = z.infer<typeof DTOCompletionRateDataSchema>;
+type DTOProfileStats = z.infer<typeof DTOProfileStatsSchema>;
 
 // Profile types (with Response suffix for API responses, without for storage)
 type DTOFillingProfileItem = z.infer<typeof DTOFillingProfileItemSchema>;
@@ -762,6 +1004,7 @@ type FieldVisibility = z.infer<typeof FieldVisibilitySchema>;
 type FieldMetadata = z.infer<typeof FieldMetadataSchema>;
 type FieldValidation = z.infer<typeof FieldValidationSchema>;
 type Field = z.infer<typeof FieldSchema>;
+type ApiFormField = z.infer<typeof ApiFormFieldSchema>;
 type DTOFillPayload = z.infer<typeof DTOFillPayloadSchema>;
 
 // Authorized files types
@@ -784,6 +1027,12 @@ type DeleteProfileResponse = z.infer<typeof DeleteProfileResponseSchema>;
 type OverlayPosition = z.infer<typeof OverlayPositionSchema>;
 type HighlightFormsOptions = z.infer<typeof HighlightFormsOptionsSchema>;
 
+// API Envelope types
+type ApiSuccessEnvelope = z.infer<typeof ApiSuccessEnvelopeSchema>;
+type ApiErrorEnvelope = z.infer<typeof ApiErrorEnvelopeSchema>;
+type StreamingError = z.infer<typeof StreamingErrorSchema>;
+type StreamingFieldData = z.infer<typeof StreamingFieldDataSchema>;
+
 // Form schema type exports
 type ProfileFormValues = z.infer<typeof ProfileFormSchema>;
 type WebsiteEditFormValues = z.infer<typeof WebsiteEditSchema>;
@@ -804,7 +1053,16 @@ export { PlanSchema, UserSchema, LimitationsSchema, AuthHealthCheckSchema, Publi
 export { computeIsPro, toUserStatus };
 
 // Dashboard Schemas
-export { DTOOverviewSchema };
+export {
+  DTOOverviewSchema,
+  DTOTimeSeriesDataSchema,
+  DTOWebsiteActivityDataSchema,
+  DTOSuccessRateDataSchema,
+  DTOFastestCompletionDataSchema,
+  DTOFormsLeftDataSchema,
+  DTOCompletionRateDataSchema,
+  DTOProfileStatsSchema,
+};
 
 // Profile Schemas
 export {
@@ -842,6 +1100,7 @@ export {
   FieldMetadataSchema,
   FieldValidationSchema,
   FieldSchema,
+  ApiFormFieldSchema,
   DTOFillPayloadSchema,
 };
 
@@ -851,6 +1110,19 @@ export {
   EditProfileResponseSchema,
   ChangeActiveProfileResponseSchema,
   DeleteProfileResponseSchema,
+};
+
+// API Envelope Schemas
+export {
+  ResponseMetaSchema,
+  ApiSuccessEnvelopeSchema,
+  ApiErrorEnvelopeSchema,
+  StreamingErrorSchema,
+  StreamingFieldDataSchema,
+  unwrapApiEnvelope,
+  parseApiError,
+  detectQuotaErrorFromResponse,
+  detectQuotaErrorFromMessage,
 };
 
 // Overlay Schemas
@@ -874,6 +1146,13 @@ export type {
   PublicHealthCheckResponse,
   UserStatus,
   DTOOverviewResponse,
+  DTOTimeSeriesData,
+  DTOWebsiteActivityData,
+  DTOSuccessRateData,
+  DTOFastestCompletionData,
+  DTOFormsLeftData,
+  DTOCompletionRateData,
+  DTOProfileStats,
   DTOFillingProfileItem,
   DTOFillingProfileItemResponse,
   DTOSuggestedWebsite,
@@ -899,6 +1178,7 @@ export type {
   FieldMetadata,
   FieldValidation,
   Field,
+  ApiFormField,
   DTOFillPayload,
   SuccessResponse,
   EditProfileResponse,
@@ -919,4 +1199,9 @@ export type {
   DTOPresignedUrlResponse,
   DTOFileDownloadUrl,
   DTOAuthorizedFileForAI,
+  // API Envelope types
+  ApiSuccessEnvelope,
+  ApiErrorEnvelope,
+  StreamingError,
+  StreamingFieldData,
 };

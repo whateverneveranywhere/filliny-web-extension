@@ -9,12 +9,12 @@ import {
   ApiQuotaExceededError,
   ApiUnauthorizedError,
   MessageType,
+  StreamingErrorSchema,
 } from '@extension/shared';
 import { profileStorage } from '@extension/storage';
 import type { StreamMessage } from './apiTransformHelpers';
 import type { FieldUpdateResult, FormUpdateResults } from './fieldUpdaterHelpers';
 import type { Field } from '@extension/shared';
-import type { DTOProfileFillingForm } from '@extension/storage';
 
 const debug = createDebugLogger('FieldFill');
 
@@ -143,9 +143,19 @@ export const handleFieldFill = async (field: Field): Promise<FieldUpdateResult> 
     element.style.transition = 'all 0.3s ease';
 
     // Get profile data
-    const [defaultProfile] = await Promise.all([profileStorage.get()]);
+    const defaultProfile = await profileStorage.get();
+    if (!defaultProfile) {
+      const noProfileError = new FieldUpdateError(
+        'No filling profile configured. Please set up a profile first.',
+        ErrorCategory.DETECTION_FAILED,
+        field.id,
+      );
+      showErrorFeedback(element, 'No profile configured');
+      restoreStyles(5000);
+      return { success: false, fieldId: field.id, error: noProfileError };
+    }
     const visitingUrl = window.location.href;
-    const matchingWebsite = getMatchingWebsite((defaultProfile as DTOProfileFillingForm).fillingWebsites, visitingUrl);
+    const matchingWebsite = getMatchingWebsite(defaultProfile.fillingWebsites, visitingUrl);
 
     // Create a promise that will be resolved/rejected based on the operation outcome
     let streamResolve: () => void;
@@ -177,16 +187,11 @@ export const handleFieldFill = async (field: Field): Promise<FieldUpdateResult> 
       if (message.type === MessageType.STREAM_CHUNK && message.data) {
         // Check if the chunk contains a server-side error
         try {
-          const parsed = JSON.parse(message.data);
-          if (parsed?.error) {
-            debug.error('Server streaming error:', parsed.error.message || parsed.error);
-            streamReject(
-              new FieldUpdateError(
-                parsed.error.message || 'Server streaming error',
-                ErrorCategory.NETWORK_ERROR,
-                field.id,
-              ),
-            );
+          const parsed: unknown = JSON.parse(message.data);
+          const errorResult = StreamingErrorSchema.safeParse(parsed);
+          if (errorResult.success) {
+            debug.error('Server streaming error:', errorResult.data.error.message);
+            streamReject(new FieldUpdateError(errorResult.data.error.message, ErrorCategory.NETWORK_ERROR, field.id));
             return;
           }
         } catch {
@@ -219,7 +224,7 @@ export const handleFieldFill = async (field: Field): Promise<FieldUpdateResult> 
     debug.log(`Calling AI service for field: ${field.id}, label: ${field.label || field.name}`);
     const response = await aiFillService({
       contextText: matchingWebsite?.fillingContext || defaultProfile?.defaultFillingContext || '',
-      formData: [transformedField as Field], // Send only this single field (transformed)
+      formData: [transformedField], // Send only this single field (transformed)
       websiteUrl: visitingUrl,
       preferences: transformedPreferences,
     });

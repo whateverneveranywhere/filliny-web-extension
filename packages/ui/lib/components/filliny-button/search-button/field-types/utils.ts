@@ -1,7 +1,7 @@
 /**
  * Safely get a string value from potentially complex field values
  */
-import { getFieldLabel } from '../fieldUtils';
+import { getFieldLabel, getFieldDescription, humanizeString, extractReactFiberLabel } from '../fieldUtils';
 import { hasProperty, isHTMLElement, FieldTypeSchema } from '@extension/shared';
 import type { Field, FieldType, JQueryWindow, DOMEventHandler, AngularContextElement } from '@extension/shared';
 
@@ -1122,7 +1122,8 @@ const getUniqueFieldId = (baseIndex: number): string => {
 };
 
 /**
- * Create a base field object with common properties
+ * Create a base field object with common properties.
+ * Ensures label is NEVER empty by combining all available metadata signals.
  */
 const createBaseField = async (
   element: HTMLElement,
@@ -1142,7 +1143,86 @@ const createBaseField = async (
     uniqueSelectors: generateUniqueSelectors(element),
     value: '',
   };
+
+  // Populate name from element attributes
+  const nameAttr = element.getAttribute('name');
+  if (nameAttr?.trim()) {
+    field.name = nameAttr.trim();
+  }
+
+  // Populate placeholder
+  const placeholderAttr = element.getAttribute('placeholder');
+  if (placeholderAttr?.trim()) {
+    field.placeholder = placeholderAttr.trim();
+  }
+
+  // Populate title from HTML title attribute
+  const titleAttr = element.getAttribute('title');
+  if (titleAttr?.trim()) {
+    field.title = titleAttr.trim();
+  }
+
+  // Populate description from getFieldDescription
+  const description = getFieldDescription(element);
+  if (description) {
+    field.description = description;
+  }
+
+  // Primary label from getFieldLabel (multi-strategy with 27+ strategies)
   field.label = getFieldLabel(element);
+
+  // Bulletproof label enrichment: combine ALL available metadata signals
+  // to ensure the API always gets maximum context about the field
+  const labelSignals: string[] = [];
+
+  // Start with the primary label if it's meaningful
+  if (field.label && field.label !== `${element.tagName.toLowerCase()}:${element.getAttribute('type') || 'unknown'}`) {
+    labelSignals.push(field.label);
+  }
+
+  // Add name if it provides additional info
+  if (field.name) {
+    const humanizedName = humanizeString(field.name);
+    if (humanizedName && !labelSignals.some(s => s.toLowerCase().includes(humanizedName.toLowerCase()))) {
+      labelSignals.push(humanizedName);
+    }
+  }
+
+  // Add placeholder if it provides additional info
+  if (field.placeholder && !labelSignals.some(s => s.toLowerCase().includes(field.placeholder!.toLowerCase()))) {
+    labelSignals.push(field.placeholder);
+  }
+
+  // Add title if it provides additional info
+  if (field.title && !labelSignals.some(s => s.toLowerCase().includes(field.title!.toLowerCase()))) {
+    labelSignals.push(field.title);
+  }
+
+  // Add description if it provides additional info (truncated for label, full in description field)
+  if (
+    field.description &&
+    field.description.length < 100 &&
+    !labelSignals.some(s => s.toLowerCase().includes(field.description!.toLowerCase()))
+  ) {
+    labelSignals.push(field.description);
+  }
+
+  // Try React fiber as an additional signal
+  const reactLabel = extractReactFiberLabel(element);
+  if (reactLabel && !labelSignals.some(s => s.toLowerCase().includes(reactLabel.toLowerCase()))) {
+    labelSignals.push(reactLabel);
+  }
+
+  // Final label assembly: combine all signals or use nuclear fallback
+  if (labelSignals.length > 0) {
+    field.label = labelSignals.join(' | ');
+  } else {
+    // Nuclear fallback: guarantee non-empty label
+    field.label =
+      humanizeString(element.getAttribute('name') || element.id || '') ||
+      `${element.tagName.toLowerCase()}:${element.getAttribute('type') || 'unknown'}`;
+  }
+
   if (testMode) {
     switch (type) {
       case 'text':

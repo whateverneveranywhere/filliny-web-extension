@@ -5,6 +5,7 @@ import {
   editFillingProfileService,
 } from '../../services/api/Profiles/index.js';
 import { invalidateProfileMutationQueries, queryKeys } from '../queryKeys.js';
+import { profileStorage } from '@extension/storage';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { DTOProfileFillingForm } from '@extension/storage';
 
@@ -61,7 +62,7 @@ export const useDeleteProfileByIdMutation = () => {
 
 /**
  * Mutation hook for creating a new filling profile
- * Invalidates profile list and dashboard queries on success
+ * Immediately updates query cache for UI reactivity, then invalidates for eventual consistency
  * Returns the created profile data for immediate use
  */
 export const useCreateFillingProfileMutation = () => {
@@ -70,8 +71,23 @@ export const useCreateFillingProfileMutation = () => {
   return useMutation({
     mutationFn: ({ data }: { data: DTOProfileFillingForm }) => createFillingProfileService(data),
     retry: false, // Don't retry on 401 - user needs to re-authenticate
-    onSuccess: async () => {
-      // Use centralized invalidation helper (no specific profile ID for new profiles)
+    onSuccess: async createdProfile => {
+      if (createdProfile?.id) {
+        const profileId = String(createdProfile.id);
+
+        // 1. Set in query cache for immediate detail access
+        queryClient.setQueryData(queryKeys.profile.detail(profileId), createdProfile);
+
+        // 2. Set in chrome storage BEFORE invalidation so useActiveProfile's
+        //    storage fallback works immediately when queries re-render
+        await profileStorage.setDefaultProfile(createdProfile);
+
+        // 3. Set as active on server so refetched list returns isActive: true
+        await changeActiveFillingProfileService(profileId).catch(err => {
+          console.warn('Failed to set new profile as active:', err);
+        });
+      }
+      // 4. Invalidate for eventual consistency (list, dashboard)
       await invalidateProfileMutationQueries(queryClient);
     },
     onError: (error: Error) => {
@@ -84,7 +100,7 @@ export const useCreateFillingProfileMutation = () => {
 
 /**
  * Mutation hook for editing an existing filling profile
- * Invalidates profile list, specific profile detail, and dashboard queries on success
+ * Immediately updates query cache for UI reactivity, then invalidates for eventual consistency
  */
 export const useEditFillingProfileMutation = () => {
   const queryClient = useQueryClient();
@@ -92,8 +108,10 @@ export const useEditFillingProfileMutation = () => {
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: DTOProfileFillingForm }) => editFillingProfileService(id, data),
     retry: false, // Don't retry on 401 - user needs to re-authenticate
-    onSuccess: async (_data, { id }) => {
-      // Use centralized invalidation helper with specific profile ID
+    onSuccess: async (_data, { id, data }) => {
+      // Immediately update cache so UI reacts without waiting for refetch
+      queryClient.setQueryData(queryKeys.profile.detail(id), data);
+      // Invalidate for eventual consistency with server data
       await invalidateProfileMutationQueries(queryClient, id);
     },
     onError: (error: Error) => {

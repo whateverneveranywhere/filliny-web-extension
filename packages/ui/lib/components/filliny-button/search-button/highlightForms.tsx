@@ -199,23 +199,21 @@ const createUnifiedFormOverlay = async (
     }
 
     const observer = new IntersectionObserver(
-      entries => {
-        entries.forEach(_entry => {
-          const overlay = overlaysContainer.querySelector(`#overlay-${unifiedFormId}`) as HTMLDivElement | null;
-          if (overlay) {
-            // Update visibility based on any form being visible
-            const wasVisible = isAnyFormVisible;
-            isAnyFormVisible = forms.some(f => {
-              const rect = f.getBoundingClientRect();
-              return rect.top < window.innerHeight && rect.bottom > 0;
-            });
+      () => {
+        const overlay = overlaysContainer.querySelector(`#overlay-${unifiedFormId}`) as HTMLDivElement | null;
+        if (overlay) {
+          // Update visibility based on any form being visible
+          const wasVisible = isAnyFormVisible;
+          isAnyFormVisible = forms.some(f => {
+            const rect = f.getBoundingClientRect();
+            return rect.top < window.innerHeight && rect.bottom > 0;
+          });
 
-            if (wasVisible !== isAnyFormVisible) {
-              overlay.style.visibility = isAnyFormVisible ? 'visible' : 'hidden';
-              overlay.style.opacity = isAnyFormVisible ? '1' : '0';
-            }
+          if (wasVisible !== isAnyFormVisible) {
+            overlay.style.visibility = isAnyFormVisible ? 'visible' : 'hidden';
+            overlay.style.opacity = isAnyFormVisible ? '1' : '0';
           }
-        });
+        }
       },
       {
         threshold: [0, 0.1, 0.5],

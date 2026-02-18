@@ -1,8 +1,7 @@
 import { BackgroundActions } from './types.js';
 import { isValidUrl } from '../services/schemas/index.js';
-import { WebappEnvs, WebappEnvsSchema } from '../types/enums.js';
+import { WebappEnvs } from '../types/enums.js';
 import { authStorage, positionStorage, profileStorage } from '@extension/storage';
-import { z } from 'zod';
 import type { ErrorResponse, GetAuthTokenResponse, Request, ExcludeValuesFromBaseArrayType } from './types.js';
 import type { DTOProfileFillingForm } from '@extension/storage';
 
@@ -61,68 +60,47 @@ const getMatchingWebsite = (websites: DTOProfileFillingForm['fillingWebsites'], 
 // ============================================================================
 
 /**
- * Schema for config entries
+ * Config entry for each environment
  */
-const ConfigEntrySchema = z.object({
-  cookieName: z.string(),
+interface ConfigEntry {
+  cookieName: string;
   /** Web app URL for redirects and links - also where Better Auth sets cookies */
-  baseURL: z.string(),
+  baseURL: string;
   /** API URL for making requests - always goes through the webapp proxy */
-  apiURL: z.string(),
-  webappEnv: WebappEnvsSchema,
-});
-type ConfigEntry = z.infer<typeof ConfigEntrySchema>;
+  apiURL: string;
+  webappEnv: WebappEnvs;
+}
 
 /**
- * Schema for process environment
+ * Extended global object type for accessing env config at runtime.
+ * Uses partial fields since these may or may not exist at runtime.
  */
-const ProcessEnvSchema = z.object({
-  NODE_ENV: z.string().optional(),
-  CLI_CEB_DEV: z.string().optional(),
-  VITE_WEBAPP_ENV: z.string().optional(),
-});
+interface ExtendedGlobalThis {
+  __CACHED_ENV_CONFIG__?: ConfigEntry;
+  process?: {
+    env?: {
+      NODE_ENV?: string;
+      CLI_CEB_DEV?: string;
+      VITE_WEBAPP_ENV?: string;
+    };
+  };
+  import?: {
+    meta?: {
+      env?: {
+        VITE_WEBAPP_ENV?: string;
+      };
+    };
+  };
+}
 
 /**
- * Schema for Vite import.meta.env
+ * Vite import.meta interface for build-time variable replacement
  */
-const ViteMetaEnvSchema = z.object({
-  VITE_WEBAPP_ENV: z.string().optional(),
-});
-
-/**
- * Schema for extended global object
- * Note: Uses partial objects since these may or may not exist at runtime
- */
-const _ExtendedGlobalThisSchema = z.object({
-  __CACHED_ENV_CONFIG__: ConfigEntrySchema.optional(),
-  process: z
-    .object({
-      env: ProcessEnvSchema.optional(),
-    })
-    .optional(),
-  import: z
-    .object({
-      meta: z
-        .object({
-          env: ViteMetaEnvSchema.optional(),
-        })
-        .optional(),
-    })
-    .optional(),
-});
-type ExtendedGlobalThis = z.infer<typeof _ExtendedGlobalThisSchema>;
-
-/**
- * Schema for Vite import.meta interface for build-time variable replacement
- */
-const _ViteImportMetaSchema = z.object({
-  env: z
-    .object({
-      VITE_WEBAPP_ENV: WebappEnvsSchema.optional(),
-    })
-    .optional(),
-});
-type ViteImportMeta = z.infer<typeof _ViteImportMetaSchema>;
+interface ViteImportMeta {
+  env?: {
+    VITE_WEBAPP_ENV?: WebappEnvs;
+  };
+}
 
 // Typed config object
 // Cookie names must match Better Auth's cookiePrefix in main app (cookiePrefix: 'filliny')
@@ -399,20 +377,31 @@ const setupAuthTokenListener = () => {
   });
 };
 
-// Check auth state from cookie on startup (no storage needed)
+// Check auth state from cookie on startup and persist to storage
 const syncAuthTokenFromCookie = () => {
   const envConfig = getConfig();
 
-  handleGetAuthToken(envConfig, response => {
-    const token = response.success?.token;
-    if (token) {
-      console.log('[Auth] Session cookie found on startup');
-    } else {
-      console.warn(
-        '[Auth] No session cookie found on startup for:',
-        `name="${envConfig.cookieName}" at "${envConfig.baseURL}"`,
-      );
+  // First check if bearer_token already exists in storage
+  chrome.storage.local.get('bearer_token', result => {
+    if (result.bearer_token) {
+      console.log('[Auth] Bearer token already in storage, skipping cookie sync');
+      return;
     }
+
+    handleGetAuthToken(envConfig, response => {
+      const token = response.success?.token;
+      if (token) {
+        // Persist cookie token as bearer_token for consistent access
+        chrome.storage.local.set({ bearer_token: token }, () => {
+          console.log('[Auth] Synced session cookie to bearer_token storage');
+        });
+      } else {
+        console.warn(
+          '[Auth] No session cookie found on startup for:',
+          `name="${envConfig.cookieName}" at "${envConfig.baseURL}"`,
+        );
+      }
+    });
   });
 };
 

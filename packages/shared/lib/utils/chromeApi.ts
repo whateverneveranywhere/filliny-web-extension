@@ -195,7 +195,7 @@ export const notifyProfileUpdate = async (messageType: string): Promise<void> =>
   }
   try {
     await chromeRuntime.sendMessage({ type: messageType });
-  } catch (_error) {
+  } catch {
     // Ignore errors - content script might not be listening
     console.debug('[Filliny] Profile update notification sent:', messageType);
   }

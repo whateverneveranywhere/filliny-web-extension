@@ -20,12 +20,12 @@ import {
   ApiQuotaExceededError,
   ApiUnauthorizedError,
   MessageType,
+  StreamingErrorSchema,
 } from '@extension/shared';
 import { profileStorage, localFilesStorage } from '@extension/storage';
 import type { StreamMessage } from './apiTransformHelpers';
 import type { FormUpdateResults } from './fieldUpdaterHelpers';
-import type { Field, DTOAuthorizedFileForAI } from '@extension/shared';
-import type { DTOProfileFillingForm } from '@extension/storage';
+import type { DTOAuthorizedFileForAI } from '@extension/shared';
 
 const debug = createDebugLogger('FormClick');
 
@@ -170,13 +170,17 @@ export const handleFormClick = async (
     }
 
     // Only execute API call logic if not in test mode
-    const [defaultProfile] = await Promise.all([profileStorage.get()]);
+    const defaultProfile = await profileStorage.get();
+    if (!defaultProfile) {
+      showInfoToast('No Profile', 'Please create a filling profile to use AI form filling.');
+      return;
+    }
     const visitingUrl = window.location.href;
-    const matchingWebsite = getMatchingWebsite((defaultProfile as DTOProfileFillingForm).fillingWebsites, visitingUrl);
+    const matchingWebsite = getMatchingWebsite(defaultProfile.fillingWebsites, visitingUrl);
 
     // Fetch authorized local files for the current profile (if profile has an ID)
     let authorizedFiles: DTOAuthorizedFileForAI[] = [];
-    const profileId = (defaultProfile as DTOProfileFillingForm)?.id;
+    const profileId = defaultProfile.id;
     if (profileId) {
       try {
         // Read from local storage instead of cloud API
@@ -231,17 +235,12 @@ export const handleFormClick = async (
         if (message.type === MessageType.STREAM_CHUNK && message.data) {
           // Check if the chunk contains a server-side error
           try {
-            const parsed = JSON.parse(message.data);
-            if (parsed?.error) {
-              debug.error('Server streaming error:', parsed.error.message || parsed.error);
+            const parsed: unknown = JSON.parse(message.data);
+            const errorResult = StreamingErrorSchema.safeParse(parsed);
+            if (errorResult.success) {
+              debug.error('Server streaming error:', errorResult.data.error.message);
               formFillStore.getState().setPhase(StreamingPhase.ERROR);
-              streamReject(
-                new FieldUpdateError(
-                  parsed.error.message || 'Server streaming error',
-                  ErrorCategory.NETWORK_ERROR,
-                  'form',
-                ),
-              );
+              streamReject(new FieldUpdateError(errorResult.data.error.message, ErrorCategory.NETWORK_ERROR, 'form'));
               return;
             }
           } catch {
@@ -276,7 +275,7 @@ export const handleFormClick = async (
     // Make the API call with authorized files for AI context
     const response = await aiFillService({
       contextText: matchingWebsite?.fillingContext || defaultProfile?.defaultFillingContext || '',
-      formData: transformedFormData as Field[],
+      formData: transformedFormData,
       websiteUrl: visitingUrl,
       preferences: transformedPreferences,
       authorizedFiles: authorizedFiles.length > 0 ? authorizedFiles : undefined,

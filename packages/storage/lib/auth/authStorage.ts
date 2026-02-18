@@ -8,10 +8,9 @@ import type { BaseStorageType } from '../base/types.js';
 // ============================================================================
 
 /**
- * Schema for auth token (non-empty string)
+ * Type for auth token (non-empty string)
  */
-const _AuthTokenSchema = z.string();
-type AuthTokenType = z.infer<typeof _AuthTokenSchema>;
+type AuthTokenType = string;
 
 /**
  * Schema for background script response

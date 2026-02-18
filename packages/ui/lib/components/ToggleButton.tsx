@@ -1,6 +1,5 @@
 import { Button } from './ui/button';
 import { cn } from '@/lib/utils';
-import { useStorage } from '@extension/shared';
 import { exampleThemeStorage } from '@extension/storage';
 import type { ButtonProps } from './ui/button';
 import type { ComponentPropsWithoutRef } from 'react';
@@ -32,8 +31,6 @@ export const ToggleButton = ({
   size = 'default',
   ...props
 }: ToggleButtonProps) => {
-  const { isLight: _isLight } = useStorage(exampleThemeStorage);
-
   const handleClick = () => {
     if (onClick) {
       onClick();

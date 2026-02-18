@@ -1,41 +1,26 @@
 import { isValidUrl } from '../services/schemas/index.js';
 import { getCurrentVistingUrl, getMatchingWebsite } from '../utils/index.js';
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { z } from 'zod';
 import type { DTOProfileFillingForm } from '@extension/storage';
 
 // ============================================================================
 // Hook Schemas
 // ============================================================================
 
-/**
- * Schema for active tab URL mode
- */
-const ActiveTabUrlModeSchema = z.enum(['activeTab', 'currentPage', 'both']);
-type _ActiveTabUrlMode = z.infer<typeof ActiveTabUrlModeSchema>;
+type ActiveTabUrlMode = 'activeTab' | 'currentPage' | 'both';
 
-/**
- * Schema for useActiveTabUrl hook props
- * Note: websites uses the imported type from storage as it references the full schema
- */
-const _UseActiveTabUrlPropsSchema = z.object({
-  websites: z.custom<DTOProfileFillingForm['fillingWebsites']>().optional(),
-  mode: ActiveTabUrlModeSchema.optional(),
-});
-type UseActiveTabUrlProps = z.infer<typeof _UseActiveTabUrlPropsSchema>;
+interface UseActiveTabUrlProps {
+  websites?: DTOProfileFillingForm['fillingWebsites'];
+  mode?: ActiveTabUrlMode;
+}
 
-/**
- * Schema for useActiveTabUrl hook return value
- * Note: matchingWebsite references the external type from storage
- */
-const _UseActiveTabUrlReturnSchema = z.object({
-  activeTabUrl: z.string(),
-  isLoading: z.boolean(),
-  isValid: z.boolean(),
-  matchingWebsite: z.custom<DTOProfileFillingForm['fillingWebsites'][0] | null>(),
-  currentPageUrl: z.string(),
-});
-type UseActiveTabUrlReturn = z.infer<typeof _UseActiveTabUrlReturnSchema>;
+interface UseActiveTabUrlReturn {
+  activeTabUrl: string;
+  isLoading: boolean;
+  isValid: boolean;
+  matchingWebsite: DTOProfileFillingForm['fillingWebsites'][0] | null;
+  currentPageUrl: string;
+}
 
 /**
  * TabUpdateListeners interface - uses function types which cannot be expressed in Zod

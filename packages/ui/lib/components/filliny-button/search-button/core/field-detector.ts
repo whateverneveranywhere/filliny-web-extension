@@ -134,7 +134,7 @@ class FieldDetector {
   private async mergeFieldResults(fieldsByElement: Map<HTMLElement, DetectedField[]>): Promise<DetectedField[]> {
     const mergedFields: DetectedField[] = [];
 
-    for (const [_element, fields] of fieldsByElement.entries()) {
+    for (const fields of fieldsByElement.values()) {
       if (fields.length === 1) {
         // Single detection, use as-is
         mergedFields.push(fields[0]);

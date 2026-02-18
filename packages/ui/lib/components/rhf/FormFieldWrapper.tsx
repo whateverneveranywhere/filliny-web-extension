@@ -57,8 +57,6 @@ const FormFieldWrapper = <T extends FieldValues = FieldValues>({
   title,
   description,
   required,
-
-  disabled: _disabled, // Available for child components via spread
   className,
   value: externalValue,
   onChange: externalOnChange,

@@ -265,13 +265,43 @@ describe('DTOFillPayload Schema', () => {
     expect(DTOFillPayloadSchema.safeParse(payload).success).toBe(true);
   });
 
-  it('should validate payload without preferences', () => {
+  it('should reject payload without preferences (preferences is required)', () => {
     const payload = {
       contextText: 'Context',
       formData: [{ id: 'field1', type: 'text' }],
       websiteUrl: 'https://example.com',
     };
-    expect(DTOFillPayloadSchema.safeParse(payload).success).toBe(true);
+    expect(DTOFillPayloadSchema.safeParse(payload).success).toBe(false);
+  });
+
+  it('should reject payload with empty contextText', () => {
+    const payload = {
+      contextText: '',
+      formData: [{ id: 'field1', type: 'text' }],
+      websiteUrl: 'https://example.com',
+      preferences: { isFormal: true, isGapFillingAllowed: false, toneId: 1, povId: 1 },
+    };
+    expect(DTOFillPayloadSchema.safeParse(payload).success).toBe(false);
+  });
+
+  it('should reject payload with empty formData', () => {
+    const payload = {
+      contextText: 'Context',
+      formData: [],
+      websiteUrl: 'https://example.com',
+      preferences: { isFormal: true, isGapFillingAllowed: false, toneId: 1, povId: 1 },
+    };
+    expect(DTOFillPayloadSchema.safeParse(payload).success).toBe(false);
+  });
+
+  it('should reject payload with invalid websiteUrl', () => {
+    const payload = {
+      contextText: 'Context',
+      formData: [{ id: 'field1', type: 'text' }],
+      websiteUrl: 'not-a-url',
+      preferences: { isFormal: true, isGapFillingAllowed: false, toneId: 1, povId: 1 },
+    };
+    expect(DTOFillPayloadSchema.safeParse(payload).success).toBe(false);
   });
 });
 

@@ -33,10 +33,7 @@ interface NoTokensAlertProps {
  * - Warning (yellow): Free user has low free forms remaining
  * - Error (red): Free user has 0 free forms OR Pro user has 0 tokens
  */
-export default function NoTokensAlert({
-  isPro = false,
-  freeFormsRemaining: _freeFormsRemaining = 0,
-}: NoTokensAlertProps) {
+export default function NoTokensAlert({ isPro = false }: NoTokensAlertProps) {
   const config = getConfig();
   const { FREE_TIER_LIMITS } = usePlanLimits();
 

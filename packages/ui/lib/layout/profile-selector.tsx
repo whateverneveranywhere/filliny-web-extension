@@ -91,13 +91,15 @@ const ProfileSelector = () => {
       await deleteProfile({ id: deletingId });
 
       if (isActiveProfile && profiles) {
-        // Only reset if we don't have any remaining profiles
+        // Immediately reset storage and notify all tabs so content UIs hide
+        // on ALL websites that belonged to the deleted profile.
+        // This mirrors the behavior of removing a single website from a profile.
+        await profileStorage.resetDefaultProfile();
+        await notifyProfileUpdate(MessageType.PROFILE_UPDATED);
+
+        // If there are remaining profiles, switch to the next one
         const remainingProfiles = profiles.filter(profile => String(profile.id) !== deletingId);
-        if (remainingProfiles.length === 0) {
-          await profileStorage.resetDefaultProfile();
-          // Notify content scripts about the profile update (removal)
-          await notifyProfileUpdate(MessageType.PROFILE_UPDATED);
-        } else {
+        if (remainingProfiles.length > 0) {
           const deletedIndex = profiles.findIndex(profile => String(profile.id) === deletingId);
           const newActiveListItem = remainingProfiles[deletedIndex] || remainingProfiles[deletedIndex - 1];
           if (newActiveListItem) {
@@ -107,9 +109,9 @@ const ProfileSelector = () => {
             const fullProfile = await getFillingProfileByIdService(newActiveId);
             if (fullProfile) {
               await profileStorage.setDefaultProfile(fullProfile);
+              // Notify again so content UIs re-appear on the new profile's websites
+              await notifyProfileUpdate(MessageType.PROFILE_UPDATED);
             }
-            // Notify content scripts about the profile update
-            await notifyProfileUpdate(MessageType.PROFILE_UPDATED);
           }
         }
       }

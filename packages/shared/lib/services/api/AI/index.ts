@@ -1,8 +1,8 @@
 import { MessageType } from '../../../types/enums.js';
 import { getConfig } from '../../../utils/helpers.js';
 import { apiEndpoints } from '../../endpoints.js';
-import { ApiUnauthorizedError, ApiQuotaExceededError, detectQuotaErrorType } from '../../httpService.js';
-import { FieldSchema } from '../../schemas/index.js';
+import { ApiUnauthorizedError, ApiQuotaExceededError } from '../../httpService.js';
+import { FieldSchema, detectQuotaErrorFromResponse } from '../../schemas/index.js';
 import { authStorage } from '@extension/storage';
 import { z } from 'zod';
 import type { DTOFillPayload, Field } from '../../schemas/index.js';
@@ -74,34 +74,28 @@ export const aiFillService = async (
         console.error('[AI Service] API error:', response.error);
         const errorMessage = response.error;
 
-        // Check for 401 unauthorized errors
+        // Check for unauthorized errors
+        const lowerError = errorMessage.toLowerCase();
         if (
-          errorMessage.includes('401') ||
-          errorMessage.toLowerCase().includes('unauthorized') ||
-          errorMessage.toLowerCase().includes('unauthenticated')
+          lowerError.includes('401') ||
+          lowerError.includes('unauthorized') ||
+          lowerError.includes('unauthenticated')
         ) {
-          // Clear stored auth token on unauthorized responses (same as httpService)
           authStorage.set('').catch(err => console.error('[AI Service] Failed to clear auth token:', err));
           reject(new ApiUnauthorizedError('Unauthorized: Please log in again', 401));
           return;
         }
 
-        // Check for 403 forbidden errors - could be quota exceeded or access denied
-        if (errorMessage.includes('403') || errorMessage.toLowerCase().includes('forbidden')) {
-          const quotaErrorType = detectQuotaErrorType(errorMessage);
-          if (quotaErrorType) {
-            reject(new ApiQuotaExceededError(errorMessage, quotaErrorType));
-            return;
-          }
-          // Treat non-quota 403 as authorization error
-          reject(new ApiUnauthorizedError(errorMessage || 'Forbidden: Access denied', 403));
+        // Check for quota/limit errors using structured detection
+        const quotaErrorType = detectQuotaErrorFromResponse(errorMessage);
+        if (quotaErrorType) {
+          reject(new ApiQuotaExceededError(errorMessage, quotaErrorType));
           return;
         }
 
-        // Check for quota-related errors that might not have 403 status code
-        const quotaErrorType = detectQuotaErrorType(errorMessage);
-        if (quotaErrorType) {
-          reject(new ApiQuotaExceededError(errorMessage, quotaErrorType));
+        // Check for other 403 errors
+        if (lowerError.includes('403') || lowerError.includes('forbidden')) {
+          reject(new ApiUnauthorizedError(errorMessage || 'Forbidden: Access denied', 403));
           return;
         }
 
@@ -116,14 +110,13 @@ export const aiFillService = async (
       }
 
       // If it's a regular response with data, validate and return it in the expected format
-      if (response?.data && typeof response.data === 'object') {
+      if (response?.data) {
         const parseResult = z.array(FieldSchema).safeParse(response.data);
         if (parseResult.success) {
           resolve({ data: parseResult.data });
         } else {
-          console.warn('[AI Service] Response validation failed, using raw data:', parseResult.error.errors);
-          // Fallback: use the data as-is if it's an array (schema may be stricter than actual response)
-          resolve({ data: Array.isArray(response.data) ? (response.data as Field[]) : [] });
+          console.error('[AI Service] Response validation failed:', parseResult.error.errors);
+          resolve({ data: [] });
         }
         return;
       }

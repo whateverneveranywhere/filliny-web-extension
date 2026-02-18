@@ -511,7 +511,7 @@ export class FileFieldUpdater implements FieldUpdateStrategy {
     return field.type === 'file' && field.element instanceof HTMLInputElement && field.element.type === 'file';
   }
 
-  async update(field: DetectedField, _value: unknown): Promise<UpdateResult> {
+  async update(field: DetectedField): Promise<UpdateResult> {
     // File inputs cannot be programmatically set for security reasons
     // We can only trigger the file picker or provide visual feedback
 

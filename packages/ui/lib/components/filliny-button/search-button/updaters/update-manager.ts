@@ -98,7 +98,7 @@ export class UpdateManager {
 
     const results = await Promise.allSettled(updates.map(({ field, value }) => this.updateField(field, value)));
 
-    const updateResults = results.map((result, _index) => {
+    const updateResults = results.map(result => {
       if (result.status === 'fulfilled') {
         return result.value;
       } else {

@@ -1,5 +1,20 @@
 import { MessageType } from '../types/enums.js';
 import { useState, useEffect, useCallback } from 'react';
+import { z } from 'zod';
+
+/**
+ * Schema for the background-script response to GET_QUOTA_STATUS.
+ * The background script always returns these fields from fetchQuotaStatus.
+ */
+const QuotaStatusResponseSchema = z.object({
+  canFillForms: z.boolean(),
+  isPro: z.boolean(),
+  tokensRemaining: z.number(),
+  freeFormsRemaining: z.number(),
+  success: z.boolean().optional(),
+});
+
+type QuotaStatusResponse = z.infer<typeof QuotaStatusResponseSchema>;
 
 interface QuotaStatus {
   canFillForms: boolean;
@@ -11,12 +26,7 @@ interface QuotaStatus {
 /**
  * Compute a user-facing reason string from the background quota response.
  */
-const computeDisabledReason = (response: {
-  canFillForms?: boolean;
-  isPro?: boolean;
-  tokensRemaining?: number;
-  freeFormsRemaining?: number;
-}): string | null => {
+const computeDisabledReason = (response: QuotaStatusResponse): string | null => {
   if (response.canFillForms) return null;
 
   if (response.isPro) {
@@ -41,15 +51,23 @@ export const useQuotaCheck = (): QuotaStatus => {
       return;
     }
 
-    chrome.runtime.sendMessage({ type: MessageType.GET_QUOTA_STATUS }, response => {
+    chrome.runtime.sendMessage({ type: MessageType.GET_QUOTA_STATUS }, rawResponse => {
       if (chrome.runtime.lastError) {
         // On error, assume user can fill (don't block)
         setCanFillForms(true);
         setDisabledReason(null);
-      } else if (response) {
-        const allowed = response.canFillForms ?? true;
-        setCanFillForms(allowed);
-        setDisabledReason(allowed ? null : computeDisabledReason(response));
+      } else {
+        const result = QuotaStatusResponseSchema.safeParse(rawResponse);
+        if (result.success) {
+          const response = result.data;
+          const allowed = response.canFillForms;
+          setCanFillForms(allowed);
+          setDisabledReason(allowed ? null : computeDisabledReason(response));
+        } else {
+          // Permissive default on parse failure
+          setCanFillForms(true);
+          setDisabledReason(null);
+        }
       }
       setIsLoading(false);
     });

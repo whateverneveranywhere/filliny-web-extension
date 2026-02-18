@@ -1,7 +1,6 @@
 import { useAuthHealthCheckQuery } from './authQueries.js';
-import { computeIsPro, toUserStatus, AuthHealthCheckSchema } from '../../services/schemas/index.js';
+import { toUserStatus, AuthHealthCheckSchema } from '../../services/schemas/index.js';
 import { useAuthContextSafe } from '../AuthContext.js';
-import { z } from 'zod';
 import type { UserStatus } from '../../services/schemas/index.js';
 
 /**
@@ -15,15 +14,10 @@ const FREE_TIER_LIMITS = {
   MAX_WEBSITES: 3,
 } as const;
 
-/**
- * Options schema for usePlanLimits hook
- */
-const _UsePlanLimitsOptionsSchema = z.object({
+interface UsePlanLimitsOptions {
   /** Whether to enable the underlying query. Pass false when user is not authenticated. */
-  enabled: z.boolean().optional(),
-});
-
-type UsePlanLimitsOptions = z.infer<typeof _UsePlanLimitsOptionsSchema>;
+  enabled?: boolean;
+}
 
 /**
  * Hook to access plan limitations and computed user status.
@@ -70,7 +64,7 @@ export const usePlanLimits = (options?: UsePlanLimitsOptions) => {
   const freeFormsRemaining = limitations?.freeFormsRemaining ?? 0;
   const maxProfiles = limitations?.maxFillingProfiles ?? FREE_TIER_LIMITS.MAX_PROFILES;
   const maxWebsites = limitations?.maxWebsitesPerProfile ?? FREE_TIER_LIMITS.MAX_WEBSITES;
-  const isPro = limitations ? computeIsPro(limitations) : false;
+  const isPro = limitations?.isProSubscriber ?? false;
 
   // Build user status object when data is available
   const userStatus: UserStatus | null = limitations ? toUserStatus(limitations) : null;

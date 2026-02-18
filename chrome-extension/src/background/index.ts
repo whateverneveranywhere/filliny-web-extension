@@ -5,6 +5,9 @@ import {
   syncAuthTokenFromCookie,
   WebappEnvs,
   MessageType,
+  unwrapApiEnvelope,
+  parseApiError,
+  AuthHealthCheckSchema,
 } from '@extension/shared';
 import 'webextension-polyfill';
 
@@ -216,15 +219,20 @@ const fetchQuotaStatus = async (): Promise<QuotaStatus> => {
     throw new Error(`Health check failed: ${response.status}`);
   }
 
-  const data = await response.json();
-  const limitations = data?.limitations;
+  const json: unknown = await response.json();
+  const unwrapped = unwrapApiEnvelope(json);
+  const parseResult = AuthHealthCheckSchema.safeParse(unwrapped);
 
-  const tokensRemaining = limitations?.tokensRemaining ?? 0;
-  const freeFormsRemaining = limitations?.freeFormsRemaining ?? 0;
-  const maxFillingProfiles = limitations?.maxFillingProfiles ?? 1;
-  // Use the same robust Pro detection as the rest of the codebase:
-  // isProSubscriber flag, or has tokens allocated, or has multiple profile slots
-  const isPro = limitations?.isProSubscriber === true || tokensRemaining > 0 || maxFillingProfiles > 1;
+  if (!parseResult.success) {
+    console.warn('[Background] Auth health response validation failed:', parseResult.error.errors);
+    // Permissive default: allow filling on validation failure
+    return { canFillForms: true, freeFormsRemaining: 0, isPro: false, tokensRemaining: 0 };
+  }
+
+  const { limitations } = parseResult.data;
+  const tokensRemaining = limitations.tokensRemaining;
+  const freeFormsRemaining = limitations.freeFormsRemaining;
+  const isPro = limitations.isProSubscriber;
   const canFillForms = isPro ? tokensRemaining > 0 : freeFormsRemaining > 0;
 
   const status: QuotaStatus = { canFillForms, freeFormsRemaining, isPro, tokensRemaining };
@@ -546,7 +554,7 @@ interface APIRequestResponse {
 }
 
 // Separate function to handle API requests
-const handleApiRequest = (
+const handleApiRequest = async (
   message: APIRequestMessage,
   sender: chrome.runtime.MessageSender,
   sendResponse: (response: APIRequestResponse) => void,
@@ -566,6 +574,23 @@ const handleApiRequest = (
   const headers = { ...options.headers };
   delete headers['Cookie']; // Forbidden header in service workers
 
+  // Safety net: if no Authorization header was provided, try to add one
+  if (!headers['Authorization']) {
+    const tokenResult = await chrome.storage.local.get('bearer_token');
+    let authToken = tokenResult.bearer_token || '';
+    if (!authToken) {
+      const envConfig = getConfig();
+      const cookie = await chrome.cookies.get({
+        url: envConfig.baseURL,
+        name: envConfig.cookieName,
+      });
+      if (cookie?.value) authToken = cookie.value;
+    }
+    if (authToken) {
+      headers['Authorization'] = `Bearer ${authToken}`;
+    }
+  }
+
   fetch(url, {
     ...options,
     headers,
@@ -575,14 +600,20 @@ const handleApiRequest = (
       // console.log('Background: API response status:', response.status);
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: response.statusText }));
-        console.error('Background: API error:', errorData);
-        sendResponse({
-          error:
-            typeof errorData === 'object'
-              ? errorData?.error?.message || errorData?.message || 'Request failed'
-              : 'Request failed',
-        });
+        let errorMessage = 'Request failed';
+        try {
+          const errorJson: unknown = await response.json();
+          const structured = parseApiError(errorJson);
+          if (structured) {
+            errorMessage = structured.message;
+          } else if (errorJson && typeof errorJson === 'object' && errorJson !== null && 'message' in errorJson) {
+            errorMessage = String((errorJson as Record<string, unknown>).message);
+          }
+        } catch {
+          errorMessage = response.statusText || 'Request failed';
+        }
+        console.error('Background: API error:', errorMessage);
+        sendResponse({ error: errorMessage });
         return;
       }
 

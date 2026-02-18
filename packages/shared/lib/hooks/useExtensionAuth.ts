@@ -3,23 +3,17 @@ import { clearUserStorage } from '../utils/helpers.js';
 import { BackgroundActions, GetAuthTokenResponseSchema } from '../utils/types.js';
 import { authStorage } from '@extension/storage';
 import { useEffect, useState } from 'react';
-import { z } from 'zod';
 import type { GetAuthTokenResponse } from '../utils/types.js';
 
 // ============================================================================
 // Extension Auth State Schema
 // ============================================================================
 
-/**
- * Schema for extension auth state
- */
-const _ExtensionAuthStateSchema = z.object({
-  isAuthenticated: z.boolean(),
-  isLoading: z.boolean(),
-  token: z.string().nullable(),
-});
-
-type ExtensionAuthState = z.infer<typeof _ExtensionAuthStateSchema>;
+interface ExtensionAuthState {
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  token: string | null;
+}
 
 /**
  * Hook to handle extension authentication.
@@ -90,16 +84,12 @@ export const useExtensionAuth = (): ExtensionAuthState => {
 
     // Listen for auth token changes from background worker
     // Handles both cookie-based (AUTH_TOKEN_CHANGED) and webapp-based (SET/CLEAR_BEARER_TOKEN) messages
-    const handleMessage = (
-      message: {
-        action?: BackgroundActions;
-        type?: string;
-        token?: string;
-        payload?: { success?: { token?: string | null } };
-      },
-      _sender: chrome.runtime.MessageSender,
-      _sendResponse: (response?: unknown) => void,
-    ) => {
+    const handleMessage = (message: {
+      action?: BackgroundActions;
+      type?: string;
+      token?: string;
+      payload?: { success?: { token?: string | null } };
+    }) => {
       if (!isMounted) {
         return;
       }
