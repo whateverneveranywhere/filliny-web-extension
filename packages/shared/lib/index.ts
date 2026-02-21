@@ -15,3 +15,6 @@ export * from './types/index.js';
 
 // Export components (AppLifecycleMonitor)
 export * from './components/index.js';
+
+// Export analytics (PostHog tracking)
+export * from './analytics/index.js';

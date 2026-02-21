@@ -1481,4 +1481,20 @@ const detectFileFields = async (
 // Exports (at end of file per ESLint import-x/exports-last rule)
 // ============================================================================
 
-export { updateFileInput, detectFileFields };
+export {
+  updateFileInput,
+  detectFileFields,
+  getFileTypeFromExtension,
+  getExtensionFromMimeType,
+  createRealisticFile,
+  createRealisticFileContent,
+  validateFileContent,
+  parseAcceptTypes,
+  categorizeFileType,
+  categorizeMimeType,
+  parseFileSize,
+  generateTestFilesForAcceptTypes,
+  MIME_TYPE_MAP,
+};
+
+export type { AcceptType };

@@ -1,6 +1,6 @@
 import { ToastAction } from '@/lib/components/ui/toast';
 import { toast } from '@/lib/hooks/use-toast';
-import { getConfig } from '@extension/shared';
+import { getConfig, track, AnalyticsEvent } from '@extension/shared';
 
 /**
  * Show a toast for quota exceeded errors.
@@ -12,6 +12,10 @@ export const showQuotaExceededToast = (message?: string): void => {
 
   // Detect whether this is a token limit message (Pro users) or free forms message
   const isTokenLimit = message?.toLowerCase().includes('token');
+  const tier = isTokenLimit ? 'pro' : 'free';
+
+  track(AnalyticsEvent.QUOTA_EXHAUSTED, { tier });
+  track(AnalyticsEvent.UPGRADE_PROMPT_SHOWN, { tier, trigger: 'form_fill' });
 
   toast({
     variant: 'destructive',
@@ -22,7 +26,12 @@ export const showQuotaExceededToast = (message?: string): void => {
         ? 'You have reached your token limit. Tokens refresh on your billing cycle.'
         : 'You have used all your free forms. Subscribe to Pro for unlimited form filling.'),
     action: isTokenLimit ? undefined : (
-      <ToastAction altText="Subscribe to Pro" onClick={() => window.open(pricingUrl, '_blank')}>
+      <ToastAction
+        altText="Subscribe to Pro"
+        onClick={() => {
+          track(AnalyticsEvent.UPGRADE_CLICKED, { tier, source: 'quota_toast' });
+          window.open(pricingUrl, '_blank');
+        }}>
         Upgrade
       </ToastAction>
     ),
@@ -67,5 +76,18 @@ export const showInfoToast = (title: string, description: string): void => {
   toast({
     title,
     description,
+    duration: 4000,
+  });
+};
+
+/**
+ * Show a toast when no forms are detected on the page.
+ */
+export const showNoFormsDetectedToast = (): void => {
+  toast({
+    title: 'No Forms Detected',
+    description:
+      "This page doesn't appear to have any fillable forms. Try navigating to a page with a form, such as a sign-up, application, or contact page.",
+    duration: 5000,
   });
 };

@@ -141,7 +141,7 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
 }) => (
   <>
     <div
-      className="filliny-fixed filliny-left-1/2 filliny-top-1/2 filliny-z-[10000001] filliny-flex filliny-w-full filliny-max-w-fit filliny--translate-x-1/2 filliny--translate-y-1/2 filliny-flex-col filliny-items-center filliny-gap-3"
+      className="filliny-absolute filliny-left-1/2 filliny-top-1/2 filliny-z-[10000001] filliny-flex filliny-w-full filliny-max-w-fit filliny--translate-x-1/2 filliny--translate-y-1/2 filliny-flex-col filliny-items-center filliny-gap-3"
       style={{ pointerEvents: 'auto' }}>
       <Button ref={buttonRef} type="button" size="lg" variant="default" onClick={onFillClick}>
         <Wand2 className="filliny-h-5 filliny-w-5" />
@@ -158,7 +158,7 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
       size="icon"
       type="button"
       variant="ghost"
-      className="filliny-fixed filliny-right-4 filliny-top-4 filliny-h-8 filliny-w-8 filliny-rounded-full filliny-bg-muted/30 filliny-text-primary-foreground hover:filliny-bg-muted/50"
+      className="filliny-absolute filliny-right-4 filliny-top-4 filliny-h-8 filliny-w-8 filliny-rounded-full filliny-bg-muted/30 filliny-text-primary-foreground hover:filliny-bg-muted/50"
       style={{ pointerEvents: 'auto' }}
       onClick={onDismiss}
       aria-label="Close overlay">

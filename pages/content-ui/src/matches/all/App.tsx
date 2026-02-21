@@ -1,14 +1,24 @@
-import { useActiveTabUrl, useStorage, AppLifecycleMonitor, MessageType, useQuotaCheck } from '@extension/shared';
+import {
+  useActiveTabUrl,
+  useStorage,
+  AppLifecycleMonitor,
+  MessageType,
+  useQuotaCheck,
+  setAnalyticsContext,
+} from '@extension/shared';
 import { authStorage, profileStorage } from '@extension/storage';
 import { FillinyButton, Toaster } from '@extension/ui';
 import { useEffect } from 'react';
+
+// Content-UI relays analytics events to background via message passing
+setAnalyticsContext('content_ui');
 
 const SHADOW_APP_ID = 'chrome-extension-filliny-all';
 
 export default function App() {
   const auth = useStorage(authStorage);
   const defaultStorageProfile = useStorage(profileStorage);
-  const { canFillForms, disabledReason } = useQuotaCheck();
+  const { canFillForms, disabledReason, isAuthenticated } = useQuotaCheck();
   // Listen for profile update messages from the background script
   // This ensures we re-evaluate visibility when profiles change
   useEffect(() => {
@@ -34,7 +44,9 @@ export default function App() {
   });
 
   // Determine if the extension UI should be visible
-  const shouldBeVisible = Boolean(auth && defaultStorageProfile && !isLoading && matchingWebsite);
+  const shouldBeVisible = Boolean(
+    auth && defaultStorageProfile && !isLoading && matchingWebsite && isAuthenticated !== false,
+  );
 
   return (
     <AppLifecycleMonitor shadowAppId={SHADOW_APP_ID} shouldBeVisible={shouldBeVisible}>

@@ -1,7 +1,12 @@
-import { detectFormLikeContainers, openCrossOriginIframeInNewTabAndAlert } from './detectionHelpers';
+import {
+  detectFormLikeContainers,
+  isInsideCrossOriginIframe,
+  openCrossOriginIframeInNewTabAndAlert,
+} from './detectionHelpers';
 import { FormsOverlay } from './FormsOverlay';
 import { addGlowingBorder, findOrCreateShadowContainer, getFormPosition } from './overlayUtils';
 import { unifiedFieldRegistry } from './unifiedFieldDetection';
+import { track, AnalyticsEvent } from '@extension/shared';
 import { createRoot } from 'react-dom/client';
 import type { HighlightFormsOptions } from './types';
 
@@ -19,7 +24,21 @@ const highlightForms = async ({ visionOnly = false, testMode = false }: Highligh
   // Use our enhanced form detection logic
   const formLikeContainers = await detectFormLikeContainers();
   if (formLikeContainers.length === 0) {
-    openCrossOriginIframeInNewTabAndAlert();
+    if (isInsideCrossOriginIframe()) {
+      track(AnalyticsEvent.CROSS_ORIGIN_IFRAME_DETECTED, {
+        website_domain: (() => {
+          try {
+            return window.location.hostname;
+          } catch {
+            return 'unknown';
+          }
+        })(),
+      });
+      openCrossOriginIframeInNewTabAndAlert();
+    } else {
+      const { showNoFormsDetectedToast } = await import('./toastHelpers');
+      showNoFormsDetectedToast();
+    }
     return;
   }
 
@@ -95,6 +114,20 @@ const highlightForms = async ({ visionOnly = false, testMode = false }: Highligh
       return rectA.left - rectB.left;
     });
 
+  // Track forms detected
+  const totalFieldCount = formsArray.reduce((sum, form) => sum + countFormFieldsInElement(form), 0);
+  track(AnalyticsEvent.FORMS_DETECTED, {
+    form_count: formsArray.length,
+    field_count: totalFieldCount,
+    website_domain: (() => {
+      try {
+        return window.location.hostname;
+      } catch {
+        return 'unknown';
+      }
+    })(),
+  });
+
   console.log(`Processing ${formsArray.length} form containers for highlighting`);
 
   // Log detailed information about each container being processed
@@ -124,6 +157,8 @@ const highlightForms = async ({ visionOnly = false, testMode = false }: Highligh
       }
     }
   } else {
+    // Track forms highlighted
+    track(AnalyticsEvent.FORMS_HIGHLIGHTED, { form_count: formsArray.length });
     // Create ONE single overlay that handles ALL forms
     if (formsArray.length > 0) {
       try {

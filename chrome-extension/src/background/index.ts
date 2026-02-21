@@ -8,13 +8,31 @@ import {
   unwrapApiEnvelope,
   parseApiError,
   AuthHealthCheckSchema,
+  initPostHog,
+  getPostHogConfig,
+  captureEvent,
+  identifyUser as phIdentifyUser,
+  resetUser as phResetUser,
+  setAnalyticsContext,
+  AnalyticsEvent,
 } from '@extension/shared';
+import type { AnalyticsMessage } from '@extension/shared';
 import 'webextension-polyfill';
 
 // Add this near the top of the file, after imports
 setupAuthTokenListener();
 // Sync auth token from cookie to storage on startup
 syncAuthTokenFromCookie();
+
+// Initialize PostHog analytics in background context
+const envConfig = getConfig();
+const phConfig = getPostHogConfig(envConfig.webappEnv);
+setAnalyticsContext('background');
+initPostHog({
+  context: 'background',
+  config: phConfig,
+  version: chrome.runtime.getManifest().version,
+});
 
 // Track extension pinning status
 let isExtensionPinned = false;
@@ -174,6 +192,7 @@ interface QuotaStatus {
   freeFormsRemaining: number;
   isPro: boolean;
   tokensRemaining: number;
+  isAuthenticated: boolean;
 }
 
 let quotaCache: { data: QuotaStatus; timestamp: number } | null = null;
@@ -204,7 +223,7 @@ const fetchQuotaStatus = async (): Promise<QuotaStatus> => {
   }
 
   if (!authToken) {
-    return { canFillForms: false, freeFormsRemaining: 0, isPro: false, tokensRemaining: 0 };
+    return { canFillForms: false, freeFormsRemaining: 0, isPro: false, tokensRemaining: 0, isAuthenticated: false };
   }
 
   const url = `${configToUse.apiURL}/auth-health`;
@@ -215,6 +234,14 @@ const fetchQuotaStatus = async (): Promise<QuotaStatus> => {
   };
 
   const response = await fetch(url, { headers, credentials: 'include' });
+
+  if (response.status === 401) {
+    // Token is expired or invalid — clear it and invalidate cache
+    await chrome.storage.local.remove('bearer_token');
+    quotaCache = null;
+    return { canFillForms: false, freeFormsRemaining: 0, isPro: false, tokensRemaining: 0, isAuthenticated: false };
+  }
+
   if (!response.ok) {
     throw new Error(`Health check failed: ${response.status}`);
   }
@@ -226,7 +253,7 @@ const fetchQuotaStatus = async (): Promise<QuotaStatus> => {
   if (!parseResult.success) {
     console.warn('[Background] Auth health response validation failed:', parseResult.error.errors);
     // Permissive default: allow filling on validation failure
-    return { canFillForms: true, freeFormsRemaining: 0, isPro: false, tokensRemaining: 0 };
+    return { canFillForms: true, freeFormsRemaining: 0, isPro: false, tokensRemaining: 0, isAuthenticated: true };
   }
 
   const { limitations } = parseResult.data;
@@ -235,7 +262,7 @@ const fetchQuotaStatus = async (): Promise<QuotaStatus> => {
   const isPro = limitations.isProSubscriber;
   const canFillForms = isPro ? tokensRemaining > 0 : freeFormsRemaining > 0;
 
-  const status: QuotaStatus = { canFillForms, freeFormsRemaining, isPro, tokensRemaining };
+  const status: QuotaStatus = { canFillForms, freeFormsRemaining, isPro, tokensRemaining, isAuthenticated: true };
   quotaCache = { data: status, timestamp: Date.now() };
   return status;
 };
@@ -262,9 +289,32 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       .catch(error => {
         console.error('[Background] Quota check failed:', error);
         // Return a permissive default so buttons aren't disabled on network errors
-        sendResponse({ success: false, canFillForms: true, freeFormsRemaining: 0, isPro: false, tokensRemaining: 0 });
+        sendResponse({
+          success: false,
+          canFillForms: true,
+          freeFormsRemaining: 0,
+          isPro: false,
+          tokensRemaining: 0,
+          isAuthenticated: true,
+        });
       });
     return true; // Keep the message channel open for async response
+  }
+
+  // Handle analytics event relay from content-UI
+  if (request.type === MessageType.ANALYTICS_EVENT) {
+    const payload = request.payload as AnalyticsMessage | undefined;
+    if (payload) {
+      if (payload.event === ('__identify' as string) && payload.properties?.['distinct_id']) {
+        const { distinct_id, ...rest } = payload.properties;
+        phIdentifyUser(String(distinct_id), rest);
+      } else if (payload.event === ('__reset' as string)) {
+        phResetUser();
+      } else {
+        captureEvent(payload.event, payload.properties);
+      }
+    }
+    return false;
   }
 
   // Invalidate quota cache when usage refreshes
@@ -321,6 +371,7 @@ chrome.runtime.onMessageExternal.addListener((request, sender, sendResponse) => 
           sendResponse({ success: false, error: chrome.runtime.lastError.message });
         } else {
           console.log('[Background] Bearer token stored successfully');
+          captureEvent(AnalyticsEvent.USER_LOGGED_IN, { method: 'bearer' });
           sendResponse({ success: true });
 
           // Invalidate quota cache so next check fetches fresh data
@@ -358,6 +409,8 @@ chrome.runtime.onMessageExternal.addListener((request, sender, sendResponse) => 
 
     chrome.storage.local.remove('bearer_token', () => {
       console.log('[Background] Bearer token cleared');
+      captureEvent(AnalyticsEvent.USER_LOGGED_OUT);
+      phResetUser();
       sendResponse({ success: true });
 
       // Broadcast to extension pages (popup, side panel)
@@ -394,6 +447,7 @@ chrome.runtime.onMessageExternal.addListener((request, sender, sendResponse) => 
         .open({ windowId: senderTab.windowId })
         .then(() => {
           console.log('[Background] Side panel opened successfully');
+          captureEvent(AnalyticsEvent.SIDE_PANEL_OPENED);
           sendResponse({ success: true });
         })
         .catch(error => {
@@ -488,7 +542,10 @@ const notifyTabAboutExtensionInstallation = (tabId: number) => {
 
 // Handle extension installation
 chrome.runtime.onInstalled.addListener(async details => {
+  const currentVersion = chrome.runtime.getManifest().version;
+
   if (details.reason === 'install') {
+    captureEvent(AnalyticsEvent.EXTENSION_INSTALLED, { version: currentVersion });
     // Ensure environment is stored
     storeEnvironmentInStorage();
 
@@ -515,6 +572,13 @@ chrome.runtime.onInstalled.addListener(async details => {
     } catch (error) {
       console.error('[Background] Error during installation setup:', error);
     }
+  }
+
+  if (details.reason === 'update') {
+    captureEvent(AnalyticsEvent.EXTENSION_UPDATED, {
+      version: currentVersion,
+      previous_version: details.previousVersion || 'unknown',
+    });
   }
 });
 
@@ -600,6 +664,9 @@ const handleApiRequest = async (
       // console.log('Background: API response status:', response.status);
 
       if (!response.ok) {
+        if (response.status === 401) {
+          captureEvent(AnalyticsEvent.AUTH_ERROR, { status_code: 401 });
+        }
         let errorMessage = 'Request failed';
         try {
           const errorJson: unknown = await response.json();

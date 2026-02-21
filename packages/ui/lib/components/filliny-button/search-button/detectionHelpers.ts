@@ -2661,6 +2661,7 @@ export {
   initializeHTMXSwapListener,
   watchForConditionalFields,
   detectFormsInDialogsAndPopovers,
+  isInsideCrossOriginIframe,
 };
 
 export type { FormDetectionCallback };

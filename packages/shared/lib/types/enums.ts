@@ -311,6 +311,8 @@ export enum MessageType {
   REFRESH_USAGE = 'REFRESH_USAGE',
   /** Request quota status from background script */
   GET_QUOTA_STATUS = 'GET_QUOTA_STATUS',
+  /** Analytics event relay from content-UI to background */
+  ANALYTICS_EVENT = 'ANALYTICS_EVENT',
 }
 
 // NOTE: Framework is exported from utils/frameworkDetection.ts (single source of truth)

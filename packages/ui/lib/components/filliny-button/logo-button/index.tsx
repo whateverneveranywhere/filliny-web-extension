@@ -18,7 +18,13 @@ const LogoButton: React.FC<LogoButtonProps> = ({ canFillForms = true, disabledRe
 
   const handleClick = () => {
     if (!canFillForms) {
-      showQuotaExceededToast();
+      if (disabledReason?.toLowerCase().includes('quota') || disabledReason?.toLowerCase().includes('limit')) {
+        showQuotaExceededToast();
+      } else {
+        import('../search-button/toastHelpers').then(({ showInfoToast }) => {
+          showInfoToast('Form Filling Unavailable', disabledReason || 'Form filling is currently unavailable.');
+        });
+      }
       return;
     }
     highlightForms({ visionOnly: false });

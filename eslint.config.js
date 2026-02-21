@@ -8,8 +8,6 @@ import eslintPluginPrettierRecommended from 'eslint-plugin-prettier/recommended'
 import reactPlugin from 'eslint-plugin-react';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
-
-const { config: defineConfig, configs: tsConfigs, parser: tsParser } = tseslint;
 // Global ignores - MUST be outside defineConfig() to remain true global ignores
 const globalIgnores = {
   ignores: [
@@ -30,10 +28,10 @@ const globalIgnores = {
 };
 export default [
   globalIgnores,
-  ...defineConfig(
+  ...tseslint.config(
     // Shared configs
     js.configs.recommended,
-    ...tsConfigs.recommended,
+    ...tseslint.configs.recommended,
     jsxA11y.flatConfigs.recommended,
     importXFlatConfig.recommended,
     importXFlatConfig.typescript,
@@ -49,7 +47,7 @@ export default [
     {
       files: ['**/*.{ts,tsx}'],
       languageOptions: {
-        parser: tsParser,
+        parser: tseslint.parser,
         ecmaVersion: 'latest',
         sourceType: 'module',
         parserOptions: {
@@ -73,16 +71,7 @@ export default [
         'react/prop-types': 'off',
         'prefer-const': 'error',
         'no-var': 'error',
-        '@typescript-eslint/no-unused-vars': [
-          'warn',
-          {
-            argsIgnorePattern: '^_',
-            varsIgnorePattern: '^_',
-            caughtErrorsIgnorePattern: '^_',
-            destructuredArrayIgnorePattern: '^_',
-            ignoreRestSiblings: true,
-          },
-        ],
+        '@typescript-eslint/no-unused-vars': 'warn',
         'func-style': ['warn', 'expression', { allowArrowFunctions: true }],
         'no-restricted-imports': [
           'error',

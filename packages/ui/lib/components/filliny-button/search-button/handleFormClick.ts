@@ -21,22 +21,31 @@ import {
   ApiUnauthorizedError,
   MessageType,
   StreamingErrorSchema,
+  track,
+  AnalyticsEvent,
 } from '@extension/shared';
 import { profileStorage, localFilesStorage } from '@extension/storage';
 import type { StreamMessage } from './apiTransformHelpers';
 import type { FormUpdateResults } from './fieldUpdaterHelpers';
-import type { DTOAuthorizedFileForAI } from '@extension/shared';
+import type { DTOAuthorizedFileForAI, AuthorizedFileCategory } from '@extension/shared';
 
 const debug = createDebugLogger('FormClick');
 
-/**
- * Default timeout for form fill operations
- */
 const FORM_FILL_TIMEOUT = 60000;
 
-/**
- * Get user-friendly error message based on error category
- */
+const IMAGE_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'heic', 'heif']);
+
+const getFileCategory = (mimeType: string, extension: string): AuthorizedFileCategory => {
+  if (mimeType.startsWith('image/') || IMAGE_EXTENSIONS.has(extension.toLowerCase())) return 'photo';
+  return 'document';
+};
+
+const formatFileSize = (bytes: number): string => {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+};
+
 const getUserErrorMessage = (results: FormUpdateResults): string => {
   if (results.errors.length === 0) {
     return 'Unknown error occurred while filling the form.';
@@ -156,7 +165,10 @@ export const handleFormClick = async (
     const fields = unifiedFieldRegistry.getAllFields();
 
     if (fields.length === 0) {
-      showInfoToast('No Fields Detected', 'Unable to detect form fields. Please refresh the page and try again.');
+      showInfoToast(
+        'No Fields Detected',
+        "We found a form but couldn't detect any fillable fields. The form might use a custom framework. Try refreshing the page.",
+      );
       return;
     }
 
@@ -164,7 +176,7 @@ export const handleFormClick = async (
     debug.log(`Field retrieval from registry took: ${((performance.now() - startTime) / 1000).toFixed(2)}s`);
 
     if (testMode) {
-      // Use the new centralized test mode handler
+      track(AnalyticsEvent.TEST_MODE_FILL_STARTED, { field_count: fields.length });
       await runTestModeFill(fields);
       return;
     }
@@ -172,7 +184,10 @@ export const handleFormClick = async (
     // Only execute API call logic if not in test mode
     const defaultProfile = await profileStorage.get();
     if (!defaultProfile) {
-      showInfoToast('No Profile', 'Please create a filling profile to use AI form filling.');
+      showInfoToast(
+        'Profile Required',
+        'Create a filling profile in the Filliny side panel to start using AI form filling.',
+      );
       return;
     }
     const visitingUrl = window.location.href;
@@ -183,24 +198,19 @@ export const handleFormClick = async (
     const profileId = defaultProfile.id;
     if (profileId) {
       try {
-        // Read from local storage instead of cloud API
         const localFiles = await localFilesStorage.getProfileFiles(String(profileId));
-        // Transform local files to the AI-friendly format
-        // Note: Local files don't have id, description, useCases, or category
-        // so we generate minimal info needed for AI to match files with fields
         authorizedFiles = localFiles.map((file, index) => ({
-          id: index, // Use index as a placeholder ID
+          id: index,
           filename: file.name,
-          description: `Local file: ${file.name}`, // Auto-generated description
-          useCases: `Match with fields accepting ${file.extension.toUpperCase()} files`, // Auto-generated use case
-          category: 'document' as const, // Default category
+          description: `User's local file: ${file.name} (${formatFileSize(file.size)})`,
+          useCases: `Upload to file input fields that accept ${file.extension.toUpperCase()} or ${file.mimeType} files`,
+          category: getFileCategory(file.mimeType, file.extension),
           mimeType: file.mimeType,
           fileSize: file.size,
         }));
         debug.log(`Loaded ${authorizedFiles.length} local authorized files for AI context`);
       } catch (filesError) {
         debug.warn('Failed to load authorized files, continuing without them:', filesError);
-        // Continue without authorized files - not a critical error
       }
     }
 
@@ -268,6 +278,22 @@ export const handleFormClick = async (
 
     chrome.runtime.onMessage.addListener(messageHandler);
 
+    // Track form fill started
+    const websiteDomain = (() => {
+      try {
+        return new URL(visitingUrl).hostname;
+      } catch {
+        return 'unknown';
+      }
+    })();
+    track(AnalyticsEvent.FORM_FILL_STARTED, {
+      field_count: fields.length,
+      form_count: formContainers.length,
+      has_context: !!(matchingWebsite?.fillingContext || defaultProfile?.defaultFillingContext),
+      has_authorized_files: authorizedFiles.length > 0,
+      website_domain: websiteDomain,
+    });
+
     // Transform data before API call to strip fields the API doesn't accept
     const transformedFormData = transformFormDataForApi(fields);
     const transformedPreferences = transformPreferencesForApi(defaultProfile?.preferences);
@@ -325,10 +351,38 @@ export const handleFormClick = async (
       debug.error('Form Click: Invalid response format:', response);
       throw new FieldUpdateError('Invalid response format from API', ErrorCategory.NETWORK_ERROR, 'form');
     }
+
+    // Track form fill completed
+    if (updateResults) {
+      const durationMs = Math.round(performance.now() - totalStartTime);
+      const outcome = updateResults.failed === 0 ? 'success' : updateResults.successful > 0 ? 'partial' : 'failed';
+      track(AnalyticsEvent.FORM_FILL_COMPLETED, {
+        outcome,
+        fields_total: updateResults.successful + updateResults.failed,
+        fields_filled: updateResults.successful,
+        fields_failed: updateResults.failed,
+        duration_ms: durationMs,
+      });
+    }
   } catch (error) {
     cleanup();
     formFillStore.getState().setPhase(StreamingPhase.ERROR);
     debug.error('Form Click: Error processing AI fill service:', error);
+
+    // Track form fill error
+    const errorCategory =
+      error instanceof FieldUpdateError
+        ? error.category
+        : error instanceof ApiUnauthorizedError
+          ? 'auth'
+          : error instanceof ApiQuotaExceededError
+            ? 'quota'
+            : 'unknown';
+    const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+    track(AnalyticsEvent.FORM_FILL_ERROR, {
+      error_category: errorCategory,
+      error_message: errorMsg.slice(0, 200),
+    });
 
     // Handle unauthorized errors - user needs to log in again
     if (error instanceof ApiUnauthorizedError) {

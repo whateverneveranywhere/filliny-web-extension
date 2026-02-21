@@ -1,4 +1,5 @@
 import { MessageType } from '../types/enums.js';
+import { authStorage } from '@extension/storage';
 import { useState, useEffect, useCallback } from 'react';
 import { z } from 'zod';
 
@@ -12,6 +13,7 @@ const QuotaStatusResponseSchema = z.object({
   tokensRemaining: z.number(),
   freeFormsRemaining: z.number(),
   success: z.boolean().optional(),
+  isAuthenticated: z.boolean().optional().default(true),
 });
 
 type QuotaStatusResponse = z.infer<typeof QuotaStatusResponseSchema>;
@@ -21,6 +23,8 @@ interface QuotaStatus {
   isLoading: boolean;
   /** Human-readable reason why filling is disabled, for tooltip use. Null when enabled. */
   disabledReason: string | null;
+  /** Whether the stored token was validated successfully. False means token is expired/invalid. */
+  isAuthenticated: boolean;
 }
 
 /**
@@ -44,6 +48,7 @@ export const useQuotaCheck = (): QuotaStatus => {
   const [canFillForms, setCanFillForms] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
   const [disabledReason, setDisabledReason] = useState<string | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(true);
 
   const checkQuota = useCallback(() => {
     if (typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) {
@@ -56,10 +61,18 @@ export const useQuotaCheck = (): QuotaStatus => {
         // On error, assume user can fill (don't block)
         setCanFillForms(true);
         setDisabledReason(null);
+        setIsAuthenticated(true);
       } else {
         const result = QuotaStatusResponseSchema.safeParse(rawResponse);
         if (result.success) {
           const response = result.data;
+          setIsAuthenticated(response.isAuthenticated);
+
+          // If not authenticated, clear stored token so storage listeners update UI
+          if (!response.isAuthenticated) {
+            authStorage.set('').catch(() => {});
+          }
+
           const allowed = response.canFillForms;
           setCanFillForms(allowed);
           setDisabledReason(allowed ? null : computeDisabledReason(response));
@@ -67,6 +80,7 @@ export const useQuotaCheck = (): QuotaStatus => {
           // Permissive default on parse failure
           setCanFillForms(true);
           setDisabledReason(null);
+          setIsAuthenticated(true);
         }
       }
       setIsLoading(false);
@@ -99,5 +113,5 @@ export const useQuotaCheck = (): QuotaStatus => {
     };
   }, [checkQuota]);
 
-  return { canFillForms, isLoading, disabledReason };
+  return { canFillForms, isLoading, disabledReason, isAuthenticated };
 };

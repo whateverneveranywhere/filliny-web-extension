@@ -7,7 +7,7 @@ import jsxA11y from 'eslint-plugin-jsx-a11y';
 import eslintPluginPrettierRecommended from 'eslint-plugin-prettier/recommended';
 import reactPlugin from 'eslint-plugin-react';
 import globals from 'globals';
-import { defineConfig, configs as tsConfigs, parser as tsParser } from 'typescript-eslint';
+import tseslint from 'typescript-eslint';
 import type { FixupConfigArray } from '@eslint/compat';
 
 // Global ignores - MUST be outside defineConfig() to remain true global ignores
@@ -31,10 +31,10 @@ const globalIgnores = {
 
 export default [
   globalIgnores,
-  ...defineConfig(
+  ...tseslint.config(
     // Shared configs
     js.configs.recommended,
-    ...tsConfigs.recommended,
+    ...tseslint.configs.recommended,
     jsxA11y.flatConfigs.recommended,
     importXFlatConfig.recommended,
     importXFlatConfig.typescript,
@@ -50,7 +50,7 @@ export default [
     {
       files: ['**/*.{ts,tsx}'],
       languageOptions: {
-        parser: tsParser,
+        parser: tseslint.parser,
         ecmaVersion: 'latest',
         sourceType: 'module',
         parserOptions: {

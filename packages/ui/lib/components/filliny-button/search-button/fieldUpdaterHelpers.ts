@@ -623,12 +623,21 @@ const updateFileInputElement = async (
  */
 const AUTHORIZED_FILE_PATTERN = /^authorized_file:\d+$/;
 
-/**
- * Determine if file value is from AI (URL-based or authorized file reference)
- */
+const LOCAL_FILENAME_PATTERN =
+  /\.(pdf|doc|docx|txt|rtf|odt|jpg|jpeg|png|gif|webp|svg|bmp|heic|heif|xls|xlsx|csv|ods|ppt|pptx|odp|zip)$/i;
+
+const isLikelyLocalFilename = (val: string): boolean =>
+  !val.startsWith('http://') &&
+  !val.startsWith('https://') &&
+  !AUTHORIZED_FILE_PATTERN.test(val) &&
+  LOCAL_FILENAME_PATTERN.test(val);
+
 const isFileValueFromAI = (fileValue: string | string[]): boolean => {
   const isAIValue = (val: string): boolean =>
-    val.startsWith('http://') || val.startsWith('https://') || AUTHORIZED_FILE_PATTERN.test(val);
+    val.startsWith('http://') ||
+    val.startsWith('https://') ||
+    AUTHORIZED_FILE_PATTERN.test(val) ||
+    isLikelyLocalFilename(val);
 
   if (typeof fileValue === 'string') {
     return isAIValue(fileValue);
@@ -1577,6 +1586,8 @@ export {
   immediateFieldSet,
   processChunksDiffAware,
   runFinalVerificationPass,
+  isFileValueFromAI,
+  AUTHORIZED_FILE_PATTERN,
   _captureFormState as captureFormState,
   _restoreFormState as restoreFormState,
   _ensureFocus as ensureFocus,
