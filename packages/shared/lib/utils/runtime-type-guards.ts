@@ -336,10 +336,33 @@ const ReactHookFormSchema = z.object({
 const isNonNullObject = (value: unknown): value is object => value !== null && typeof value === 'object';
 
 /**
+ * Dynamic property value type - covers all JSON-compatible values
+ * that can appear as object properties during runtime inspection.
+ */
+type DynamicPropertyValue =
+  | string
+  | number
+  | boolean
+  | null
+  | DynamicPropertyValue[]
+  | { [key: string]: DynamicPropertyValue };
+
+const DynamicPropertyValueSchema: z.ZodType<DynamicPropertyValue> = z.lazy(() =>
+  z.union([
+    z.string(),
+    z.number(),
+    z.boolean(),
+    z.null(),
+    z.array(DynamicPropertyValueSchema),
+    z.record(z.string(), DynamicPropertyValueSchema),
+  ]),
+);
+
+/**
  * Schema for objects with dynamic string keys
  * Used internally for safe property access when the shape is truly unknown
  */
-const DynamicObjectSchema = z.record(z.string(), z.unknown());
+const DynamicObjectSchema = z.record(z.string(), DynamicPropertyValueSchema);
 
 /**
  * Safely access a property from an unknown object using Zod validation
@@ -358,9 +381,16 @@ const safeGetProperty = <T>(obj: unknown, key: string): T | undefined => {
  * Safely check if object has a property using Zod validation
  * Creates a schema that requires the specific key to exist
  */
-const hasProperty = <K extends string>(obj: unknown, key: K): obj is { [P in K]: unknown } => {
-  const schema = z.object({ [key]: z.unknown() });
-  return schema.safeParse(obj).success;
+/**
+ * Safely check if an object has a property.
+ * Uses native `in` operator with a non-null object guard.
+ * The value type is `string | number | boolean | null | object | ((...args: never[]) => unknown)`
+ * to cover JSON data, DOM properties, and method references.
+ */
+type PropertyValue = string | number | boolean | null | object | ((...args: never[]) => DynamicPropertyValue);
+const hasProperty = <K extends string>(obj: unknown, key: K): obj is { [P in K]: PropertyValue } => {
+  if (!isNonNullObject(obj)) return false;
+  return key in obj;
 };
 
 /**

@@ -1,6 +1,21 @@
 import { createBaseField } from './utils';
-import { Framework } from '@extension/shared';
+import { Framework, FieldTypeEnum } from '@extension/shared';
 import type { Field, FillinyFileInputElement } from '@extension/shared';
+
+/**
+ * Typed querySelector that returns HTMLInputElement | null.
+ * Avoids repetitive `as HTMLInputElement | null` casts on file input selectors.
+ */
+const queryInputElement = (parent: ParentNode, selector: string): HTMLInputElement | null =>
+  parent.querySelector<HTMLInputElement>(selector);
+
+/**
+ * Store Filliny file references on an HTMLInputElement.
+ * Uses the FillinyFileInputElement extension from @extension/shared.
+ */
+const setFillinyFiles = (input: HTMLInputElement, files: File[]): void => {
+  (input as FillinyFileInputElement).__fillinyFiles = files;
+};
 
 // Extend Field type with file-specific properties
 interface FileField extends Field {
@@ -219,43 +234,127 @@ const validateFileContent = async (blob: Blob, expectedMimeType: string, filenam
 };
 
 /**
- * Create realistic binary content for test files
+ * Create realistic binary content for test files.
+ * PDFs contain a valid minimal structure that PDF parsers accept.
+ * Images are valid 1x1 pixel files that pass file-type detection.
  */
 const createRealisticFileContent = (filename: string, mimeType: string): Uint8Array => {
   const name = filename.toLowerCase();
 
-  // PDF file header
+  // Valid minimal PDF (parseable by most PDF readers)
   if (mimeType === 'application/pdf' || name.endsWith('.pdf')) {
-    const pdfHeader = '%PDF-1.4\n1 0 obj\n<<\n/Type /Catalog\n/Pages 2 0 R\n>>\nendobj\n';
-    return new TextEncoder().encode(pdfHeader + '\n% Simple PDF content for testing\n');
+    const pdf = [
+      '%PDF-1.4',
+      '1 0 obj',
+      '<< /Type /Catalog /Pages 2 0 R >>',
+      'endobj',
+      '2 0 obj',
+      '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+      'endobj',
+      '3 0 obj',
+      '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << >> >>',
+      'endobj',
+      '4 0 obj',
+      '<< /Length 44 >>',
+      'stream',
+      'BT /F1 12 Tf 100 700 Td (Filliny Test) Tj ET',
+      'endstream',
+      'endobj',
+      'xref',
+      '0 5',
+      '0000000000 65535 f ',
+      '0000000009 00000 n ',
+      '0000000058 00000 n ',
+      '0000000115 00000 n ',
+      '0000000236 00000 n ',
+      'trailer',
+      '<< /Size 5 /Root 1 0 R >>',
+      'startxref',
+      '330',
+      '%%EOF',
+    ].join('\n');
+    return new TextEncoder().encode(pdf);
   }
 
-  // JPEG file header
+  // Valid 1x1 white pixel JPEG (JFIF format)
   if (mimeType === 'image/jpeg' || name.endsWith('.jpg') || name.endsWith('.jpeg')) {
-    return new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01]);
+    // prettier-ignore
+    return new Uint8Array([
+      0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46, 0x00, 0x01,
+      0x01, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00,
+      0xFF, 0xDB, 0x00, 0x43, 0x00,
+      0x08, 0x06, 0x06, 0x07, 0x06, 0x05, 0x08, 0x07,
+      0x07, 0x07, 0x09, 0x09, 0x08, 0x0A, 0x0C, 0x14,
+      0x0D, 0x0C, 0x0B, 0x0B, 0x0C, 0x19, 0x12, 0x13,
+      0x0F, 0x14, 0x1D, 0x1A, 0x1F, 0x1E, 0x1D, 0x1A,
+      0x1C, 0x1C, 0x20, 0x24, 0x2E, 0x27, 0x20, 0x22,
+      0x2C, 0x23, 0x1C, 0x1C, 0x28, 0x37, 0x29, 0x2C,
+      0x30, 0x31, 0x34, 0x34, 0x34, 0x1F, 0x27, 0x39,
+      0x3D, 0x38, 0x32, 0x3C, 0x2E, 0x33, 0x34, 0x32,
+      0xFF, 0xC0, 0x00, 0x0B, 0x08, 0x00, 0x01, 0x00, 0x01, 0x01, 0x01, 0x11, 0x00,
+      0xFF, 0xC4, 0x00, 0x1F, 0x00, 0x00, 0x01, 0x05, 0x01, 0x01, 0x01, 0x01,
+      0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+      0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06,
+      0x07, 0x08, 0x09, 0x0A, 0x0B,
+      0xFF, 0xDA, 0x00, 0x08, 0x01, 0x01, 0x00, 0x00, 0x3F, 0x00, 0x7B, 0x40,
+      0xFF, 0xD9,
+    ]);
   }
 
-  // PNG file header
+  // Valid 1x1 white pixel PNG
   if (mimeType === 'image/png' || name.endsWith('.png')) {
-    return new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    // prettier-ignore
+    return new Uint8Array([
+      0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
+      0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
+      0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+      0x08, 0x02, 0x00, 0x00, 0x00, 0x90, 0x77, 0x53, 0xDE,
+      0x00, 0x00, 0x00, 0x0C, 0x49, 0x44, 0x41, 0x54,
+      0x08, 0xD7, 0x63, 0xF8, 0xCF, 0xC0, 0x00, 0x00,
+      0x01, 0x01, 0x01, 0x00, 0x18, 0xDD, 0x8D, 0xB4,
+      0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44,
+      0xAE, 0x42, 0x60, 0x82,
+    ]);
   }
 
-  // ZIP file header
-  if (mimeType === 'application/zip' || name.endsWith('.zip')) {
-    return new Uint8Array([0x50, 0x4b, 0x03, 0x04]);
+  // Valid 1x1 white pixel GIF89a
+  if (mimeType === 'image/gif' || name.endsWith('.gif')) {
+    // prettier-ignore
+    return new Uint8Array([
+      0x47, 0x49, 0x46, 0x38, 0x39, 0x61,
+      0x01, 0x00, 0x01, 0x00,
+      0x80, 0x00, 0x00,
+      0xFF, 0xFF, 0xFF,
+      0x00, 0x00, 0x00,
+      0x2C, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00,
+      0x02, 0x02, 0x44, 0x01, 0x00,
+      0x3B,
+    ]);
   }
 
-  // Excel file header (Office Open XML)
-  if (mimeType.includes('spreadsheet') || name.endsWith('.xlsx')) {
-    return new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0x14, 0x00, 0x06, 0x00]);
+  // ZIP file header (also covers .docx, .xlsx, .pptx as they are ZIP-based)
+  if (
+    mimeType === 'application/zip' ||
+    name.endsWith('.zip') ||
+    mimeType.includes('spreadsheet') ||
+    name.endsWith('.xlsx') ||
+    mimeType.includes('wordprocessingml') ||
+    name.endsWith('.docx') ||
+    mimeType.includes('presentation') ||
+    name.endsWith('.pptx')
+  ) {
+    // prettier-ignore
+    return new Uint8Array([
+      0x50, 0x4B, 0x05, 0x06,
+      0x00, 0x00, 0x00, 0x00,
+      0x00, 0x00, 0x00, 0x00,
+      0x00, 0x00, 0x00, 0x00,
+      0x00, 0x00, 0x00, 0x00,
+      0x00, 0x00,
+    ]);
   }
 
-  // Word document header (Office Open XML)
-  if (mimeType.includes('wordprocessingml') || name.endsWith('.docx')) {
-    return new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0x14, 0x00, 0x06, 0x00]);
-  }
-
-  // Generic text content with some realistic structure
+  // Generic text content with realistic structure
   const textContent = `Test file: ${filename}\nCreated: ${new Date().toISOString()}\nContent-Type: ${mimeType}\n\nThis is realistic test content for ${filename}.\n`;
   return new TextEncoder().encode(textContent);
 };
@@ -298,43 +397,61 @@ const createRealisticFile = (filename: string, mimeType?: string): File => {
 };
 
 /**
- * Simulate drag and drop file upload for custom upload components
+ * Simulate drag and drop file upload for custom upload components.
+ * Dispatches a realistic event sequence that satisfies framework-level
+ * listeners (React Dropzone, FilePond, Uppy, etc.):
+ *   1. dragenter on document (some frameworks listen at document level)
+ *   2. dragenter on the drop zone
+ *   3. dragover on the drop zone (multiple, to satisfy debounce timers)
+ *   4. drop on the drop zone
+ *   5. dragleave on document (cleanup)
+ *
+ * Each event includes proper dataTransfer.types, effectAllowed, dropEffect,
+ * and mouse coordinates centered on the drop zone.
  */
 const simulateDragAndDrop = async (dropZone: HTMLElement, files: File[]): Promise<void> => {
   try {
-    // Create drag and drop events
     const dataTransfer = new DataTransfer();
     files.forEach(file => dataTransfer.items.add(file));
 
-    // Simulate the drag and drop sequence
-    const dragEnterEvent = new DragEvent('dragenter', {
+    // Calculate center coordinates of the drop zone
+    const rect = dropZone.getBoundingClientRect();
+    const clientX = rect.left + rect.width / 2;
+    const clientY = rect.top + rect.height / 2;
+
+    const baseDragInit: DragEventInit = {
       bubbles: true,
       cancelable: true,
+      composed: true,
       dataTransfer,
-    });
+      clientX,
+      clientY,
+      screenX: clientX,
+      screenY: clientY,
+    };
 
-    const dragOverEvent = new DragEvent('dragover', {
-      bubbles: true,
-      cancelable: true,
-      dataTransfer,
-    });
-
-    const dropEvent = new DragEvent('drop', {
-      bubbles: true,
-      cancelable: true,
-      dataTransfer,
-    });
-
-    // Dispatch events in sequence
-    dropZone.dispatchEvent(dragEnterEvent);
+    // Step 1: Dispatch dragenter on document first (React Dropzone, etc.)
+    document.dispatchEvent(new DragEvent('dragenter', { ...baseDragInit }));
     await new Promise(resolve => setTimeout(resolve, 10));
 
-    dropZone.dispatchEvent(dragOverEvent);
+    // Step 2: Dispatch dragenter on the drop zone
+    dropZone.dispatchEvent(new DragEvent('dragenter', { ...baseDragInit }));
     await new Promise(resolve => setTimeout(resolve, 10));
 
-    dropZone.dispatchEvent(dropEvent);
+    // Step 3: Dispatch multiple dragover events (some frameworks need repeated dragover)
+    for (let i = 0; i < 3; i++) {
+      dropZone.dispatchEvent(new DragEvent('dragover', { ...baseDragInit }));
+      await new Promise(resolve => setTimeout(resolve, 20));
+    }
 
-    // Also try common custom events
+    // Step 4: Dispatch the drop event
+    dropZone.dispatchEvent(new DragEvent('drop', { ...baseDragInit }));
+    await new Promise(resolve => setTimeout(resolve, 10));
+
+    // Step 5: Dispatch dragleave on document for cleanup
+    document.dispatchEvent(new DragEvent('dragleave', { ...baseDragInit }));
+
+    // Also try common custom events that upload libraries may listen for
     const customEvents = ['file-drop', 'files-added', 'upload-files', 'fileupload'];
     for (const eventName of customEvents) {
       try {
@@ -454,7 +571,8 @@ const triggerNativeFilePicker = async (
 
     // Set up change listener
     const handleChange = (event: Event) => {
-      const target = event.target as HTMLInputElement;
+      const target = event.target;
+      if (!(target instanceof HTMLInputElement)) return;
       const files = target.files ? Array.from(target.files) : [];
 
       // Clean up
@@ -486,6 +604,113 @@ const triggerNativeFilePicker = async (
   });
 
 /**
+ * Programmatically set files on an HTMLInputElement via DataTransfer.
+ * Returns true if the files property was successfully set and verified.
+ */
+const programmaticSetFiles = (fileInput: HTMLInputElement, files: File[]): boolean => {
+  try {
+    const dt = new DataTransfer();
+    files.forEach(file => dt.items.add(file));
+    fileInput.files = dt.files;
+
+    // Dispatch change + input events
+    fileInput.dispatchEvent(new Event('change', { bubbles: true, cancelable: true }));
+    fileInput.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+
+    // Verify
+    if (fileInput.files && fileInput.files.length === files.length) {
+      const namesMatch = files.every((f, i) => fileInput.files?.item(i)?.name === f.name);
+      if (namesMatch) return true;
+    }
+    return false;
+  } catch (error) {
+    console.debug('programmaticSetFiles failed:', error);
+    return false;
+  }
+};
+
+/**
+ * Verify that files were successfully set on a file input.
+ * Checks file count and file name matching.
+ */
+const verifyFilesSet = (fileInput: HTMLInputElement, expectedFiles: File[]): boolean => {
+  try {
+    if (!fileInput.files || fileInput.files.length === 0) return false;
+    if (fileInput.files.length !== expectedFiles.length) return false;
+    return expectedFiles.every((f, i) => fileInput.files?.item(i)?.name === f.name);
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Use a MutationObserver to watch for dynamically created file inputs
+ * after clicking an upload trigger button. Some sites create the input
+ * only on demand.
+ *
+ * Clicks the trigger, observes the DOM for up to timeoutMs for a new
+ * input type=file, programmatically sets files on it, and resolves
+ * to true if successful.
+ */
+const watchForDynamicFileInput = (
+  triggerElement: HTMLElement,
+  files: File[],
+  timeoutMs: number = 3000,
+): Promise<boolean> =>
+  new Promise(resolve => {
+    let resolved = false;
+
+    const finish = (success: boolean): void => {
+      if (resolved) return;
+      resolved = true;
+      observer.disconnect();
+      clearTimeout(timer);
+      resolve(success);
+    };
+
+    const observer = new MutationObserver(mutations => {
+      for (const mutation of mutations) {
+        for (const node of Array.from(mutation.addedNodes)) {
+          if (!(node instanceof HTMLElement)) continue;
+
+          // Check if the added node itself is a file input
+          if (node instanceof HTMLInputElement && node.type === FieldTypeEnum.FILE) {
+            const success = programmaticSetFiles(node, files);
+            finish(success);
+            return;
+          }
+
+          // Check if it contains a file input
+          const nestedInput = node.querySelector('input[type="file"]');
+          if (nestedInput instanceof HTMLInputElement) {
+            const success = programmaticSetFiles(nestedInput, files);
+            finish(success);
+            return;
+          }
+        }
+      }
+    });
+
+    const timer = setTimeout(() => {
+      finish(false);
+    }, timeoutMs);
+
+    // Start observing the entire body for added nodes
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+    });
+
+    // Click the trigger to cause the file input to appear
+    try {
+      triggerElement.click();
+    } catch (error) {
+      console.debug('watchForDynamicFileInput: trigger click failed:', error);
+      finish(false);
+    }
+  });
+
+/**
  * Update a file input with actual file objects or simulate file selection
  * This function handles both test mode and AI mode file filling with enhanced capabilities
  */
@@ -511,9 +736,6 @@ const updateFileInput = async (
 
     if (isAiMode) {
       // AI mode - handle URLs or local filenames suggested by AI
-      // With local files feature, AI returns filenames like "Resume.pdf" that match
-      // files in the user's authorized folder. We create realistic placeholder files
-      // and show the user which file to select from their authorized folder.
       for (const fileValue of fileNames) {
         try {
           // Check if this is a URL
@@ -522,8 +744,6 @@ const updateFileInput = async (
             files.push(file);
           } else {
             // This is a local filename suggested by AI (e.g., "Resume.pdf")
-            // Create a realistic file placeholder - the user will need to manually
-            // select the actual file from their authorized folder
             console.log(`AI suggested local file: ${fileValue}`);
             const file = createRealisticFile(fileValue, getFileTypeFromExtension(fileValue));
             files.push(file);
@@ -577,57 +797,72 @@ const updateFileInput = async (
       }
     }
 
-    // Try to actually set the files property if we have real file objects
+    // Try to set files with progressive fallback strategies and verification
     if (files.length > 0) {
-      try {
-        // Create a new FileList object with enhanced validation
-        const dataTransfer = new DataTransfer();
+      // Validate files against accept types if specified
+      const validFiles = files.filter(file => {
+        if (acceptTypes.length === 0) return true;
 
-        // Validate files against accept types if specified
-        const validFiles = files.filter(file => {
-          if (acceptTypes.length === 0) return true;
-
-          return acceptTypes.some((acceptType: AcceptType) => {
-            if (acceptType.type === 'mime') {
-              return (
-                file.type === acceptType.value ||
-                (acceptType.value.endsWith('/*') && file.type.startsWith(acceptType.value.slice(0, -1)))
-              );
-            } else {
-              return file.name.toLowerCase().endsWith(`.${acceptType.value.toLowerCase()}`);
-            }
-          });
+        return acceptTypes.some((acceptType: AcceptType) => {
+          if (acceptType.type === 'mime') {
+            return (
+              file.type === acceptType.value ||
+              (acceptType.value.endsWith('/*') && file.type.startsWith(acceptType.value.slice(0, -1)))
+            );
+          } else {
+            return file.name.toLowerCase().endsWith(`.${acceptType.value.toLowerCase()}`);
+          }
         });
+      });
 
-        // Add validated files to data transfer
-        validFiles.forEach(file => dataTransfer.items.add(file));
+      if (files.length > validFiles.length) {
+        console.warn(`${files.length - validFiles.length} files were filtered out due to accept type restrictions`);
+      }
 
-        // Set the files property
-        fileInput.files = dataTransfer.files;
+      // Strategy A: Programmatic set via DataTransfer + verification
+      let filesSuccessfullySet = programmaticSetFiles(fileInput, validFiles);
 
-        // Set enhanced data attributes for debugging and validation
-        fileInput.setAttribute('data-filliny-files', validFiles.map(f => f.name).join(', '));
-        fileInput.setAttribute('data-filliny-files-count', validFiles.length.toString());
-        fileInput.setAttribute('data-filliny-files-size', validFiles.reduce((acc, f) => acc + f.size, 0).toString());
-        fileInput.setAttribute('data-filliny-files-types', validFiles.map(f => f.type).join(', '));
+      // Strategy B: If verification failed, try finding an associated hidden input
+      if (!filesSuccessfullySet) {
+        console.debug('Strategy A (programmatic set) failed, trying associated hidden file input');
+        const hiddenInput = findAssociatedFileInput(fileInput);
+        if (hiddenInput && hiddenInput !== fileInput) {
+          filesSuccessfullySet = programmaticSetFiles(hiddenInput, validFiles);
+        }
+      }
 
-        // Store file references for later access using a properly typed extension
-        (fileInput as FillinyFileInputElement).__fillinyFiles = validFiles;
+      // Strategy C: Drag-and-drop simulation on the trigger element
+      if (!filesSuccessfullySet && isCustomUpload && triggerElement) {
+        console.debug('Strategy B failed, trying drag-and-drop simulation');
+        await simulateDragAndDrop(triggerElement, validFiles);
+        await new Promise(resolve => setTimeout(resolve, 200));
+        filesSuccessfullySet = verifyFilesSet(fileInput, validFiles);
+      }
 
+      // Strategy D: MutationObserver - click trigger and watch for dynamic file inputs
+      if (!filesSuccessfullySet && isCustomUpload && triggerElement && triggerElement !== fileInput) {
+        console.debug('Strategy C failed, trying MutationObserver for dynamic file input');
+        filesSuccessfullySet = await watchForDynamicFileInput(triggerElement, validFiles, 3000);
+      }
+
+      // Set enhanced data attributes for debugging and validation
+      fileInput.setAttribute('data-filliny-files', validFiles.map(f => f.name).join(', '));
+      fileInput.setAttribute('data-filliny-files-count', validFiles.length.toString());
+      fileInput.setAttribute('data-filliny-files-size', validFiles.reduce((acc, f) => acc + f.size, 0).toString());
+      fileInput.setAttribute('data-filliny-files-types', validFiles.map(f => f.type).join(', '));
+
+      // Store file references for later access using a properly typed extension
+      setFillinyFiles(fileInput, validFiles);
+
+      if (filesSuccessfullySet) {
         console.log(
           `Successfully set ${validFiles.length} files on input:`,
           validFiles.map(f => `${f.name} (${f.size} bytes, ${f.type})`),
         );
-
-        // If any files were filtered out, warn about it
-        if (files.length > validFiles.length) {
-          console.warn(`${files.length - validFiles.length} files were filtered out due to accept type restrictions`);
-        }
-      } catch (error) {
-        console.warn('Could not set files property directly, falling back to attributes:', error);
-        // Fallback to setting attributes
-        fileInput.setAttribute('data-filliny-files', files.map(f => f.name).join(', '));
-        fileInput.setAttribute('data-filliny-files-count', files.length.toString());
+      } else {
+        console.warn(
+          `Could not programmatically set files. Set data attributes as fallback for ${validFiles.length} files.`,
+        );
       }
     }
 
@@ -984,20 +1219,19 @@ const generateTestFilesForAcceptTypes = (acceptTypes: AcceptType[], isMultiple: 
   };
 
   // Group accept types by category
-  const categories = acceptTypes.reduce(
-    (acc, type) => {
-      if (!acc[type.category]) {
-        acc[type.category] = [];
-      }
-      acc[type.category].push(type);
-      return acc;
-    },
-    {} as Record<AcceptType['category'], AcceptType[]>,
-  );
+  const categories: Partial<Record<AcceptType['category'], AcceptType[]>> = {};
+  for (const type of acceptTypes) {
+    const group = categories[type.category];
+    if (group) {
+      group.push(type);
+    } else {
+      categories[type.category] = [type];
+    }
+  }
 
   // Generate test files for each category
-  for (const [category, types] of Object.entries(categories)) {
-    const samples = categorySamples[category as AcceptType['category']] || ['test-file.txt'];
+  for (const [category, types] of Object.entries(categories) as [AcceptType['category'], AcceptType[]][]) {
+    const samples = categorySamples[category] || ['test-file.txt'];
 
     // If specific extensions are specified, use them
     const extensionTypes = types.filter(t => t.type === 'extension');
@@ -1104,7 +1338,7 @@ const FILE_UPLOAD_PATTERNS = {
  */
 const isFileUploadElement = (element: HTMLElement): boolean => {
   // Standard file input
-  if (element instanceof HTMLInputElement && element.type === 'file') {
+  if (element instanceof HTMLInputElement && element.type === FieldTypeEnum.FILE) {
     return true;
   }
 
@@ -1153,43 +1387,140 @@ const isFileUploadElement = (element: HTMLElement): boolean => {
 };
 
 /**
- * Find associated hidden file input for custom upload components
+ * Calculate DOM distance between two elements by walking up to
+ * their common ancestor, counting edges.
+ */
+const getDomDistance = (a: HTMLElement, b: HTMLElement): number => {
+  const pathA: HTMLElement[] = [];
+  const pathB: HTMLElement[] = [];
+  let current: HTMLElement | null = a;
+  while (current) {
+    pathA.push(current);
+    current = current.parentElement;
+  }
+  current = b;
+  while (current) {
+    pathB.push(current);
+    current = current.parentElement;
+  }
+  const setA = new Set(pathA);
+  let distB = 0;
+  for (const node of pathB) {
+    if (setA.has(node)) {
+      const distA = pathA.indexOf(node);
+      return distA + distB;
+    }
+    distB++;
+  }
+  return Infinity;
+};
+
+/**
+ * Find associated hidden file input for custom upload components.
+ * Uses a progressive multi-strategy search: child, parent traversal (5 levels),
+ * sibling inspection, label associations, form scope, shadow DOM, and finally
+ * a global nearest-by-DOM-distance fallback.
  */
 const findAssociatedFileInput = (element: HTMLElement): HTMLInputElement | null => {
   // Strategy 1: Look for hidden file input as child
-  let fileInput = element.querySelector('input[type="file"]') as HTMLInputElement;
+  let fileInput = queryInputElement(element, 'input[type="file"]');
   if (fileInput) return fileInput;
 
-  // Strategy 2: Look for hidden file input as sibling
-  const parent = element.parentElement;
-  if (parent) {
-    fileInput = parent.querySelector('input[type="file"]') as HTMLInputElement;
+  // Strategy 2: Walk up to 5 levels of parent elements, checking each for file inputs
+  let ancestor: HTMLElement | null = element.parentElement;
+  for (let level = 0; level < 5 && ancestor; level++) {
+    fileInput = queryInputElement(ancestor, 'input[type="file"]');
     if (fileInput) return fileInput;
+
+    // Also check siblings of each ancestor
+    const siblings = Array.from(ancestor.parentElement?.children ?? []);
+    for (const sibling of siblings) {
+      if (sibling === ancestor || !(sibling instanceof HTMLElement)) continue;
+      fileInput = queryInputElement(sibling, 'input[type="file"]');
+      if (fileInput) return fileInput;
+      if (sibling instanceof HTMLInputElement && sibling.type === FieldTypeEnum.FILE) return sibling;
+    }
+
+    ancestor = ancestor.parentElement;
   }
 
-  // Strategy 3: Look for file input by ID reference
+  // Strategy 3: Look for file input by ID reference (label for="id")
   const forAttr = element.getAttribute('for');
   if (forAttr) {
-    fileInput = document.getElementById(forAttr) as HTMLInputElement;
-    if (fileInput && fileInput.type === 'file') return fileInput;
+    const referenced = document.getElementById(forAttr);
+    if (referenced instanceof HTMLInputElement && referenced.type === FieldTypeEnum.FILE) return referenced;
   }
 
   // Strategy 4: Look for file input by aria-controls
   const ariaControls = element.getAttribute('aria-controls');
   if (ariaControls) {
-    fileInput = document.getElementById(ariaControls) as HTMLInputElement;
-    if (fileInput && fileInput.type === 'file') return fileInput;
+    const referenced = document.getElementById(ariaControls);
+    if (referenced instanceof HTMLInputElement && referenced.type === FieldTypeEnum.FILE) return referenced;
   }
 
-  // Strategy 5: Look for hidden file inputs using common selectors
+  // Strategy 5: Check if a <label> element wraps or references a file input
+  const labelElement = element.closest('label') ?? (element.tagName === 'LABEL' ? element : null);
+  if (labelElement) {
+    fileInput = queryInputElement(labelElement, 'input[type="file"]');
+    if (fileInput) return fileInput;
+    const labelFor = labelElement instanceof HTMLLabelElement ? labelElement.htmlFor : null;
+    if (labelFor) {
+      const referenced = document.getElementById(labelFor);
+      if (referenced instanceof HTMLInputElement && referenced.type === FieldTypeEnum.FILE) return referenced;
+    }
+  }
+
+  // Strategy 6: Look for file inputs with matching name within the same form
+  const form = element.closest('form');
+  if (form) {
+    const nameAttr = element.getAttribute('name') || element.getAttribute('data-name');
+    if (nameAttr) {
+      fileInput = queryInputElement(form, `input[type="file"][name="${CSS.escape(nameAttr)}"]`);
+      if (fileInput) return fileInput;
+    }
+    fileInput = queryInputElement(form, 'input[type="file"]');
+    if (fileInput) return fileInput;
+  }
+
+  // Strategy 7: Look for hidden file inputs using common selectors with context check
   for (const selector of FILE_UPLOAD_PATTERNS.hiddenFileInputs) {
-    fileInput = document.querySelector(selector) as HTMLInputElement;
-    if (fileInput) {
-      // Check if this input is related to our element
-      const inputParent = fileInput.closest('[class*="upload"], [class*="file"], [class*="drop"]');
+    const candidates = document.querySelectorAll<HTMLInputElement>(selector);
+    for (const candidate of Array.from(candidates)) {
+      const inputParent = candidate.closest('[class*="upload"], [class*="file"], [class*="drop"]');
       if (inputParent && (inputParent.contains(element) || element.contains(inputParent))) {
-        return fileInput;
+        return candidate;
       }
+    }
+  }
+
+  // Strategy 8: Check shadow DOM roots of ancestors and nearby elements
+  ancestor = element.parentElement;
+  for (let level = 0; level < 5 && ancestor; level++) {
+    if (ancestor.shadowRoot) {
+      fileInput = queryInputElement(ancestor.shadowRoot, 'input[type="file"]');
+      if (fileInput) return fileInput;
+    }
+    ancestor = ancestor.parentElement;
+  }
+  if (element.shadowRoot) {
+    fileInput = queryInputElement(element.shadowRoot, 'input[type="file"]');
+    if (fileInput) return fileInput;
+  }
+
+  // Strategy 9: Global fallback - find the closest file input by DOM distance
+  const allFileInputs = document.querySelectorAll<HTMLInputElement>('input[type="file"]');
+  if (allFileInputs.length > 0) {
+    let closest: HTMLInputElement | null = null;
+    let minDistance = Infinity;
+    for (const candidate of Array.from(allFileInputs)) {
+      const distance = getDomDistance(element, candidate);
+      if (distance < minDistance) {
+        minDistance = distance;
+        closest = candidate;
+      }
+    }
+    if (closest && minDistance <= 15) {
+      return closest;
     }
   }
 
@@ -1197,18 +1528,49 @@ const findAssociatedFileInput = (element: HTMLElement): HTMLInputElement | null 
 };
 
 /**
- * Detect enhanced drag-and-drop zones with modern patterns
+ * Detect enhanced drag-and-drop zones with modern patterns.
+ * Covers generic patterns plus React Dropzone, FilePond, Uppy,
+ * vue-upload-component, Angular Material, Ant Design Upload,
+ * and Chakra UI file upload.
  */
 const detectEnhancedDragDropZone = (element: HTMLElement): boolean => {
-  // Check for modern drag-and-drop patterns
-  const dragDropPatterns = [
+  const className = element.className || '';
+  const dataAttrs = Array.from(element.attributes)
+    .map(a => `${a.name}=${a.value}`)
+    .join(' ');
+
+  // Generic drag-and-drop class patterns
+  const genericPatterns = [
     /\b(drop-zone|dropzone|drop-area|drag-area)\b/i,
     /\b(file-drop|file-drag|upload-drop)\b/i,
     /\b(droppable|draggable|sortable)\b/i,
   ];
 
-  const className = element.className || '';
-  const hasDropClass = dragDropPatterns.some(pattern => pattern.test(className));
+  // Framework-specific class and attribute patterns
+  const frameworkPatterns = [
+    /\breact-dropzone\b/i,
+    /\bgetRootProps\b/i,
+    /\bgetInputProps\b/i,
+    /\bfilepond--root\b/i,
+    /\bfilepond\b/i,
+    /\buppy-Dashboard\b/i,
+    /\buppy-DragDrop\b/i,
+    /\buppy-StatusBar\b/i,
+    /\bfile-uploads?\b/i,
+    /\bvue-upload\b/i,
+    /\bmat-file-upload\b/i,
+    /\bngx-file-drop\b/i,
+    /\bngx-dropzone\b/i,
+    /\bant-upload\b/i,
+    /\bant-upload-drag\b/i,
+    /\bchakra-file-upload\b/i,
+    /\bchakra-dropzone\b/i,
+  ];
+
+  const combinedText = `${className} ${dataAttrs}`;
+  const hasDropClass =
+    genericPatterns.some(pattern => pattern.test(combinedText)) ||
+    frameworkPatterns.some(pattern => pattern.test(combinedText));
 
   // Check for HTML5 drag-and-drop attributes
   const hasDropAttributes =
@@ -1217,15 +1579,39 @@ const detectEnhancedDragDropZone = (element: HTMLElement): boolean => {
     element.hasAttribute('ondragover') ||
     element.hasAttribute('ondragenter');
 
+  // Check for data attributes that React Dropzone and similar libraries set
+  const hasDropDataAttrs =
+    element.hasAttribute('data-rbd-droppable-id') ||
+    element.hasAttribute('data-dropzone') ||
+    element.getAttribute('role') === 'presentation';
+
   // Check for ARIA indicators
   const ariaLabel = element.getAttribute('aria-label') || '';
   const hasDropAria = /\b(drop|drag|upload)\b/i.test(ariaLabel);
 
   // Check for text content indicating drop zone
   const textContent = element.textContent || '';
-  const hasDropText = /\b(drop\s+file|drag\s+file|drop\s+here)\b/i.test(textContent);
+  const hasDropText = /\b(drop\s+file|drag\s+file|drop\s+here|drag\s+(&|and)\s+drop)\b/i.test(textContent);
 
-  return hasDropClass || hasDropAttributes || hasDropAria || hasDropText;
+  // Check for FilePond-specific element structure
+  const isFilePond = element.closest('.filepond--root') !== null || element.querySelector('.filepond--root') !== null;
+
+  // Check for Uppy-specific element structure
+  const isUppy = element.closest('[class*="uppy"]') !== null || element.querySelector('[class*="uppy"]') !== null;
+
+  // Check for Ant Design Upload
+  const isAntUpload = element.closest('.ant-upload') !== null || element.querySelector('.ant-upload') !== null;
+
+  return (
+    hasDropClass ||
+    hasDropAttributes ||
+    hasDropDataAttrs ||
+    hasDropAria ||
+    hasDropText ||
+    isFilePond ||
+    isUppy ||
+    isAntUpload
+  );
 };
 
 /**
@@ -1251,8 +1637,8 @@ const detectCloudStorageIntegration = (element: HTMLElement): CloudStorageIntegr
   if (/\b(dropbox|dbx)\b/i.test(combinedText)) {
     return {
       provider: 'dropbox',
-      button: element.querySelector('[class*="dropbox"], [data-service="dropbox"]') as HTMLElement,
-      container: element.closest('[class*="dropbox"]') as HTMLElement,
+      button: element.querySelector<HTMLElement>('[class*="dropbox"], [data-service="dropbox"]') ?? undefined,
+      container: element.closest<HTMLElement>('[class*="dropbox"]') ?? undefined,
     };
   }
 
@@ -1260,8 +1646,8 @@ const detectCloudStorageIntegration = (element: HTMLElement): CloudStorageIntegr
   if (/\b(google[\s-]?drive|gdrive|gcloud)\b/i.test(combinedText)) {
     return {
       provider: 'google-drive',
-      button: element.querySelector('[class*="google"], [data-service="google"]') as HTMLElement,
-      container: element.closest('[class*="google"]') as HTMLElement,
+      button: element.querySelector<HTMLElement>('[class*="google"], [data-service="google"]') ?? undefined,
+      container: element.closest<HTMLElement>('[class*="google"]') ?? undefined,
     };
   }
 
@@ -1269,8 +1655,8 @@ const detectCloudStorageIntegration = (element: HTMLElement): CloudStorageIntegr
   if (/\b(onedrive|microsoft[\s-]?drive)\b/i.test(combinedText)) {
     return {
       provider: 'onedrive',
-      button: element.querySelector('[class*="onedrive"], [data-service="onedrive"]') as HTMLElement,
-      container: element.closest('[class*="onedrive"]') as HTMLElement,
+      button: element.querySelector<HTMLElement>('[class*="onedrive"], [data-service="onedrive"]') ?? undefined,
+      container: element.closest<HTMLElement>('[class*="onedrive"]') ?? undefined,
     };
   }
 
@@ -1278,8 +1664,8 @@ const detectCloudStorageIntegration = (element: HTMLElement): CloudStorageIntegr
   if (/\bbox\b/i.test(combinedText) && /\b(cloud|storage|file)\b/i.test(combinedText)) {
     return {
       provider: 'box',
-      button: element.querySelector('[class*="box"], [data-service="box"]') as HTMLElement,
-      container: element.closest('[class*="box"]') as HTMLElement,
+      button: element.querySelector<HTMLElement>('[class*="box"], [data-service="box"]') ?? undefined,
+      container: element.closest<HTMLElement>('[class*="box"]') ?? undefined,
     };
   }
 
@@ -1298,8 +1684,7 @@ const handleCloudStorageUpload = async (
     console.log(`Handling ${integration.provider} upload with ${files.length} files`);
 
     // Find the appropriate button to click
-    const targetButton =
-      integration.button || (element.querySelector('button, [role="button"]') as HTMLElement) || element;
+    const targetButton = integration.button ?? element.querySelector<HTMLElement>('button, [role="button"]') ?? element;
 
     if (targetButton) {
       // Click the cloud storage button
@@ -1352,8 +1737,8 @@ const simulateCloudStorageSelection = async (provider: string, files: File[]): P
         console.log(`Found cloud storage interface elements: ${selector}`);
 
         // Click the first available element
-        const firstElement = elements[0] as HTMLElement;
-        if (firstElement) {
+        const firstElement = elements[0];
+        if (firstElement instanceof HTMLElement) {
           firstElement.click();
           await new Promise(resolve => setTimeout(resolve, 200));
         }
@@ -1399,7 +1784,7 @@ const detectFileFields = async (
     let isCustomUpload = false;
 
     // Determine if this is a standard file input or custom upload component
-    if (element instanceof HTMLInputElement && element.type === 'file') {
+    if (element instanceof HTMLInputElement && element.type === FieldTypeEnum.FILE) {
       fileInput = element;
     } else {
       // This is a custom upload component, find the associated file input
@@ -1427,7 +1812,8 @@ const detectFileFields = async (
 
     // Create field based on the actual file input or custom component
     const targetElement = isCustomUpload ? element : fileInput;
-    const field = (await createBaseField(targetElement, baseIndex + i, 'file', testMode)) as FileField;
+    const baseField = await createBaseField(targetElement, baseIndex + i, 'file', testMode);
+    const field: FileField = { ...baseField };
 
     // Add file-specific metadata from the actual file input
     const acceptTypes = parseAcceptTypes(fileInput.accept || '');
@@ -1445,8 +1831,8 @@ const detectFileFields = async (
       };
     }
 
-    // Store file upload specific metadata - FileFieldMetadata type includes fileUploadData
-    (field.metadata as FileFieldMetadata).fileUploadData = {
+    // Store file upload specific metadata in the metadata record
+    field.metadata.fileUploadData = {
       fileInput: fileInput,
       isCustomUpload: isCustomUpload,
       triggerElement: isCustomUpload ? element : fileInput,
@@ -1494,6 +1880,12 @@ export {
   categorizeMimeType,
   parseFileSize,
   generateTestFilesForAcceptTypes,
+  programmaticSetFiles,
+  verifyFilesSet,
+  watchForDynamicFileInput,
+  findAssociatedFileInput,
+  detectEnhancedDragDropZone,
+  simulateDragAndDrop,
   MIME_TYPE_MAP,
 };
 

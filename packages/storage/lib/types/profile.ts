@@ -97,6 +97,3 @@ export type DTOPov = z.infer<typeof DTOPovSchema>;
 export type DTOFillingWebsite = z.infer<typeof DTOFillingWebsiteSchema>;
 export type DTOFillingPreferences = z.infer<typeof DTOFillingPreferencesSchema>;
 export type DTOProfileFillingForm = z.infer<typeof DTOProfileFillingFormSchema>;
-
-/** @deprecated Use DTOFillingPreferences instead */
-export type DTOFillingPrefrences = DTOFillingPreferences;

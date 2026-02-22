@@ -1,7 +1,9 @@
+import { GlobalWithImportMetaSchema, GlobalWithProcessEnvSchema } from './runtime-type-guards.js';
 import { BackgroundActions } from './types.js';
 import { isValidUrl } from '../services/schemas/index.js';
-import { WebappEnvs } from '../types/enums.js';
+import { WebappEnvs, WebappEnvsSchema } from '../types/enums.js';
 import { authStorage, positionStorage, profileStorage } from '@extension/storage';
+import { z } from 'zod';
 import type { ErrorResponse, GetAuthTokenResponse, Request, ExcludeValuesFromBaseArrayType } from './types.js';
 import type { DTOProfileFillingForm } from '@extension/storage';
 
@@ -60,47 +62,55 @@ const getMatchingWebsite = (websites: DTOProfileFillingForm['fillingWebsites'], 
 // ============================================================================
 
 /**
- * Config entry for each environment
+ * Config entry Zod schema for each environment
  */
-interface ConfigEntry {
-  cookieName: string;
+const ConfigEntrySchema = z.object({
+  cookieName: z.string(),
   /** Web app URL for redirects and links - also where Better Auth sets cookies */
-  baseURL: string;
+  baseURL: z.string(),
   /** API URL for making requests - always goes through the webapp proxy */
-  apiURL: string;
-  webappEnv: WebappEnvs;
-}
+  apiURL: z.string(),
+  webappEnv: WebappEnvsSchema,
+});
+
+type ConfigEntry = z.infer<typeof ConfigEntrySchema>;
 
 /**
- * Extended global object type for accessing env config at runtime.
- * Uses partial fields since these may or may not exist at runtime.
+ * Read the cached env config from globalThis with runtime validation.
+ * Reads the property via bracket notation, then validates with Zod safeParse.
+ * Avoids parsing globalThis itself (which has circular references).
  */
-interface ExtendedGlobalThis {
-  __CACHED_ENV_CONFIG__?: ConfigEntry;
-  process?: {
-    env?: {
-      NODE_ENV?: string;
-      CLI_CEB_DEV?: string;
-      VITE_WEBAPP_ENV?: string;
-    };
-  };
-  import?: {
-    meta?: {
-      env?: {
-        VITE_WEBAPP_ENV?: string;
-      };
-    };
-  };
-}
+const getCachedConfig = (): ConfigEntry | undefined => {
+  const cached = (globalThis as Record<string, unknown>)['__CACHED_ENV_CONFIG__'];
+  if (!cached) return undefined;
+  const result = ConfigEntrySchema.safeParse(cached);
+  return result.success ? result.data : undefined;
+};
 
 /**
- * Vite import.meta interface for build-time variable replacement
+ * Write a config entry to the globalThis cache.
+ * Uses bracket notation to avoid needing ambient type declarations.
+ */
+const setCachedConfig = (entry: ConfigEntry): void => {
+  (globalThis as Record<string, unknown>)['__CACHED_ENV_CONFIG__'] = entry;
+};
+
+/**
+ * Vite import.meta type for build-time variable replacement.
+ * Vite statically replaces import.meta.env.VITE_* before TypeScript compilation.
  */
 interface ViteImportMeta {
   env?: {
-    VITE_WEBAPP_ENV?: WebappEnvs;
+    VITE_WEBAPP_ENV?: string;
   };
 }
+
+/**
+ * Read Vite build-time environment from import.meta.
+ * import.meta is a language-level construct that cannot be validated with Zod,
+ * so we use a typed accessor function to centralize the narrowing.
+ */
+const getViteBuildEnv = (): string | undefined => (import.meta as ViteImportMeta).env?.VITE_WEBAPP_ENV;
 
 // Typed config object
 // Cookie names must match Better Auth's cookiePrefix in main app (cookiePrefix: 'filliny')
@@ -163,15 +173,34 @@ const handleGetAuthToken = (
 //
 // IMPORTANT: In Vite, import.meta.env.VITE_* variables are statically replaced during build
 // and the replacement happens before TypeScript compilation.
-const VITE_WEBAPP_ENV = (import.meta as ViteImportMeta).env?.VITE_WEBAPP_ENV;
+const VITE_WEBAPP_ENV = getViteBuildEnv();
 console.log('Build-time VITE_WEBAPP_ENV:', VITE_WEBAPP_ENV);
+
+/**
+ * Parse a string as a validated WebappEnvs value.
+ * Returns the parsed enum value or undefined if invalid.
+ */
+const parseWebappEnv = (value: string | undefined): WebappEnvs | undefined => {
+  if (!value) return undefined;
+  const result = WebappEnvsSchema.safeParse(value);
+  return result.success ? result.data : undefined;
+};
+
+/**
+ * Cache and return a config entry for the given environment.
+ */
+const cacheAndReturn = (env: WebappEnvs): ConfigEntry => {
+  const envConfig = config[env];
+  setCachedConfig(envConfig);
+  return envConfig;
+};
 
 const getConfig = (): ConfigEntry => {
   // Get cached environment from memory to avoid repeated calculations
-  const extendedGlobal = globalThis as unknown as ExtendedGlobalThis;
-  if (extendedGlobal.__CACHED_ENV_CONFIG__) {
-    console.log('Using cached config:', extendedGlobal.__CACHED_ENV_CONFIG__.baseURL);
-    return extendedGlobal.__CACHED_ENV_CONFIG__;
+  const cached = getCachedConfig();
+  if (cached) {
+    console.log('Using cached config:', cached.baseURL);
+    return cached;
   }
 
   console.log('getConfig called - determining environment');
@@ -179,11 +208,10 @@ const getConfig = (): ConfigEntry => {
   try {
     // First, try to use the build-time environment variable from Vite
     // This will be statically replaced during build, so we need to check if it exists
-    if (VITE_WEBAPP_ENV && Object.values(WebappEnvs).includes(VITE_WEBAPP_ENV)) {
-      console.log('Using build-time environment:', VITE_WEBAPP_ENV);
-      const envConfig = config[VITE_WEBAPP_ENV];
-      extendedGlobal.__CACHED_ENV_CONFIG__ = envConfig;
-      return envConfig;
+    const buildEnv = parseWebappEnv(VITE_WEBAPP_ENV);
+    if (buildEnv) {
+      console.log('Using build-time environment:', buildEnv);
+      return cacheAndReturn(buildEnv);
     }
 
     // Try to get from extension storage if available
@@ -191,18 +219,18 @@ const getConfig = (): ConfigEntry => {
       // Check if we have a cached value from sessionStorage
       if (typeof sessionStorage !== 'undefined') {
         const cachedEnv = sessionStorage.getItem('filliny_webapp_env');
-        if (cachedEnv && Object.values(WebappEnvs).includes(cachedEnv as WebappEnvs)) {
-          console.log('Using environment from sessionStorage:', cachedEnv);
-          const envConfig = config[cachedEnv as WebappEnvs];
-          extendedGlobal.__CACHED_ENV_CONFIG__ = envConfig;
-          return envConfig;
+        const parsedCachedEnv = parseWebappEnv(cachedEnv ?? undefined);
+        if (parsedCachedEnv) {
+          console.log('Using environment from sessionStorage:', parsedCachedEnv);
+          return cacheAndReturn(parsedCachedEnv);
         }
       }
 
       // For async settings, still set sessionStorage for next time
       // but don't halt execution waiting for results
       chrome.storage.local.get('webapp_env', result => {
-        if (result.webapp_env && Object.values(WebappEnvs).includes(result.webapp_env as WebappEnvs)) {
+        const storageEnv = parseWebappEnv(result.webapp_env);
+        if (storageEnv) {
           if (typeof sessionStorage !== 'undefined') {
             sessionStorage.setItem('filliny_webapp_env', result.webapp_env);
             console.log('Updated sessionStorage with environment from chrome.storage:', result.webapp_env);
@@ -212,16 +240,21 @@ const getConfig = (): ConfigEntry => {
     }
 
     // Access process.env for any other environment checks
-    const processEnv = extendedGlobal.process?.env;
+    // Use bracket notation + Zod to avoid parsing circular globalThis
+    const processObj = (globalThis as Record<string, unknown>)['process'];
+    const processResult = GlobalWithProcessEnvSchema.safeParse({ process: processObj });
+    const processEnv = processResult.success ? processResult.data.process?.env : undefined;
 
-    // Try Vite's import.meta.env (works in development)
-    const importMeta = extendedGlobal.import?.meta;
-    const viteEnv = importMeta?.env?.VITE_WEBAPP_ENV;
-    if (viteEnv && Object.values(WebappEnvs).includes(viteEnv as WebappEnvs)) {
+    // Try Vite's import.meta.env (works in development via globalThis fallback)
+    // Use bracket notation + Zod to avoid parsing circular globalThis
+    const importObj = (globalThis as Record<string, unknown>)['import'];
+    const importParseResult = GlobalWithImportMetaSchema.safeParse({ import: importObj });
+    const viteEnv = importParseResult.success
+      ? parseWebappEnv(importParseResult.data.import?.meta?.env?.VITE_WEBAPP_ENV)
+      : undefined;
+    if (viteEnv) {
       console.log('Using environment from import.meta.env:', viteEnv);
-      const envConfig = config[viteEnv as WebappEnvs];
-      extendedGlobal.__CACHED_ENV_CONFIG__ = envConfig;
-      return envConfig;
+      return cacheAndReturn(viteEnv);
     }
 
     // Development indicators - this section should only run if no explicit env is set
@@ -229,9 +262,7 @@ const getConfig = (): ConfigEntry => {
     // Check if CLI_CEB_DEV flag is set to true
     if (processEnv?.CLI_CEB_DEV === 'true') {
       console.log('Using DEV environment because CLI_CEB_DEV is true');
-      const envConfig = config[WebappEnvs.DEV];
-      extendedGlobal.__CACHED_ENV_CONFIG__ = envConfig;
-      return envConfig;
+      return cacheAndReturn(WebappEnvs.DEV);
     }
 
     // Check hostname (for local development)
@@ -240,9 +271,7 @@ const getConfig = (): ConfigEntry => {
         const hostname = window.location.hostname;
         if (hostname === 'localhost') {
           console.log('Using DEV environment based on hostname:', hostname);
-          const envConfig = config[WebappEnvs.DEV];
-          extendedGlobal.__CACHED_ENV_CONFIG__ = envConfig;
-          return envConfig;
+          return cacheAndReturn(WebappEnvs.DEV);
         }
       } catch {
         // Ignore window errors
@@ -252,18 +281,14 @@ const getConfig = (): ConfigEntry => {
     // Check NODE_ENV
     if (processEnv?.NODE_ENV === 'development') {
       console.log("Using DEV environment because NODE_ENV is 'development'");
-      const envConfig = config[WebappEnvs.DEV];
-      extendedGlobal.__CACHED_ENV_CONFIG__ = envConfig;
-      return envConfig;
+      return cacheAndReturn(WebappEnvs.DEV);
     }
 
     // Last resort - assume production for non-development environments
     // This ensures production is used when no other indicators are present
     if (processEnv?.NODE_ENV !== 'development' && processEnv?.CLI_CEB_DEV !== 'true') {
       console.log('Using PROD environment (no development indicators present)');
-      const envConfig = config[WebappEnvs.PROD];
-      extendedGlobal.__CACHED_ENV_CONFIG__ = envConfig;
-      return envConfig;
+      return cacheAndReturn(WebappEnvs.PROD);
     }
   } catch (error) {
     console.error('Error determining environment:', error);
@@ -271,9 +296,7 @@ const getConfig = (): ConfigEntry => {
 
   // Default to PROD as last resort
   console.log('Defaulting to PROD environment');
-  const defaultConfig = config[WebappEnvs.PROD];
-  extendedGlobal.__CACHED_ENV_CONFIG__ = defaultConfig;
-  return defaultConfig;
+  return cacheAndReturn(WebappEnvs.PROD);
 };
 
 const handleAuthTokenChanged = (
@@ -411,8 +434,16 @@ const clearUserStorage = () => {
   profileStorage.resetDefaultProfile();
 };
 
-const excludeValuesFromBaseArray = <B extends string[], E extends (string | number)[]>(baseArray: B, excludeArray: E) =>
-  baseArray.filter(value => !excludeArray.includes(value)) as ExcludeValuesFromBaseArrayType<B, E>;
+const excludeValuesFromBaseArray = <B extends string[], E extends (string | number)[]>(
+  baseArray: B,
+  excludeArray: E,
+): ExcludeValuesFromBaseArrayType<B, E> => {
+  const filtered: string[] = baseArray.filter(value => !excludeArray.includes(value));
+  // The filter guarantees only values NOT in excludeArray remain,
+  // which matches the Exclude<TupleToUnion<B>, TupleToUnion<E>>[] type.
+  // This return type is verified by the function signature.
+  return filtered as ExcludeValuesFromBaseArrayType<B, E>;
+};
 
 const sleep = async (time: number) => new Promise(r => setTimeout(r, time));
 
@@ -423,6 +454,7 @@ export {
   formatToK,
   getMatchingWebsite,
   getConfig,
+  parseWebappEnv,
   handleAction,
   getCurrentVistingUrl,
   setupAuthTokenListener,
@@ -431,3 +463,4 @@ export {
   excludeValuesFromBaseArray,
   sleep,
 };
+export type { ConfigEntry };

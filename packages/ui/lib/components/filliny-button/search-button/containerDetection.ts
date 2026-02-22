@@ -1,5 +1,6 @@
 import { getFormFieldsRobust } from './field-types';
 import { safeGetLowerString } from './field-types/utils';
+import { FieldTypeEnum } from '@extension/shared';
 
 /**
  * Get the depth of an element in the DOM tree
@@ -23,13 +24,18 @@ export const getFieldTypesInContainer = (container: HTMLElement): Set<string> =>
   // Check for different input types
   const inputs = container.querySelectorAll('input');
   inputs.forEach(input => {
-    if (input.type === 'text' || input.type === 'email' || input.type === 'tel' || input.type === 'url') {
+    if (
+      input.type === FieldTypeEnum.TEXT ||
+      input.type === FieldTypeEnum.EMAIL ||
+      input.type === FieldTypeEnum.TEL ||
+      input.type === FieldTypeEnum.URL
+    ) {
       types.add('text');
-    } else if (input.type === 'checkbox') {
+    } else if (input.type === FieldTypeEnum.CHECKBOX) {
       types.add('checkbox');
-    } else if (input.type === 'radio') {
+    } else if (input.type === FieldTypeEnum.RADIO) {
       types.add('radio');
-    } else if (input.type === 'file') {
+    } else if (input.type === FieldTypeEnum.FILE) {
       types.add('file');
     }
   });
@@ -262,6 +268,28 @@ export const scoreFormContainerEnhanced = (
     }
   }
 
+  // Form-specific HTML attributes
+  if (element.hasAttribute('action')) {
+    score += 50;
+    reasons.push('has action attribute (+50)');
+  }
+  if (element.hasAttribute('method')) {
+    score += 30;
+    reasons.push('has method attribute (+30)');
+  }
+  if (element.hasAttribute('enctype')) {
+    score += 20;
+    reasons.push('has enctype attribute (+20)');
+  }
+
+  // ARIA form landmark bonus
+  if (element.getAttribute('aria-label') || element.getAttribute('aria-labelledby')) {
+    if (role === 'form' || tagName === 'form') {
+      score += 20;
+      reasons.push('ARIA form landmark (+20)');
+    }
+  }
+
   // Structural indicators
   const hasLegend = element.querySelector('legend');
   if (hasLegend) {
@@ -271,8 +299,8 @@ export const scoreFormContainerEnhanced = (
 
   const hasSubmitButton = element.querySelector('input[type="submit"], button[type="submit"], button:not([type])');
   if (hasSubmitButton) {
-    score += 25;
-    reasons.push('contains submit button');
+    score += 50;
+    reasons.push('contains submit button (+50)');
   }
 
   // Group relationship bonuses

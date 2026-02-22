@@ -58,12 +58,12 @@ const findOutermostContainer = (element: HTMLElement): HTMLElement => {
 const findFormElement = (formId: string): HTMLElement | null => {
   // Try multiple strategies to find the form element
   const strategies = [
-    () => document.querySelector(`form[data-form-id="${formId}"]`) as HTMLElement,
-    () => document.querySelector(`[data-filliny-form-container][data-form-id="${formId}"]`) as HTMLElement,
-    () => document.querySelector(`[data-form-id="${formId}"]`) as HTMLElement,
+    () => document.querySelector<HTMLElement>(`form[data-form-id="${formId}"]`),
+    () => document.querySelector<HTMLElement>(`[data-filliny-form-container][data-form-id="${formId}"]`),
+    () => document.querySelector<HTMLElement>(`[data-form-id="${formId}"]`),
     // Add new strategies for unified form
-    () => document.querySelector(`[data-filliny-unified-form="true"]`) as HTMLElement,
-    () => document.querySelector(`[data-filliny-primary-form="true"]`) as HTMLElement,
+    () => document.querySelector<HTMLElement>(`[data-filliny-unified-form="true"]`),
+    () => document.querySelector<HTMLElement>(`[data-filliny-primary-form="true"]`),
   ];
 
   for (const strategy of strategies) {

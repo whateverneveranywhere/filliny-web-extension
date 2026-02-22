@@ -24,6 +24,14 @@ enum StreamingPhase {
 }
 
 /**
+ * Counters for a fill strategy's attempts and successes
+ */
+interface StrategyStatsEntry {
+  attempted: number;
+  succeeded: number;
+}
+
+/**
  * Per-field state tracked during streaming
  */
 interface FieldFillState {
@@ -33,6 +41,10 @@ interface FieldFillState {
   previousValue: string | string[] | undefined;
   isValueStable: boolean;
   errorMessage?: string;
+  verificationAttempts: number;
+  verificationPassed: boolean;
+  lastVerifiedAt: number | null;
+  fillStrategy: string;
 }
 
 /**
@@ -60,6 +72,7 @@ interface FormFillState {
   phase: StreamingPhase;
   fields: Record<string, FieldFillState>;
   lastPartialObject: PartialFieldValueMap | null;
+  strategyStats: Map<string, StrategyStatsEntry>;
 
   // Actions
   initSession: (fields: Array<{ id: string; label: string }>) => void;
@@ -70,6 +83,8 @@ interface FormFillState {
   markFieldError: (id: string, message: string) => void;
   setPhase: (phase: StreamingPhase) => void;
   setLastPartialObject: (obj: PartialFieldValueMap | null) => void;
+  setVerificationResult: (fieldId: string, passed: boolean, strategy?: string) => void;
+  recordStrategyResult: (strategy: string, succeeded: boolean) => void;
   reset: () => void;
 }
 
@@ -77,6 +92,7 @@ const initialState = {
   phase: StreamingPhase.IDLE as StreamingPhase,
   fields: {} as Record<string, FieldFillState>,
   lastPartialObject: null as PartialFieldValueMap | null,
+  strategyStats: new Map<string, StrategyStatsEntry>(),
 };
 
 /**
@@ -96,12 +112,17 @@ const formFillStore = createStore<FormFillState>((set, get) => ({
         currentValue: undefined,
         previousValue: undefined,
         isValueStable: false,
+        verificationAttempts: 0,
+        verificationPassed: false,
+        lastVerifiedAt: null,
+        fillStrategy: '',
       };
     }
     set({
       phase: StreamingPhase.STREAMING,
       fields,
       lastPartialObject: null,
+      strategyStats: new Map<string, StrategyStatsEntry>(),
     });
   },
 
@@ -198,8 +219,42 @@ const formFillStore = createStore<FormFillState>((set, get) => ({
     set({ lastPartialObject: obj });
   },
 
+  setVerificationResult: (fieldId: string, passed: boolean, strategy?: string) => {
+    const { fields } = get();
+    const field = fields[fieldId];
+    if (!field) return;
+
+    set({
+      fields: {
+        ...fields,
+        [fieldId]: {
+          ...field,
+          verificationPassed: passed,
+          verificationAttempts: field.verificationAttempts + 1,
+          lastVerifiedAt: Date.now(),
+          fillStrategy: strategy ?? field.fillStrategy,
+          status: passed ? FieldFillStatus.VERIFIED : field.status,
+        },
+      },
+    });
+  },
+
+  recordStrategyResult: (strategy: string, succeeded: boolean) => {
+    const { strategyStats } = get();
+    const updated = new Map(strategyStats);
+    const existing = updated.get(strategy) ?? { attempted: 0, succeeded: 0 };
+    updated.set(strategy, {
+      attempted: existing.attempted + 1,
+      succeeded: existing.succeeded + (succeeded ? 1 : 0),
+    });
+    set({ strategyStats: updated });
+  },
+
   reset: () => {
-    set({ ...initialState });
+    set({
+      ...initialState,
+      strategyStats: new Map<string, StrategyStatsEntry>(),
+    });
   },
 }));
 

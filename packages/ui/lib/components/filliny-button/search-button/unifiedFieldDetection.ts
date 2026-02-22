@@ -1,5 +1,6 @@
+import { observeContainerForDynamicFields, stopAllDynamicFieldObservers } from './dynamicFieldObserver';
 import { detectFields, isElementAttached, captureFormState, restoreFormState, createBaseField } from './field-types';
-import { FieldSchema } from '@extension/shared';
+import { FieldSchema, FieldTypeEnum } from '@extension/shared';
 import { z } from 'zod';
 import type { FormStateSnapshot } from './field-types';
 import type { Field } from '@extension/shared';
@@ -37,7 +38,7 @@ const GroupedFieldOptionSchema = z.object({
 const GroupedFieldInfoSchema = z.object({
   groupId: z.string(),
   containerId: z.string(),
-  groupType: z.enum(['radio', 'checkbox']),
+  groupType: z.enum([FieldTypeEnum.RADIO, FieldTypeEnum.CHECKBOX]),
   fields: z.array(DetectedFieldInfoSchema),
   options: z.array(GroupedFieldOptionSchema),
   container: z.custom<HTMLElement>(val => val instanceof HTMLElement, { message: 'Expected HTMLElement' }),
@@ -95,8 +96,9 @@ class UnifiedFieldRegistry {
     return UnifiedFieldRegistry.instance;
   }
 
-  // Clear all registry data
+  // Clear all registry data and stop dynamic field observers
   clear(): void {
+    stopAllDynamicFieldObservers();
     this.detectedFields.clear();
     this.containers.clear();
     this.groupedFields.clear();
@@ -149,6 +151,9 @@ class UnifiedFieldRegistry {
         individualFields.push(fieldInfo);
       }
     }
+
+    // Start observing the container for dynamically added fields
+    observeContainerForDynamicFields(container, containerId);
 
     return {
       containerId,
@@ -222,19 +227,22 @@ class UnifiedFieldRegistry {
     // Radio fields are ALWAYS grouped (even single radios conceptually belong to a group)
     // Checkbox fields are grouped if they have multiple options
     // Select fields are always individual (they handle their own options internally)
-    return !!(field.type === 'radio' || (field.type === 'checkbox' && field.options && field.options.length > 1));
+    return !!(
+      field.type === FieldTypeEnum.RADIO ||
+      (field.type === FieldTypeEnum.CHECKBOX && field.options && field.options.length > 1)
+    );
   }
 
   private getGroupId(field: Field): string | undefined {
     if (!this.isGroupedField(field)) return undefined;
 
     // For radio fields, use the name attribute or field ID as group identifier
-    if (field.type === 'radio') {
+    if (field.type === FieldTypeEnum.RADIO) {
       return field.name ? `radio-group-${field.name}` : `radio-group-${field.id}`;
     }
 
     // For checkbox groups, use similar logic
-    if (field.type === 'checkbox' && field.options && field.options.length > 1) {
+    if (field.type === FieldTypeEnum.CHECKBOX && field.options && field.options.length > 1) {
       return field.name ? `checkbox-group-${field.name}` : `checkbox-group-${field.id}`;
     }
 
@@ -254,7 +262,7 @@ class UnifiedFieldRegistry {
       const groupInfo: GroupedFieldInfo = {
         groupId,
         containerId: fieldInfo.containerId,
-        groupType: fieldInfo.field.type as 'radio' | 'checkbox',
+        groupType: fieldInfo.field.type as typeof FieldTypeEnum.RADIO | typeof FieldTypeEnum.CHECKBOX,
         fields: [fieldInfo],
         options: fieldInfo.field.options || [],
         container: fieldInfo.container,
@@ -507,24 +515,24 @@ class UnifiedFieldRegistry {
   // Infer field type from an HTML element
   private inferFieldType(element: HTMLElement): string {
     if (element instanceof HTMLInputElement) {
-      return element.type || 'text';
+      return element.type || FieldTypeEnum.TEXT;
     }
     if (element instanceof HTMLSelectElement) {
-      return 'select';
+      return FieldTypeEnum.SELECT;
     }
     if (element instanceof HTMLTextAreaElement) {
-      return 'textarea';
+      return FieldTypeEnum.TEXTAREA;
     }
     if (element.hasAttribute('contenteditable') && element.getAttribute('contenteditable') !== 'false') {
-      return 'text';
+      return FieldTypeEnum.TEXT;
     }
     const role = element.getAttribute('role');
-    if (role === 'textbox' || role === 'searchbox') return 'text';
-    if (role === 'combobox' || role === 'listbox') return 'select';
-    if (role === 'checkbox') return 'checkbox';
-    if (role === 'radio') return 'radio';
-    if (role === 'switch') return 'checkbox';
-    return 'text';
+    if (role === 'textbox' || role === 'searchbox') return FieldTypeEnum.TEXT;
+    if (role === 'combobox' || role === 'listbox') return FieldTypeEnum.SELECT;
+    if (role === FieldTypeEnum.CHECKBOX) return FieldTypeEnum.CHECKBOX;
+    if (role === FieldTypeEnum.RADIO) return FieldTypeEnum.RADIO;
+    if (role === 'switch') return FieldTypeEnum.CHECKBOX;
+    return FieldTypeEnum.TEXT;
   }
 
   // Enhanced element finding with comprehensive fallback strategies
@@ -562,28 +570,28 @@ class UnifiedFieldRegistry {
 
       // Strategy 4: Find by type and position
       () => {
-        const typeSelectors = {
-          text: 'input[type="text"], input:not([type])',
-          email: 'input[type="email"]',
-          password: 'input[type="password"]',
-          tel: 'input[type="tel"]',
-          url: 'input[type="url"]',
-          number: 'input[type="number"]',
-          date: 'input[type="date"]',
-          'datetime-local': 'input[type="datetime-local"]',
-          time: 'input[type="time"]',
-          month: 'input[type="month"]',
-          week: 'input[type="week"]',
-          color: 'input[type="color"]',
-          range: 'input[type="range"]',
-          select: 'select',
-          textarea: 'textarea',
-          checkbox: 'input[type="checkbox"]',
-          radio: 'input[type="radio"]',
-          file: 'input[type="file"]',
+        const typeSelectors: Record<string, string> = {
+          [FieldTypeEnum.TEXT]: 'input[type="text"], input:not([type])',
+          [FieldTypeEnum.EMAIL]: 'input[type="email"]',
+          [FieldTypeEnum.PASSWORD]: 'input[type="password"]',
+          [FieldTypeEnum.TEL]: 'input[type="tel"]',
+          [FieldTypeEnum.URL]: 'input[type="url"]',
+          [FieldTypeEnum.NUMBER]: 'input[type="number"]',
+          [FieldTypeEnum.DATE]: 'input[type="date"]',
+          [FieldTypeEnum.DATETIME_LOCAL]: 'input[type="datetime-local"]',
+          [FieldTypeEnum.TIME]: 'input[type="time"]',
+          [FieldTypeEnum.MONTH]: 'input[type="month"]',
+          [FieldTypeEnum.WEEK]: 'input[type="week"]',
+          [FieldTypeEnum.COLOR]: 'input[type="color"]',
+          [FieldTypeEnum.RANGE]: 'input[type="range"]',
+          [FieldTypeEnum.SELECT]: 'select',
+          [FieldTypeEnum.TEXTAREA]: 'textarea',
+          [FieldTypeEnum.CHECKBOX]: 'input[type="checkbox"]',
+          [FieldTypeEnum.RADIO]: 'input[type="radio"]',
+          [FieldTypeEnum.FILE]: 'input[type="file"]',
         };
 
-        const selector = typeSelectors[field.type as keyof typeof typeSelectors];
+        const selector = typeSelectors[field.type];
         if (selector) {
           const elements = container.querySelectorAll(selector);
           // Return the first element that doesn't already have a data-filliny-id
@@ -594,14 +602,14 @@ class UnifiedFieldRegistry {
 
       // Strategy 5: Find by ARIA attributes
       () => {
-        const ariaSelectors = {
-          text: '[role="textbox"]',
-          select: '[role="combobox"], [role="listbox"]',
-          checkbox: '[role="checkbox"]',
-          radio: '[role="radio"]',
+        const ariaSelectors: Record<string, string> = {
+          [FieldTypeEnum.TEXT]: '[role="textbox"]',
+          [FieldTypeEnum.SELECT]: '[role="combobox"], [role="listbox"]',
+          [FieldTypeEnum.CHECKBOX]: '[role="checkbox"]',
+          [FieldTypeEnum.RADIO]: '[role="radio"]',
         };
 
-        const selector = ariaSelectors[field.type as keyof typeof ariaSelectors];
+        const selector = ariaSelectors[field.type];
         if (selector) {
           const elements = container.querySelectorAll(selector);
           return (Array.from(elements).find(el => !el.hasAttribute('data-filliny-id')) as HTMLElement) || null;
@@ -611,7 +619,7 @@ class UnifiedFieldRegistry {
 
       // Strategy 6: Find by content editable
       () =>
-        field.type === 'text' || field.type === 'textarea'
+        field.type === FieldTypeEnum.TEXT || field.type === FieldTypeEnum.TEXTAREA
           ? (container.querySelector('[contenteditable="true"]') as HTMLElement)
           : null,
     ];
@@ -673,4 +681,5 @@ export {
   saveFormSnapshot,
   undoFormFill,
 };
+export { stopAllDynamicFieldObservers, getActiveObserverCount } from './dynamicFieldObserver';
 export type { DetectedFieldInfo, GroupedFieldInfo, DetectedContainerInfo, FieldButtonData };

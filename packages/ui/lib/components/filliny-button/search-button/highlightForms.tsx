@@ -8,7 +8,7 @@ import { addGlowingBorder, findOrCreateShadowContainer, getFormPosition } from '
 import { unifiedFieldRegistry } from './unifiedFieldDetection';
 import { track, AnalyticsEvent } from '@extension/shared';
 import { createRoot } from 'react-dom/client';
-import type { HighlightFormsOptions } from './types';
+import type { HighlightFormsOptions } from '@extension/shared';
 
 const highlightForms = async ({ visionOnly = false, testMode = false }: HighlightFormsOptions): Promise<void> => {
   const shadowRoot = document.querySelector('#chrome-extension-filliny-all')?.shadowRoot;

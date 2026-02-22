@@ -1,13 +1,27 @@
 // Export all field type handlers
 import { detectCheckableFields } from './checkable';
 import { detectFileFields } from './file';
+import { validateDetectedFields } from './postDetectionValidation';
 import { detectSelectFields } from './select';
 import { UNIVERSAL_FORM_SELECTORS } from './selectors';
 import { detectTextField } from './text';
 import { isHoneypotField } from './utils';
-import { hasProperty } from '@extension/shared';
-import type { SelectorWithConfidence } from './selectors';
+import { countBy } from '../core/utils';
+import { hasProperty, FieldTypeEnum } from '@extension/shared';
 import type { Field, ShadowDOMHostElement, ElementWithEventListeners } from '@extension/shared';
+
+/**
+ * Form-associated custom element that exposes a `.form` property
+ * via ElementInternals (e.g., web components with `static formAssociated = true`).
+ */
+interface FormAssociatedElement extends HTMLElement {
+  readonly form: HTMLFormElement | null;
+}
+
+/**
+ * Type guard for elements that have a `.form` property (form-associated custom elements).
+ */
+const isFormAssociated = (el: HTMLElement): el is FormAssociatedElement => hasProperty(el, 'form');
 
 /**
  * Universal field detection with multiple strategies and robust error handling
@@ -73,9 +87,7 @@ const getFormElementsRobust = (container: HTMLElement | ShadowRoot): HTMLElement
   // Strategy 7: Dialog and popover detection
   // Detect forms inside open <dialog> and [popover] elements
   try {
-    const combinedSelector = createUniversalFormElementSelectors()
-      .map(s => s.selector)
-      .join(', ');
+    const combinedSelector = UNIVERSAL_FORM_SELECTORS.map(s => s.selector).join(', ');
     const dialogsAndPopovers = container.querySelectorAll('dialog[open], [popover]:popover-open');
     dialogsAndPopovers.forEach(dp => {
       if (dp instanceof HTMLElement) {
@@ -95,6 +107,20 @@ const getFormElementsRobust = (container: HTMLElement | ShadowRoot): HTMLElement
 
   console.log(`📋 After FormAssociated + dialog/popover detection: ${elements.length} elements`);
 
+  // Strategy 8: Web component detection (Shoelace, Vaadin, Lightning, etc.)
+  elements = enhanceWithWebComponentDetection(container, elements);
+
+  // Strategy 9: Date/time picker detection (Flatpickr, Pikaday, Air Datepicker, etc.)
+  elements = enhanceWithDatePickerDetection(container, elements);
+
+  // Strategy 10: Phone number input detection (intl-tel-input, react-phone-input, etc.)
+  elements = enhanceWithPhoneInputDetection(container, elements);
+
+  // Strategy 11: OTP/verification code detection
+  elements = enhanceWithOTPDetection(container, elements);
+
+  console.log(`📋 After enhanced detection strategies: ${elements.length} elements`);
+
   // Final filtering with confidence scoring
   const filteredElements = applyUniversalFieldFiltering(elements);
   console.log(`✅ Final filtered result: ${filteredElements.length} elements`);
@@ -102,18 +128,12 @@ const getFormElementsRobust = (container: HTMLElement | ShadowRoot): HTMLElement
   return filteredElements;
 };
 
-// Selectors are now imported from ./selectors.ts
-// Using UNIVERSAL_FORM_SELECTORS constant
-
-// Legacy function wrapper for backward compatibility
-const createUniversalFormElementSelectors = (): SelectorWithConfidence[] => UNIVERSAL_FORM_SELECTORS;
-
 /**
  * Apply universal CSS selector matching for form elements
  * Enhanced with confidence scoring and multiple detection strategies
  */
 const applyUniversalSelectorMatching = (container: HTMLElement | ShadowRoot): HTMLElement[] => {
-  const fieldSelectors = createUniversalFormElementSelectors();
+  const fieldSelectors = UNIVERSAL_FORM_SELECTORS;
   const elements: HTMLElement[] = [];
   const elementConfidence = new Map<HTMLElement, number>();
 
@@ -1238,6 +1258,398 @@ const isInFormLikeVisualArrangement = (el: HTMLElement): boolean => {
   }
 };
 
+// ============================================================================
+// ENHANCED DETECTION STRATEGIES
+// Web components, date pickers, phone inputs, OTP inputs
+// ============================================================================
+
+/**
+ * Known web component tag prefixes for popular component libraries
+ */
+const KNOWN_WEB_COMPONENT_PREFIXES = [
+  'sl-', // Shoelace
+  'vaadin-', // Vaadin
+  'lightning-', // Salesforce Lightning
+  'fast-', // Microsoft FAST
+  'ion-', // Ionic
+  'sp-', // Adobe Spectrum
+  'mwc-', // Material Web Components
+  'fluent-', // Fluent UI
+  'calcite-', // Esri Calcite
+  'eui-', // Elastic UI
+  'gux-', // Genesys UX
+  'ui5-', // SAP UI5
+] as const;
+
+/**
+ * Known web component tag names for form-related components
+ */
+const KNOWN_WEB_COMPONENT_FORM_TAGS = new Set([
+  // Shoelace
+  'sl-input',
+  'sl-textarea',
+  'sl-select',
+  'sl-checkbox',
+  'sl-radio',
+  'sl-radio-group',
+  'sl-switch',
+  'sl-range',
+  'sl-color-picker',
+  'sl-rating',
+  // Vaadin
+  'vaadin-text-field',
+  'vaadin-text-area',
+  'vaadin-email-field',
+  'vaadin-number-field',
+  'vaadin-password-field',
+  'vaadin-select',
+  'vaadin-combo-box',
+  'vaadin-checkbox',
+  'vaadin-radio-button',
+  'vaadin-radio-group',
+  'vaadin-date-picker',
+  'vaadin-time-picker',
+  'vaadin-upload',
+  // Salesforce Lightning
+  'lightning-input',
+  'lightning-textarea',
+  'lightning-combobox',
+  'lightning-checkbox-group',
+  'lightning-radio-group',
+  'lightning-slider',
+  'lightning-file-upload',
+  // Microsoft FAST
+  'fast-text-field',
+  'fast-text-area',
+  'fast-select',
+  'fast-checkbox',
+  'fast-radio',
+  'fast-radio-group',
+  'fast-switch',
+  'fast-slider',
+  'fast-number-field',
+  // Ionic
+  'ion-input',
+  'ion-textarea',
+  'ion-select',
+  'ion-checkbox',
+  'ion-radio',
+  'ion-radio-group',
+  'ion-toggle',
+  'ion-range',
+  'ion-datetime',
+  // Adobe Spectrum
+  'sp-textfield',
+  'sp-dropdown',
+  'sp-checkbox',
+  'sp-radio',
+  'sp-switch',
+  'sp-slider',
+  // Material Web Components
+  'mwc-textfield',
+  'mwc-textarea',
+  'mwc-select',
+  'mwc-checkbox',
+  'mwc-radio',
+  'mwc-switch',
+  'mwc-slider',
+]);
+
+/**
+ * Enhance detection with web component awareness.
+ * Detects known web component libraries and generic custom elements with form behavior.
+ */
+const enhanceWithWebComponentDetection = (
+  container: HTMLElement | ShadowRoot,
+  existingElements: HTMLElement[],
+): HTMLElement[] => {
+  const newElements: HTMLElement[] = [];
+  const existingSet = new Set(existingElements);
+
+  const startTime = performance.now();
+  const TIME_BUDGET_MS = 300;
+
+  try {
+    const allElements = Array.from(container.querySelectorAll<HTMLElement>('*')).slice(0, 2000);
+
+    for (const el of allElements) {
+      if (performance.now() - startTime > TIME_BUDGET_MS) break;
+      if (existingSet.has(el)) continue;
+
+      const tagName = el.tagName.toLowerCase();
+
+      // Check if it is a known web component form tag
+      if (KNOWN_WEB_COMPONENT_FORM_TAGS.has(tagName)) {
+        newElements.push(el);
+        existingSet.add(el);
+        continue;
+      }
+
+      // Check if it matches a known prefix and has form-like attributes
+      if (tagName.includes('-')) {
+        const matchesPrefix = KNOWN_WEB_COMPONENT_PREFIXES.some(prefix => tagName.startsWith(prefix));
+        if (matchesPrefix) {
+          const hasFormAttr =
+            el.hasAttribute('value') ||
+            el.hasAttribute('name') ||
+            el.hasAttribute('required') ||
+            el.hasAttribute('placeholder') ||
+            el.hasAttribute('disabled');
+          if (hasFormAttr) {
+            newElements.push(el);
+            existingSet.add(el);
+            continue;
+          }
+        }
+
+        // Generic custom element: check shadow DOM for inner inputs
+        const shadowRoot = (el as ShadowDOMHostElement).shadowRoot;
+        if (shadowRoot) {
+          const innerInputs = shadowRoot.querySelectorAll<HTMLElement>(
+            'input, select, textarea, [role="textbox"], [role="combobox"]',
+          );
+          if (innerInputs.length > 0) {
+            // Register the shadow root inputs directly
+            innerInputs.forEach(inner => {
+              if (!existingSet.has(inner)) {
+                newElements.push(inner);
+                existingSet.add(inner);
+              }
+            });
+          }
+        }
+
+        // Form-associated custom elements (ElementInternals)
+        if (isFormAssociated(el) && el.form !== null) {
+          if (!existingSet.has(el)) {
+            newElements.push(el);
+            existingSet.add(el);
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.debug('Web component detection error:', e);
+  }
+
+  if (newElements.length > 0) {
+    console.log(`Web component detection found ${newElements.length} additional elements`);
+  }
+
+  return [...existingElements, ...newElements];
+};
+
+/**
+ * Date/time picker selectors for third-party libraries
+ */
+const DATE_PICKER_SELECTORS = [
+  // Flatpickr
+  '.flatpickr-input',
+  '[data-flatpickr]',
+  'input.flatpickr',
+  // Pikaday
+  '.pika-single input',
+  '[data-pikaday]',
+  // Air Datepicker
+  '.air-datepicker input',
+  '[data-air-datepicker]',
+  '.datepicker-input',
+  // React DatePicker
+  '.react-datepicker__input-container input',
+  '.react-datepicker-wrapper input',
+  // MUI DatePicker
+  '.MuiDatePicker-root input',
+  '.MuiDateTimePicker-root input',
+  '.MuiTimePicker-root input',
+  // jQuery UI Datepicker
+  '.hasDatepicker',
+  '.ui-datepicker-trigger',
+  // Bootstrap Datepicker
+  '[data-provide="datepicker"]',
+  '[data-date-format]',
+  '.datepicker input',
+  // Ant Design DatePicker
+  '.ant-picker-input input',
+  '.ant-picker input',
+  // Tempus Dominus
+  '[data-td-target]',
+  '.tempus-dominus input',
+  // Generic date input patterns
+  'input[type="date"]',
+  'input[type="datetime-local"]',
+  'input[type="time"]',
+  'input[type="month"]',
+  'input[type="week"]',
+];
+
+/**
+ * Enhance detection with date/time picker awareness.
+ * Catches elements from popular date picker libraries.
+ */
+const enhanceWithDatePickerDetection = (
+  container: HTMLElement | ShadowRoot,
+  existingElements: HTMLElement[],
+): HTMLElement[] => {
+  const newElements: HTMLElement[] = [];
+  const existingSet = new Set(existingElements);
+
+  try {
+    const combinedSelector = DATE_PICKER_SELECTORS.join(', ');
+    const found = container.querySelectorAll<HTMLElement>(combinedSelector);
+    found.forEach(el => {
+      if (!existingSet.has(el)) {
+        newElements.push(el);
+        existingSet.add(el);
+      }
+    });
+  } catch (e) {
+    console.debug('Date picker detection error:', e);
+  }
+
+  if (newElements.length > 0) {
+    console.log(`Date picker detection found ${newElements.length} additional elements`);
+  }
+
+  return [...existingElements, ...newElements];
+};
+
+/**
+ * Phone input selectors for third-party phone libraries
+ */
+const PHONE_INPUT_SELECTORS = [
+  // intl-tel-input
+  '.iti input',
+  '.iti__tel-input',
+  '[data-intl-tel-input]',
+  'input.intl-tel-input',
+  // react-phone-input-2
+  '.react-tel-input input',
+  '.phone-input input',
+  // react-phone-number-input
+  '.PhoneInput input',
+  '.PhoneInputInput',
+  '[class*="PhoneInput"] input',
+  // vue-tel-input
+  '.vue-tel-input input',
+  '[class*="vue-tel-input"] input',
+  // Generic phone patterns
+  'input[type="tel"]',
+  'input[autocomplete="tel"]',
+  'input[autocomplete="tel-national"]',
+  'input[name*="phone"]',
+  'input[name*="telephone"]',
+  'input[name*="mobile"]',
+];
+
+/**
+ * Enhance detection with phone number input awareness.
+ * Catches elements from popular phone input libraries.
+ */
+const enhanceWithPhoneInputDetection = (
+  container: HTMLElement | ShadowRoot,
+  existingElements: HTMLElement[],
+): HTMLElement[] => {
+  const newElements: HTMLElement[] = [];
+  const existingSet = new Set(existingElements);
+
+  try {
+    const combinedSelector = PHONE_INPUT_SELECTORS.join(', ');
+    const found = container.querySelectorAll<HTMLElement>(combinedSelector);
+    found.forEach(el => {
+      if (!existingSet.has(el)) {
+        newElements.push(el);
+        existingSet.add(el);
+      }
+    });
+  } catch (e) {
+    console.debug('Phone input detection error:', e);
+  }
+
+  if (newElements.length > 0) {
+    console.log(`Phone input detection found ${newElements.length} additional elements`);
+  }
+
+  return [...existingElements, ...newElements];
+};
+
+/**
+ * OTP/verification code selectors
+ */
+const OTP_SELECTORS = [
+  '[autocomplete="one-time-code"]',
+  '[inputmode="numeric"][maxlength="1"]',
+  '[class*="otp"]',
+  '[class*="verification-code"]',
+  '[class*="pin-input"]',
+  '[class*="code-input"]',
+  '[data-otp-input]',
+  '[data-otp]',
+  '[data-pin-input]',
+  '[data-verification-input]',
+];
+
+/**
+ * Enhance detection with OTP/verification code input awareness.
+ * Detects groups of single-character inputs used for OTP/PIN codes.
+ */
+const enhanceWithOTPDetection = (
+  container: HTMLElement | ShadowRoot,
+  existingElements: HTMLElement[],
+): HTMLElement[] => {
+  const newElements: HTMLElement[] = [];
+  const existingSet = new Set(existingElements);
+
+  try {
+    // Strategy 1: Direct OTP selectors
+    const combinedSelector = OTP_SELECTORS.join(', ');
+    const found = container.querySelectorAll<HTMLElement>(combinedSelector);
+    found.forEach(el => {
+      if (!existingSet.has(el)) {
+        newElements.push(el);
+        existingSet.add(el);
+      }
+    });
+
+    // Strategy 2: Heuristic detection of OTP groups
+    // Look for groups of 4-8 single-character text inputs that are siblings
+    const allInputs = Array.from(container.querySelectorAll<HTMLInputElement>('input[type="text"], input[type="tel"]'));
+    const singleCharInputs = allInputs.filter(
+      input => input.maxLength === 1 || input.getAttribute('maxlength') === '1',
+    );
+
+    if (singleCharInputs.length >= 4 && singleCharInputs.length <= 8) {
+      // Check if they share a common parent (likely an OTP group)
+      const parentMap = new Map<HTMLElement | null, HTMLInputElement[]>();
+      singleCharInputs.forEach(input => {
+        const parent = input.parentElement;
+        if (!parentMap.has(parent)) {
+          parentMap.set(parent, []);
+        }
+        parentMap.get(parent)?.push(input);
+      });
+
+      for (const [, inputs] of parentMap) {
+        if (inputs.length >= 4 && inputs.length <= 8) {
+          inputs.forEach(input => {
+            if (!existingSet.has(input)) {
+              newElements.push(input);
+              existingSet.add(input);
+            }
+          });
+        }
+      }
+    }
+  } catch (e) {
+    console.debug('OTP detection error:', e);
+  }
+
+  if (newElements.length > 0) {
+    console.log(`OTP detection found ${newElements.length} additional elements`);
+  }
+
+  return [...existingElements, ...newElements];
+};
+
 /**
  * Apply universal filtering with confidence-based scoring
  */
@@ -1297,7 +1709,7 @@ const isUniversalElementVisible = (el: HTMLElement): boolean => {
     // Skip elements with zero dimensions that aren't special cases
     const rect = el.getBoundingClientRect();
     const isCheckableField =
-      (el instanceof HTMLInputElement && (el.type === 'checkbox' || el.type === 'radio')) ||
+      (el instanceof HTMLInputElement && (el.type === FieldTypeEnum.CHECKBOX || el.type === FieldTypeEnum.RADIO)) ||
       ['checkbox', 'radio', 'switch'].includes(el.getAttribute('role') || '');
 
     // Allow zero-dimension elements if they're checkable or have special roles
@@ -1523,8 +1935,11 @@ const detectFields = async (container: HTMLElement, testMode: boolean = false): 
       }
     }
 
+    // Post-detection validation: remove invalid fields (not in DOM, hidden, disabled, honeypot)
+    const validatedFields = validateDetectedFields(fields, container);
+
     // Add data attributes to help identify detected fields
-    fields.forEach(field => {
+    validatedFields.forEach(field => {
       try {
         // Find the element for this field
         const selector =
@@ -1550,8 +1965,8 @@ const detectFields = async (container: HTMLElement, testMode: boolean = false): 
     });
 
     console.log(
-      `🎯 Final result: Detected ${fields.length} total fields`,
-      fields.map(f => ({
+      `🎯 Final result: Detected ${validatedFields.length} total fields (${fields.length - validatedFields.length} removed by validation)`,
+      validatedFields.map(f => ({
         id: f.id,
         type: f.type,
         label: f.label?.substring(0, 30) + (f.label && f.label.length > 30 ? '...' : ''),
@@ -1561,17 +1976,11 @@ const detectFields = async (container: HTMLElement, testMode: boolean = false): 
     );
 
     // Validate field distribution
-    const fieldTypes = fields.reduce(
-      (acc, field) => {
-        acc[field.type] = (acc[field.type] || 0) + 1;
-        return acc;
-      },
-      {} as Record<string, number>,
-    );
+    const fieldTypes = countBy(validatedFields, field => field.type);
 
     console.log(`📊 Field type distribution:`, fieldTypes);
 
-    return fields;
+    return validatedFields;
   } catch (error) {
     console.error('❌ Error in main field detection:', error);
     return fields; // Return whatever we managed to detect
@@ -1632,3 +2041,5 @@ export * from './text';
 export * from './checkable';
 export * from './file';
 export * from './select';
+export { validateDetectedFields } from './postDetectionValidation';
+export type { FieldValidationResult } from './postDetectionValidation';

@@ -10,7 +10,7 @@ import { Button } from '../../ui';
 import * as Progress from '@radix-ui/react-progress';
 import { X, Wand2, Loader2, CheckCircle2, XCircle, AlertTriangle, Check } from 'lucide-react';
 import { useRef } from 'react';
-import type { OverlayPosition } from './types';
+import type { OverlayPosition } from '@extension/shared';
 import type React from 'react';
 
 interface OverlayProps {

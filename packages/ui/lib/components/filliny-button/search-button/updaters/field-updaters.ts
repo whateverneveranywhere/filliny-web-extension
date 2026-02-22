@@ -5,6 +5,8 @@
  * Each strategy implements the FieldUpdateStrategy interface.
  */
 
+import { getErrorMessage } from '../core/utils';
+import { FieldTypeEnum } from '@extension/shared';
 import type { FieldUpdateStrategy, DetectedField, UpdateResult } from '../core/types';
 import type { FieldType } from '@extension/shared';
 
@@ -14,7 +16,15 @@ import type { FieldType } from '@extension/shared';
 
 export class TextFieldUpdater implements FieldUpdateStrategy {
   readonly name = 'text-field-updater';
-  readonly supportedTypes: FieldType[] = ['text', 'email', 'password', 'tel', 'url', 'search', 'textarea'];
+  readonly supportedTypes: FieldType[] = [
+    FieldTypeEnum.TEXT,
+    FieldTypeEnum.EMAIL,
+    FieldTypeEnum.PASSWORD,
+    FieldTypeEnum.TEL,
+    FieldTypeEnum.URL,
+    FieldTypeEnum.SEARCH,
+    FieldTypeEnum.TEXTAREA,
+  ];
 
   canUpdate(field: DetectedField): boolean {
     return (
@@ -61,26 +71,26 @@ export class TextFieldUpdater implements FieldUpdateStrategy {
       return {
         success: false,
         strategy: this.name,
-        error: (error as Error).message,
+        error: getErrorMessage(error),
       };
     }
   }
 
   private formatValue(value: string, type: string): string {
     switch (type) {
-      case 'email':
+      case FieldTypeEnum.EMAIL:
         if (!value.includes('@')) {
           return value.includes('.') ? `${value.split('.')[0]}@example.com` : `${value}@example.com`;
         }
         return value;
 
-      case 'url':
+      case FieldTypeEnum.URL:
         if (!value.match(/^https?:\/\//)) {
           return `https://${value.replace(/^(www\.)?/, 'www.')}`;
         }
         return value;
 
-      case 'tel': {
+      case FieldTypeEnum.TEL: {
         // Basic phone number formatting
         const digits = value.replace(/\D/g, '');
         if (digits.length < 10) {
@@ -134,10 +144,10 @@ export class TextFieldUpdater implements FieldUpdateStrategy {
 
 export class SelectFieldUpdater implements FieldUpdateStrategy {
   readonly name = 'select-field-updater';
-  readonly supportedTypes: FieldType[] = ['select'];
+  readonly supportedTypes: FieldType[] = [FieldTypeEnum.SELECT];
 
   canUpdate(field: DetectedField): boolean {
-    if (field.type !== 'select') return false;
+    if (field.type !== FieldTypeEnum.SELECT) return false;
 
     // Support native selects
     if (field.element instanceof HTMLSelectElement) return true;
@@ -191,7 +201,7 @@ export class SelectFieldUpdater implements FieldUpdateStrategy {
       return {
         success: false,
         strategy: this.name,
-        error: (error as Error).message,
+        error: getErrorMessage(error),
       };
     }
   }
@@ -223,7 +233,7 @@ export class SelectFieldUpdater implements FieldUpdateStrategy {
       return {
         success: false,
         strategy: this.name,
-        error: (error as Error).message,
+        error: getErrorMessage(error),
       };
     }
   }
@@ -283,11 +293,11 @@ export class SelectFieldUpdater implements FieldUpdateStrategy {
 
 export class CheckboxFieldUpdater implements FieldUpdateStrategy {
   readonly name = 'checkbox-field-updater';
-  readonly supportedTypes: FieldType[] = ['checkbox'];
+  readonly supportedTypes: FieldType[] = [FieldTypeEnum.CHECKBOX];
 
   canUpdate(field: DetectedField): boolean {
     return (
-      field.type === 'checkbox' &&
+      field.type === FieldTypeEnum.CHECKBOX &&
       (field.element instanceof HTMLInputElement || field.element.getAttribute('role') === 'checkbox')
     );
   }
@@ -329,7 +339,7 @@ export class CheckboxFieldUpdater implements FieldUpdateStrategy {
       return {
         success: false,
         strategy: this.name,
-        error: (error as Error).message,
+        error: getErrorMessage(error),
       };
     }
   }
@@ -357,11 +367,11 @@ export class CheckboxFieldUpdater implements FieldUpdateStrategy {
 
 export class RadioFieldUpdater implements FieldUpdateStrategy {
   readonly name = 'radio-field-updater';
-  readonly supportedTypes: FieldType[] = ['radio'];
+  readonly supportedTypes: FieldType[] = [FieldTypeEnum.RADIO];
 
   canUpdate(field: DetectedField): boolean {
     return (
-      field.type === 'radio' &&
+      field.type === FieldTypeEnum.RADIO &&
       (field.element instanceof HTMLInputElement || field.element.getAttribute('role') === 'radio')
     );
   }
@@ -414,7 +424,7 @@ export class RadioFieldUpdater implements FieldUpdateStrategy {
       return {
         success: false,
         strategy: this.name,
-        error: (error as Error).message,
+        error: getErrorMessage(error),
       };
     }
   }
@@ -505,17 +515,24 @@ export class RadioFieldUpdater implements FieldUpdateStrategy {
 
 export class FileFieldUpdater implements FieldUpdateStrategy {
   readonly name = 'file-field-updater';
-  readonly supportedTypes: FieldType[] = ['file'];
+  readonly supportedTypes: FieldType[] = [FieldTypeEnum.FILE];
 
   canUpdate(field: DetectedField): boolean {
-    return field.type === 'file' && field.element instanceof HTMLInputElement && field.element.type === 'file';
+    return (
+      field.type === FieldTypeEnum.FILE &&
+      field.element instanceof HTMLInputElement &&
+      field.element.type === FieldTypeEnum.FILE
+    );
   }
 
   async update(field: DetectedField): Promise<UpdateResult> {
     // File inputs cannot be programmatically set for security reasons
     // We can only trigger the file picker or provide visual feedback
 
-    const element = field.element as HTMLInputElement;
+    if (!(field.element instanceof HTMLInputElement)) {
+      return { success: false, strategy: this.name, error: 'Element is not an HTMLInputElement' };
+    }
+    const element = field.element;
 
     try {
       // Trigger file picker
@@ -530,7 +547,7 @@ export class FileFieldUpdater implements FieldUpdateStrategy {
       return {
         success: false,
         strategy: this.name,
-        error: (error as Error).message,
+        error: getErrorMessage(error),
       };
     }
   }

@@ -7,7 +7,7 @@
 
 import { withPerformanceMonitoring } from './event-system';
 import { isElementInteractive, generateUniqueSelectors, getElementXPath, combineConfidenceScores } from './utils';
-import { Framework, FieldTypeSchema } from '@extension/shared';
+import { Framework, FieldTypeSchema, FieldTypeEnum } from '@extension/shared';
 import type { DetectedField, FieldDetectionStrategy, DetectionConfig, ConfidenceScore } from './types';
 import type { FieldType } from '@extension/shared';
 
@@ -237,11 +237,11 @@ class FieldDetector {
 
 /**
  * Validate and coerce a type string into a FieldType.
- * Falls back to 'text' if the provided type is not a recognized FieldType value.
+ * Falls back to FieldTypeEnum.TEXT if the provided type is not a recognized FieldType value.
  */
 const parseFieldType = (type: string): FieldType => {
   const result = FieldTypeSchema.safeParse(type);
-  return result.success ? result.data : 'text';
+  return result.success ? result.data : FieldTypeEnum.TEXT;
 };
 
 /**

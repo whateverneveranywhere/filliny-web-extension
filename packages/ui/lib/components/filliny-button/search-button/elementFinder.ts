@@ -4,8 +4,41 @@
  * Provides a comprehensive set of strategies for finding form field elements
  * across different detection scenarios. This consolidates the element finding
  * logic that was previously scattered across multiple files.
+ *
+ * Enhanced with DOM fingerprinting, Shadow DOM/iframe searching,
+ * MutationObserver tracking, and additional strategies (data-testid,
+ * data-cy, accessibility name, form association, visual position,
+ * React fiber key, fingerprint matching).
  */
+import {
+  DOMFingerprintSchema,
+  fingerprintStore,
+  createFingerprint,
+  storeFingerprint,
+  scoreFingerprintMatch,
+  findByFingerprint,
+  generateCSSPath,
+  generateXPath,
+  collectShadowRoots,
+  findInShadowDOM,
+  findInIframes,
+  trackElement,
+  untrackElement,
+  getTrackedElement,
+  cleanupAllTrackers,
+  findByDataTestId,
+  findByDataCy,
+  computeAccessibleName,
+  findByAccessibilityName,
+  findByFormAssociation,
+  findElementByVisualPosition,
+  findByVisualPosition,
+  storeReactFiberKey,
+  findByReactFiberKey,
+} from './elementFinderEnhanced';
+import { FieldTypeEnum } from '@extension/shared';
 import { z } from 'zod';
+import type { DOMFingerprint } from './elementFinderEnhanced';
 import type { Field } from '@extension/shared';
 
 /**
@@ -21,6 +54,15 @@ enum FindStrategy {
   BY_TYPE = 'byType',
   BY_PLACEHOLDER = 'byPlaceholder',
   BY_CONTENT_EDITABLE = 'byContentEditable',
+  BY_DATA_TESTID = 'byDataTestId',
+  BY_DATA_CY = 'byDataCy',
+  BY_ACCESSIBILITY_NAME = 'byAccessibilityName',
+  BY_FORM_ASSOCIATION = 'byFormAssociation',
+  BY_VISUAL_POSITION = 'byVisualPosition',
+  BY_REACT_FIBER_KEY = 'byReactFiberKey',
+  BY_FINGERPRINT = 'byFingerprint',
+  BY_SHADOW_DOM = 'byShadowDOM',
+  BY_IFRAME = 'byIframe',
 }
 
 // ============================================================================
@@ -72,43 +114,52 @@ const DEFAULT_STRATEGIES: FindStrategy[] = [
   FindStrategy.BY_ID,
   FindStrategy.BY_LABEL,
   FindStrategy.BY_ARIA,
+  FindStrategy.BY_DATA_TESTID,
+  FindStrategy.BY_DATA_CY,
+  FindStrategy.BY_ACCESSIBILITY_NAME,
+  FindStrategy.BY_FORM_ASSOCIATION,
   FindStrategy.BY_TYPE,
   FindStrategy.BY_PLACEHOLDER,
   FindStrategy.BY_CONTENT_EDITABLE,
+  FindStrategy.BY_REACT_FIBER_KEY,
+  FindStrategy.BY_FINGERPRINT,
+  FindStrategy.BY_SHADOW_DOM,
+  FindStrategy.BY_IFRAME,
+  FindStrategy.BY_VISUAL_POSITION,
 ];
 
 /**
  * Type selectors mapping field types to CSS selectors
  */
 const TYPE_SELECTORS: Record<string, string> = {
-  text: 'input[type="text"], input:not([type])',
-  email: 'input[type="email"]',
-  password: 'input[type="password"]',
-  tel: 'input[type="tel"]',
-  url: 'input[type="url"]',
-  number: 'input[type="number"]',
-  date: 'input[type="date"]',
-  'datetime-local': 'input[type="datetime-local"]',
-  time: 'input[type="time"]',
-  month: 'input[type="month"]',
-  week: 'input[type="week"]',
-  color: 'input[type="color"]',
-  range: 'input[type="range"]',
-  select: 'select',
-  textarea: 'textarea',
-  checkbox: 'input[type="checkbox"]',
-  radio: 'input[type="radio"]',
-  file: 'input[type="file"]',
+  [FieldTypeEnum.TEXT]: 'input[type="text"], input:not([type])',
+  [FieldTypeEnum.EMAIL]: 'input[type="email"]',
+  [FieldTypeEnum.PASSWORD]: 'input[type="password"]',
+  [FieldTypeEnum.TEL]: 'input[type="tel"]',
+  [FieldTypeEnum.URL]: 'input[type="url"]',
+  [FieldTypeEnum.NUMBER]: 'input[type="number"]',
+  [FieldTypeEnum.DATE]: 'input[type="date"]',
+  [FieldTypeEnum.DATETIME_LOCAL]: 'input[type="datetime-local"]',
+  [FieldTypeEnum.TIME]: 'input[type="time"]',
+  [FieldTypeEnum.MONTH]: 'input[type="month"]',
+  [FieldTypeEnum.WEEK]: 'input[type="week"]',
+  [FieldTypeEnum.COLOR]: 'input[type="color"]',
+  [FieldTypeEnum.RANGE]: 'input[type="range"]',
+  [FieldTypeEnum.SELECT]: 'select',
+  [FieldTypeEnum.TEXTAREA]: 'textarea',
+  [FieldTypeEnum.CHECKBOX]: 'input[type="checkbox"]',
+  [FieldTypeEnum.RADIO]: 'input[type="radio"]',
+  [FieldTypeEnum.FILE]: 'input[type="file"]',
 };
 
 /**
  * ARIA selectors mapping field types to ARIA role selectors
  */
 const ARIA_SELECTORS: Record<string, string> = {
-  text: '[role="textbox"]',
-  select: '[role="combobox"], [role="listbox"]',
-  checkbox: '[role="checkbox"]',
-  radio: '[role="radio"]',
+  [FieldTypeEnum.TEXT]: '[role="textbox"]',
+  [FieldTypeEnum.SELECT]: '[role="combobox"], [role="listbox"]',
+  [FieldTypeEnum.CHECKBOX]: '[role="checkbox"]',
+  [FieldTypeEnum.RADIO]: '[role="radio"]',
 };
 
 /**
@@ -219,12 +270,12 @@ const findByPlaceholder = (field: Field, container: HTMLElement | Document): HTM
  * Find contenteditable element for text/textarea types
  */
 const findByContentEditable = (field: Field, container: HTMLElement | Document): HTMLElement | null => {
-  if (field.type !== 'text' && field.type !== 'textarea') return null;
+  if (field.type !== FieldTypeEnum.TEXT && field.type !== FieldTypeEnum.TEXTAREA) return null;
   return container.querySelector<HTMLElement>('[contenteditable="true"]');
 };
 
 /**
- * Strategy function mapping
+ * Strategy function mapping - extended with enhanced strategies
  */
 const STRATEGY_FUNCTIONS: Record<
   FindStrategy,
@@ -239,6 +290,15 @@ const STRATEGY_FUNCTIONS: Record<
   [FindStrategy.BY_TYPE]: findByType,
   [FindStrategy.BY_PLACEHOLDER]: findByPlaceholder,
   [FindStrategy.BY_CONTENT_EDITABLE]: findByContentEditable,
+  [FindStrategy.BY_DATA_TESTID]: findByDataTestId,
+  [FindStrategy.BY_DATA_CY]: findByDataCy,
+  [FindStrategy.BY_ACCESSIBILITY_NAME]: findByAccessibilityName,
+  [FindStrategy.BY_FORM_ASSOCIATION]: findByFormAssociation,
+  [FindStrategy.BY_VISUAL_POSITION]: findByVisualPosition,
+  [FindStrategy.BY_REACT_FIBER_KEY]: findByReactFiberKey,
+  [FindStrategy.BY_FINGERPRINT]: findByFingerprint,
+  [FindStrategy.BY_SHADOW_DOM]: findInShadowDOM,
+  [FindStrategy.BY_IFRAME]: findInIframes,
 };
 
 /**
@@ -262,10 +322,60 @@ const isElementEnabled = (element: HTMLElement): boolean =>
   element.getAttribute('aria-disabled') !== 'true';
 
 /**
+ * Check if element is still attached to the DOM
+ */
+const isElementAttached = (element: HTMLElement): boolean => {
+  try {
+    return element.isConnected;
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Attempt stale reference recovery using ALL re-finding strategies.
+ * Called when isElementAttached returns false for a previously known element.
+ */
+const recoverStaleReference = (field: Field, container: HTMLElement | Document = document): FindResult => {
+  // First check MutationObserver tracked elements
+  const tracked = getTrackedElement(field.id);
+  if (tracked) {
+    return { element: tracked, strategy: null };
+  }
+
+  // Try all strategies in order
+  for (const strategy of DEFAULT_STRATEGIES) {
+    try {
+      const strategyFn = STRATEGY_FUNCTIONS[strategy];
+      if (!strategyFn) continue;
+
+      const foundElement = strategyFn(field, container);
+      if (foundElement && foundElement.isConnected) {
+        console.debug(`Recovered stale reference for field ${field.id} using strategy ${strategy}`);
+
+        // Update tracking for the recovered element
+        trackElement(field.id, foundElement);
+        storeFingerprint(field.id, foundElement);
+
+        return { element: foundElement, strategy };
+      }
+    } catch {
+      // Continue to next strategy
+    }
+  }
+
+  return { element: null, strategy: null };
+};
+
+/**
  * Unified function to find a field element using multiple strategies
+ *
+ * Enhanced with MutationObserver tracking, fingerprint storage,
+ * React fiber key storage, and automatic stale reference recovery.
  *
  * @param field - The field data to find the element for
  * @param config - Optional configuration for the search
+ * @param element - Optional existing element reference
  * @returns FindResult with the element and the strategy that found it
  */
 const findFieldElement = (field: Field, config: FindConfig = {}, element?: HTMLElement): FindResult => {
@@ -276,23 +386,42 @@ const findFieldElement = (field: Field, config: FindConfig = {}, element?: HTMLE
     return { element, strategy: null };
   }
 
+  // Check MutationObserver tracked elements first
+  const tracked = getTrackedElement(field.id);
+  if (tracked) {
+    return { element: tracked, strategy: null };
+  }
+
+  // If the element was provided but is stale, attempt recovery
+  if (element && !element.isConnected) {
+    const recovered = recoverStaleReference(field, container);
+    if (recovered.element) {
+      return recovered;
+    }
+  }
+
   for (const strategy of strategies) {
     try {
       const strategyFn = STRATEGY_FUNCTIONS[strategy];
       if (!strategyFn) continue;
 
-      const element = strategyFn(field, container);
+      const foundElement = strategyFn(field, container);
 
-      if (element) {
+      if (foundElement) {
         // Apply filters
-        if (skipHidden && !isElementVisible(element)) {
+        if (skipHidden && !isElementVisible(foundElement)) {
           continue;
         }
-        if (skipDisabled && !isElementEnabled(element)) {
+        if (skipDisabled && !isElementEnabled(foundElement)) {
           continue;
         }
 
-        return { element, strategy };
+        // Store fingerprint and start tracking on first successful find
+        storeFingerprint(field.id, foundElement);
+        storeReactFiberKey(field.id, foundElement);
+        trackElement(field.id, foundElement);
+
+        return { element: foundElement, strategy };
       }
     } catch (error) {
       console.debug(`Strategy ${strategy} failed for field ${field.id}:`, error);
@@ -472,6 +601,7 @@ export {
   FindStrategy,
   FindResultSchema,
   FindConfigSchema,
+  DOMFingerprintSchema,
   findFieldElement,
   findElement,
   findElementWithStrategies,
@@ -486,10 +616,42 @@ export {
   findByType,
   findByPlaceholder,
   findByContentEditable,
+  findByDataTestId,
+  findByDataCy,
+  findByAccessibilityName,
+  findByFormAssociation,
+  findByReactFiberKey,
+  findByFingerprint,
+  findByVisualPosition,
+  findInShadowDOM,
+  findInIframes,
   findByLabelProximity,
+  findElementByVisualPosition,
   isElementVisible,
   isElementEnabled,
+  isElementAttached,
   countFormFields,
+  // Fingerprinting
+  createFingerprint,
+  storeFingerprint,
+  scoreFingerprintMatch,
+  fingerprintStore,
+  // Element tracking
+  trackElement,
+  untrackElement,
+  getTrackedElement,
+  cleanupAllTrackers,
+  // Stale reference recovery
+  recoverStaleReference,
+  // Shadow DOM utilities
+  collectShadowRoots,
+  // Accessible name computation
+  computeAccessibleName,
+  // CSS path / XPath generation
+  generateCSSPath,
+  generateXPath,
+  // React fiber key utilities
+  storeReactFiberKey,
 };
 
-export type { FindResult, FindConfig };
+export type { FindResult, FindConfig, DOMFingerprint };

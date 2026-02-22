@@ -19,9 +19,6 @@ export { unifiedFieldRegistry } from './unifiedFieldDetection';
 // Field types
 export * from './field-types';
 
-// Types
-export type * from './types';
-
 // Utilities (keeping essential ones only)
 export { resetOverlays, addGlowingBorder } from './overlayUtils';
 

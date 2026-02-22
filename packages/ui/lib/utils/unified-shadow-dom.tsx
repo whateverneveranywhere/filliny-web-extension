@@ -87,7 +87,7 @@ export class UnifiedShadowDOMManager {
       const { css, shadowHostId = 'chrome-extension-filliny-all' } = config;
 
       // Find or create the shadow host
-      this.shadowHost = document.querySelector(`#${shadowHostId}`) as HTMLElement;
+      this.shadowHost = document.querySelector<HTMLElement>(`#${shadowHostId}`);
 
       if (!this.shadowHost) {
         this.shadowHost = document.createElement('div');

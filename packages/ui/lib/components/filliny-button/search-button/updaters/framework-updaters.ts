@@ -5,10 +5,10 @@
  * These updaters understand framework-specific patterns and event handling.
  */
 
-import { detectFramework } from '../core/utils';
-import { Framework, hasProperty } from '@extension/shared';
+import { detectFramework, getFrameworkWindow, getErrorMessage } from '../core/utils';
+import { FieldTypeEnum, Framework } from '@extension/shared';
 import type { FieldUpdateStrategy, DetectedField, UpdateResult } from '../core/types';
-import type { FieldType, FrameworkDetectionWindow } from '@extension/shared';
+import type { FieldType } from '@extension/shared';
 
 // ============================================================================
 // FRAMEWORK RUNTIME TYPE INTERFACES
@@ -49,6 +49,17 @@ interface VueElement extends HTMLElement {
   __vue__?: Vue2Instance;
 }
 
+/**
+ * Type guard for elements with Vue 2 instance attached.
+ */
+const isVueElement = (element: HTMLElement): element is VueElement => '__vue__' in element;
+
+/**
+ * Type guard for Angular ng global object with getComponent helper.
+ */
+const isAngularNgGlobal = (ng: unknown): ng is AngularNgGlobal =>
+  typeof ng === 'object' && ng !== null && 'getComponent' in ng;
+
 // ============================================================================
 // REACT FIELD UPDATER
 // ============================================================================
@@ -56,16 +67,16 @@ interface VueElement extends HTMLElement {
 export class ReactFieldUpdater implements FieldUpdateStrategy {
   readonly name = 'react-field-updater';
   readonly supportedTypes: FieldType[] = [
-    'text',
-    'email',
-    'password',
-    'tel',
-    'url',
-    'search',
-    'textarea',
-    'select',
-    'checkbox',
-    'radio',
+    FieldTypeEnum.TEXT,
+    FieldTypeEnum.EMAIL,
+    FieldTypeEnum.PASSWORD,
+    FieldTypeEnum.TEL,
+    FieldTypeEnum.URL,
+    FieldTypeEnum.SEARCH,
+    FieldTypeEnum.TEXTAREA,
+    FieldTypeEnum.SELECT,
+    FieldTypeEnum.CHECKBOX,
+    FieldTypeEnum.RADIO,
   ];
 
   canUpdate(field: DetectedField): boolean {
@@ -97,7 +108,7 @@ export class ReactFieldUpdater implements FieldUpdateStrategy {
       return {
         success: false,
         strategy: this.name,
-        error: (error as Error).message,
+        error: getErrorMessage(error),
       };
     }
   }
@@ -251,16 +262,16 @@ export class ReactFieldUpdater implements FieldUpdateStrategy {
 export class AngularFieldUpdater implements FieldUpdateStrategy {
   readonly name = 'angular-field-updater';
   readonly supportedTypes: FieldType[] = [
-    'text',
-    'email',
-    'password',
-    'tel',
-    'url',
-    'search',
-    'textarea',
-    'select',
-    'checkbox',
-    'radio',
+    FieldTypeEnum.TEXT,
+    FieldTypeEnum.EMAIL,
+    FieldTypeEnum.PASSWORD,
+    FieldTypeEnum.TEL,
+    FieldTypeEnum.URL,
+    FieldTypeEnum.SEARCH,
+    FieldTypeEnum.TEXTAREA,
+    FieldTypeEnum.SELECT,
+    FieldTypeEnum.CHECKBOX,
+    FieldTypeEnum.RADIO,
   ];
 
   canUpdate(field: DetectedField): boolean {
@@ -293,7 +304,7 @@ export class AngularFieldUpdater implements FieldUpdateStrategy {
       return {
         success: false,
         strategy: this.name,
-        error: (error as Error).message,
+        error: getErrorMessage(error),
       };
     }
   }
@@ -306,10 +317,9 @@ export class AngularFieldUpdater implements FieldUpdateStrategy {
 
     // Trigger Angular's zone detection
     try {
-      const fwWindow = window as unknown as FrameworkDetectionWindow;
-      if (fwWindow.ng && hasProperty(fwWindow.ng, 'getComponent')) {
-        const ngGlobal = fwWindow.ng as unknown as AngularNgGlobal;
-        const component = ngGlobal.getComponent?.(element);
+      const fwWindow = getFrameworkWindow();
+      if (fwWindow.ng && isAngularNgGlobal(fwWindow.ng)) {
+        const component = fwWindow.ng.getComponent?.(element);
         if (component?.ngZone) {
           component.ngZone.run(() => {
             // Force change detection
@@ -329,16 +339,16 @@ export class AngularFieldUpdater implements FieldUpdateStrategy {
 export class VueFieldUpdater implements FieldUpdateStrategy {
   readonly name = 'vue-field-updater';
   readonly supportedTypes: FieldType[] = [
-    'text',
-    'email',
-    'password',
-    'tel',
-    'url',
-    'search',
-    'textarea',
-    'select',
-    'checkbox',
-    'radio',
+    FieldTypeEnum.TEXT,
+    FieldTypeEnum.EMAIL,
+    FieldTypeEnum.PASSWORD,
+    FieldTypeEnum.TEL,
+    FieldTypeEnum.URL,
+    FieldTypeEnum.SEARCH,
+    FieldTypeEnum.TEXTAREA,
+    FieldTypeEnum.SELECT,
+    FieldTypeEnum.CHECKBOX,
+    FieldTypeEnum.RADIO,
   ];
 
   canUpdate(field: DetectedField): boolean {
@@ -371,7 +381,7 @@ export class VueFieldUpdater implements FieldUpdateStrategy {
       return {
         success: false,
         strategy: this.name,
-        error: (error as Error).message,
+        error: getErrorMessage(error),
       };
     }
   }
@@ -384,11 +394,8 @@ export class VueFieldUpdater implements FieldUpdateStrategy {
 
     // Try to trigger Vue's reactivity system
     try {
-      if (hasProperty(element, '__vue__')) {
-        const vueElement = element as VueElement;
-        if (vueElement.__vue__?.$forceUpdate) {
-          vueElement.__vue__.$forceUpdate();
-        }
+      if (isVueElement(element) && element.__vue__?.$forceUpdate) {
+        element.__vue__.$forceUpdate();
       }
     } catch {
       // Ignore if Vue instance is not available

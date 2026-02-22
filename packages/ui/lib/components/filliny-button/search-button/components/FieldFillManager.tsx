@@ -4,6 +4,7 @@ import { detectFormLikeContainers } from '../detectionHelpers';
 import { formFillStore, StreamingPhase } from '../stores';
 import { runTestModeFill } from '../testModeHelpers';
 import { unifiedFieldRegistry } from '../unifiedFieldDetection';
+import { FieldTypeEnum } from '@extension/shared';
 import { useEffect, useState, useCallback, useRef } from 'react';
 import type { FieldButtonData } from '../unifiedFieldDetection';
 import type { Field } from '@extension/shared';
@@ -65,7 +66,8 @@ export const FieldFillManager: React.FC<FieldFillManagerProps> = ({ canFillForms
 
       const rect = element.getBoundingClientRect();
       const isCheckableInput =
-        element instanceof HTMLInputElement && (element.type === 'checkbox' || element.type === 'radio');
+        element instanceof HTMLInputElement &&
+        (element.type === FieldTypeEnum.CHECKBOX || element.type === FieldTypeEnum.RADIO);
 
       if (!isCheckableInput && (rect.width === 0 || rect.height === 0)) return false;
       if (element.getAttribute('aria-hidden') === 'true' || element.getAttribute('role') === 'presentation')

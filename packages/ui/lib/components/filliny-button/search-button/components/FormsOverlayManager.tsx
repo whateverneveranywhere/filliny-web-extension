@@ -1,7 +1,7 @@
 import { unifiedShadowDOM } from '../../../../utils/unified-shadow-dom';
 import { FormsOverlay } from '../FormsOverlay';
 import type { ComponentInjectionConfig } from '../../../../utils/unified-shadow-dom';
-import type { OverlayPosition } from '../types';
+import type { OverlayPosition } from '@extension/shared';
 
 interface FormsOverlayManagerConfig {
   formId: string;

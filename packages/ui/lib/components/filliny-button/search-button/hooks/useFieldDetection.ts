@@ -1,5 +1,7 @@
+import { countBy } from '../core/utils';
 import { detectFormLikeContainers } from '../detectionHelpers';
 import { unifiedFieldRegistry } from '../unifiedFieldDetection';
+import { FieldTypeEnum } from '@extension/shared';
 import { useEffect, useState, useCallback, useRef } from 'react';
 import type { FieldButtonData } from '../unifiedFieldDetection';
 
@@ -45,7 +47,8 @@ const isElementVisibleAndInteractive = (element: HTMLElement): boolean => {
     // Check if element has dimensions or is a functional radio/checkbox
     const rect = element.getBoundingClientRect();
     const isCheckableInput =
-      element instanceof HTMLInputElement && (element.type === 'checkbox' || element.type === 'radio');
+      element instanceof HTMLInputElement &&
+      (element.type === FieldTypeEnum.CHECKBOX || element.type === FieldTypeEnum.RADIO);
 
     // Allow checkable inputs even if they have zero dimensions (they might be custom styled)
     if (!isCheckableInput && (rect.width === 0 || rect.height === 0)) {
@@ -131,13 +134,7 @@ export const useFieldDetection = (): UseFieldDetectionReturn => {
           console.log(`Container ${containerId}: ${containerFieldButtons.length} field buttons created`);
 
           // Debug: log field types
-          const fieldTypes = containerFieldButtons.reduce(
-            (acc, btn) => {
-              acc[btn.field.type] = (acc[btn.field.type] || 0) + 1;
-              return acc;
-            },
-            {} as Record<string, number>,
-          );
+          const fieldTypes = countBy(containerFieldButtons, btn => btn.field.type);
           console.log(`Field button types for ${containerId}:`, fieldTypes);
 
           allFieldButtons.push(...containerFieldButtons);

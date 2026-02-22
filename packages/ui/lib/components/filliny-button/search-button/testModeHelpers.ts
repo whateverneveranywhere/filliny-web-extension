@@ -1,5 +1,7 @@
+import { generateTestFilesForAcceptTypes, parseAcceptTypes } from './field-types/file';
 import { updateFormFields } from './fieldUpdaterHelpers';
-import type { AcceptType, Field, FileUploadData } from '@extension/shared';
+import { FieldTypeEnum } from '@extension/shared';
+import type { Field, FileUploadData } from '@extension/shared';
 
 /**
  * Generate test file based on field metadata and accept types
@@ -21,7 +23,7 @@ const generateTestFileForField = (field: Field): string | string[] => {
   if (element) {
     const acceptAttr = element.getAttribute('accept');
     if (acceptAttr) {
-      const parsedTypes = parseAcceptAttribute(acceptAttr);
+      const parsedTypes = parseAcceptTypes(acceptAttr);
       const testFiles = generateTestFilesForAcceptTypes(parsedTypes, element.multiple);
       return element.multiple ? testFiles : testFiles[0];
     }
@@ -37,141 +39,6 @@ const generateTestFileForField = (field: Field): string | string[] => {
 };
 
 /**
- * Generate test files based on accept types
- */
-const generateTestFilesForAcceptTypes = (acceptTypes: AcceptType[], isMultiple: boolean = false): string[] => {
-  const testFiles: string[] = [];
-
-  // Sample filenames by category
-  const categorySamples: Record<AcceptType['category'], string[]> = {
-    image: ['test-photo.jpg', 'test-image.png', 'test-graphic.svg'],
-    document: ['test-document.pdf', 'test-report.docx', 'test-spreadsheet.xlsx'],
-    video: ['test-video.mp4', 'test-clip.mov', 'test-recording.webm'],
-    audio: ['test-audio.mp3', 'test-song.wav', 'test-recording.ogg'],
-    archive: ['test-archive.zip', 'test-backup.tar.gz', 'test-files.rar'],
-    text: ['test-notes.txt', 'test-data.csv', 'test-config.json'],
-    other: ['test-file.bin', 'test-data.dat'],
-  };
-
-  // Group accept types by category
-  const categories = acceptTypes.reduce(
-    (acc, type) => {
-      if (!acc[type.category]) {
-        acc[type.category] = [];
-      }
-      acc[type.category].push(type);
-      return acc;
-    },
-    {} as Record<AcceptType['category'], AcceptType[]>,
-  );
-
-  // Generate test files for each category
-  for (const [category, types] of Object.entries(categories)) {
-    const samples = categorySamples[category as AcceptType['category']] || ['test-file.txt'];
-
-    // If specific extensions are specified, use them
-    const extensionTypes = types.filter(t => t.type === 'extension');
-    if (extensionTypes.length > 0) {
-      for (const extType of extensionTypes) {
-        testFiles.push(`test-${category}.${extType.value}`);
-        if (isMultiple && testFiles.length < 3) {
-          testFiles.push(`test-${category}-2.${extType.value}`);
-        }
-      }
-    } else {
-      // Use default samples for the category
-      testFiles.push(...samples.slice(0, isMultiple ? 2 : 1));
-    }
-  }
-
-  // Add default files if nothing matched
-  if (testFiles.length === 0) {
-    testFiles.push('test-document.pdf');
-    if (isMultiple) {
-      testFiles.push('test-image.jpg', 'test-data.xlsx');
-    }
-  }
-
-  // Remove duplicates and limit to reasonable number
-  const uniqueFiles = [...new Set(testFiles)];
-  return isMultiple ? uniqueFiles.slice(0, 3) : [uniqueFiles[0]];
-};
-
-/**
- * Parse accept attribute value into structured accept types
- */
-const parseAcceptAttribute = (acceptValue: string): AcceptType[] => {
-  if (!acceptValue || acceptValue.trim() === '') {
-    return [];
-  }
-
-  return acceptValue
-    .split(',')
-    .map(item => item.trim())
-    .filter(item => item !== '')
-    .map(item => {
-      const trimmed = item.trim();
-
-      if (trimmed.startsWith('.')) {
-        // File extension
-        const extension = trimmed.substring(1).toLowerCase();
-        return {
-          type: 'extension' as const,
-          value: extension,
-          category: categorizeFileType(extension),
-        };
-      } else {
-        // MIME type
-        const mimeType = trimmed.toLowerCase();
-        return {
-          type: 'mime' as const,
-          value: mimeType,
-          category: categorizeMimeType(mimeType),
-        };
-      }
-    });
-};
-
-/**
- * Categorize file type by extension
- */
-const categorizeFileType = (extension: string): AcceptType['category'] => {
-  const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg', 'ico', 'tiff', 'tif', 'heic', 'heif'];
-  const documentExts = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'odt', 'ods', 'odp', 'rtf'];
-  const audioExts = ['mp3', 'wav', 'ogg', 'flac', 'aac', 'wma', 'm4a'];
-  const videoExts = ['mp4', 'avi', 'mov', 'wmv', 'flv', 'webm', 'mkv', 'm4v'];
-  const archiveExts = ['zip', 'rar', 'tar', 'gz', '7z', 'bz2'];
-  const textExts = ['txt', 'csv', 'json', 'xml', 'html', 'htm', 'css', 'js', 'ts', 'md', 'yaml', 'yml'];
-
-  if (imageExts.includes(extension)) return 'image';
-  if (documentExts.includes(extension)) return 'document';
-  if (audioExts.includes(extension)) return 'audio';
-  if (videoExts.includes(extension)) return 'video';
-  if (archiveExts.includes(extension)) return 'archive';
-  if (textExts.includes(extension)) return 'text';
-  return 'other';
-};
-
-/**
- * Categorize MIME type
- */
-const categorizeMimeType = (mimeType: string): AcceptType['category'] => {
-  if (mimeType.startsWith('image/')) return 'image';
-  if (mimeType.startsWith('audio/')) return 'audio';
-  if (mimeType.startsWith('video/')) return 'video';
-  if (mimeType.startsWith('text/')) return 'text';
-  if (
-    mimeType.includes('pdf') ||
-    mimeType.includes('document') ||
-    mimeType.includes('spreadsheet') ||
-    mimeType.includes('presentation')
-  )
-    return 'document';
-  if (mimeType.includes('zip') || mimeType.includes('compressed')) return 'archive';
-  return 'other';
-};
-
-/**
  * Generate appropriate test values for different field types
  * This is used by both form-level and field-level test mode filling
  */
@@ -181,7 +48,7 @@ export const generateTestValue = (field: Field): string | string[] => {
 
   switch (type) {
     // Basic input types
-    case 'text':
+    case FieldTypeEnum.TEXT:
       // Use label-based intelligent values when available
       if (field.label) {
         const label = field.label.toLowerCase();
@@ -249,42 +116,42 @@ export const generateTestValue = (field: Field): string | string[] => {
 
       return 'Test input';
 
-    case 'password':
+    case FieldTypeEnum.PASSWORD:
       return 'P@ssw0rd123';
 
-    case 'email':
+    case FieldTypeEnum.EMAIL:
       return 'test@example.com';
 
-    case 'tel':
+    case FieldTypeEnum.TEL:
       return '+1-555-0123';
 
-    case 'url':
+    case FieldTypeEnum.URL:
       return 'https://example.com';
 
-    case 'search':
+    case FieldTypeEnum.SEARCH:
       return 'search query';
 
     // Date and time inputs
-    case 'date':
+    case FieldTypeEnum.DATE:
       return now.toISOString().split('T')[0];
 
-    case 'datetime-local':
+    case FieldTypeEnum.DATETIME_LOCAL:
       return now.toISOString().slice(0, 16);
 
-    case 'month':
+    case FieldTypeEnum.MONTH:
       return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
-    case 'week': {
+    case FieldTypeEnum.WEEK: {
       const weekNum = Math.ceil((now.getDate() + 6) / 7);
       return `${now.getFullYear()}-W${String(weekNum).padStart(2, '0')}`;
     }
 
-    case 'time':
+    case FieldTypeEnum.TIME:
       return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 
     // Numeric inputs
-    case 'number':
-    case 'range': {
+    case FieldTypeEnum.NUMBER:
+    case FieldTypeEnum.RANGE: {
       const min = field.validation?.min ?? 0;
       const max = field.validation?.max ?? 100;
       const step = field.validation?.step ?? 1;
@@ -292,14 +159,14 @@ export const generateTestValue = (field: Field): string | string[] => {
     }
 
     // Color input
-    case 'color':
+    case FieldTypeEnum.COLOR:
       return '#FF0000';
 
     // Complex input types
-    case 'file':
+    case FieldTypeEnum.FILE:
       return generateTestFileForField(field);
 
-    case 'checkbox': {
+    case FieldTypeEnum.CHECKBOX: {
       // If this is a checkbox group, return array of values
       if (field.options && field.options.length > 1) {
         // Select 1-2 random options for checkbox groups
@@ -312,7 +179,7 @@ export const generateTestValue = (field: Field): string | string[] => {
       return Math.random() > 0.5 ? 'true' : 'false';
     }
 
-    case 'radio': {
+    case FieldTypeEnum.RADIO: {
       if (field.options?.length) {
         // For radio groups, prefer non-placeholder options
         const nonPlaceholders = field.options.filter(opt => {
@@ -332,7 +199,7 @@ export const generateTestValue = (field: Field): string | string[] => {
       return 'true';
     }
 
-    case 'select': {
+    case FieldTypeEnum.SELECT: {
       if (!field.options?.length) return '';
 
       // Check for a select element to examine options and determine if multi-select
@@ -373,14 +240,14 @@ export const generateTestValue = (field: Field): string | string[] => {
       return isMultiple ? ['option1'] : 'option1';
     }
 
-    case 'textarea':
+    case FieldTypeEnum.TEXTAREA:
       // Provide a longer multi-line sample for textareas to ensure they visibly update
       return `This is a sample textarea content for testing purposes.\nThis form field supports multiple lines of text.\nFeel free to edit this example text.`;
 
-    case 'button':
+    case FieldTypeEnum.BUTTON:
       return 'Click me';
 
-    case 'fieldset':
+    case FieldTypeEnum.FIELDSET:
       return '';
 
     default:

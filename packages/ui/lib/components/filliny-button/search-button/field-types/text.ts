@@ -6,11 +6,13 @@ import {
   setNativeValue,
   invokeReactOnChange,
   ensureFocus,
+  simulatePaste,
 } from './utils';
 import {
   Framework,
   TEXT_INPUT_TYPES,
   INPUT_TYPES,
+  FieldTypeEnum,
   detectFrameworkForElement,
   detectUILibrary,
   detectVue,
@@ -48,15 +50,36 @@ interface CKEditorHostElement extends HTMLElement {
 }
 
 /**
+ * CKEditor 5 container element with `__ckeditorInstance` on `.ck-editor` wrapper
+ */
+interface CKEditorContainerElement extends HTMLElement {
+  __ckeditorInstance?: CKEditorInstance;
+}
+
+/**
+ * CKEditor 4 global `CKEDITOR.instances` map
+ */
+interface CKEditor4Static {
+  instances: Record<string, CKEditorInstance | undefined>;
+}
+
+interface CKEditor4Window extends Window {
+  CKEDITOR?: CKEditor4Static;
+}
+
+/**
  * TinyMCE editor instance returned by `tinymce.get(id)`
  */
 interface TinyMCEEditorInstance {
+  id: string;
   setContent: (content: string) => void;
   getContent: () => string;
 }
 
 interface TinyMCEStatic {
   get: (id: string) => TinyMCEEditorInstance | null;
+  activeEditor?: TinyMCEEditorInstance | null;
+  editors: TinyMCEEditorInstance[];
 }
 
 interface TinyMCEWindow extends Window {
@@ -69,10 +92,24 @@ interface TinyMCEWindow extends Window {
 interface QuillInstance {
   setText: (text: string) => void;
   getText: () => string;
+  clipboard?: {
+    dangerouslyPasteHTML: (html: string) => void;
+  };
 }
 
 interface QuillHostElement extends HTMLElement {
   __quill?: QuillInstance;
+}
+
+/**
+ * Quill static class with `.find()` method
+ */
+interface QuillStatic {
+  find: (element: HTMLElement) => QuillInstance | null;
+}
+
+interface QuillWindow extends Window {
+  Quill?: QuillStatic;
 }
 
 /**
@@ -101,10 +138,97 @@ interface ProseMirrorHostElement extends HTMLElement {
 }
 
 /**
+ * Trix editor element (`<trix-editor>`) and its internal editor API
+ */
+interface TrixEditorInterface {
+  loadHTML: (html: string) => void;
+  insertString: (text: string) => void;
+  getDocument: () => { toString: () => string };
+}
+
+interface TrixEditorElement extends HTMLElement {
+  editor?: TrixEditorInterface;
+}
+
+/**
+ * Monaco editor (VS Code editor) interfaces
+ */
+interface MonacoTextModel {
+  setValue: (value: string) => void;
+  getValue: () => string;
+}
+
+interface MonacoEditorStatic {
+  getModels: () => MonacoTextModel[];
+}
+
+interface MonacoStatic {
+  editor: MonacoEditorStatic;
+}
+
+interface MonacoWindow extends Window {
+  monaco?: MonacoStatic;
+}
+
+/**
+ * CodeMirror 5 instance attached via `.CodeMirror` on the wrapper element
+ */
+interface CodeMirror5Instance {
+  setValue: (value: string) => void;
+  getValue: () => string;
+}
+
+interface CodeMirror5Element extends HTMLElement {
+  CodeMirror?: CodeMirror5Instance;
+}
+
+/**
+ * CodeMirror 6 view accessed via `.cmView.view` on `.cm-editor` element
+ */
+interface CodeMirror6Transaction {
+  changes: { from: number; to: number; insert: string };
+}
+
+interface CodeMirror6Doc {
+  length: number;
+}
+
+interface CodeMirror6State {
+  doc: CodeMirror6Doc;
+}
+
+interface CodeMirror6View {
+  state: CodeMirror6State;
+  dispatch: (spec: CodeMirror6Transaction) => void;
+}
+
+interface CodeMirror6ViewDesc {
+  view: CodeMirror6View;
+}
+
+interface CodeMirror6Element extends HTMLElement {
+  cmView?: CodeMirror6ViewDesc;
+}
+
+/**
  * Lit element with reactive update lifecycle
  */
 interface LitElement extends Element {
   requestUpdate: () => void;
+}
+
+/**
+ * Svelte 3/4 component instance attached to a DOM element
+ */
+interface SvelteComponentInstance {
+  $set?: (props: Record<string, string | number | boolean | null>) => void;
+}
+
+/**
+ * Svelte meta object attached to a DOM element via `__svelte_meta`
+ */
+interface SvelteMeta {
+  component?: SvelteComponentInstance;
 }
 
 // ============================================================================
@@ -228,7 +352,7 @@ const detectInputField = async (
 
     // Skip hidden and disabled inputs
     if (
-      element.type === 'hidden' ||
+      element.type === FieldTypeEnum.HIDDEN ||
       element.disabled ||
       element.readOnly ||
       element.getAttribute('aria-hidden') === 'true' ||
@@ -239,7 +363,7 @@ const detectInputField = async (
     }
 
     // Create field based on input type
-    const fieldType = element.type as string;
+    const fieldType = element.type;
     const field = await createBaseField(element, baseIndex + i, fieldType, testMode);
 
     // Add input-specific metadata
@@ -251,7 +375,7 @@ const detectInputField = async (
     if (element.maxLength > 0) field.validation.maxLength = element.maxLength;
     if (element.minLength > 0) field.validation.minLength = element.minLength;
 
-    if (element.type === 'number' || element.type === 'range') {
+    if (element.type === FieldTypeEnum.NUMBER || element.type === FieldTypeEnum.RANGE) {
       field.validation = field.validation || {};
       field.validation.min = element.min ? Number(element.min) : undefined;
       field.validation.max = element.max ? Number(element.max) : undefined;
@@ -318,7 +442,10 @@ const detectInputField = async (
 const updateTextField = async (element: HTMLElement, value: string): Promise<void> => {
   try {
     // Safety check: Don't apply text updates to checkbox/radio elements
-    if (element instanceof HTMLInputElement && (element.type === 'checkbox' || element.type === 'radio')) {
+    if (
+      element instanceof HTMLInputElement &&
+      (element.type === FieldTypeEnum.CHECKBOX || element.type === FieldTypeEnum.RADIO)
+    ) {
       console.warn(`updateTextField called on ${element.type} element, ignoring to prevent design breakage`);
       return;
     }
@@ -357,8 +484,8 @@ const updateTextField = async (element: HTMLElement, value: string): Promise<voi
       if (element.maxLength > 0 && normalizedValue.length > element.maxLength) {
         normalizedValue = normalizedValue.substring(0, element.maxLength);
       }
-      // Set value directly and dispatch events
-      element.value = normalizedValue;
+      // Use setNativeValue as the primary mechanism
+      setNativeValue(element, normalizedValue);
       dispatchEvent(element, 'input');
       dispatchEvent(element, 'change');
 
@@ -373,13 +500,23 @@ const updateTextField = async (element: HTMLElement, value: string): Promise<voi
         console.debug('Native event dispatch error:', e);
       }
 
-      // If the value didn't set, try a secondary approach
+      // If the value didn't set, try execCommand('insertText') as a fallback
       if (element.value !== normalizedValue) {
-        // For stubborn textareas, try with selection approach
-        element.focus();
-        element.select();
-        document.execCommand('insertText', false, normalizedValue);
+        try {
+          element.focus();
+          element.select();
+          document.execCommand('selectAll', false);
+          document.execCommand('insertText', false, normalizedValue);
+        } catch {
+          // Last resort: direct assignment
+          element.focus();
+          element.select();
+          element.value = normalizedValue;
+        }
       }
+
+      // Run silent verification and retry if needed
+      await verifyAndRetryTextFill(element, normalizedValue);
 
       return;
     } else if (element instanceof HTMLInputElement) {
@@ -497,6 +634,8 @@ const updateTextField = async (element: HTMLElement, value: string): Promise<voi
       console.log('Element is inside Shadow DOM, using appropriate update strategy');
     }
 
+    let frameworkHandled = false;
+
     // Handle React components (including Next.js, etc.)
     if (detectedFramework === Framework.REACT || detectReact(element)) {
       console.log('Detected React component, using enhanced update strategy', {
@@ -504,77 +643,87 @@ const updateTextField = async (element: HTMLElement, value: string): Promise<voi
         formLibrary: detectedFormLibrary,
       });
       await handleReactTextInput(element, normalizedValue, { isReact: true, type: 'unknown' });
-      return;
+      frameworkHandled = true;
     }
 
     // Handle Vue components
-    if (detectedFramework === Framework.VUE || detectVue(element)) {
+    if (!frameworkHandled && (detectedFramework === Framework.VUE || detectVue(element))) {
       console.log('Detected Vue component, using Vue-specific update strategy');
       await handleVueTextInput(element, normalizedValue);
-      return;
+      frameworkHandled = true;
     }
 
     // Handle Angular components
-    if (detectedFramework === Framework.ANGULAR || detectAngular(element)) {
+    if (!frameworkHandled && (detectedFramework === Framework.ANGULAR || detectAngular(element))) {
       console.log('Detected Angular component, using enhanced update strategy');
       await handleAngularTextInput(element, normalizedValue);
-      return;
+      frameworkHandled = true;
     }
 
     // Handle Svelte components
-    if (detectedFramework === Framework.SVELTE || detectSvelte(element)) {
+    if (!frameworkHandled && (detectedFramework === Framework.SVELTE || detectSvelte(element))) {
       console.log('Detected Svelte component, using Svelte-specific update strategy');
       await handleSvelteTextInput(element, normalizedValue);
-      return;
+      frameworkHandled = true;
     }
 
     // Handle Qwik components
-    if (detectedFramework === Framework.QWIK || detectQwik(element)) {
+    if (!frameworkHandled && (detectedFramework === Framework.QWIK || detectQwik(element))) {
       console.log('Detected Qwik component, using Qwik-specific update strategy');
       await handleQwikTextInput(element, normalizedValue);
-      return;
+      frameworkHandled = true;
     }
 
     // Handle new framework-specific components
-    let frameworkResult = false;
-    switch (detectedFramework) {
-      case Framework.ALPINE:
-        frameworkResult = await handleAlpineTextInput(element, normalizedValue);
-        break;
-      case Framework.HTMX:
-        frameworkResult = await handleHTMXTextInput(element, normalizedValue);
-        break;
-      case Framework.KNOCKOUT:
-        frameworkResult = await handleKnockoutTextInput(element, normalizedValue);
-        break;
-      case Framework.LIT:
-        frameworkResult = await handleLitTextInput(element, normalizedValue);
-        break;
-      case Framework.PREACT:
-        frameworkResult = await handlePreactTextInput(element, normalizedValue);
-        break;
-      case Framework.SOLID:
-        frameworkResult = await handleSolidTextInput(element, normalizedValue);
-        break;
-      case Framework.EMBER:
-        frameworkResult = await handleEmberTextInput(element, normalizedValue);
-        break;
-      default:
-        break;
-    }
-
-    if (frameworkResult) {
-      return;
+    if (!frameworkHandled) {
+      let frameworkResult = false;
+      switch (detectedFramework) {
+        case Framework.ALPINE:
+          frameworkResult = await handleAlpineTextInput(element, normalizedValue);
+          break;
+        case Framework.HTMX:
+          frameworkResult = await handleHTMXTextInput(element, normalizedValue);
+          break;
+        case Framework.KNOCKOUT:
+          frameworkResult = await handleKnockoutTextInput(element, normalizedValue);
+          break;
+        case Framework.LIT:
+          frameworkResult = await handleLitTextInput(element, normalizedValue);
+          break;
+        case Framework.PREACT:
+          frameworkResult = await handlePreactTextInput(element, normalizedValue);
+          break;
+        case Framework.SOLID:
+          frameworkResult = await handleSolidTextInput(element, normalizedValue);
+          break;
+        case Framework.EMBER:
+          frameworkResult = await handleEmberTextInput(element, normalizedValue);
+          break;
+        default:
+          break;
+      }
+      if (frameworkResult) {
+        frameworkHandled = true;
+      }
     }
 
     // If no special frameworks detected, use standard approach with simulateTyping
-    await simulateTyping(element, normalizedValue);
+    if (!frameworkHandled) {
+      await simulateTyping(element, normalizedValue);
+    }
+
+    // Silent verification: check if the value persisted after framework handler ran
+    const verified = await verifyAndRetryTextFill(element, normalizedValue);
+    if (!verified) {
+      console.debug('updateTextField: framework handler did not persist value, trying handleGenericFramework');
+      await handleGenericFramework(element, normalizedValue);
+    }
   } catch (error) {
     console.error('Error updating text field:', error);
     // Fallback to direct value setting if simulation fails
     try {
-      if (element instanceof HTMLInputElement) {
-        element.value = value;
+      if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
+        setNativeValue(element, value);
         dispatchEvent(element, 'input');
         dispatchEvent(element, 'change');
       }
@@ -586,7 +735,7 @@ const updateTextField = async (element: HTMLElement, value: string): Promise<voi
         try {
           console.log('Final attempt for textarea');
           element.focus();
-          element.value = value;
+          setNativeValue(element, value);
           // Force blur and focus to trigger change detection
           element.blur();
           element.focus();
@@ -887,9 +1036,6 @@ const handleGenericReactComponent = async (element: HTMLElement, value: string):
 };
 
 /**
- * Trigger React state updates using synthetic events
- */
-/**
  * Wait for React's reconciler to process and verify the value stuck.
  * React processes events in microtasks, so we wait a frame + microtask
  * to check if the value survived React's re-render.
@@ -904,6 +1050,174 @@ const waitAndVerifyValue = async (
   return element.value === expectedValue;
 };
 
+/**
+ * Silently verify if the value persisted in the DOM after a fill attempt.
+ * Waits for a microtask flush + requestAnimationFrame to let frameworks reconcile.
+ */
+const verifyValue = async (element: HTMLElement, expected: string): Promise<boolean> => {
+  await new Promise(r => setTimeout(r, 0));
+  await new Promise(r => requestAnimationFrame(() => r(undefined)));
+  if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
+    return element.value === expected;
+  }
+  if (element.isContentEditable) {
+    return (element.textContent || '').trim() === expected.trim();
+  }
+  return false;
+};
+
+/**
+ * Escalation strategies ordered from least to most aggressive.
+ * Each strategy attempts a different approach to setting the value.
+ */
+const ESCALATION_STRATEGIES: Array<{
+  name: string;
+  apply: (element: HTMLInputElement | HTMLTextAreaElement, value: string) => void;
+}> = [
+  {
+    name: 'setNativeValue + InputEvent(insertReplacementText)',
+    apply: (element, value) => {
+      setNativeValue(element, value);
+      element.dispatchEvent(
+        new InputEvent('input', { bubbles: true, data: value, inputType: 'insertReplacementText' }),
+      );
+      element.dispatchEvent(new Event('change', { bubbles: true }));
+    },
+  },
+  {
+    name: 'setNativeValue + invokeReactOnChange',
+    apply: (element, value) => {
+      setNativeValue(element, value);
+      invokeReactOnChange(element);
+    },
+  },
+  {
+    name: 'setNativeValue + CompositionEvent sequence',
+    apply: (element, value) => {
+      setNativeValue(element, value);
+      element.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
+      element.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true, data: value }));
+      element.dispatchEvent(
+        new InputEvent('input', { bubbles: true, data: value, inputType: 'insertCompositionText' }),
+      );
+      element.dispatchEvent(new Event('change', { bubbles: true }));
+    },
+  },
+  {
+    name: 'execCommand(selectAll + insertText)',
+    apply: (element, value) => {
+      element.focus();
+      element.select();
+      document.execCommand('selectAll', false);
+      document.execCommand('insertText', false, value);
+    },
+  },
+  {
+    name: 'simulatePaste',
+    apply: (element, value) => {
+      simulatePaste(element, value);
+    },
+  },
+];
+
+/**
+ * Verify that a text fill succeeded, and if not, escalate through
+ * progressively more aggressive strategies. Returns true if the value
+ * was eventually set successfully.
+ */
+const verifyAndRetryTextFill = async (element: HTMLElement, value: string): Promise<boolean> => {
+  // Only works for input/textarea elements
+  if (!(element instanceof HTMLInputElement) && !(element instanceof HTMLTextAreaElement)) {
+    // For contentEditable, just verify once
+    return verifyValue(element, value);
+  }
+
+  // Check if value already persisted
+  if (await verifyValue(element, value)) {
+    return true;
+  }
+
+  // Escalate through strategies
+  for (let attempt = 0; attempt < ESCALATION_STRATEGIES.length; attempt++) {
+    const strategy = ESCALATION_STRATEGIES[attempt];
+    console.debug(`verifyAndRetryTextFill: attempt ${attempt + 1} using "${strategy.name}"`);
+
+    try {
+      strategy.apply(element, value);
+    } catch (e) {
+      console.debug(`Strategy "${strategy.name}" threw:`, e);
+    }
+
+    if (await verifyValue(element, value)) {
+      console.debug(`verifyAndRetryTextFill: succeeded with "${strategy.name}"`);
+      return true;
+    }
+  }
+
+  // Final attempt: character-by-character typing
+  console.debug('verifyAndRetryTextFill: all strategies failed, trying character-by-character typing');
+  element.value = '';
+  element.focus();
+
+  for (let i = 0; i < value.length; i++) {
+    const char = value[i];
+    const partial = value.substring(0, i + 1);
+    setNativeValue(element, partial);
+    element.dispatchEvent(new InputEvent('input', { bubbles: true, data: char, inputType: 'insertText' }));
+    await new Promise(resolve => setTimeout(resolve, 10));
+  }
+  element.dispatchEvent(new Event('change', { bubbles: true }));
+
+  // One more check with requestAnimationFrame + microtask flush
+  await new Promise(r => setTimeout(r, 0));
+  await new Promise(r => requestAnimationFrame(() => r(undefined)));
+  await new Promise(r => setTimeout(r, 0));
+
+  return element.value === value;
+};
+
+/**
+ * Universal fallback that tries ALL strategies in sequence.
+ * Used when no framework-specific handler succeeded.
+ */
+const handleGenericFramework = async (element: HTMLElement, value: string): Promise<boolean> => {
+  if (!(element instanceof HTMLInputElement) && !(element instanceof HTMLTextAreaElement)) {
+    return false;
+  }
+
+  console.debug('handleGenericFramework: trying all strategies in sequence');
+
+  for (const strategy of ESCALATION_STRATEGIES) {
+    try {
+      strategy.apply(element, value);
+    } catch (e) {
+      console.debug(`handleGenericFramework: "${strategy.name}" threw:`, e);
+      continue;
+    }
+    if (await verifyValue(element, value)) {
+      console.debug(`handleGenericFramework: succeeded with "${strategy.name}"`);
+      return true;
+    }
+  }
+
+  // Character-by-character as final attempt
+  element.value = '';
+  element.focus();
+  for (let i = 0; i < value.length; i++) {
+    const char = value[i];
+    const partial = value.substring(0, i + 1);
+    setNativeValue(element, partial);
+    element.dispatchEvent(new InputEvent('input', { bubbles: true, data: char, inputType: 'insertText' }));
+    await new Promise(resolve => setTimeout(resolve, 10));
+  }
+  element.dispatchEvent(new Event('change', { bubbles: true }));
+
+  return verifyValue(element, value);
+};
+
+/**
+ * Trigger React state updates using synthetic events
+ */
 const triggerReactStateUpdate = async (element: HTMLElement, value: string): Promise<void> => {
   // For controlled components, we need to simulate user input to trigger state updates
   if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
@@ -1015,8 +1329,8 @@ const handleAngularTextInput = async (element: HTMLElement, value: string): Prom
     element.focus();
 
     // For Angular forms, we need to update the value and dispatch specific events
-    if (element instanceof HTMLInputElement) {
-      element.value = value;
+    if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
+      setNativeValue(element, value);
     } else if (element.isContentEditable) {
       element.textContent = value;
     }
@@ -1055,9 +1369,9 @@ const handleVueTextInput = async (element: HTMLElement, value: string): Promise<
     // Focus the element
     element.focus();
 
-    // For Vue, update the value and dispatch Vue-specific events
+    // For Vue, use setNativeValue as the primary mechanism
     if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
-      element.value = value;
+      setNativeValue(element, value);
     } else if (element.isContentEditable) {
       element.textContent = value;
     }
@@ -1098,9 +1412,9 @@ const handleSvelteTextInput = async (element: HTMLElement, value: string): Promi
     // Focus the element
     element.focus();
 
-    // For Svelte, update the value and dispatch events
+    // For Svelte, use setNativeValue as the primary mechanism
     if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
-      element.value = value;
+      setNativeValue(element, value);
     } else if (element.isContentEditable) {
       element.textContent = value;
     }
@@ -1120,7 +1434,34 @@ const handleSvelteTextInput = async (element: HTMLElement, value: string): Promi
     // For Svelte, also try the bind:value pattern
     // Svelte stores component references in the element
     if (hasProperty(element, '__svelte_component__') && element.__svelte_component__) {
-      console.log('Svelte component detected');
+      console.log('Svelte component detected via __svelte_component__');
+      // Try to trigger $set if available (Svelte 3/4 pattern)
+      const comp = element.__svelte_component__ as SvelteComponentInstance;
+      if (typeof comp.$set === 'function') {
+        try {
+          comp.$set({ value });
+          console.debug('Svelte $set invoked via __svelte_component__');
+        } catch (e) {
+          console.debug('Svelte $set invocation failed:', e);
+        }
+      }
+    }
+
+    // Detect __svelte_meta and try to access the component from there
+    if (hasProperty(element, '__svelte_meta')) {
+      console.log('Svelte component detected via __svelte_meta');
+      const meta = element.__svelte_meta as SvelteMeta;
+      if (meta && typeof meta === 'object' && meta.component) {
+        const comp = meta.component;
+        if (typeof comp.$set === 'function') {
+          try {
+            comp.$set({ value });
+            console.debug('Svelte $set invoked via __svelte_meta');
+          } catch (e) {
+            console.debug('Svelte $set invocation via __svelte_meta failed:', e);
+          }
+        }
+      }
     }
 
     // Small delay for Svelte's reactivity to process
@@ -1140,9 +1481,9 @@ const handleQwikTextInput = async (element: HTMLElement, value: string): Promise
     // Focus the element
     element.focus();
 
-    // For Qwik, update the value and dispatch events
+    // For Qwik, use setNativeValue as the primary mechanism
     if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
-      element.value = value;
+      setNativeValue(element, value);
     } else if (element.isContentEditable) {
       element.textContent = value;
     }
@@ -1193,8 +1534,8 @@ const handleNextjsComponent = async (element: HTMLElement, value: string): Promi
     }
 
     // Handle form updates with Next.js specific patterns
-    if (element instanceof HTMLInputElement) {
-      element.value = value;
+    if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
+      setNativeValue(element, value);
 
       // Next.js forms often use router for submissions
       await triggerReactEvents(element, ['focus', 'input', 'change', 'blur']);
@@ -1220,9 +1561,9 @@ const handleReact18ConcurrentComponent = async (element: HTMLElement, value: str
   try {
     console.log('Handling React 18+ concurrent component');
 
-    if (element instanceof HTMLInputElement) {
+    if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
       // For concurrent mode, use startTransition pattern
-      element.value = value;
+      setNativeValue(element, value);
 
       // Trigger events with consideration for concurrent features
       await triggerReactEvents(element, ['focus']);
@@ -1230,7 +1571,7 @@ const handleReact18ConcurrentComponent = async (element: HTMLElement, value: str
       // Simulate gradual typing for concurrent mode
       for (let i = 0; i <= value.length; i++) {
         const partialValue = value.substring(0, i);
-        element.value = partialValue;
+        setNativeValue(element, partialValue);
 
         const inputEvent = new InputEvent('input', {
           bubbles: true,
@@ -1260,8 +1601,8 @@ const handleReactQueryComponent = async (element: HTMLElement, value: string): P
   try {
     console.log('Handling React Query component');
 
-    if (element instanceof HTMLInputElement) {
-      element.value = value;
+    if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
+      setNativeValue(element, value);
       await triggerReactEvents(element, ['focus', 'input', 'change', 'blur']);
 
       // React Query might invalidate queries on form changes
@@ -1281,8 +1622,8 @@ const handleReduxToolkitComponent = async (element: HTMLElement, value: string):
   try {
     console.log('Handling Redux Toolkit component');
 
-    if (element instanceof HTMLInputElement) {
-      element.value = value;
+    if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
+      setNativeValue(element, value);
 
       // Redux Toolkit components often use controlled inputs with dispatch actions
       await triggerReactEvents(element, ['focus', 'input', 'change', 'blur']);
@@ -1303,8 +1644,8 @@ const handleZustandComponent = async (element: HTMLElement, value: string): Prom
   try {
     console.log('Handling Zustand component');
 
-    if (element instanceof HTMLInputElement) {
-      element.value = value;
+    if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
+      setNativeValue(element, value);
       await triggerReactEvents(element, ['focus', 'input', 'change', 'blur']);
     }
   } catch (error) {
@@ -1320,8 +1661,8 @@ const handleJotaiComponent = async (element: HTMLElement, value: string): Promis
   try {
     console.log('Handling Jotai component');
 
-    if (element instanceof HTMLInputElement) {
-      element.value = value;
+    if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
+      setNativeValue(element, value);
       await triggerReactEvents(element, ['focus', 'input', 'change', 'blur']);
     }
   } catch (error) {
@@ -1337,8 +1678,8 @@ const handleRecoilComponent = async (element: HTMLElement, value: string): Promi
   try {
     console.log('Handling Recoil component');
 
-    if (element instanceof HTMLInputElement) {
-      element.value = value;
+    if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
+      setNativeValue(element, value);
       await triggerReactEvents(element, ['focus', 'input', 'change', 'blur']);
     }
   } catch (error) {
@@ -1374,116 +1715,557 @@ const waitForNextjsHydration = async (): Promise<void> =>
     checkHydration();
   });
 
+// ============================================================================
+// Content Editable - Editor-Specific Helpers
+// ============================================================================
+
 /**
- * Handle contentEditable elements like rich text editors
+ * Verify that a contentEditable element's content starts with the expected value.
+ * Waits a microtask + animation frame to let frameworks process.
+ */
+const verifyContentEditable = async (element: HTMLElement, value: string): Promise<boolean> => {
+  await new Promise(resolve => setTimeout(resolve, 0));
+  await new Promise(resolve => requestAnimationFrame(() => resolve(undefined)));
+  const actual = (element.textContent || element.innerText || '').trim();
+  const expected = value.trim();
+  // Check if first 20 chars match (handles trailing whitespace/formatting)
+  return actual.substring(0, 20) === expected.substring(0, 20);
+};
+
+/**
+ * Try CKEditor 4 and 5 APIs with multiple detection strategies.
+ */
+const tryCKEditor = (element: HTMLElement, value: string): boolean => {
+  // Strategy 1: CKEditor 5 via element.ckeditorInstance
+  if ('ckeditorInstance' in element) {
+    try {
+      const ckElement = element as CKEditorHostElement;
+      if (ckElement.ckeditorInstance) {
+        ckElement.ckeditorInstance.setData(value);
+        return true;
+      }
+    } catch {
+      /* fall through */
+    }
+  }
+
+  // Strategy 2: CKEditor 5 via walking up DOM for .ck-editor with __ckeditorInstance
+  try {
+    const ckContainer = element.closest<CKEditorContainerElement>('.ck-editor');
+    if (ckContainer?.__ckeditorInstance) {
+      ckContainer.__ckeditorInstance.setData(value);
+      return true;
+    }
+  } catch {
+    /* fall through */
+  }
+
+  // Strategy 3: CKEditor 5 inline via .ck-editor__editable
+  if (element.classList.contains('ck-editor__editable') || element.closest('.ck-editor__editable')) {
+    try {
+      const editableEl =
+        element.closest<CKEditorHostElement>('.ck-editor__editable') ?? (element as CKEditorHostElement);
+      if (editableEl.ckeditorInstance) {
+        editableEl.ckeditorInstance.setData(value);
+        return true;
+      }
+    } catch {
+      /* fall through */
+    }
+  }
+
+  // Strategy 4: CKEditor 4 via global CKEDITOR.instances
+  try {
+    const ck4Window = window as CKEditor4Window;
+    if (ck4Window.CKEDITOR?.instances) {
+      const elementName = element.getAttribute('name') || element.id || '';
+      if (elementName) {
+        const instance = ck4Window.CKEDITOR.instances[elementName];
+        if (instance) {
+          instance.setData(value);
+          return true;
+        }
+      }
+      // Try all instances as last resort
+      const allInstances = Object.values(ck4Window.CKEDITOR.instances);
+      if (allInstances.length === 1 && allInstances[0]) {
+        allInstances[0].setData(value);
+        return true;
+      }
+    }
+  } catch {
+    /* fall through */
+  }
+
+  // Strategy 5: Global fallback - query selector for any CKEditor editable
+  try {
+    const globalCkEditable = document.querySelector<CKEditorHostElement>('.ck-editor__editable');
+    if (globalCkEditable?.ckeditorInstance && (globalCkEditable === element || globalCkEditable.contains(element))) {
+      globalCkEditable.ckeditorInstance.setData(value);
+      return true;
+    }
+  } catch {
+    /* fall through */
+  }
+
+  return false;
+};
+
+/**
+ * Try TinyMCE API with multiple detection strategies.
+ */
+const tryTinyMCE = (element: HTMLElement, value: string): boolean => {
+  if (!('tinymce' in window)) return false;
+
+  const tinymceWindow = window as TinyMCEWindow;
+  if (!tinymceWindow.tinymce) return false;
+
+  // Strategy 1: Try tinymce.get(id) with element's own ID
+  if (element.id) {
+    try {
+      const editor = tinymceWindow.tinymce.get(element.id);
+      if (editor) {
+        editor.setContent(value);
+        return true;
+      }
+    } catch {
+      /* fall through */
+    }
+  }
+
+  // Strategy 2: Try tinymce.get(id) with closest ID container
+  const closestId = element.closest('[id]')?.id;
+  if (closestId && closestId !== element.id) {
+    try {
+      const editor = tinymceWindow.tinymce.get(closestId);
+      if (editor) {
+        editor.setContent(value);
+        return true;
+      }
+    } catch {
+      /* fall through */
+    }
+  }
+
+  // Strategy 3: Try tinymce.activeEditor
+  try {
+    if (tinymceWindow.tinymce.activeEditor) {
+      tinymceWindow.tinymce.activeEditor.setContent(value);
+      return true;
+    }
+  } catch {
+    /* fall through */
+  }
+
+  // Strategy 4: Try tinymce.editors[0]
+  try {
+    const editors = tinymceWindow.tinymce.editors;
+    if (editors && editors.length > 0 && editors[0]) {
+      editors[0].setContent(value);
+      return true;
+    }
+  } catch {
+    /* fall through */
+  }
+
+  // Strategy 5: Find by .tox-tinymce container
+  try {
+    const toxContainer = element.closest('.tox-tinymce');
+    if (toxContainer) {
+      const iframe = toxContainer.querySelector('iframe');
+      if (iframe?.id) {
+        // TinyMCE iframe ID is usually "{editorId}_ifr"
+        const editorId = iframe.id.replace(/_ifr$/, '');
+        const editor = tinymceWindow.tinymce.get(editorId);
+        if (editor) {
+          editor.setContent(value);
+          return true;
+        }
+      }
+    }
+  } catch {
+    /* fall through */
+  }
+
+  // Strategy 6: TinyMCE 6+ data-mce-id attribute
+  try {
+    const mceId = element.getAttribute('data-mce-id') || element.closest('[data-mce-id]')?.getAttribute('data-mce-id');
+    if (mceId) {
+      const editor = tinymceWindow.tinymce.get(mceId);
+      if (editor) {
+        editor.setContent(value);
+        return true;
+      }
+    }
+  } catch {
+    /* fall through */
+  }
+
+  return false;
+};
+
+/**
+ * Try Quill API with multiple detection strategies.
+ * Uses dangerouslyPasteHTML for HTML content, setText for plain text.
+ */
+const tryQuill = (element: HTMLElement, value: string): boolean => {
+  const isHTML = /<[^>]+>/.test(value);
+
+  const fillQuill = (quill: QuillInstance): boolean => {
+    if (isHTML && quill.clipboard?.dangerouslyPasteHTML) {
+      quill.clipboard.dangerouslyPasteHTML(value);
+    } else {
+      quill.setText(value);
+    }
+    return true;
+  };
+
+  // Strategy 1: element.__quill
+  if ('__quill' in element) {
+    try {
+      const quillElement = element as QuillHostElement;
+      if (quillElement.__quill) {
+        return fillQuill(quillElement.__quill);
+      }
+    } catch {
+      /* fall through */
+    }
+  }
+
+  // Strategy 2: Quill.find(element) via window.Quill
+  try {
+    const quillWindow = window as QuillWindow;
+    if (quillWindow.Quill?.find) {
+      const quill = quillWindow.Quill.find(element);
+      if (quill) {
+        return fillQuill(quill);
+      }
+    }
+  } catch {
+    /* fall through */
+  }
+
+  // Strategy 3: element.closest('.ql-container').__quill
+  try {
+    const qlContainer = element.closest<QuillHostElement>('.ql-container');
+    if (qlContainer?.__quill) {
+      return fillQuill(qlContainer.__quill);
+    }
+  } catch {
+    /* fall through */
+  }
+
+  // Strategy 4: element.closest('.ql-editor') parent's __quill
+  try {
+    const qlEditor = element.closest('.ql-editor');
+    if (qlEditor) {
+      const qlContainer = qlEditor.closest<QuillHostElement>('.ql-container');
+      if (qlContainer?.__quill) {
+        return fillQuill(qlContainer.__quill);
+      }
+    }
+  } catch {
+    /* fall through */
+  }
+
+  return false;
+};
+
+/**
+ * Try Trix editor API. Trix uses <trix-editor> custom element.
+ */
+const tryTrix = (element: HTMLElement, value: string): boolean => {
+  // Strategy 1: element IS a trix-editor
+  if (element.tagName.toLowerCase() === 'trix-editor') {
+    try {
+      const trixEl = element as TrixEditorElement;
+      if (trixEl.editor) {
+        const isHTML = /<[^>]+>/.test(value);
+        if (isHTML) {
+          trixEl.editor.loadHTML(value);
+        } else {
+          trixEl.editor.loadHTML('');
+          trixEl.editor.insertString(value);
+        }
+        return true;
+      }
+    } catch {
+      /* fall through */
+    }
+  }
+
+  // Strategy 2: Find closest trix-editor ancestor or child
+  try {
+    const trixEditor =
+      element.closest<TrixEditorElement>('trix-editor') ?? element.querySelector<TrixEditorElement>('trix-editor');
+    if (trixEditor?.editor) {
+      const isHTML = /<[^>]+>/.test(value);
+      if (isHTML) {
+        trixEditor.editor.loadHTML(value);
+      } else {
+        trixEditor.editor.loadHTML('');
+        trixEditor.editor.insertString(value);
+      }
+      return true;
+    }
+  } catch {
+    /* fall through */
+  }
+
+  return false;
+};
+
+/**
+ * Try Monaco editor (VS Code) API via window.monaco.
+ */
+const tryMonaco = (element: HTMLElement, value: string): boolean => {
+  // Only attempt if element is inside a .monaco-editor container
+  if (!element.closest('.monaco-editor')) return false;
+
+  try {
+    const monacoWindow = window as MonacoWindow;
+    if (monacoWindow.monaco?.editor) {
+      const models = monacoWindow.monaco.editor.getModels();
+      if (models.length > 0 && models[0]) {
+        models[0].setValue(value);
+        return true;
+      }
+    }
+  } catch {
+    /* fall through */
+  }
+
+  return false;
+};
+
+/**
+ * Try CodeMirror 5 and 6 APIs.
+ */
+const tryCodeMirror = (element: HTMLElement, value: string): boolean => {
+  // CodeMirror 5: .CodeMirror property on wrapper element
+  try {
+    const cm5Wrapper = element.closest<CodeMirror5Element>('.CodeMirror');
+    if (cm5Wrapper?.CodeMirror) {
+      cm5Wrapper.CodeMirror.setValue(value);
+      return true;
+    }
+  } catch {
+    /* fall through */
+  }
+
+  // CodeMirror 6: .cmView.view on .cm-editor element
+  try {
+    const cm6Editor = element.closest<CodeMirror6Element>('.cm-editor') ?? (element as CodeMirror6Element);
+    if (cm6Editor.cmView?.view) {
+      const view = cm6Editor.cmView.view;
+      const docLength = view.state.doc.length;
+      view.dispatch({
+        changes: { from: 0, to: docLength, insert: value },
+      });
+      return true;
+    }
+  } catch {
+    /* fall through */
+  }
+
+  return false;
+};
+
+/**
+ * Try Draft.js editor. Draft.js uses [data-editor] with `DraftEditor` in class names.
+ */
+const tryDraftJs = (element: HTMLElement, value: string): boolean => {
+  const isDraft =
+    element.hasAttribute('data-editor') ||
+    element.closest('[data-editor]') !== null ||
+    element.className.includes('DraftEditor') ||
+    element.closest('.DraftEditor-root') !== null;
+
+  if (!isDraft) return false;
+
+  try {
+    element.focus();
+    // Select all content and replace
+    document.execCommand('selectAll', false);
+    document.execCommand('insertText', false, value);
+    return true;
+  } catch {
+    /* fall through */
+  }
+
+  return false;
+};
+
+/**
+ * Handle contentEditable elements like rich text editors.
+ *
+ * Phase 1: Try editor-specific APIs (CKEditor 4/5, TinyMCE, Quill,
+ *          ProseMirror/Tiptap, Slate, Trix, Monaco, CodeMirror, Draft.js)
+ *          with verification after each attempt.
+ *
+ * Phase 2: Generic contentEditable strategies with escalation:
+ *          execCommand -> Selection API -> innerHTML -> simulateTyping -> simulatePaste
  */
 const updateContentEditable = async (element: HTMLElement, value: string): Promise<void> => {
   try {
-    // Try CKEditor 5 API
-    if ('ckeditorInstance' in element) {
-      try {
-        const ckElement = element as CKEditorHostElement;
-        if (ckElement.ckeditorInstance) {
-          ckElement.ckeditorInstance.setData(value);
-          return;
-        }
-      } catch {
-        /* fall through */
-      }
+    // ================================================================
+    // Phase 1: Editor-specific APIs (ordered by popularity)
+    // ================================================================
+
+    // --- CKEditor 4 & 5 ---
+    if (tryCKEditor(element, value)) {
+      if (await verifyContentEditable(element, value)) return;
+      console.debug('CKEditor API returned success but verification failed, continuing...');
     }
 
-    // Try TinyMCE API
-    const tinymceId = element.id || element.closest('[id]')?.id;
-    if (tinymceId && 'tinymce' in window) {
-      try {
-        const tinymceWindow = window as TinyMCEWindow;
-        const editor = tinymceWindow.tinymce?.get(tinymceId);
-        if (editor) {
-          editor.setContent(value);
-          return;
-        }
-      } catch {
-        /* fall through */
-      }
+    // --- TinyMCE ---
+    if (tryTinyMCE(element, value)) {
+      if (await verifyContentEditable(element, value)) return;
+      console.debug('TinyMCE API returned success but verification failed, continuing...');
     }
 
-    // Try Quill API
-    if ('__quill' in element) {
-      try {
-        const quillElement = element as QuillHostElement;
-        if (quillElement.__quill) {
-          quillElement.__quill.setText(value);
-          return;
-        }
-      } catch {
-        /* fall through */
-      }
+    // --- Quill ---
+    if (tryQuill(element, value)) {
+      if (await verifyContentEditable(element, value)) return;
+      console.debug('Quill API returned success but verification failed, continuing...');
     }
 
-    // Try ProseMirror/Tiptap
-    if (element.classList.contains('ProseMirror')) {
+    // --- ProseMirror / Tiptap ---
+    if (element.classList.contains('ProseMirror') || element.closest('.ProseMirror')) {
       try {
-        const pmElement = element as ProseMirrorHostElement;
-        const view = pmElement.pmViewDesc?.view;
+        const pmEl = element.closest<ProseMirrorHostElement>('.ProseMirror') ?? (element as ProseMirrorHostElement);
+        const view = pmEl.pmViewDesc?.view;
         if (view) {
           const tr = view.state.tr.insertText(value, 0, view.state.doc.content.size);
           view.dispatch(tr);
-          return;
+          if (await verifyContentEditable(element, value)) return;
         }
       } catch {
         /* fall through */
       }
     }
 
-    // Try Slate
-    if (element.hasAttribute('data-slate-editor')) {
+    // --- Slate ---
+    if (element.hasAttribute('data-slate-editor') || element.closest('[data-slate-editor]')) {
       try {
-        element.focus();
-        document.execCommand('selectAll', false);
-        document.execCommand('insertText', false, value);
-        return;
+        const slateEl = element.hasAttribute('data-slate-editor')
+          ? element
+          : element.closest<HTMLElement>('[data-slate-editor]');
+        if (slateEl) {
+          slateEl.focus();
+          document.execCommand('selectAll', false);
+          document.execCommand('insertText', false, value);
+          if (await verifyContentEditable(element, value)) return;
+        }
       } catch {
         /* fall through */
       }
     }
 
-    // First check if we're dealing with a rich text editor
-    const isRichEditor =
-      element.closest('[class*="editor"]') !== null ||
-      element.closest('[class*="wysiwyg"]') !== null ||
-      element.closest('[class*="rich-text"]') !== null;
-
-    if (isRichEditor) {
-      console.log('Detected rich text editor, attempting appropriate update strategy');
-
-      // Focus the element first
-      element.focus();
-
-      // For CKEditor, TinyMCE and similar editors
-      if (window.document.querySelector('.ck-editor, .tox-tinymce, .trumbowyg')) {
-        // Use document.execCommand for these editors
-        document.execCommand('selectAll', false);
-        document.execCommand('insertText', false, value);
-      } else {
-        // Standard approach for other contentEditable elements
-        element.innerHTML = value.replace(/\n/g, '<br>');
-
-        // Dispatch appropriate events
-        dispatchEvent(element, 'input');
-        dispatchEvent(element, 'change');
-      }
-    } else {
-      // For simple contentEditable elements
-      await simulateTyping(element, value);
+    // --- Trix ---
+    if (tryTrix(element, value)) {
+      if (await verifyContentEditable(element, value)) return;
+      console.debug('Trix API returned success but verification failed, continuing...');
     }
+
+    // --- Monaco ---
+    if (tryMonaco(element, value)) {
+      if (await verifyContentEditable(element, value)) return;
+      console.debug('Monaco API returned success but verification failed, continuing...');
+    }
+
+    // --- CodeMirror 5 & 6 ---
+    if (tryCodeMirror(element, value)) {
+      if (await verifyContentEditable(element, value)) return;
+      console.debug('CodeMirror API returned success but verification failed, continuing...');
+    }
+
+    // --- Draft.js ---
+    if (tryDraftJs(element, value)) {
+      if (await verifyContentEditable(element, value)) return;
+      console.debug('Draft.js approach returned success but verification failed, continuing...');
+    }
+
+    // ================================================================
+    // Phase 2: Generic contentEditable strategies (escalating)
+    // ================================================================
+
+    // Ensure focus before all generic strategies
+    ensureFocus(element);
+
+    // Strategy 1: execCommand('insertText') after selectAll
+    try {
+      element.innerHTML = '';
+      document.execCommand('selectAll', false);
+      const success = document.execCommand('insertText', false, value);
+      if (success && (await verifyContentEditable(element, value))) return;
+    } catch {
+      /* fall through */
+    }
+
+    // Strategy 2: Selection API with Range
+    try {
+      element.innerHTML = '';
+      const selection = window.getSelection();
+      if (selection) {
+        const range = document.createRange();
+        range.selectNodeContents(element);
+        selection.removeAllRanges();
+        selection.addRange(range);
+        const textNode = document.createTextNode(value);
+        range.deleteContents();
+        range.insertNode(textNode);
+        // Collapse cursor to end
+        range.setStartAfter(textNode);
+        range.collapse(true);
+        selection.removeAllRanges();
+        selection.addRange(range);
+        dispatchEvent(element, 'input');
+        if (await verifyContentEditable(element, value)) return;
+      }
+    } catch {
+      /* fall through */
+    }
+
+    // Strategy 3: Set innerHTML directly with <br> for newlines
+    try {
+      element.innerHTML = value.replace(/\n/g, '<br>');
+      dispatchEvent(element, 'input');
+      dispatchEvent(element, 'change');
+      if (await verifyContentEditable(element, value)) return;
+    } catch {
+      /* fall through */
+    }
+
+    // Strategy 4: simulateTyping (character-by-character, slowest but most compatible)
+    try {
+      element.innerHTML = '';
+      await simulateTyping(element, value);
+      if (await verifyContentEditable(element, value)) return;
+    } catch {
+      /* fall through */
+    }
+
+    // Strategy 5: simulatePaste as last resort
+    try {
+      element.innerHTML = '';
+      ensureFocus(element);
+      simulatePaste(element, value);
+      if (await verifyContentEditable(element, value)) return;
+    } catch {
+      /* fall through */
+    }
+
+    // If nothing verified, log a warning - the last strategy's result stands
+    console.warn('updateContentEditable: all strategies attempted, content may not have been set correctly');
   } catch (error) {
     console.error('Error updating contentEditable element:', error);
-    // Fallback approach
+    // Emergency fallback
     try {
       element.innerHTML = value.replace(/\n/g, '<br>');
       dispatchEvent(element, 'input');
     } catch (fallbackError) {
-      console.error('Even fallback approach failed:', fallbackError);
+      console.error('Even emergency fallback failed:', fallbackError);
     }
   }
 };

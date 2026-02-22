@@ -7,7 +7,7 @@
 
 import { createBaseDetectedField, getFieldLabel } from '../core/field-detector';
 import { isValidFormField, detectFramework } from '../core/utils';
-import { Framework } from '@extension/shared';
+import { Framework, FieldTypeEnum } from '@extension/shared';
 import type { FieldDetectionStrategy, DetectedField } from '../core/types';
 
 // ============================================================================
@@ -129,24 +129,24 @@ export class ReactFieldStrategy implements FieldDetectionStrategy {
     const className = element.className.toLowerCase();
 
     // Material-UI patterns
-    if (className.includes('muitextfield')) return 'text';
-    if (className.includes('muiselect')) return 'select';
-    if (className.includes('muicheckbox')) return 'checkbox';
-    if (className.includes('muiradio')) return 'radio';
+    if (className.includes('muitextfield')) return FieldTypeEnum.TEXT;
+    if (className.includes('muiselect')) return FieldTypeEnum.SELECT;
+    if (className.includes('muicheckbox')) return FieldTypeEnum.CHECKBOX;
+    if (className.includes('muiradio')) return FieldTypeEnum.RADIO;
 
     // Ant Design patterns
-    if (className.includes('ant-input')) return 'text';
-    if (className.includes('ant-select')) return 'select';
-    if (className.includes('ant-checkbox')) return 'checkbox';
-    if (className.includes('ant-radio')) return 'radio';
+    if (className.includes('ant-input')) return FieldTypeEnum.TEXT;
+    if (className.includes('ant-select')) return FieldTypeEnum.SELECT;
+    if (className.includes('ant-checkbox')) return FieldTypeEnum.CHECKBOX;
+    if (className.includes('ant-radio')) return FieldTypeEnum.RADIO;
 
     // Generic patterns
-    if (className.includes('input')) return 'text';
-    if (className.includes('select') || className.includes('dropdown')) return 'select';
-    if (className.includes('checkbox')) return 'checkbox';
-    if (className.includes('radio')) return 'radio';
+    if (className.includes('input')) return FieldTypeEnum.TEXT;
+    if (className.includes('select') || className.includes('dropdown')) return FieldTypeEnum.SELECT;
+    if (className.includes('checkbox')) return FieldTypeEnum.CHECKBOX;
+    if (className.includes('radio')) return FieldTypeEnum.RADIO;
 
-    return 'text';
+    return FieldTypeEnum.TEXT;
   }
 
   private calculateReactConfidence(element: HTMLElement): number {
@@ -263,17 +263,17 @@ export class AngularFieldStrategy implements FieldDetectionStrategy {
     const className = element.className.toLowerCase();
 
     // Angular Material patterns
-    if (className.includes('mat-input')) return 'text';
-    if (className.includes('mat-select')) return 'select';
-    if (className.includes('mat-checkbox')) return 'checkbox';
-    if (className.includes('mat-radio')) return 'radio';
+    if (className.includes('mat-input')) return FieldTypeEnum.TEXT;
+    if (className.includes('mat-select')) return FieldTypeEnum.SELECT;
+    if (className.includes('mat-checkbox')) return FieldTypeEnum.CHECKBOX;
+    if (className.includes('mat-radio')) return FieldTypeEnum.RADIO;
 
     // Check form control attributes
     if (element.hasAttribute('type')) {
-      return element.getAttribute('type') || 'text';
+      return element.getAttribute('type') || FieldTypeEnum.TEXT;
     }
 
-    return 'text';
+    return FieldTypeEnum.TEXT;
   }
 
   private calculateAngularConfidence(element: HTMLElement): number {
@@ -373,16 +373,16 @@ export class VueFieldStrategy implements FieldDetectionStrategy {
     const className = element.className.toLowerCase();
 
     // Element UI patterns
-    if (className.includes('el-input')) return 'text';
-    if (className.includes('el-select')) return 'select';
-    if (className.includes('el-checkbox')) return 'checkbox';
-    if (className.includes('el-radio')) return 'radio';
+    if (className.includes('el-input')) return FieldTypeEnum.TEXT;
+    if (className.includes('el-select')) return FieldTypeEnum.SELECT;
+    if (className.includes('el-checkbox')) return FieldTypeEnum.CHECKBOX;
+    if (className.includes('el-radio')) return FieldTypeEnum.RADIO;
 
     // Vant UI patterns
-    if (className.includes('van-field')) return 'text';
-    if (className.includes('van-picker')) return 'select';
+    if (className.includes('van-field')) return FieldTypeEnum.TEXT;
+    if (className.includes('van-picker')) return FieldTypeEnum.SELECT;
 
-    return 'text';
+    return FieldTypeEnum.TEXT;
   }
 
   private calculateVueConfidence(element: HTMLElement): number {

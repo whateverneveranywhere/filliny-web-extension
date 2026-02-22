@@ -130,6 +130,3 @@ const StepperForm1 = () => {
 };
 
 export default StepperForm1;
-
-// Re-export WebsiteFormFields for backward compatibility
-export { WebsiteFormFields } from './WebsiteFormFields';

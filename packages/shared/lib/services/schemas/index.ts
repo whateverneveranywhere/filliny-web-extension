@@ -687,14 +687,44 @@ const HighlightFormsOptionsSchema = z.object({
 /**
  * Meta information attached to every API response
  */
-const ResponseMetaSchema = z
-  .object({
-    requestId: z.string().optional(),
-    timestamp: z.string().optional(),
-    version: z.string().optional(),
-    duration: z.number().optional(),
-  })
-  .passthrough();
+const ResponseMetaSchema = z.object({
+  requestId: z.string().optional(),
+  timestamp: z.string().optional(),
+  version: z.string().optional(),
+  duration: z.number().optional(),
+  rateLimit: z
+    .object({
+      remaining: z.number().optional(),
+      limit: z.number().optional(),
+      reset: z.number().optional(),
+    })
+    .optional(),
+  pagination: z
+    .object({
+      page: z.number().optional(),
+      pageSize: z.number().optional(),
+      total: z.number().optional(),
+      totalPages: z.number().optional(),
+    })
+    .optional(),
+});
+
+/**
+ * JSON-compatible value type for API response data.
+ * Covers all valid JSON types: primitives, arrays, and objects.
+ */
+type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
+
+const JsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
+  z.union([
+    z.string(),
+    z.number(),
+    z.boolean(),
+    z.null(),
+    z.array(JsonValueSchema),
+    z.record(z.string(), JsonValueSchema),
+  ]),
+);
 
 /**
  * API success envelope - all successful responses are wrapped in this shape.
@@ -702,7 +732,7 @@ const ResponseMetaSchema = z
  */
 const ApiSuccessEnvelopeSchema = z.object({
   success: z.literal(true),
-  data: z.unknown(),
+  data: JsonValueSchema,
   meta: ResponseMetaSchema.optional(),
 });
 
@@ -715,7 +745,9 @@ const ApiErrorEnvelopeSchema = z.object({
   error: z.object({
     code: z.string(),
     message: z.string(),
-    details: z.record(z.string(), z.unknown()).optional(),
+    details: z
+      .record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null(), z.array(z.string())]))
+      .optional(),
     validation: z
       .array(
         z.object({

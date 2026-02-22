@@ -107,8 +107,3 @@ export const cleanupSearchButton = (): void => {
 
 // Default export for the main component
 export default SearchButtonMain;
-
-// Export for legacy compatibility
-export { highlightForms } from './highlightForms';
-export { handleFormClick } from './handleFormClick';
-export { handleFieldFill } from './index';

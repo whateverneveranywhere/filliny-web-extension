@@ -1,9 +1,4 @@
-import {
-  unwrapApiEnvelope,
-  parseApiError,
-  detectQuotaErrorFromResponse,
-  detectQuotaErrorFromMessage,
-} from './schemas/index.js';
+import { unwrapApiEnvelope, parseApiError, detectQuotaErrorFromResponse } from './schemas/index.js';
 import { getConfig } from '../utils/index.js';
 import { authStorage } from '@extension/storage';
 import { z } from 'zod';
@@ -118,12 +113,6 @@ class ApiQuotaExceededError extends Error {
     return this.errorType === 'no_tokens' || this.errorType === 'no_free_forms';
   }
 }
-
-/**
- * Detect quota error type from error message
- * @deprecated Use detectQuotaErrorFromMessage from schemas instead
- */
-const detectQuotaErrorType = detectQuotaErrorFromMessage;
 
 const appConfig = getConfig();
 
@@ -387,7 +376,6 @@ export {
   ApiUnauthorizedError,
   ApiTimeoutError,
   ApiQuotaExceededError,
-  detectQuotaErrorType,
   ApiDefaultErrorSchema,
   ApiErrorDetailsSchema,
   ApiErrorResponseSchema,

@@ -1,10 +1,29 @@
 import { createBaseField, findRelatedRadioButtons, dispatchPointerClickSequence, ensureFocus } from './utils';
 import { getFieldLabel } from '../fieldUtils';
-import { createDebugLogger, isHTMLElement, isHTMLInputElement, queryInputElement } from '@extension/shared';
+import {
+  createDebugLogger,
+  isHTMLElement,
+  isHTMLInputElement,
+  queryInputElement,
+  FieldTypeEnum,
+} from '@extension/shared';
 import { z } from 'zod';
 import type { Field } from '@extension/shared';
 
 const debug = createDebugLogger('Checkable');
+
+// ============================================================================
+// Constants
+// ============================================================================
+
+/** Delay (ms) after clicking before checking verification */
+const VERIFICATION_DELAY_MS = 100;
+
+/** Delay (ms) for fallback click attempts */
+const FALLBACK_CLICK_DELAY_MS = 100;
+
+/** Maximum number of ancestor levels to search for clickable wrappers */
+const MAX_ANCESTOR_DEPTH = 5;
 
 // ============================================================================
 // Zod Schemas for Value Checking
@@ -38,9 +57,10 @@ const NumberValueSchema = z.number();
 const StringValueSchema = z.string();
 
 /**
- * Schema for array values
+ * Schema for array values containing primitives (strings, numbers, booleans)
+ * Used for checkbox/radio value matching where items are converted to strings
  */
-const ArrayValueSchema = z.array(z.unknown());
+const ArrayValueSchema = z.array(z.union([z.string(), z.number(), z.boolean(), z.null()]));
 
 // Extend Field type with checkable-specific properties
 interface CheckableField extends Field {
@@ -147,6 +167,281 @@ const matchesCheckboxValue = (optionValue: string, targetValue: unknown): boolea
   return false;
 };
 
+// ============================================================================
+// Clickable Target Discovery (Requirement 2)
+// ============================================================================
+
+/**
+ * Find the best clickable target for a given input element.
+ * Searches for associated labels, framework wrappers, and clickable ancestors.
+ * Returns the outermost clickable container rather than the raw input.
+ */
+const findClickableTarget = (element: HTMLElement): HTMLElement => {
+  // 1. Check for an associated <label> via the `for` attribute
+  if (element.id) {
+    const label = document.querySelector(`label[for="${element.id}"]`);
+    if (isHTMLElement(label)) {
+      debug.log(`findClickableTarget: found label[for="${element.id}"]`);
+      return label;
+    }
+  }
+
+  // 2. Check if the element is inside a <label>
+  const ancestorLabel = element.closest('label');
+  if (ancestorLabel && isHTMLElement(ancestorLabel)) {
+    debug.log('findClickableTarget: found ancestor <label>');
+    return ancestorLabel;
+  }
+
+  // 3. Check for framework-specific wrappers
+  const frameworkWrapper = findFrameworkWrapper(element);
+  if (frameworkWrapper) {
+    debug.log('findClickableTarget: found framework wrapper');
+    return frameworkWrapper;
+  }
+
+  // 4. Search for a generic clickable parent
+  const clickableWrapper = findClickableWrapper(element);
+  if (clickableWrapper) {
+    debug.log('findClickableTarget: found clickable wrapper');
+    return clickableWrapper;
+  }
+
+  // 5. Fallback: return the element itself
+  return element;
+};
+
+/**
+ * Detect framework-specific wrapper elements around a checkable input.
+ * Supports: Ant Design, Chakra UI, Bootstrap, MUI, Radix, Headless UI.
+ */
+const findFrameworkWrapper = (element: HTMLElement): HTMLElement | null => {
+  const frameworkSelectors = [
+    // Ant Design
+    '.ant-checkbox-wrapper',
+    '.ant-radio-wrapper',
+    '.ant-switch',
+    // Chakra UI
+    '.chakra-checkbox',
+    '.chakra-radio',
+    '.chakra-switch',
+    '[class*="chakra-checkbox"]',
+    '[class*="chakra-radio"]',
+    '[class*="chakra-switch"]',
+    // Bootstrap
+    '.form-check',
+    '.form-switch',
+    '.custom-control',
+    '.custom-switch',
+    // MUI
+    '.MuiSwitch-root',
+    '.MuiCheckbox-root',
+    '.MuiRadio-root',
+    '.MuiFormControlLabel-root',
+    // Radix UI
+    '[data-state][role="checkbox"]',
+    '[data-state][role="switch"]',
+    '[data-state][role="radio"]',
+    // Headless UI
+    '[data-headlessui-state]',
+  ];
+
+  for (const selector of frameworkSelectors) {
+    const wrapper = element.closest(selector);
+    if (wrapper && isHTMLElement(wrapper)) {
+      return wrapper;
+    }
+  }
+
+  return null;
+};
+
+/**
+ * Search up the DOM tree for a generic clickable wrapper element.
+ * Identifies elements with cursor:pointer, click handlers, or interactive roles.
+ */
+const findClickableWrapper = (element: HTMLElement): HTMLElement | null => {
+  let current = element.parentElement;
+  let depth = 0;
+
+  while (current && depth < MAX_ANCESTOR_DEPTH && current !== document.body) {
+    // Check for cursor:pointer in computed styles
+    try {
+      const computedStyle = window.getComputedStyle(current);
+      if (computedStyle.cursor === 'pointer') {
+        return current;
+      }
+    } catch {
+      // getComputedStyle can fail in some edge cases
+    }
+
+    // Check for click-related attributes
+    if (
+      current.getAttribute('onclick') ||
+      current.getAttribute('tabindex') === '0' ||
+      current.getAttribute('role') === 'button' ||
+      current.getAttribute('role') === 'checkbox' ||
+      current.getAttribute('role') === 'radio' ||
+      current.getAttribute('role') === 'switch'
+    ) {
+      return current;
+    }
+
+    current = current.parentElement;
+    depth++;
+  }
+
+  return null;
+};
+
+// ============================================================================
+// Verification Helpers (Requirement 3)
+// ============================================================================
+
+/**
+ * Verify whether an element is in the desired checked state.
+ * Checks native .checked, aria-checked, data-state, data-headlessui-state,
+ * and common CSS class patterns.
+ */
+const verifyCheckableState = (element: HTMLElement, desiredChecked: boolean): boolean => {
+  // Native input
+  if (element instanceof HTMLInputElement) {
+    return element.checked === desiredChecked;
+  }
+
+  // ARIA state
+  const ariaChecked = element.getAttribute('aria-checked');
+  if (ariaChecked !== null) {
+    return (ariaChecked === 'true') === desiredChecked;
+  }
+
+  // Radix UI data-state
+  const dataState = element.getAttribute('data-state');
+  if (dataState !== null) {
+    return (dataState === 'checked') === desiredChecked;
+  }
+
+  // Headless UI data-headlessui-state
+  const headlessState = element.getAttribute('data-headlessui-state');
+  if (headlessState !== null) {
+    return headlessState.includes('checked') === desiredChecked;
+  }
+
+  // Check within the element for a hidden native input
+  const hiddenInput = element.querySelector('input[type="checkbox"], input[type="radio"]');
+  if (hiddenInput instanceof HTMLInputElement) {
+    return hiddenInput.checked === desiredChecked;
+  }
+
+  // CSS class heuristics
+  const hasCheckedClass =
+    element.classList.contains('checked') ||
+    element.classList.contains('selected') ||
+    element.classList.contains('active') ||
+    element.classList.contains('Mui-checked') ||
+    element.classList.contains('ant-checkbox-checked') ||
+    element.classList.contains('ant-radio-checked') ||
+    element.classList.contains('ant-switch-checked');
+
+  return hasCheckedClass === desiredChecked;
+};
+
+/**
+ * Wait a short delay then verify the element state.
+ * Looks at both the element itself and nearby containers/parents.
+ */
+const waitAndVerify = async (element: HTMLElement, desiredChecked: boolean): Promise<boolean> => {
+  await new Promise(resolve => setTimeout(resolve, VERIFICATION_DELAY_MS));
+
+  // Check the element directly
+  if (verifyCheckableState(element, desiredChecked)) {
+    return true;
+  }
+
+  // Check parent containers (framework wrappers may hold the state)
+  const frameworkWrapper = findFrameworkWrapper(element);
+  if (frameworkWrapper && verifyCheckableState(frameworkWrapper, desiredChecked)) {
+    return true;
+  }
+
+  // Check for a controlled native input nearby
+  const controlledInput = findControlledInput(element);
+  if (controlledInput && controlledInput.checked === desiredChecked) {
+    return true;
+  }
+
+  return false;
+};
+
+// ============================================================================
+// Custom Toggle Detection (Requirement 8)
+// ============================================================================
+
+/**
+ * Detect whether an element looks like a custom iOS-style toggle switch.
+ * Checks for CSS transition on transform, border-radius making a circle,
+ * and small overall dimensions typical of toggle switches.
+ */
+const isCustomToggleElement = (element: HTMLElement): boolean => {
+  try {
+    const style = window.getComputedStyle(element);
+
+    // Check for transition on transform (sliding toggle indicator)
+    const transition = style.transition || style.getPropertyValue('transition');
+    const hasTransformTransition = transition.includes('transform') || transition.includes('left');
+
+    // Check for circular shape (toggle knob)
+    const borderRadius = style.borderRadius;
+    const isRound = borderRadius === '50%' || parseInt(borderRadius, 10) >= 10;
+
+    // Check for toggle-like dimensions
+    const rect = element.getBoundingClientRect();
+    const isToggleSized = rect.width >= 30 && rect.width <= 80 && rect.height >= 15 && rect.height <= 40;
+
+    // Check for toggle-related class names
+    const className = element.className.toLowerCase();
+    const hasToggleClass =
+      className.includes('toggle') ||
+      className.includes('switch') ||
+      className.includes('slider') ||
+      className.includes('knob');
+
+    // An element is likely a toggle if it has transition + round shape, or toggle classes
+    return (hasTransformTransition && isRound) || (isToggleSized && hasToggleClass);
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Capture a serialized snapshot of an element's current state.
+ * Used to detect whether a click actually changed something.
+ */
+const captureElementState = (element: HTMLElement): string => {
+  const parts: string[] = [];
+
+  if (element instanceof HTMLInputElement) {
+    parts.push(`checked:${element.checked}`);
+    parts.push(`value:${element.value}`);
+  }
+
+  parts.push(`aria-checked:${element.getAttribute('aria-checked')}`);
+  parts.push(`data-state:${element.getAttribute('data-state')}`);
+  parts.push(`classes:${element.className}`);
+
+  // Check child inputs
+  const childInput = element.querySelector('input[type="checkbox"], input[type="radio"]');
+  if (childInput instanceof HTMLInputElement) {
+    parts.push(`child-checked:${childInput.checked}`);
+  }
+
+  return parts.join('|');
+};
+
+// ============================================================================
+// Main Entry Point
+// ============================================================================
+
 /**
  * Update a checkbox or radio button input
  * This is the main entry point for updating checkable fields
@@ -180,24 +475,68 @@ const updateCheckable = async (element: HTMLElement, checked: boolean): Promise<
       if (result) return;
     }
 
+    // Ant Design (Requirement 5)
+    if (
+      element.closest('.ant-checkbox-wrapper') ||
+      element.closest('.ant-radio-wrapper') ||
+      element.closest('.ant-switch')
+    ) {
+      const result = await handleAntDesign(element, checked);
+      if (result) return;
+    }
+
+    // Chakra UI (Requirement 6)
+    if (
+      element.closest('.chakra-checkbox') ||
+      element.closest('.chakra-radio') ||
+      element.closest('.chakra-switch') ||
+      element.closest('[class*="chakra-checkbox"]') ||
+      element.closest('[class*="chakra-radio"]') ||
+      element.closest('[class*="chakra-switch"]')
+    ) {
+      const result = await handleChakraUI(element, checked);
+      if (result) return;
+    }
+
+    // Bootstrap toggle (Requirement 7)
+    if (
+      element.closest('.form-check') ||
+      element.closest('.form-switch') ||
+      element.closest('.custom-control') ||
+      element.closest('.custom-switch')
+    ) {
+      const result = await handleBootstrapToggle(element, checked);
+      if (result) return;
+    }
+
+    // iOS-style custom toggle (Requirement 8)
+    if (isCustomToggleElement(element) || (element.parentElement && isCustomToggleElement(element.parentElement))) {
+      const result = await handleCustomToggle(element, checked);
+      if (result) return;
+    }
+
     // Handle both native inputs and ARIA-based custom controls
-    if (element instanceof HTMLInputElement && (element.type === 'checkbox' || element.type === 'radio')) {
-      updateNativeCheckable(element, checked);
+    if (
+      element instanceof HTMLInputElement &&
+      (element.type === FieldTypeEnum.CHECKBOX || element.type === FieldTypeEnum.RADIO)
+    ) {
+      await updateNativeCheckable(element, checked);
     } else if (
-      element.getAttribute('role') === 'checkbox' ||
-      element.getAttribute('role') === 'radio' ||
+      element.getAttribute('role') === FieldTypeEnum.CHECKBOX ||
+      element.getAttribute('role') === FieldTypeEnum.RADIO ||
       element.getAttribute('role') === 'switch'
     ) {
-      updateAriaCheckable(element, checked);
+      await updateAriaCheckable(element, checked);
     } else {
-      // Attempt to handle custom components by looking for common patterns
-      updateCustomCheckable(element, checked);
+      // Universal fallback for unknown custom components (Requirement 10)
+      await updateWithUniversalFallback(element, checked);
     }
 
     // If this is a radio button and we're checking it, ensure that other radio buttons in the same group are unchecked
     if (
       checked &&
-      ((element instanceof HTMLInputElement && element.type === 'radio') || element.getAttribute('role') === 'radio')
+      ((element instanceof HTMLInputElement && element.type === FieldTypeEnum.RADIO) ||
+        element.getAttribute('role') === FieldTypeEnum.RADIO)
     ) {
       updateRelatedRadioButtons(element);
     }
@@ -206,73 +545,119 @@ const updateCheckable = async (element: HTMLElement, checked: boolean): Promise<
   }
 };
 
+// ============================================================================
+// Native Checkable Update (Requirement 1 - Click-first approach)
+// ============================================================================
+
 /**
- * Update a native checkbox or radio input
+ * Update a native checkbox or radio input using click-first behavior.
+ * Clicks the label or wrapper first, then falls back to direct property manipulation.
  */
-const updateNativeCheckable = (element: HTMLInputElement, checked: boolean): void => {
-  // First check if element is already in the desired state
+const updateNativeCheckable = async (element: HTMLInputElement, checked: boolean): Promise<void> => {
+  // Already in the desired state
   if (element.checked === checked) return;
 
-  // Update the checked state
+  // Strategy 1: Click the outermost clickable target (label, wrapper)
+  const clickTarget = findClickableTarget(element);
+  if (clickTarget !== element) {
+    debug.log('updateNativeCheckable: clicking label/wrapper instead of input');
+    ensureFocus(clickTarget);
+    dispatchPointerClickSequence(clickTarget);
+
+    const verified = await waitAndVerify(element, checked);
+    if (verified) {
+      debug.log('updateNativeCheckable: label/wrapper click succeeded');
+      return;
+    }
+  }
+
+  // Strategy 2: Click the input directly
+  debug.log('updateNativeCheckable: clicking input directly');
+  ensureFocus(element);
+  dispatchPointerClickSequence(element);
+
+  const verifiedAfterClick = await waitAndVerify(element, checked);
+  if (verifiedAfterClick) {
+    debug.log('updateNativeCheckable: direct click succeeded');
+    return;
+  }
+
+  // Strategy 3: Direct property manipulation (last resort)
+  debug.log('updateNativeCheckable: falling back to direct property manipulation');
   element.checked = checked;
 
-  // Dispatch appropriate events to trigger any event listeners
   const changeEvent = new Event('change', { bubbles: true });
   element.dispatchEvent(changeEvent);
 
   const inputEvent = new Event('input', { bubbles: true });
   element.dispatchEvent(inputEvent);
 
-  // Trigger click event only if state needs to change
-  if (element.checked !== checked) {
-    dispatchPointerClickSequence(element);
+  // Try React-style synthetic event via native setter
+  try {
+    const nativeSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'checked')?.set;
+    if (nativeSetter) {
+      nativeSetter.call(element, checked);
+      element.dispatchEvent(new Event('change', { bubbles: true }));
+      element.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+  } catch {
+    // Ignore setter errors
   }
 };
 
-/**
- * Update an ARIA-based checkbox or radio element
- */
-const updateAriaCheckable = (element: HTMLElement, checked: boolean): void => {
-  // Determine the role
-  const role = element.getAttribute('role');
+// ============================================================================
+// ARIA Checkable Update (Requirement 1 - Click-first approach)
+// ============================================================================
 
+/**
+ * Update an ARIA-based checkbox or radio element.
+ * Clicks the element first, then falls back to attribute manipulation.
+ */
+const updateAriaCheckable = async (element: HTMLElement, checked: boolean): Promise<void> => {
   // Get the current state
-  const currentChecked =
-    role === 'switch'
-      ? element.getAttribute('aria-checked') === 'true'
-      : element.getAttribute('aria-checked') === 'true';
+  const currentChecked = element.getAttribute('aria-checked') === 'true';
 
   // If already in desired state, return
   if (currentChecked === checked) return;
 
-  // Update the ARIA state
-  element.setAttribute('aria-checked', checked ? 'true' : 'false');
+  // Strategy 1: Click the outermost clickable target
+  const clickTarget = findClickableTarget(element);
+  ensureFocus(clickTarget);
+  dispatchPointerClickSequence(clickTarget);
 
-  // Look for an actual input that might be controlled by this ARIA element
-  const controlledInput = findControlledInput(element);
-  if (controlledInput) {
-    updateNativeCheckable(controlledInput, checked);
+  const verified = await waitAndVerify(element, checked);
+  if (verified) {
+    debug.log('updateAriaCheckable: click succeeded');
     return;
   }
 
-  // If no controlled input, simulate a click to trigger any bound event handlers
-  dispatchPointerClickSequence(element);
+  // Strategy 2: Try clicking the element itself if different from target
+  if (clickTarget !== element) {
+    ensureFocus(element);
+    dispatchPointerClickSequence(element);
 
-  // Update CSS classes based on common patterns
-  if (checked) {
-    element.classList.add('checked', 'selected', 'active');
-    element.classList.remove('unchecked');
-  } else {
-    element.classList.remove('checked', 'selected', 'active');
-    element.classList.add('unchecked');
+    const verifiedDirect = await waitAndVerify(element, checked);
+    if (verifiedDirect) {
+      debug.log('updateAriaCheckable: direct element click succeeded');
+      return;
+    }
   }
 
-  // Dispatch events
-  const changeEvent = new Event('change', { bubbles: true });
-  element.dispatchEvent(changeEvent);
+  // Strategy 3: Look for a controlled native input
+  const controlledInput = findControlledInput(element);
+  if (controlledInput) {
+    await updateNativeCheckable(controlledInput, checked);
+    // Sync aria-checked with the input state
+    element.setAttribute('aria-checked', checked ? 'true' : 'false');
+    return;
+  }
 
-  const inputEvent = new Event('input', { bubbles: true });
-  element.dispatchEvent(inputEvent);
+  // Strategy 4: Direct attribute manipulation (last resort)
+  debug.log('updateAriaCheckable: falling back to attribute manipulation');
+  element.setAttribute('aria-checked', checked ? 'true' : 'false');
+
+  // Update CSS classes
+  updateVisualIndicators(element, checked);
 };
 
 /**
@@ -330,66 +715,520 @@ const updateVisualIndicators = (element: HTMLElement, checked: boolean): void =>
   element.dispatchEvent(inputEvent);
 };
 
-/**
- * Attempt to update custom checkable components
- */
-const updateCustomCheckable = (element: HTMLElement, checked: boolean): void => {
-  // First, try to find a native input that might be associated with this element
-  let inputFound = false;
+// ============================================================================
+// Framework-Specific Handlers
+// ============================================================================
 
-  // Check if element contains an input
+/**
+ * Handle Headless UI Switch/Checkbox components
+ */
+const handleHeadlessUISwitch = async (element: HTMLElement, shouldBeChecked: boolean): Promise<boolean> => {
+  try {
+    const switchEl = element.closest<HTMLElement>('[data-headlessui-state]') ?? element;
+    const currentState =
+      switchEl.getAttribute('data-headlessui-state')?.includes('checked') ||
+      switchEl.getAttribute('aria-checked') === 'true';
+
+    if (currentState !== shouldBeChecked) {
+      // Click the switch element itself (Headless UI handles state internally)
+      const clickTarget = findClickableTarget(switchEl);
+      ensureFocus(clickTarget);
+      dispatchPointerClickSequence(clickTarget);
+
+      const verified = await waitAndVerify(switchEl, shouldBeChecked);
+      if (verified) return true;
+
+      // Fallback: click the switch directly
+      if (clickTarget !== switchEl) {
+        dispatchPointerClickSequence(switchEl);
+        return await waitAndVerify(switchEl, shouldBeChecked);
+      }
+
+      return false;
+    }
+    return true; // Already in desired state
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Handle Radix UI Checkbox components
+ */
+const handleRadixCheckbox = async (element: HTMLElement, shouldBeChecked: boolean): Promise<boolean> => {
+  try {
+    const checkEl = element.closest<HTMLElement>('[data-state]') ?? element;
+    const currentState = checkEl.getAttribute('data-state') === 'checked';
+
+    if (currentState !== shouldBeChecked) {
+      const clickTarget = findClickableTarget(checkEl);
+      ensureFocus(clickTarget);
+      dispatchPointerClickSequence(clickTarget);
+
+      const verified = await waitAndVerify(checkEl, shouldBeChecked);
+      if (verified) return true;
+
+      // Fallback: click the data-state element directly
+      if (clickTarget !== checkEl) {
+        dispatchPointerClickSequence(checkEl);
+        return await waitAndVerify(checkEl, shouldBeChecked);
+      }
+
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Handle Radix UI Switch components
+ */
+const handleRadixSwitch = async (element: HTMLElement, shouldBeChecked: boolean): Promise<boolean> => {
+  try {
+    const switchEl = element.closest<HTMLElement>('[data-state][role="switch"]') ?? element;
+    const currentState = switchEl.getAttribute('data-state') === 'checked';
+
+    if (currentState !== shouldBeChecked) {
+      const clickTarget = findClickableTarget(switchEl);
+      ensureFocus(clickTarget);
+      dispatchPointerClickSequence(clickTarget);
+
+      const verified = await waitAndVerify(switchEl, shouldBeChecked);
+      if (verified) return true;
+
+      // Fallback: click the switch directly
+      if (clickTarget !== switchEl) {
+        dispatchPointerClickSequence(switchEl);
+        return await waitAndVerify(switchEl, shouldBeChecked);
+      }
+
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Handle MUI Switch components (Requirement 9 - improved)
+ * Clicks the .MuiSwitch-root container first instead of finding the checkbox input.
+ */
+const handleMUISwitch = async (element: HTMLElement, shouldBeChecked: boolean): Promise<boolean> => {
+  try {
+    // Strategy 1: Click the .MuiSwitch-root container
+    const muiRoot =
+      element.closest<HTMLElement>('.MuiSwitch-root') || element.closest<HTMLElement>('.MuiFormControlLabel-root');
+
+    if (muiRoot) {
+      // Find the input to check current state
+      const input = muiRoot.querySelector<HTMLInputElement>('input[type="checkbox"]');
+      const currentChecked = input ? input.checked : element.classList.contains('Mui-checked');
+
+      if (currentChecked !== shouldBeChecked) {
+        ensureFocus(muiRoot);
+        dispatchPointerClickSequence(muiRoot);
+
+        const verified = await waitAndVerify(element, shouldBeChecked);
+        if (verified) return true;
+
+        // Strategy 2: Click the MuiSwitch-switchBase (the clickable thumb area)
+        const switchBase = muiRoot.querySelector<HTMLElement>('.MuiSwitch-switchBase');
+        if (switchBase) {
+          dispatchPointerClickSequence(switchBase);
+          const verifiedBase = await waitAndVerify(element, shouldBeChecked);
+          if (verifiedBase) return true;
+        }
+
+        // Strategy 3: Click the input directly
+        if (input && input.checked !== shouldBeChecked) {
+          ensureFocus(input);
+          dispatchPointerClickSequence(input);
+          await new Promise(resolve => setTimeout(resolve, VERIFICATION_DELAY_MS));
+
+          if (input.checked !== shouldBeChecked) {
+            // Last resort: direct manipulation
+            input.checked = shouldBeChecked;
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+          }
+        }
+
+        return input ? input.checked === shouldBeChecked : false;
+      }
+
+      return true; // Already in desired state
+    }
+
+    // No MUI root found - try finding input directly
+    const input =
+      element.querySelector<HTMLInputElement>('input[type="checkbox"]') ||
+      (element instanceof HTMLInputElement ? element : null);
+
+    if (!input) return false;
+
+    if (input.checked !== shouldBeChecked) {
+      ensureFocus(input);
+      dispatchPointerClickSequence(input);
+      await new Promise(resolve => setTimeout(resolve, VERIFICATION_DELAY_MS));
+
+      if (input.checked !== shouldBeChecked) {
+        input.checked = shouldBeChecked;
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+    }
+    return input.checked === shouldBeChecked;
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Handle Ant Design Checkbox/Radio/Switch components (Requirement 5)
+ * Clicks the .ant-checkbox-wrapper, .ant-radio-wrapper, or .ant-switch element.
+ */
+const handleAntDesign = async (element: HTMLElement, shouldBeChecked: boolean): Promise<boolean> => {
+  try {
+    // Find the Ant Design wrapper
+    const wrapper =
+      element.closest<HTMLElement>('.ant-checkbox-wrapper') ||
+      element.closest<HTMLElement>('.ant-radio-wrapper') ||
+      element.closest<HTMLElement>('.ant-switch');
+
+    if (!wrapper) return false;
+
+    // Determine current state
+    const isAntSwitch = wrapper.classList.contains('ant-switch');
+    const currentChecked = isAntSwitch
+      ? wrapper.classList.contains('ant-switch-checked')
+      : wrapper.classList.contains('ant-checkbox-checked') ||
+        wrapper.classList.contains('ant-radio-checked') ||
+        wrapper.querySelector('.ant-checkbox-checked, .ant-radio-checked') !== null;
+
+    // Also check via hidden input
+    const hiddenInput = wrapper.querySelector<HTMLInputElement>('input[type="checkbox"], input[type="radio"]');
+    const inputChecked = hiddenInput ? hiddenInput.checked : currentChecked;
+
+    if (inputChecked !== shouldBeChecked) {
+      // Click the wrapper (Ant Design handles state via React)
+      ensureFocus(wrapper);
+      dispatchPointerClickSequence(wrapper);
+
+      const verified = await waitAndVerify(element, shouldBeChecked);
+      if (verified) return true;
+
+      // Fallback: click the inner checkbox/radio/switch element
+      const innerTarget = wrapper.querySelector<HTMLElement>('.ant-checkbox, .ant-radio, .ant-switch-inner') ?? wrapper;
+
+      if (innerTarget !== wrapper) {
+        dispatchPointerClickSequence(innerTarget);
+        const verifiedInner = await waitAndVerify(element, shouldBeChecked);
+        if (verifiedInner) return true;
+      }
+
+      // Last resort: manipulate the hidden input
+      if (hiddenInput && hiddenInput.checked !== shouldBeChecked) {
+        hiddenInput.checked = shouldBeChecked;
+        hiddenInput.dispatchEvent(new Event('change', { bubbles: true }));
+        hiddenInput.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+
+      return hiddenInput ? hiddenInput.checked === shouldBeChecked : false;
+    }
+
+    return true; // Already in desired state
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Handle Chakra UI Checkbox/Radio/Switch components (Requirement 6)
+ * Clicks the chakra-checkbox/radio/switch container element.
+ */
+const handleChakraUI = async (element: HTMLElement, shouldBeChecked: boolean): Promise<boolean> => {
+  try {
+    // Find the Chakra wrapper
+    const wrapper =
+      element.closest<HTMLElement>('.chakra-checkbox') ||
+      element.closest<HTMLElement>('.chakra-radio') ||
+      element.closest<HTMLElement>('.chakra-switch') ||
+      element.closest<HTMLElement>('[class*="chakra-checkbox"]') ||
+      element.closest<HTMLElement>('[class*="chakra-radio"]') ||
+      element.closest<HTMLElement>('[class*="chakra-switch"]');
+
+    if (!wrapper) return false;
+
+    // Find the hidden input
+    const hiddenInput = wrapper.querySelector<HTMLInputElement>('input[type="checkbox"], input[type="radio"]');
+    const currentChecked = hiddenInput
+      ? hiddenInput.checked
+      : wrapper.getAttribute('data-checked') !== null || wrapper.getAttribute('aria-checked') === 'true';
+
+    if (currentChecked !== shouldBeChecked) {
+      // Chakra UI uses labels or the wrapper itself as click targets
+      const label = wrapper.querySelector<HTMLElement>('label');
+      const clickTarget = label || wrapper;
+
+      ensureFocus(clickTarget);
+      dispatchPointerClickSequence(clickTarget);
+
+      const verified = await waitAndVerify(element, shouldBeChecked);
+      if (verified) return true;
+
+      // Fallback: click the control element
+      const control = wrapper.querySelector<HTMLElement>('.chakra-checkbox__control, .chakra-switch__track');
+      if (control) {
+        dispatchPointerClickSequence(control);
+        const verifiedControl = await waitAndVerify(element, shouldBeChecked);
+        if (verifiedControl) return true;
+      }
+
+      // Last resort: manipulate the hidden input
+      if (hiddenInput && hiddenInput.checked !== shouldBeChecked) {
+        hiddenInput.checked = shouldBeChecked;
+        hiddenInput.dispatchEvent(new Event('change', { bubbles: true }));
+        hiddenInput.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+
+      return hiddenInput ? hiddenInput.checked === shouldBeChecked : false;
+    }
+
+    return true; // Already in desired state
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Handle Bootstrap toggle/checkbox/radio components (Requirement 7)
+ * Clicks the .form-check wrapper or the associated label.
+ */
+const handleBootstrapToggle = async (element: HTMLElement, shouldBeChecked: boolean): Promise<boolean> => {
+  try {
+    // Find the Bootstrap wrapper
+    const wrapper =
+      element.closest<HTMLElement>('.form-switch') ||
+      element.closest<HTMLElement>('.form-check') ||
+      element.closest<HTMLElement>('.custom-switch') ||
+      element.closest<HTMLElement>('.custom-control');
+
+    if (!wrapper) return false;
+
+    // Find the input
+    const input = wrapper.querySelector<HTMLInputElement>('input[type="checkbox"], input[type="radio"]');
+
+    if (!input) return false;
+
+    if (input.checked !== shouldBeChecked) {
+      // Bootstrap: clicking the label toggles the input
+      const label = wrapper.querySelector<HTMLElement>('.form-check-label, .custom-control-label, label');
+      const clickTarget = label || input;
+
+      ensureFocus(clickTarget);
+      dispatchPointerClickSequence(clickTarget);
+
+      const verified = await waitAndVerify(input, shouldBeChecked);
+      if (verified) return true;
+
+      // Fallback: click the input directly
+      if (clickTarget !== input) {
+        ensureFocus(input);
+        dispatchPointerClickSequence(input);
+
+        const verifiedInput = await waitAndVerify(input, shouldBeChecked);
+        if (verifiedInput) return true;
+      }
+
+      // Last resort: direct manipulation
+      input.checked = shouldBeChecked;
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+
+      return input.checked === shouldBeChecked;
+    }
+
+    return true; // Already in desired state
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Handle iOS-style custom toggle switches (Requirement 8)
+ * Detects elements with CSS transitions on transform, circular knobs, etc.
+ */
+const handleCustomToggle = async (element: HTMLElement, shouldBeChecked: boolean): Promise<boolean> => {
+  try {
+    // Find the toggle container (the element or its parent)
+    const toggleEl = isCustomToggleElement(element)
+      ? element
+      : element.parentElement && isCustomToggleElement(element.parentElement)
+        ? element.parentElement
+        : null;
+
+    if (!toggleEl) return false;
+
+    // Check for a hidden input inside the toggle
+    const hiddenInput = toggleEl.querySelector<HTMLInputElement>('input[type="checkbox"]');
+    const currentChecked = hiddenInput
+      ? hiddenInput.checked
+      : toggleEl.getAttribute('aria-checked') === 'true' ||
+        toggleEl.classList.contains('checked') ||
+        toggleEl.classList.contains('active') ||
+        toggleEl.classList.contains('on');
+
+    if (currentChecked !== shouldBeChecked) {
+      // Click the toggle
+      ensureFocus(toggleEl);
+      dispatchPointerClickSequence(toggleEl);
+
+      const verified = await waitAndVerify(toggleEl, shouldBeChecked);
+      if (verified) return true;
+
+      // Fallback: try clicking the knob/thumb
+      const knob = toggleEl.querySelector<HTMLElement>('.toggle-knob, .toggle-thumb, .slider, .knob, .thumb');
+      if (knob) {
+        dispatchPointerClickSequence(knob);
+        const verifiedKnob = await waitAndVerify(toggleEl, shouldBeChecked);
+        if (verifiedKnob) return true;
+      }
+
+      // Last resort: manipulate the hidden input
+      if (hiddenInput && hiddenInput.checked !== shouldBeChecked) {
+        hiddenInput.checked = shouldBeChecked;
+        hiddenInput.dispatchEvent(new Event('change', { bubbles: true }));
+        hiddenInput.dispatchEvent(new Event('input', { bubbles: true }));
+        return hiddenInput.checked === shouldBeChecked;
+      }
+
+      // Direct attribute manipulation
+      toggleEl.setAttribute('aria-checked', shouldBeChecked ? 'true' : 'false');
+      if (shouldBeChecked) {
+        toggleEl.classList.add('checked', 'active', 'on');
+        toggleEl.classList.remove('unchecked', 'off');
+      } else {
+        toggleEl.classList.remove('checked', 'active', 'on');
+        toggleEl.classList.add('unchecked', 'off');
+      }
+
+      return false; // Cannot confidently verify custom toggles with attribute manipulation
+    }
+
+    return true; // Already in desired state
+  } catch {
+    return false;
+  }
+};
+
+// ============================================================================
+// Universal Fallback (Requirement 10)
+// ============================================================================
+
+/**
+ * Universal fallback for custom toggle/checkbox/radio components.
+ * Progressively attempts: click element, click parent, click children, direct manipulation.
+ */
+const updateWithUniversalFallback = async (element: HTMLElement, checked: boolean): Promise<void> => {
+  // Capture initial state to detect changes
+  const initialState = captureElementState(element);
+
+  // Strategy 1: Find and click a native input inside
   const containedInput = queryInputElement(element, 'input[type="checkbox"], input[type="radio"]');
   if (containedInput) {
-    updateNativeCheckable(containedInput, checked);
-    inputFound = true;
-  }
-
-  // Check if element's parent contains an input
-  if (!inputFound && element.parentElement) {
-    const parentInput = queryInputElement(element.parentElement, 'input[type="checkbox"], input[type="radio"]');
-    if (parentInput && !parentInput.contains(element)) {
-      updateNativeCheckable(parentInput, checked);
-      inputFound = true;
+    await updateNativeCheckable(containedInput, checked);
+    const newState = captureElementState(element);
+    if (newState !== initialState) {
+      debug.log('updateWithUniversalFallback: contained input update succeeded');
+      return;
     }
   }
 
-  // Check for label that might be connected to an input
-  if (!inputFound && element.tagName === 'LABEL') {
+  // Strategy 2: Check for a label linked to an input
+  if (element.tagName === 'LABEL') {
     const labelFor = element.getAttribute('for');
     if (labelFor) {
       const linkedInput = document.getElementById(labelFor);
-      if (isHTMLInputElement(linkedInput) && (linkedInput.type === 'checkbox' || linkedInput.type === 'radio')) {
-        updateNativeCheckable(linkedInput, checked);
-        inputFound = true;
+      if (
+        isHTMLInputElement(linkedInput) &&
+        (linkedInput.type === FieldTypeEnum.CHECKBOX || linkedInput.type === FieldTypeEnum.RADIO)
+      ) {
+        await updateNativeCheckable(linkedInput, checked);
+        return;
       }
     }
   }
 
-  // If no input found, treat as a custom component
-  if (!inputFound) {
-    // Set custom data attribute to track state
-    element.setAttribute('data-filliny-checked', checked ? 'true' : 'false');
+  // Strategy 3: Click the element itself
+  ensureFocus(element);
+  dispatchPointerClickSequence(element);
+  await new Promise(resolve => setTimeout(resolve, FALLBACK_CLICK_DELAY_MS));
 
-    // Update classes based on common patterns
-    if (checked) {
-      element.classList.add('checked', 'selected', 'active');
-      element.classList.remove('unchecked');
-    } else {
-      element.classList.remove('checked', 'selected', 'active');
-      element.classList.add('unchecked');
-    }
+  const stateAfterClick = captureElementState(element);
+  if (stateAfterClick !== initialState) {
+    debug.log('updateWithUniversalFallback: element click succeeded (state changed)');
+    return;
+  }
 
-    // Trigger click if needed
-    const currentChecked =
-      element.classList.contains('checked') ||
-      element.classList.contains('selected') ||
-      element.classList.contains('active');
+  // Strategy 4: Click the parent element
+  if (element.parentElement && element.parentElement !== document.body) {
+    dispatchPointerClickSequence(element.parentElement);
+    await new Promise(resolve => setTimeout(resolve, FALLBACK_CLICK_DELAY_MS));
 
-    if (currentChecked !== checked) {
-      dispatchPointerClickSequence(element);
+    const stateAfterParentClick = captureElementState(element);
+    if (stateAfterParentClick !== initialState) {
+      debug.log('updateWithUniversalFallback: parent click succeeded (state changed)');
+      return;
     }
   }
+
+  // Strategy 5: Try clicking interactive children (buttons, links, etc.)
+  const interactiveChildren = element.querySelectorAll('button, a, [role="button"], [tabindex="0"]');
+  for (const child of Array.from(interactiveChildren)) {
+    if (isHTMLElement(child)) {
+      dispatchPointerClickSequence(child);
+      await new Promise(resolve => setTimeout(resolve, FALLBACK_CLICK_DELAY_MS));
+
+      const stateAfterChildClick = captureElementState(element);
+      if (stateAfterChildClick !== initialState) {
+        debug.log('updateWithUniversalFallback: child click succeeded (state changed)');
+        return;
+      }
+    }
+  }
+
+  // Strategy 6: Check parent for input siblings
+  if (element.parentElement) {
+    const parentInput = queryInputElement(element.parentElement, 'input[type="checkbox"], input[type="radio"]');
+    if (parentInput && !parentInput.contains(element)) {
+      await updateNativeCheckable(parentInput, checked);
+      return;
+    }
+  }
+
+  // Strategy 7: Direct manipulation (absolute last resort)
+  debug.log('updateWithUniversalFallback: all click strategies failed, using direct manipulation');
+  element.setAttribute('data-filliny-checked', checked ? 'true' : 'false');
+
+  if (checked) {
+    element.classList.add('checked', 'selected', 'active');
+    element.classList.remove('unchecked');
+  } else {
+    element.classList.remove('checked', 'selected', 'active');
+    element.classList.add('unchecked');
+  }
+
+  // Dispatch events
+  element.dispatchEvent(new Event('change', { bubbles: true }));
+  element.dispatchEvent(new Event('input', { bubbles: true }));
 };
+
+// ============================================================================
+// Radio Group Helpers (Requirement 4 - click LABELS not inputs)
+// ============================================================================
 
 /**
  * Find and update related radio buttons in the same group
@@ -456,6 +1295,10 @@ const findCommonContainer = (elements: HTMLElement[]): HTMLElement | null => {
   return null;
 };
 
+// ============================================================================
+// Field Detection
+// ============================================================================
+
 /**
  * Detect checkable fields with proper grouping
  * This is the main entry point for detecting radio and checkbox fields
@@ -474,10 +1317,14 @@ const detectCheckableFields = async (
 
   // Separate elements by type
   const radioElements = elements.filter(
-    el => (el instanceof HTMLInputElement && el.type === 'radio') || el.getAttribute('role') === 'radio',
+    el =>
+      (el instanceof HTMLInputElement && el.type === FieldTypeEnum.RADIO) ||
+      el.getAttribute('role') === FieldTypeEnum.RADIO,
   );
   const checkboxElements = elements.filter(
-    el => (el instanceof HTMLInputElement && el.type === 'checkbox') || el.getAttribute('role') === 'checkbox',
+    el =>
+      (el instanceof HTMLInputElement && el.type === FieldTypeEnum.CHECKBOX) ||
+      el.getAttribute('role') === FieldTypeEnum.CHECKBOX,
   );
   const switchElements = elements.filter(el => el.getAttribute('role') === 'switch');
 
@@ -542,6 +1389,10 @@ const detectCheckableFields = async (
   debug.log(`Detected ${fields.length} checkable fields total`);
   return fields;
 };
+
+// ============================================================================
+// Grouping Algorithms
+// ============================================================================
 
 /**
  * Enhanced grouping algorithm for radio elements with comprehensive fallback strategies
@@ -867,6 +1718,10 @@ const getContainerDepth = (container: HTMLElement): number => {
   return depth;
 };
 
+// ============================================================================
+// Field Creation
+// ============================================================================
+
 /**
  * Create a field for a radio group
  */
@@ -955,11 +1810,11 @@ const createRadioGroupField = async (
         // Pick a random valid option
         const randomIndex = Math.floor(Math.random() * validOptions.length);
         field.testValue = validOptions[randomIndex].value;
-        debug.log(`🎯 Generated random test value for radio group ${field.id}: ${field.testValue}`);
+        debug.log(`Generated random test value for radio group ${field.id}: ${field.testValue}`);
       } else {
         // Fallback to first option
         field.testValue = field.options[0].value;
-        debug.log(`🎯 Using first option as test value for radio group ${field.id}: ${field.testValue}`);
+        debug.log(`Using first option as test value for radio group ${field.id}: ${field.testValue}`);
       }
     }
   }
@@ -1074,106 +1929,11 @@ const createSwitchField = async (element: HTMLElement, index: number, testMode: 
   return field;
 };
 
-/**
- * Handle Headless UI Switch/Checkbox components
- */
-const handleHeadlessUISwitch = async (element: HTMLElement, shouldBeChecked: boolean): Promise<boolean> => {
-  try {
-    const switchEl = element.closest('[data-headlessui-state]') || element;
-    const currentState =
-      switchEl.getAttribute('data-headlessui-state')?.includes('checked') ||
-      switchEl.getAttribute('aria-checked') === 'true';
-
-    if (currentState !== shouldBeChecked) {
-      dispatchPointerClickSequence(switchEl as HTMLElement);
-      // Verify state changed
-      await new Promise(resolve => setTimeout(resolve, 100));
-      const newState =
-        switchEl.getAttribute('data-headlessui-state')?.includes('checked') ||
-        switchEl.getAttribute('aria-checked') === 'true';
-      return newState === shouldBeChecked;
-    }
-    return true; // Already in desired state
-  } catch {
-    return false;
-  }
-};
-
-/**
- * Handle Radix UI Checkbox components
- */
-const handleRadixCheckbox = async (element: HTMLElement, shouldBeChecked: boolean): Promise<boolean> => {
-  try {
-    const checkEl = element.closest('[data-state]') || element;
-    const currentState = checkEl.getAttribute('data-state') === 'checked';
-
-    if (currentState !== shouldBeChecked) {
-      dispatchPointerClickSequence(checkEl as HTMLElement);
-      // Verify state changed
-      await new Promise(resolve => setTimeout(resolve, 100));
-      const newState = checkEl.getAttribute('data-state') === 'checked';
-      return newState === shouldBeChecked;
-    }
-    return true;
-  } catch {
-    return false;
-  }
-};
-
-/**
- * Handle Radix UI Switch components
- */
-const handleRadixSwitch = async (element: HTMLElement, shouldBeChecked: boolean): Promise<boolean> => {
-  try {
-    const switchEl = element.closest('[data-state][role="switch"]') || element;
-    const currentState = switchEl.getAttribute('data-state') === 'checked';
-
-    if (currentState !== shouldBeChecked) {
-      dispatchPointerClickSequence(switchEl as HTMLElement);
-      await new Promise(resolve => setTimeout(resolve, 100));
-      const newState = switchEl.getAttribute('data-state') === 'checked';
-      return newState === shouldBeChecked;
-    }
-    return true;
-  } catch {
-    return false;
-  }
-};
-
-/**
- * Handle MUI Switch components
- */
-const handleMUISwitch = async (element: HTMLElement, shouldBeChecked: boolean): Promise<boolean> => {
-  try {
-    // MUI Switch wraps the actual input in ripple containers
-    const input =
-      (element.querySelector('input[type="checkbox"]') as HTMLInputElement | null) ||
-      (element instanceof HTMLInputElement ? element : null);
-
-    if (!input) return false;
-
-    if (input.checked !== shouldBeChecked) {
-      ensureFocus(input);
-      dispatchPointerClickSequence(input);
-      await new Promise(resolve => setTimeout(resolve, 50));
-
-      if (input.checked !== shouldBeChecked) {
-        input.checked = shouldBeChecked;
-        input.dispatchEvent(new Event('change', { bubbles: true }));
-        input.dispatchEvent(new Event('input', { bubbles: true }));
-      }
-    }
-    return input.checked === shouldBeChecked;
-  } catch {
-    return false;
-  }
-};
-
 // Testing utilities
 const __testing = {
   updateNativeCheckable,
   updateAriaCheckable,
-  updateCustomCheckable,
+  updateWithUniversalFallback,
   findControlledInput,
   updateVisualIndicators,
   updateRelatedRadioButtons,
@@ -1185,6 +1945,17 @@ const __testing = {
   handleRadixCheckbox,
   handleRadixSwitch,
   handleMUISwitch,
+  handleAntDesign,
+  handleChakraUI,
+  handleBootstrapToggle,
+  handleCustomToggle,
+  findClickableTarget,
+  verifyCheckableState,
+  findFrameworkWrapper,
+  findClickableWrapper,
+  isCustomToggleElement,
+  captureElementState,
+  waitAndVerify,
 };
 
 // ============================================================================
@@ -1200,5 +1971,11 @@ export {
   handleRadixCheckbox,
   handleRadixSwitch,
   handleMUISwitch,
+  handleAntDesign,
+  handleChakraUI,
+  handleBootstrapToggle,
+  handleCustomToggle,
+  findClickableTarget,
+  verifyCheckableState,
   __testing,
 };

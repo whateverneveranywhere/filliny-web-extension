@@ -5,9 +5,61 @@
  * including support for Shadow DOM traversal and observation.
  */
 
-import { hasProperty } from './runtime-type-guards.js';
+import { hasProperty, isShadowRoot, isDocument } from './runtime-type-guards.js';
 import { z } from 'zod';
 import type { FrameworkDetectionWindow, StateManagerDetectionWindow, SSRDetectionWindow } from '../types/dom.js';
+
+// ============================================================================
+// Typed window accessors using declaration merging
+// ============================================================================
+
+/**
+ * Get the default view of a document as FrameworkDetectionWindow.
+ * Returns null if the document has no default view.
+ * The cast is safe because FrameworkDetectionWindow extends Window
+ * and all additional properties are optional.
+ */
+const getFrameworkWindow = (doc: Document): FrameworkDetectionWindow | null => {
+  const win = doc.defaultView;
+  if (!win) return null;
+  // Window always satisfies FrameworkDetectionWindow structurally
+  // because all FrameworkDetectionWindow properties are optional extensions.
+  return win as FrameworkDetectionWindow;
+};
+
+/**
+ * Get the default view of a document as StateManagerDetectionWindow.
+ * Returns null if the document has no default view.
+ */
+const getStateManagerWindow = (doc: Document): StateManagerDetectionWindow | null => {
+  const win = doc.defaultView;
+  if (!win) return null;
+  return win as StateManagerDetectionWindow;
+};
+
+/**
+ * Get the default view of a document as SSRDetectionWindow.
+ * Returns null if the document has no default view.
+ */
+const getSSRWindow = (doc: Document): SSRDetectionWindow | null => {
+  const win = doc.defaultView;
+  if (!win) return null;
+  return win as SSRDetectionWindow;
+};
+
+/**
+ * Type guard for the return value of Element.getRootNode().
+ * getRootNode() returns a Node, which is either a Document or ShadowRoot
+ * in practice (the spec guarantees one of these for connected elements).
+ */
+const getElementRoot = (element: Element): Document | ShadowRoot => {
+  const root = element.getRootNode();
+  if (isDocument(root)) return root;
+  if (isShadowRoot(root)) return root;
+  // Fallback: for disconnected elements, getRootNode returns the element itself.
+  // Return ownerDocument as a safe fallback.
+  return element.ownerDocument;
+};
 
 /**
  * Enum for supported frontend frameworks
@@ -490,7 +542,7 @@ const detectFrameworkForElement = (element: Element): Framework => {
  */
 const detectDocumentFramework = (doc: Document = document): Framework => {
   // Check for global framework indicators
-  const win = doc.defaultView as FrameworkDetectionWindow | null;
+  const win = getFrameworkWindow(doc);
 
   if (!win) return Framework.VANILLA;
 
@@ -686,7 +738,7 @@ const detectFormLibrary = (element: Element): FormLibrary => {
  * Detect state management library used
  */
 const detectStateManager = (doc: Document = document): StateManager => {
-  const win = doc.defaultView as StateManagerDetectionWindow | null;
+  const win = getStateManagerWindow(doc);
 
   if (!win) return StateManager.UNKNOWN;
 
@@ -746,7 +798,7 @@ const detectFramework = (doc: Document = document): FrameworkDetectionResult => 
   const formLibrary = formElement ? detectFormLibrary(formElement) : FormLibrary.UNKNOWN;
 
   // Detect SSR/SPA
-  const win = doc.defaultView as SSRDetectionWindow | null;
+  const win = getSSRWindow(doc);
 
   const isSSR = !!(win?.__NEXT_DATA__ || win?.__NUXT__ || win?.__SVELTEKIT_APP_VERSION__);
   const isSPA = !isSSR && framework !== Framework.VANILLA;
@@ -779,8 +831,9 @@ const isInShadowDOM = (element: Element): boolean => {
 
 /**
  * Get the root of an element (document or shadow root)
+ * Uses type guards instead of inline casts for type-safe narrowing.
  */
-const getRoot = (element: Element): Document | ShadowRoot => element.getRootNode() as Document | ShadowRoot;
+const getRoot = (element: Element): Document | ShadowRoot => getElementRoot(element);
 
 /**
  * Traverse all shadow roots from an element

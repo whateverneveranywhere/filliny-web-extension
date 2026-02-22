@@ -117,10 +117,19 @@ export type DOMEventHandler = (this: HTMLElement, event: Event) => void;
 // ============================================================================
 
 /**
+ * jQuery wrapped set returned by the jQuery function.
+ * Includes common methods used in form-filling code.
+ */
+export interface JQueryWrappedSet {
+  trigger: (eventName: string) => void;
+  data: (key: string) => unknown;
+}
+
+/**
  * jQuery static function interface
  */
 export interface JQueryStatic {
-  (element: HTMLElement): { trigger: (eventName: string) => void };
+  (element: HTMLElement): JQueryWrappedSet;
 }
 
 /**

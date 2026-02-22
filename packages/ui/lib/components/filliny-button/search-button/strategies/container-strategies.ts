@@ -6,6 +6,7 @@
  */
 
 import { isValidFormField } from '../core/utils';
+import { FieldTypeEnum } from '@extension/shared';
 import type { ContainerDetectionStrategy, FormContainer } from '../core/types';
 
 // ============================================================================
@@ -428,7 +429,7 @@ export class JobApplicationContainerStrategy implements ContainerDetectionStrate
     }
 
     // File upload fields (common in job applications)
-    const fileFields = fields.filter(field => field instanceof HTMLInputElement && field.type === 'file');
+    const fileFields = fields.filter(field => field instanceof HTMLInputElement && field.type === FieldTypeEnum.FILE);
     if (fileFields.length > 0) {
       score += 10;
     }
@@ -450,7 +451,7 @@ export class JobApplicationContainerStrategy implements ContainerDetectionStrate
       reasons.push('Class name indicates job application');
     }
 
-    const fileFields = fields.filter(field => field instanceof HTMLInputElement && field.type === 'file');
+    const fileFields = fields.filter(field => field instanceof HTMLInputElement && field.type === FieldTypeEnum.FILE);
     if (fileFields.length > 0) {
       reasons.push(`${fileFields.length} file upload field(s) found`);
     }

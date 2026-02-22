@@ -9,29 +9,280 @@ import {
   invokeReactOnChange,
   isHoneypotField,
   isElementAttached,
-  captureFormState,
-  restoreFormState,
-  ensureFocus,
+  simulatePaste,
+  simulateTyping,
 } from './field-types/utils';
 import { formFillStore } from './stores';
 import { unifiedFieldRegistry } from './unifiedFieldDetection.js';
-import { createDebugLogger, StreamingErrorSchema, StreamingFieldDataSchema } from '@extension/shared';
+import { createDebugLogger, FieldTypeEnum, StreamingErrorSchema, StreamingFieldDataSchema } from '@extension/shared';
 import type { PartialFieldValueMap } from './stores';
 import type { Field, StreamingFieldData } from '@extension/shared';
 
 const debug = createDebugLogger('FieldUpdater');
-
-// Re-export imported utilities to suppress unused-import warnings.
-// These are used by downstream consumers of fieldUpdaterHelpers.
-const _captureFormState = captureFormState;
-const _restoreFormState = restoreFormState;
-const _ensureFocus = ensureFocus;
 
 /**
  * Union type representing all possible field values
  * This replaces 'unknown' with a proper typed union
  */
 type FieldValue = string | string[] | boolean | number | undefined;
+
+// ----------------------------------------
+// Verification & Recovery Types
+// ----------------------------------------
+
+/**
+ * Result of verifying a single field after fill
+ */
+interface FieldVerificationEntry {
+  fieldId: string;
+  expectedValue: FieldValue;
+  actualValue: FieldValue;
+  passed: boolean;
+  retried: boolean;
+  retriedSuccessfully: boolean;
+  strategy: string;
+}
+
+/**
+ * Aggregated results from batch verification
+ */
+interface BatchVerificationResults {
+  totalFields: number;
+  verified: number;
+  failed: number;
+  retried: number;
+  retriedSuccessfully: number;
+  entries: FieldVerificationEntry[];
+}
+
+// ----------------------------------------
+// Named Update Strategies (escalating order)
+// ----------------------------------------
+
+/**
+ * Ordered list of escalating field update strategies.
+ * Each retry attempt uses the next strategy in this list
+ * instead of repeating the same approach.
+ */
+const FIELD_UPDATE_STRATEGIES = [
+  'standard', // Default updateField path (native setter + framework events)
+  'native-setter', // Direct native value setter with React onChange
+  'composition-events', // Composition events for IME-aware frameworks
+  'paste-simulation', // Simulate clipboard paste event
+  'char-by-char', // Character-by-character typing with natural delays
+] as const;
+
+type FieldUpdateStrategy = (typeof FIELD_UPDATE_STRATEGIES)[number];
+
+// ----------------------------------------
+// Field Value Reading & Element Finding Helpers
+// ----------------------------------------
+
+/**
+ * Read the current DOM value of a field element.
+ * Works across input types, selects, textareas, contentEditable, and ARIA elements.
+ */
+const getCurrentFieldValue = (element: HTMLElement): FieldValue => {
+  if (element instanceof HTMLInputElement) {
+    switch (element.type) {
+      case FieldTypeEnum.CHECKBOX:
+      case FieldTypeEnum.RADIO:
+        return element.checked;
+      case FieldTypeEnum.FILE:
+        return element.files && element.files.length > 0 ? Array.from(element.files).map(f => f.name) : undefined;
+      default:
+        return element.value;
+    }
+  }
+
+  if (element instanceof HTMLSelectElement) {
+    if (element.multiple) {
+      return Array.from(element.selectedOptions).map(opt => opt.value);
+    }
+    return element.value;
+  }
+
+  if (element instanceof HTMLTextAreaElement) {
+    return element.value;
+  }
+
+  if (element.isContentEditable) {
+    return element.textContent ?? '';
+  }
+
+  // ARIA checkbox/switch
+  const role = element.getAttribute('role');
+  if (role === FieldTypeEnum.CHECKBOX || role === 'switch') {
+    return element.getAttribute('aria-checked') === 'true';
+  }
+
+  // ARIA textbox
+  if (role === 'textbox' || role === 'searchbox') {
+    return element.textContent ?? '';
+  }
+
+  return undefined;
+};
+
+/**
+ * Generate a simple test value for a given field type.
+ * Used by silentFieldTest to probe a field before user fills.
+ */
+const generateTestValue = (fieldType: string): string => {
+  switch (fieldType) {
+    case FieldTypeEnum.EMAIL:
+      return 'test@filliny.io';
+    case FieldTypeEnum.TEL:
+      return '+10000000000';
+    case FieldTypeEnum.URL:
+      return 'https://filliny.io';
+    case FieldTypeEnum.NUMBER:
+      return '42';
+    case FieldTypeEnum.DATE:
+      return '2024-01-01';
+    case FieldTypeEnum.COLOR:
+      return '#ff0000';
+    default:
+      return 'filliny_test';
+  }
+};
+
+/**
+ * Restore a field element to a previous value.
+ * Used after silentFieldTest to undo the test probe.
+ */
+const restoreFieldValue = (element: HTMLElement, previousValue: FieldValue): void => {
+  if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
+    const strValue = typeof previousValue === 'string' ? previousValue : String(previousValue ?? '');
+    setNativeValue(element, strValue);
+    element.dispatchEvent(new Event('input', { bubbles: true }));
+    element.dispatchEvent(new Event('change', { bubbles: true }));
+  } else if (element instanceof HTMLSelectElement) {
+    const strValue = typeof previousValue === 'string' ? previousValue : String(previousValue ?? '');
+    setNativeValue(element, strValue);
+    element.dispatchEvent(new Event('change', { bubbles: true }));
+  } else if (element.isContentEditable) {
+    element.textContent = String(previousValue ?? '');
+    element.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+};
+
+/**
+ * Find a field element using the registry first, then fallback to DOM query by data-filliny-id.
+ * Used for error recovery when the cached element reference becomes stale.
+ */
+const findFieldElement = (fieldId: string): HTMLElement | null => {
+  // Strategy 1: Registry lookup
+  const fieldInfo = unifiedFieldRegistry.getField(fieldId);
+  if (fieldInfo?.element && isElementAttached(fieldInfo.element)) {
+    return fieldInfo.element;
+  }
+
+  // Strategy 2: DOM query by data-filliny-id
+  const domElement = document.querySelector<HTMLElement>(`[data-filliny-id="${fieldId}"]`);
+  if (domElement && isElementAttached(domElement)) {
+    return domElement;
+  }
+
+  return null;
+};
+
+/**
+ * Apply a value to a field using a specific named strategy.
+ * This enables per-retry escalation instead of repeating the same approach.
+ */
+const applyValueWithStrategy = async (
+  element: HTMLElement,
+  value: string,
+  strategy: FieldUpdateStrategy,
+): Promise<void> => {
+  switch (strategy) {
+    case 'standard':
+      // Standard path: native setter + standard events
+      if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
+        setNativeValue(element, value);
+        element.dispatchEvent(new Event('input', { bubbles: true }));
+        element.dispatchEvent(new Event('change', { bubbles: true }));
+      } else if (element.isContentEditable) {
+        element.textContent = value;
+        element.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+      break;
+
+    case 'native-setter':
+      // Native setter + React props onChange
+      if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
+        setNativeValue(element, value);
+        invokeReactOnChange(element);
+        element.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      break;
+
+    case 'composition-events':
+      // Composition events for IME-aware frameworks
+      if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
+        setNativeValue(element, value);
+        element.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true, data: '' }));
+        element.dispatchEvent(new CompositionEvent('compositionupdate', { bubbles: true, data: value }));
+        element.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true, data: value }));
+        element.dispatchEvent(new Event('input', { bubbles: true }));
+        element.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      break;
+
+    case 'paste-simulation':
+      // Simulate clipboard paste
+      simulatePaste(element, value);
+      break;
+
+    case 'char-by-char':
+      // Character-by-character typing with natural delays
+      await simulateTyping(element, value);
+      break;
+  }
+};
+
+/**
+ * Silently test ONE field before user-initiated fill.
+ * Saves original value, sets test value, verifies it took, then restores original.
+ * Returns true if the fill mechanism works for this field type.
+ */
+const silentFieldTest = async (element: HTMLElement, field: Field): Promise<{ success: boolean; strategy: string }> => {
+  const originalValue = getCurrentFieldValue(element);
+  const testValue = generateTestValue(field.type);
+
+  debug.log(`Silent field test for ${field.id} (${field.type})`);
+
+  for (const strategy of FIELD_UPDATE_STRATEGIES) {
+    try {
+      // Apply test value using the current strategy
+      await applyValueWithStrategy(element, testValue, strategy);
+
+      // Brief wait for framework processing
+      await new Promise(resolve => setTimeout(resolve, 50));
+
+      // Read back
+      const currentValue = getCurrentFieldValue(element);
+      const matched =
+        typeof currentValue === 'string' ? currentValue === testValue : String(currentValue) === testValue;
+
+      if (matched) {
+        debug.log(`Silent test passed with strategy "${strategy}" for ${field.id}`);
+        // Restore original value
+        restoreFieldValue(element, originalValue);
+        await new Promise(resolve => setTimeout(resolve, 30));
+        return { success: true, strategy };
+      }
+    } catch (error) {
+      debug.log(`Silent test strategy "${strategy}" failed for ${field.id}:`, error);
+    }
+  }
+
+  // Restore original value even if all strategies failed
+  restoreFieldValue(element, originalValue);
+  await new Promise(resolve => setTimeout(resolve, 30));
+  return { success: false, strategy: 'none' };
+};
 
 // Error Categorization
 // ----------------------------------------
@@ -73,6 +324,7 @@ interface FieldUpdateResult {
   fieldId: string;
   error?: FieldUpdateError;
   retryCount?: number;
+  strategy?: string;
 }
 
 /**
@@ -166,13 +418,17 @@ const withTimeout = <T>(
 // ----------------------------------------
 
 /**
- * Enhanced field update with retry mechanism and better error handling
+ * Enhanced field update with retry mechanism using escalating strategies.
+ * Each retry attempt uses a DIFFERENT strategy from FIELD_UPDATE_STRATEGIES
+ * for better coverage of framework-specific quirks.
+ * Includes error recovery: if an element is stale, re-finds it by data-filliny-id.
+ *
  * @param element - The HTML element to update
  * @param field - The field data containing the value to set
  * @param isTestMode - Whether this is a test mode fill
  * @param maxRetries - Maximum number of retry attempts (default: 3)
  * @param timeoutMs - Timeout for each attempt in milliseconds (default: 10000)
- * @returns FieldUpdateResult with success status and any errors
+ * @returns FieldUpdateResult with success status, strategy used, and any errors
  */
 const updateFieldWithRetry = async (
   element: HTMLElement,
@@ -182,20 +438,50 @@ const updateFieldWithRetry = async (
   timeoutMs: number = DEFAULT_FIELD_UPDATE_TIMEOUT,
 ): Promise<FieldUpdateResult> => {
   let lastError: FieldUpdateError | undefined;
+  let currentElement = element;
+  // Cap retries to available strategies
+  const effectiveMaxRetries = Math.min(maxRetries, FIELD_UPDATE_STRATEGIES.length);
 
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+  for (let attempt = 1; attempt <= effectiveMaxRetries; attempt++) {
     let cleanup: (() => void) | undefined;
+    const strategyName = FIELD_UPDATE_STRATEGIES[attempt - 1] ?? 'standard';
 
     try {
-      // Wrap the update operation with a timeout
-      const updatePromise = updateField(element, field, isTestMode);
-      const { promise: timedPromise, cleanup: timeoutCleanup } = withTimeout(updatePromise, timeoutMs, field.id);
-      cleanup = timeoutCleanup;
+      // Error recovery: check if element is still attached, re-find if stale
+      if (!isElementAttached(currentElement)) {
+        debug.log(`Element stale on attempt ${attempt} for ${field.id}, attempting re-find`);
+        const refound = findFieldElement(field.id);
+        if (refound) {
+          currentElement = refound;
+        } else {
+          lastError = new FieldUpdateError(
+            `Element detached and could not be re-found for ${field.id}`,
+            ErrorCategory.ELEMENT_NOT_FOUND,
+            field.id,
+          );
+          break;
+        }
+      }
 
-      await timedPromise;
+      // First attempt uses the standard updateField path
+      if (attempt === 1) {
+        const updatePromise = updateField(currentElement, field, isTestMode);
+        const { promise: timedPromise, cleanup: timeoutCleanup } = withTimeout(updatePromise, timeoutMs, field.id);
+        cleanup = timeoutCleanup;
+        await timedPromise;
+      } else {
+        // Subsequent attempts use escalating strategies
+        const valueToUse =
+          isTestMode && field.testValue !== undefined ? String(field.testValue) : String(field.value ?? '');
+        debug.log(`Retry ${attempt} for ${field.id} using strategy "${strategyName}"`);
+        const strategyPromise = applyValueWithStrategy(currentElement, valueToUse, strategyName);
+        const { promise: timedPromise, cleanup: timeoutCleanup } = withTimeout(strategyPromise, timeoutMs, field.id);
+        cleanup = timeoutCleanup;
+        await timedPromise;
+      }
 
       // Verify the update was successful with its own timeout
-      const verifyPromise = verifyFieldUpdate(element, field, isTestMode);
+      const verifyPromise = verifyFieldUpdate(currentElement, field, isTestMode);
       const { promise: timedVerifyPromise, cleanup: verifyCleanup } = withTimeout(
         verifyPromise,
         timeoutMs / 2,
@@ -206,19 +492,25 @@ const updateFieldWithRetry = async (
       const verified = await timedVerifyPromise;
 
       if (verified) {
-        debug.log(`Field ${field.id} updated and verified successfully (attempt ${attempt})`);
-        return { success: true, fieldId: field.id, retryCount: attempt - 1 };
+        debug.log(`Field ${field.id} updated and verified (attempt ${attempt}, strategy: ${strategyName})`);
+        // Record strategy result in the store
+        formFillStore.getState().recordStrategyResult(strategyName, true);
+        return { success: true, fieldId: field.id, retryCount: attempt - 1, strategy: strategyName };
       }
 
       // Verification failed - create specific error
       lastError = new FieldUpdateError(
-        `Verification failed for field ${field.id}`,
+        `Verification failed for field ${field.id} (strategy: ${strategyName})`,
         ErrorCategory.VERIFICATION_FAILED,
         field.id,
       );
 
-      if (attempt < maxRetries) {
-        debug.log(`Field update verification failed for ${field.id}, retrying (attempt ${attempt}/${maxRetries})`);
+      formFillStore.getState().recordStrategyResult(strategyName, false);
+
+      if (attempt < effectiveMaxRetries) {
+        debug.log(
+          `Field update verification failed for ${field.id}, retrying (attempt ${attempt}/${effectiveMaxRetries})`,
+        );
         // Exponential backoff with jitter
         const delay = Math.min(100 * Math.pow(2, attempt - 1) + Math.random() * 50, 2000);
         await new Promise(resolve => setTimeout(resolve, delay));
@@ -230,15 +522,25 @@ const updateFieldWithRetry = async (
       }
 
       lastError = categorizeError(error, field.id);
-      debug.error(`Error updating field ${field.id} (attempt ${attempt}/${maxRetries}):`, lastError);
+      debug.error(
+        `Error updating field ${field.id} (attempt ${attempt}/${effectiveMaxRetries}, strategy: ${strategyName}):`,
+        lastError,
+      );
 
-      if (attempt === maxRetries) {
-        break;
+      formFillStore.getState().recordStrategyResult(strategyName, false);
+
+      // Error recovery: try to re-find the element for next attempt
+      if (attempt < effectiveMaxRetries) {
+        const refound = findFieldElement(field.id);
+        if (refound) {
+          currentElement = refound;
+          debug.log(`Re-found element for ${field.id} after error, will retry`);
+        }
+
+        // Exponential backoff with jitter
+        const delay = Math.min(100 * Math.pow(2, attempt - 1) + Math.random() * 50, 2000);
+        await new Promise(resolve => setTimeout(resolve, delay));
       }
-
-      // Exponential backoff with jitter
-      const delay = Math.min(100 * Math.pow(2, attempt - 1) + Math.random() * 50, 2000);
-      await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
 
@@ -246,13 +548,13 @@ const updateFieldWithRetry = async (
   const finalError =
     lastError ||
     new FieldUpdateError(
-      `Failed to update field ${field.id} after ${maxRetries} attempts`,
+      `Failed to update field ${field.id} after ${effectiveMaxRetries} attempts`,
       ErrorCategory.UPDATE_FAILED,
       field.id,
     );
 
   debug.error(`All retry attempts exhausted for field ${field.id}:`, finalError);
-  return { success: false, fieldId: field.id, error: finalError, retryCount: maxRetries };
+  return { success: false, fieldId: field.id, error: finalError, retryCount: effectiveMaxRetries };
 };
 
 /**
@@ -261,12 +563,12 @@ const updateFieldWithRetry = async (
 const verifyFieldValueImmediate = (element: HTMLElement, expectedValue: FieldValue): boolean => {
   if (element instanceof HTMLInputElement) {
     switch (element.type) {
-      case 'checkbox':
-      case 'radio': {
+      case FieldTypeEnum.CHECKBOX:
+      case FieldTypeEnum.RADIO: {
         const expectedChecked = isValueChecked(expectedValue);
         return element.checked === expectedChecked;
       }
-      case 'file':
+      case FieldTypeEnum.FILE:
         return element.hasAttribute('data-filliny-file') || element.hasAttribute('data-filliny-files');
       default:
         return element.value === String(expectedValue || '');
@@ -282,7 +584,7 @@ const verifyFieldValueImmediate = (element: HTMLElement, expectedValue: FieldVal
     return element.value === String(expectedValue || '');
   } else if (element.isContentEditable) {
     return element.textContent === String(expectedValue || '');
-  } else if (element.getAttribute('role') === 'checkbox' || element.getAttribute('role') === 'switch') {
+  } else if (element.getAttribute('role') === FieldTypeEnum.CHECKBOX || element.getAttribute('role') === 'switch') {
     const expectedChecked = isValueChecked(expectedValue);
     return element.getAttribute('aria-checked') === String(expectedChecked);
   }
@@ -439,7 +741,7 @@ const updateField = async (element: HTMLElement, field: Field, isTestMode = fals
     } else if (element.hasAttribute('contenteditable')) {
       debug.log(`Processing contentEditable element ${element.id || 'unnamed'}`);
       await updateContentEditable(element, getStringValue(valueToUse));
-    } else if (field.type === 'select') {
+    } else if (field.type === FieldTypeEnum.SELECT) {
       // Custom select components (React Select, MUI, Headless UI, Radix, etc.)
       // that use <div> elements instead of native <select>.
       // Route to updateSelect() which handles all custom select libraries.
@@ -467,29 +769,29 @@ const updateInputElement = async (
   isTestMode: boolean,
 ): Promise<void> => {
   switch (element.type) {
-    case 'checkbox':
+    case FieldTypeEnum.CHECKBOX:
       await updateCheckboxInput(element, field, valueToUse, isTestMode);
       break;
-    case 'radio':
+    case FieldTypeEnum.RADIO:
       await updateRadioInput(element, field, valueToUse, isTestMode);
       break;
-    case 'file':
+    case FieldTypeEnum.FILE:
       await updateFileInputElement(element, field, valueToUse, isTestMode);
       break;
-    case 'text':
-    case 'email':
-    case 'url':
-    case 'search':
-    case 'tel':
-    case 'password':
-    case 'number':
-    case 'date':
-    case 'datetime-local':
-    case 'month':
-    case 'week':
-    case 'time':
-    case 'color':
-    case 'range':
+    case FieldTypeEnum.TEXT:
+    case FieldTypeEnum.EMAIL:
+    case FieldTypeEnum.URL:
+    case FieldTypeEnum.SEARCH:
+    case FieldTypeEnum.TEL:
+    case FieldTypeEnum.PASSWORD:
+    case FieldTypeEnum.NUMBER:
+    case FieldTypeEnum.DATE:
+    case FieldTypeEnum.DATETIME_LOCAL:
+    case FieldTypeEnum.MONTH:
+    case FieldTypeEnum.WEEK:
+    case FieldTypeEnum.TIME:
+    case FieldTypeEnum.COLOR:
+    case FieldTypeEnum.RANGE:
       await updateTextLikeInput(element, valueToUse);
       break;
     default:
@@ -674,13 +976,13 @@ const updateDefaultInput = async (element: HTMLInputElement, valueToUse: FieldVa
 const updateAriaElement = async (element: HTMLElement, field: Field, valueToUse: FieldValue): Promise<void> => {
   const role = element.getAttribute('role');
 
-  if (role === 'checkbox' || role === 'switch') {
+  if (role === FieldTypeEnum.CHECKBOX || role === 'switch') {
     const isChecked =
       typeof valueToUse === 'boolean'
         ? valueToUse
         : ['true', 'yes', 'on', '1'].includes(String(valueToUse).toLowerCase());
     await updateCheckable(element, isChecked);
-  } else if (role === 'radio') {
+  } else if (role === FieldTypeEnum.RADIO) {
     const isChecked =
       typeof valueToUse === 'boolean'
         ? valueToUse
@@ -728,10 +1030,24 @@ const BATCH_SIZE = 5;
 /**
  * Watch for conditional fields that may appear after fills (e.g., state depends on country).
  * Uses MutationObserver to detect new form elements added to the DOM.
+ * Resolves early if new fields are detected before the timeout expires.
  */
 const watchForNewFields = (container: HTMLElement, duration: number = 500): Promise<HTMLElement[]> =>
   new Promise(resolve => {
     const newElements: HTMLElement[] = [];
+    let resolved = false;
+    let earlyResolveTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const finalize = (): void => {
+      if (resolved) return;
+      resolved = true;
+      observer.disconnect();
+      if (earlyResolveTimer !== null) {
+        clearTimeout(earlyResolveTimer);
+      }
+      resolve(newElements);
+    };
+
     const observer = new MutationObserver(mutations => {
       for (const mutation of mutations) {
         for (const node of Array.from(mutation.addedNodes)) {
@@ -746,23 +1062,145 @@ const watchForNewFields = (container: HTMLElement, duration: number = 500): Prom
           }
         }
       }
+
+      // Early resolution: once we detect new fields, wait a brief 100ms for any
+      // additional mutations, then resolve without waiting the full duration
+      if (newElements.length > 0 && earlyResolveTimer === null) {
+        earlyResolveTimer = setTimeout(finalize, 100);
+      }
     });
 
     observer.observe(container, { childList: true, subtree: true });
-    setTimeout(() => {
-      observer.disconnect();
-      resolve(newElements);
-    }, duration);
+
+    // Full timeout fallback
+    setTimeout(finalize, duration);
   });
 
 /**
  * Check if a field type is a choice-type that may trigger conditional fields
  */
 const isChoiceFieldType = (fieldType: string): boolean =>
-  fieldType === 'select' || fieldType === 'radio' || fieldType === 'checkbox';
+  fieldType === FieldTypeEnum.SELECT || fieldType === FieldTypeEnum.RADIO || fieldType === FieldTypeEnum.CHECKBOX;
 
 /**
- * Update multiple form fields with their values using parallel batching
+ * Verify all fields after the entire form has been filled.
+ * Re-reads each field's current DOM value, compares against expected,
+ * and retries failures with escalating strategies.
+ * Results are logged but not surfaced to the user.
+ */
+const verifyAllFields = async (fields: Field[], testMode: boolean): Promise<BatchVerificationResults> => {
+  const results: BatchVerificationResults = {
+    totalFields: fields.length,
+    verified: 0,
+    failed: 0,
+    retried: 0,
+    retriedSuccessfully: 0,
+    entries: [],
+  };
+
+  debug.log(`Starting post-fill verification for ${fields.length} fields`);
+
+  for (const field of fields) {
+    const element = findFieldElement(field.id);
+    if (!element) {
+      debug.log(`Verification skip: element not found for ${field.id}`);
+      results.failed++;
+      results.entries.push({
+        fieldId: field.id,
+        expectedValue: testMode && field.testValue !== undefined ? field.testValue : field.value,
+        actualValue: undefined,
+        passed: false,
+        retried: false,
+        retriedSuccessfully: false,
+        strategy: 'none',
+      });
+      continue;
+    }
+
+    const expectedValue = testMode && field.testValue !== undefined ? field.testValue : field.value;
+    const actualValue = getCurrentFieldValue(element);
+
+    // Check if value matches
+    const passed = verifyFieldValueImmediate(element, expectedValue);
+
+    if (passed) {
+      results.verified++;
+      results.entries.push({
+        fieldId: field.id,
+        expectedValue,
+        actualValue,
+        passed: true,
+        retried: false,
+        retriedSuccessfully: false,
+        strategy: 'standard',
+      });
+      formFillStore.getState().setVerificationResult(field.id, true, 'standard');
+      continue;
+    }
+
+    // Value mismatch - retry with escalating strategies
+    debug.log(
+      `Verification mismatch for ${field.id}: expected=${String(expectedValue)}, actual=${String(actualValue)}`,
+    );
+    results.retried++;
+    let retriedOk = false;
+    let winningStrategy = 'none';
+
+    // Skip 'standard' since it already failed
+    for (let i = 1; i < FIELD_UPDATE_STRATEGIES.length; i++) {
+      const strategy = FIELD_UPDATE_STRATEGIES[i];
+      try {
+        const valueStr = typeof expectedValue === 'string' ? expectedValue : String(expectedValue ?? '');
+        await applyValueWithStrategy(element, valueStr, strategy);
+        await new Promise(resolve => setTimeout(resolve, 60));
+
+        if (verifyFieldValueImmediate(element, expectedValue)) {
+          retriedOk = true;
+          winningStrategy = strategy;
+          debug.log(`Verification retry succeeded for ${field.id} with strategy "${strategy}"`);
+          formFillStore.getState().recordStrategyResult(strategy, true);
+          break;
+        }
+        formFillStore.getState().recordStrategyResult(strategy, false);
+      } catch (retryErr) {
+        debug.log(`Verification retry strategy "${strategy}" failed for ${field.id}:`, retryErr);
+        formFillStore.getState().recordStrategyResult(strategy, false);
+      }
+    }
+
+    if (retriedOk) {
+      results.verified++;
+      results.retriedSuccessfully++;
+      formFillStore.getState().setVerificationResult(field.id, true, winningStrategy);
+    } else {
+      results.failed++;
+      formFillStore.getState().setVerificationResult(field.id, false);
+    }
+
+    results.entries.push({
+      fieldId: field.id,
+      expectedValue,
+      actualValue,
+      passed: retriedOk,
+      retried: true,
+      retriedSuccessfully: retriedOk,
+      strategy: winningStrategy,
+    });
+  }
+
+  debug.log(
+    `Post-fill verification complete: ${results.verified}/${results.totalFields} verified, ` +
+      `${results.retried} retried, ${results.retriedSuccessfully} retry successes, ${results.failed} failed`,
+  );
+
+  return results;
+};
+
+/**
+ * Update multiple form fields with their values using parallel batching.
+ * After all batches complete, runs a silent post-fill verification pass
+ * that retries failed fields with escalating strategies.
+ *
  * @param fields - Array of fields to update
  * @param testMode - Whether this is a test mode fill
  * @returns FormUpdateResults with detailed statistics
@@ -816,13 +1254,22 @@ const updateFormFields = async (fields: Field[], testMode = false): Promise<Form
         }
       }
 
-      // Watch for conditional fields after batches containing choice-type fills
+      // Watch for conditional fields after batches containing choice-type fills.
+      // Use 2 seconds for choice fields to allow dependent UI to render.
       if (batchHasChoiceFields) {
-        const newElements = await watchForNewFields(document.body, 300);
+        const newElements = await watchForNewFields(document.body, 2000);
         if (newElements.length > 0) {
-          debug.log(`Detected ${newElements.length} new conditional field(s) after batch fill`);
+          debug.log(`Detected ${newElements.length} new conditional field(s) after choice-type batch fill`);
         }
       }
+    }
+
+    // Run silent post-fill verification pass
+    const verificationResults = await verifyAllFields(fields, testMode);
+    if (verificationResults.retriedSuccessfully > 0) {
+      // Adjust counts: fields that were marked failed but succeeded on retry
+      results.successful += verificationResults.retriedSuccessfully;
+      results.failed = Math.max(0, results.failed - verificationResults.retriedSuccessfully);
     }
 
     const duration = ((performance.now() - startTime) / 1000).toFixed(2);
@@ -861,7 +1308,9 @@ const updateFormFields = async (fields: Field[], testMode = false): Promise<Form
 };
 
 /**
- * Update a field, handling radio/checkbox groups appropriately
+ * Update a field, handling radio/checkbox groups appropriately.
+ * Includes error recovery: if the update throws, attempts to re-find the element
+ * by data-filliny-id and retries once.
  */
 const updateFieldWithGroupHandling = async (field: Field, testMode: boolean): Promise<FieldUpdateResult> => {
   try {
@@ -902,6 +1351,18 @@ const updateFieldWithGroupHandling = async (field: Field, testMode: boolean): Pr
     }
   } catch (error) {
     debug.error(`Error updating field ${field.id}:`, error);
+
+    // Error recovery: try to re-find the element and retry once
+    const refound = findFieldElement(field.id);
+    if (refound) {
+      debug.log(`Error recovery: re-found element for ${field.id}, retrying once`);
+      try {
+        return await updateFieldWithRetry(refound, field, testMode);
+      } catch (retryError) {
+        debug.error(`Error recovery retry also failed for ${field.id}:`, retryError);
+      }
+    }
+
     return {
       success: false,
       fieldId: field.id,
@@ -917,7 +1378,7 @@ const updateGroupedField = async (field: Field, testMode: boolean): Promise<Fiel
   const fieldValue = testMode && field.testValue !== undefined ? field.testValue : field.value;
 
   try {
-    if (field.type === 'radio') {
+    if (field.type === FieldTypeEnum.RADIO) {
       const success = await updateRadioGroup(field, fieldValue, testMode);
       return {
         success,
@@ -926,8 +1387,8 @@ const updateGroupedField = async (field: Field, testMode: boolean): Promise<Fiel
           ? undefined
           : new FieldUpdateError(`Failed to update radio group ${field.id}`, ErrorCategory.UPDATE_FAILED, field.id),
       };
-    } else if (field.type === 'checkbox' && field.options && field.options.length > 1) {
-      const success = await updateCheckboxGroup(field, fieldValue, testMode);
+    } else if (field.type === FieldTypeEnum.CHECKBOX && field.options && field.options.length > 1) {
+      const success = await updateCheckboxGroup(field, fieldValue);
       return {
         success,
         fieldId: field.id,
@@ -1176,7 +1637,7 @@ const findRadioByLabelText = (selectedOption: NonNullable<Field['options']>[0]):
       const forAttr = label.getAttribute('for');
       if (forAttr) {
         const linkedElement = document.getElementById(forAttr) as HTMLInputElement;
-        if (linkedElement && linkedElement.type === 'radio') {
+        if (linkedElement && linkedElement.type === FieldTypeEnum.RADIO) {
           return linkedElement;
         }
       }
@@ -1253,7 +1714,7 @@ const logRadioGroupMatchFailure = (field: Field, targetValue: string): void => {
 /**
  * Update a checkbox group - select multiple options if needed
  */
-const updateCheckboxGroup = async (field: Field, value: unknown, _testMode: boolean): Promise<boolean> => {
+const updateCheckboxGroup = async (field: Field, value: unknown): Promise<boolean> => {
   if (!field.options) return false;
 
   debug.log(`Updating checkbox group ${field.id} with value:`, value);
@@ -1318,11 +1779,11 @@ const hasValueChanged = (prev: string | string[] | undefined, next: string | str
  */
 const classifyFieldForStreaming = (fieldType: string): 'text-like' | 'choice' | 'file' => {
   switch (fieldType) {
-    case 'select':
-    case 'radio':
-    case 'checkbox':
+    case FieldTypeEnum.SELECT:
+    case FieldTypeEnum.RADIO:
+    case FieldTypeEnum.CHECKBOX:
       return 'choice';
-    case 'file':
+    case FieldTypeEnum.FILE:
       return 'file';
     default:
       return 'text-like';
@@ -1588,9 +2049,11 @@ export {
   runFinalVerificationPass,
   isFileValueFromAI,
   AUTHORIZED_FILE_PATTERN,
-  _captureFormState as captureFormState,
-  _restoreFormState as restoreFormState,
-  _ensureFocus as ensureFocus,
+  getCurrentFieldValue,
+  silentFieldTest,
+  verifyAllFields,
+  findFieldElement,
+  FIELD_UPDATE_STRATEGIES,
 };
 
-export type { FieldUpdateResult, FormUpdateResults };
+export type { FieldUpdateResult, FormUpdateResults, FieldVerificationEntry, BatchVerificationResults };

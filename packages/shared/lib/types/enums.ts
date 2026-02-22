@@ -6,7 +6,7 @@
 /**
  * Field types supported by the form detection system
  * Maps to HTML input types and custom form elements
- * Note: This is an enum version. The string union type is in services/types/ai.ts
+ * Note: This is an enum version. The string union type is inferred from Zod schemas in services/schemas
  */
 import { z } from 'zod';
 
@@ -30,6 +30,7 @@ export enum FieldTypeEnum {
   RADIO = 'radio',
   TEXTAREA = 'textarea',
   FILE = 'file',
+  HIDDEN = 'hidden',
   BUTTON = 'button',
   FIELDSET = 'fieldset',
 }

@@ -3,6 +3,7 @@ import {
   handleAction,
   setupAuthTokenListener,
   syncAuthTokenFromCookie,
+  parseWebappEnv,
   WebappEnvs,
   MessageType,
   unwrapApiEnvelope,
@@ -87,34 +88,31 @@ chrome.windows.onFocusChanged.addListener(windowId => {
 /**
  * Extended global interface for environment access in background script
  */
-interface ExtendedGlobalThis {
-  import?: {
-    meta?: {
-      env?: {
-        VITE_WEBAPP_ENV?: string;
-      };
-    };
-  };
-  process?: {
-    env?: {
-      NODE_ENV?: string;
-    };
-  };
-}
+/**
+ * Safely access a nested property chain from globalThis using bracket notation.
+ * Returns undefined if any step in the chain is not an object.
+ */
+const getGlobalProperty = (...keys: string[]): unknown => {
+  let current: unknown = globalThis;
+  for (const key of keys) {
+    if (current === null || current === undefined || typeof current !== 'object') return undefined;
+    current = (current as Record<string, unknown>)[key];
+  }
+  return current;
+};
 
 // Store the current environment in storage for consistent access across contexts
 const storeEnvironmentInStorage = () => {
   try {
     // Get the environment from the same source as getConfig()
-    const extendedGlobal = globalThis as unknown as ExtendedGlobalThis;
-    const importMeta = extendedGlobal.import?.meta;
-    const viteEnv = importMeta?.env?.VITE_WEBAPP_ENV;
+    const viteEnv = getGlobalProperty('import', 'meta', 'env', 'VITE_WEBAPP_ENV');
 
     // Use the same environment detection logic as in getConfig()
     let env: WebappEnvs;
 
-    if (viteEnv && Object.values(WebappEnvs).includes(viteEnv as WebappEnvs)) {
-      env = viteEnv as WebappEnvs;
+    const parsedEnv = typeof viteEnv === 'string' ? parseWebappEnv(viteEnv) : undefined;
+    if (parsedEnv) {
+      env = parsedEnv;
     } else if (typeof window !== 'undefined') {
       // Check hostname (for local development)
       try {
@@ -154,9 +152,8 @@ const storeEnvironmentInStorage = () => {
 
     // Fallback: use the dev environment if in development
     try {
-      const extendedGlobal = globalThis as unknown as ExtendedGlobalThis;
-      const processEnv = extendedGlobal.process?.env;
-      const isDev = processEnv?.NODE_ENV === 'development';
+      const nodeEnv = getGlobalProperty('process', 'env', 'NODE_ENV');
+      const isDev = nodeEnv === 'development';
 
       chrome.storage.local.set({
         webapp_env: isDev ? WebappEnvs.DEV : WebappEnvs.PROD,
@@ -303,12 +300,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
   // Handle analytics event relay from content-UI
   if (request.type === MessageType.ANALYTICS_EVENT) {
-    const payload = request.payload as AnalyticsMessage | undefined;
-    if (payload) {
-      if (payload.event === ('__identify' as string) && payload.properties?.['distinct_id']) {
+    const raw = request.payload;
+    if (raw && typeof raw === 'object' && 'event' in raw && typeof raw.event === 'string') {
+      const payload = raw as AnalyticsMessage;
+      if (payload.event === AnalyticsEvent.INTERNAL_IDENTIFY && payload.properties?.['distinct_id']) {
         const { distinct_id, ...rest } = payload.properties;
         phIdentifyUser(String(distinct_id), rest);
-      } else if (payload.event === ('__reset' as string)) {
+      } else if (payload.event === AnalyticsEvent.INTERNAL_RESET) {
         phResetUser();
       } else {
         captureEvent(payload.event, payload.properties);
@@ -673,8 +671,8 @@ const handleApiRequest = async (
           const structured = parseApiError(errorJson);
           if (structured) {
             errorMessage = structured.message;
-          } else if (errorJson && typeof errorJson === 'object' && errorJson !== null && 'message' in errorJson) {
-            errorMessage = String((errorJson as Record<string, unknown>).message);
+          } else if (errorJson && typeof errorJson === 'object' && 'message' in errorJson) {
+            errorMessage = String((errorJson as { message: unknown }).message);
           }
         } catch {
           errorMessage = response.statusText || 'Request failed';

@@ -22,6 +22,28 @@ import type { FieldPath } from 'react-hook-form';
 
 type ProfileFormTypes = ProfileFormValues;
 
+/**
+ * Known field paths for ProfileFormTypes.
+ * Used to convert step config strings to type-safe FieldPath values.
+ */
+const PROFILE_FIELD_PATHS = new Set<FieldPath<ProfileFormTypes>>([
+  'profileName',
+  'defaultFillingContext',
+  'fillingWebsites',
+  'preferences',
+  'preferences.isFormal',
+  'preferences.isGapFillingAllowed',
+  'preferences.toneId',
+  'preferences.povId',
+]);
+
+/**
+ * Convert a string to a FieldPath<ProfileFormTypes> if it is a known valid path.
+ * Returns undefined for unknown paths.
+ */
+const toProfileFieldPath = (path: string): FieldPath<ProfileFormTypes> | undefined =>
+  PROFILE_FIELD_PATHS.has(path as FieldPath<ProfileFormTypes>) ? (path as FieldPath<ProfileFormTypes>) : undefined;
+
 const defaultFormValues: ProfileFormTypes = {
   profileName: '',
   defaultFillingContext: '',
@@ -89,8 +111,10 @@ const ProfileForm = ({ id, onFormSubmit, onDirtyChange }: Props) => {
     (formData: ProfileFormTypes): DTOProfileFillingForm => ({
       ...formData,
       // filter out the user side isNew variable before sending to api
-
-      fillingWebsites: formData.fillingWebsites.map(({ isNew, ...rest }) => rest),
+      fillingWebsites: formData.fillingWebsites.map(
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars -- destructuring to omit isNew from spread
+        ({ isNew, ...rest }) => rest,
+      ),
       preferences: {
         ...formData.preferences,
         povId: Number(formData.preferences?.povId),
@@ -176,13 +200,19 @@ const ProfileForm = ({ id, onFormSubmit, onDirtyChange }: Props) => {
           // which is the required field in the schema
           if (fillingWebsites && fillingWebsites.length > 0) {
             for (let i = 0; i < fillingWebsites.length; i++) {
-              expandedFields.push(`fillingWebsites.${i}.websiteUrl` as FieldPath<ProfileFormTypes>);
+              // Dynamic array paths like `fillingWebsites.0.websiteUrl` are valid FieldPath values
+              // but cannot be pre-registered in PROFILE_FIELD_PATHS since indices are dynamic.
+              const websiteUrlPath: FieldPath<ProfileFormTypes> = `fillingWebsites.${i}.websiteUrl`;
+              expandedFields.push(websiteUrlPath);
             }
           }
           // Also include the array itself to catch array-level errors
-          expandedFields.push('fillingWebsites' as FieldPath<ProfileFormTypes>);
+          expandedFields.push('fillingWebsites');
         } else {
-          expandedFields.push(field as FieldPath<ProfileFormTypes>);
+          const fieldPath = toProfileFieldPath(field);
+          if (fieldPath) {
+            expandedFields.push(fieldPath);
+          }
         }
       }
 

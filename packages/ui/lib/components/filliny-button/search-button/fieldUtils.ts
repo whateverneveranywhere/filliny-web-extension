@@ -1,6 +1,16 @@
 import { hasProperty } from '@extension/shared';
 import type { ReactFiberElement } from '@extension/shared';
 
+/**
+ * Minimal React Fiber node shape for tree traversal.
+ * Only the properties we actually access are typed.
+ */
+interface ReactFiberNode {
+  memoizedProps?: Record<string, string | number | boolean | null | undefined | object>;
+  pendingProps?: Record<string, string | number | boolean | null | undefined | object>;
+  return?: ReactFiberNode | null;
+}
+
 // ============================================================================
 // Autocomplete Label Map
 // ============================================================================
@@ -204,12 +214,12 @@ const extractReactFiberLabel = (element: HTMLElement): string | null => {
 
     // Walk the fiber tree upward to find props with label-like values
     const labelProps = ['label', 'aria-label', 'placeholder', 'name', 'title', 'fieldLabel', 'inputLabel', 'helpText'];
-    let fiber = element[fiberKey] as Record<string, unknown> | null;
+    let fiber = element[fiberKey] as ReactFiberNode | null;
     let depth = 0;
     const maxDepth = 15;
 
     while (fiber && depth < maxDepth) {
-      const memoizedProps = fiber.memoizedProps as Record<string, unknown> | undefined;
+      const memoizedProps = fiber.memoizedProps;
       if (memoizedProps && typeof memoizedProps === 'object') {
         for (const prop of labelProps) {
           const val = memoizedProps[prop];
@@ -225,7 +235,7 @@ const extractReactFiberLabel = (element: HTMLElement): string | null => {
       }
 
       // Also check pendingProps
-      const pendingProps = fiber.pendingProps as Record<string, unknown> | undefined;
+      const pendingProps = fiber.pendingProps;
       if (pendingProps && typeof pendingProps === 'object') {
         for (const prop of labelProps) {
           const val = pendingProps[prop];
@@ -235,19 +245,21 @@ const extractReactFiberLabel = (element: HTMLElement): string | null => {
         }
       }
 
-      fiber = (fiber.return ?? null) as Record<string, unknown> | null;
+      fiber = fiber.return ?? null;
       depth++;
     }
 
     // Also check __reactProps$ for label-like properties
     const propsKey = Object.keys(element).find(key => key.startsWith('__reactProps$'));
     if (propsKey && hasProperty(element, propsKey)) {
-      const props = element[propsKey] as Record<string, unknown>;
+      const props = element[propsKey];
       if (props && typeof props === 'object') {
         for (const prop of labelProps) {
-          const val = props[prop];
-          if (typeof val === 'string' && val.trim()) {
-            return val.trim();
+          if (hasProperty(props, prop)) {
+            const val = props[prop];
+            if (typeof val === 'string' && val.trim()) {
+              return val.trim();
+            }
           }
         }
       }
@@ -342,7 +354,7 @@ const extractTableHeaderLabel = (element: HTMLElement): string | null => {
     const tr = td.closest('tr');
     if (!tr) return null;
 
-    const cellIndex = Array.from(tr.cells).indexOf(td as HTMLTableCellElement);
+    const cellIndex = td instanceof HTMLTableCellElement ? Array.from(tr.cells).indexOf(td) : -1;
 
     // Strategy 1: Check the preceding td/th in the same row
     if (cellIndex > 0) {

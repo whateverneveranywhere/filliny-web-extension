@@ -4,28 +4,38 @@ import * as XLSX from 'xlsx';
 /**
  * Supported file types for text extraction
  */
-export type SupportedFileType = 'txt' | 'md' | 'docx' | 'pdf' | 'xlsx' | 'xls' | 'csv' | 'rtf';
+type SupportedFileType = 'txt' | 'md' | 'docx' | 'pdf' | 'xlsx' | 'xls' | 'csv' | 'rtf';
 
 /**
  * Default accepted file extensions
  */
-export const DEFAULT_ACCEPTED_FILE_TYPES = '.docx,.pdf,.xlsx,.txt,.csv,.rtf,.md';
+const DEFAULT_ACCEPTED_FILE_TYPES = '.docx,.pdf,.xlsx,.txt,.csv,.rtf,.md';
+
+/**
+ * All supported file type values, used for runtime membership checks.
+ */
+const SUPPORTED_FILE_TYPES: readonly SupportedFileType[] = ['txt', 'md', 'docx', 'pdf', 'xlsx', 'xls', 'csv', 'rtf'];
+
+/**
+ * Type guard for SupportedFileType
+ */
+const isSupportedFileType = (ext: string): ext is SupportedFileType =>
+  (SUPPORTED_FILE_TYPES as readonly string[]).includes(ext);
 
 /**
  * Detect file type from file name
  */
-export const detectFileType = (file: File): SupportedFileType | null => {
+const detectFileType = (file: File): SupportedFileType | null => {
   const extension = file.name.split('.').pop()?.toLowerCase();
   if (!extension) return null;
 
-  const supportedTypes: SupportedFileType[] = ['txt', 'md', 'docx', 'pdf', 'xlsx', 'xls', 'csv', 'rtf'];
-  return supportedTypes.includes(extension as SupportedFileType) ? (extension as SupportedFileType) : null;
+  return isSupportedFileType(extension) ? extension : null;
 };
 
 /**
  * Validate if a file has an accepted type
  */
-export const isAcceptedFileType = (file: File, acceptedTypes: string): boolean => {
+const isAcceptedFileType = (file: File, acceptedTypes: string): boolean => {
   const normalizedTypes = acceptedTypes.split(',').map(type => type.replace('.', '').toLowerCase().trim());
   const fileExtension = file.name.split('.').pop()?.toLowerCase();
   return normalizedTypes.some(type => fileExtension === type);
@@ -34,7 +44,7 @@ export const isAcceptedFileType = (file: File, acceptedTypes: string): boolean =
 /**
  * Process PDF files - only available in browser environments
  */
-export const processPDF = async (file: File): Promise<string> => {
+const processPDF = async (file: File): Promise<string> => {
   if (typeof window === 'undefined') {
     throw new Error('PDF processing is only available in browser environments');
   }
@@ -60,12 +70,10 @@ export const processPDF = async (file: File): Promise<string> => {
   for (let i = 1; i <= numPages; i++) {
     const page = await pdf.getPage(i);
     const content = await page.getTextContent();
-    // Use type assertion for content.items to avoid TypeScript errors
-    type PossibleTextItem = { str?: string; [key: string]: unknown };
 
     const pageText = content.items
-      .filter((item: PossibleTextItem) => typeof item === 'object' && item && 'str' in item)
-      .map((item: PossibleTextItem) => String(item.str))
+      .filter(item => 'str' in item)
+      .map(item => item.str)
       .join(' ');
     textContent.push(pageText);
   }
@@ -76,7 +84,7 @@ export const processPDF = async (file: File): Promise<string> => {
 /**
  * Process DOCX files
  */
-export const processDOCX = async (file: File): Promise<string> => {
+const processDOCX = async (file: File): Promise<string> => {
   const arrayBuffer = await file.arrayBuffer();
   const result = await mammoth.extractRawText({ arrayBuffer });
   return result.value;
@@ -85,7 +93,7 @@ export const processDOCX = async (file: File): Promise<string> => {
 /**
  * Process Excel/CSV files (xlsx, xls, csv)
  */
-export const processSpreadsheet = async (file: File, isRawCsv = false): Promise<string> => {
+const processSpreadsheet = async (file: File, isRawCsv = false): Promise<string> => {
   const buffer = await file.arrayBuffer();
   const workbook = XLSX.read(buffer, { type: 'array', raw: isRawCsv });
   const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
@@ -95,12 +103,12 @@ export const processSpreadsheet = async (file: File, isRawCsv = false): Promise<
 /**
  * Process plain text files (txt, md, rtf)
  */
-export const processTextFile = async (file: File): Promise<string> => file.text();
+const processTextFile = async (file: File): Promise<string> => file.text();
 
 /**
  * Extract text content from a file based on its type
  */
-export const extractTextFromFile = async (file: File): Promise<string> => {
+const extractTextFromFile = async (file: File): Promise<string> => {
   const fileType = detectFileType(file);
 
   if (!fileType) {
@@ -146,3 +154,15 @@ export const extractTextFromFile = async (file: File): Promise<string> => {
 
   return extractedText;
 };
+
+export {
+  DEFAULT_ACCEPTED_FILE_TYPES,
+  detectFileType,
+  isAcceptedFileType,
+  processPDF,
+  processDOCX,
+  processSpreadsheet,
+  processTextFile,
+  extractTextFromFile,
+};
+export type { SupportedFileType };

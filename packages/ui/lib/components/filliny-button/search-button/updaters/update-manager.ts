@@ -6,7 +6,7 @@
  */
 
 import { emitFieldDetectionEvent, withPerformanceMonitoring } from '../core/event-system';
-import { retry } from '../core/utils';
+import { retry, getErrorMessage } from '../core/utils';
 import type { FieldUpdateStrategy, DetectedField, UpdateResult, UpdateConfig } from '../core/types';
 
 // ============================================================================
@@ -78,7 +78,7 @@ export class UpdateManager {
           console.warn(`⚠️ Strategy ${strategy.name} failed: ${result.error}`);
         }
       } catch (error) {
-        lastError = (error as Error).message;
+        lastError = getErrorMessage(error);
         console.error(`❌ Strategy ${strategy.name} threw error:`, error);
       }
     }
@@ -98,16 +98,17 @@ export class UpdateManager {
 
     const results = await Promise.allSettled(updates.map(({ field, value }) => this.updateField(field, value)));
 
-    const updateResults = results.map(result => {
+    const updateResults: UpdateResult[] = results.map(result => {
       if (result.status === 'fulfilled') {
         return result.value;
-      } else {
-        return {
-          success: false,
-          strategy: 'unknown',
-          error: result.reason?.message || 'Update failed',
-        } as UpdateResult;
       }
+      const reason: unknown = result.reason;
+      const errorMessage = reason instanceof Error ? reason.message : 'Update failed';
+      return {
+        success: false,
+        strategy: 'unknown',
+        error: errorMessage,
+      };
     });
 
     const successCount = updateResults.filter(r => r.success).length;

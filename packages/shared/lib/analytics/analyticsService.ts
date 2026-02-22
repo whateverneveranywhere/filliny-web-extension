@@ -7,8 +7,9 @@
  * Callers use `track()` without caring which context they're in.
  */
 import { captureEvent, identifyUser as phIdentify, resetUser as phReset } from './posthogClient.js';
+import { AnalyticsEvent } from './types.js';
 import { MessageType } from '../types/enums.js';
-import type { AnalyticsEvent, AnalyticsEventProperties } from './types.js';
+import type { AnalyticsEventProperties } from './types.js';
 
 type ExtensionContext = 'background' | 'extension_page' | 'content_ui';
 
@@ -51,7 +52,7 @@ export const identifyUser = (distinctId: string, properties?: AnalyticsEventProp
       chrome.runtime
         .sendMessage({
           type: MessageType.ANALYTICS_EVENT,
-          payload: { event: '__identify' as AnalyticsEvent, properties: { distinct_id: distinctId, ...properties } },
+          payload: { event: AnalyticsEvent.INTERNAL_IDENTIFY, properties: { distinct_id: distinctId, ...properties } },
         })
         .catch(() => {});
     } else {
@@ -69,7 +70,7 @@ export const resetAnalyticsUser = (): void => {
       chrome.runtime
         .sendMessage({
           type: MessageType.ANALYTICS_EVENT,
-          payload: { event: '__reset' as AnalyticsEvent },
+          payload: { event: AnalyticsEvent.INTERNAL_RESET },
         })
         .catch(() => {});
     } else {

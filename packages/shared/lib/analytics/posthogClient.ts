@@ -102,8 +102,8 @@ const initPostHog = ({ context, config, version }: InitOptions): void => {
         userOptedIn = false;
       }
 
-      if (result.posthog_distinct_id) {
-        distinctId = result.posthog_distinct_id as string;
+      if (typeof result.posthog_distinct_id === 'string') {
+        distinctId = result.posthog_distinct_id;
       } else {
         distinctId = generateAnonymousId();
         chrome.storage.local.set({ posthog_distinct_id: distinctId });

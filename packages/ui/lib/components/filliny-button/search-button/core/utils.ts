@@ -5,9 +5,16 @@
  * following the DRY principle and ensuring consistency.
  */
 
-import { Framework } from '@extension/shared';
+import { Framework, FieldTypeEnum } from '@extension/shared';
 import type { ConfidenceScore, ElementPosition, FrameworkDetection, SelectorWithConfidence } from './types';
 import type { FrameworkDetectionWindow } from '@extension/shared';
+
+/**
+ * Access window with framework detection properties.
+ * Uses declaration merging: FrameworkDetectionWindow extends Window,
+ * so the extra properties are all optional and safe to read.
+ */
+const getFrameworkWindow = (): FrameworkDetectionWindow => window as FrameworkDetectionWindow;
 
 // ============================================================================
 // ELEMENT UTILITIES
@@ -40,7 +47,8 @@ const isElementInteractive = (element: HTMLElement): boolean => {
   if (rect.width === 0 || rect.height === 0) {
     // Exception for radio/checkbox which might be visually hidden but functional
     const isCheckable =
-      element instanceof HTMLInputElement && (element.type === 'checkbox' || element.type === 'radio');
+      element instanceof HTMLInputElement &&
+      (element.type === FieldTypeEnum.CHECKBOX || element.type === FieldTypeEnum.RADIO);
     if (!isCheckable) return false;
   }
 
@@ -146,7 +154,7 @@ const detectFramework = (element?: HTMLElement): FrameworkDetection => {
   let confidence: ConfidenceScore = 0;
   let version: string | undefined;
 
-  const fwWindow = window as unknown as FrameworkDetectionWindow;
+  const fwWindow = getFrameworkWindow();
 
   // React detection
   const reactIndicators = [
@@ -369,8 +377,34 @@ const throttle = <TArgs extends unknown[]>(
 };
 
 // ============================================================================
+// COLLECTION UTILITIES
+// ============================================================================
+
+/**
+ * Count items in an array by a key extractor function.
+ * Returns a Record mapping each key to its occurrence count.
+ * Replaces the repeated reduce-based accumulator pattern.
+ */
+const countBy = <T>(items: T[], keyFn: (item: T) => string): Record<string, number> =>
+  items.reduce<Record<string, number>>((acc, item) => {
+    const key = keyFn(item);
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
+
+// ============================================================================
 // ERROR HANDLING UTILITIES
 // ============================================================================
+
+/**
+ * Extract a human-readable message from an unknown error value.
+ * Eliminates the repeated `(error as Error).message` pattern across the codebase.
+ */
+const getErrorMessage = (error: unknown): string => {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'string') return error;
+  return 'Unknown error';
+};
 
 /**
  * Safe function execution with error handling
@@ -413,6 +447,7 @@ const retry = async <T>(fn: () => Promise<T>, maxAttempts: number = 3, baseDelay
 // ============================================================================
 
 export {
+  getFrameworkWindow,
   isElementInteractive,
   getElementPosition,
   generateUniqueSelectors,
@@ -426,4 +461,6 @@ export {
   throttle,
   safeExecute,
   retry,
+  getErrorMessage,
+  countBy,
 };

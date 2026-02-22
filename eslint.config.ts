@@ -26,6 +26,7 @@ const globalIgnores = {
     '.agents/**',
     'remotion-demo/**',
     '.claude/**',
+    'packages/ui/lib/components/ui/**/*',
   ],
 };
 
@@ -74,7 +75,16 @@ export default [
         'react/prop-types': 'off',
         'prefer-const': 'error',
         'no-var': 'error',
-        '@typescript-eslint/no-unused-vars': 'warn',
+        '@typescript-eslint/no-unused-vars': [
+          'warn',
+          {
+            argsIgnorePattern: '^_',
+            varsIgnorePattern: '^_',
+            destructuredArrayIgnorePattern: '^_',
+            caughtErrorsIgnorePattern: '^_',
+            ignoreRestSiblings: true,
+          },
+        ],
         'func-style': ['warn', 'expression', { allowArrowFunctions: true }],
         'no-restricted-imports': [
           'error',
@@ -133,4 +143,20 @@ export default [
       },
     },
   ),
+  // Override no-unused-vars AFTER tseslint.configs.recommended to ensure options apply
+  {
+    files: ['**/*.{ts,tsx}'],
+    rules: {
+      '@typescript-eslint/no-unused-vars': [
+        'warn',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          destructuredArrayIgnorePattern: '^_',
+          caughtErrorsIgnorePattern: '^_',
+          ignoreRestSiblings: true,
+        },
+      ],
+    },
+  },
 ];

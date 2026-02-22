@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import type { OverlayPosition } from '../types';
+import type { OverlayPosition } from '@extension/shared';
 
 interface UseOverlayPositionProps {
   formRef: React.MutableRefObject<HTMLElement | null>;

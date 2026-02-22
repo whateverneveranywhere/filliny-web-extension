@@ -39,6 +39,12 @@ export enum AnalyticsEvent {
   EXTENSION_INSTALLED = 'extension_installed',
   EXTENSION_UPDATED = 'extension_updated',
   SIDE_PANEL_OPENED = 'side_panel_opened',
+
+  // Internal control events (used for cross-context message relay)
+  /** Relay event to trigger user identification in the background context */
+  INTERNAL_IDENTIFY = '__identify',
+  /** Relay event to trigger user reset in the background context */
+  INTERNAL_RESET = '__reset',
 }
 
 /** Property interfaces for type-safe event tracking */

@@ -1,8 +1,9 @@
 /**
  * Safely get a string value from potentially complex field values
  */
+import { getElementXPath, generateUniqueSelectors } from '../core/utils';
 import { getFieldLabel, getFieldDescription, humanizeString, extractReactFiberLabel } from '../fieldUtils';
-import { hasProperty, isHTMLElement, FieldTypeSchema } from '@extension/shared';
+import { hasProperty, isHTMLElement, FieldTypeSchema, FieldTypeEnum } from '@extension/shared';
 import type { Field, FieldType, JQueryWindow, DOMEventHandler, AngularContextElement } from '@extension/shared';
 
 // Track used field IDs to ensure uniqueness
@@ -30,6 +31,22 @@ const hasAngularContext = (element: HTMLElement): element is AngularContextEleme
  */
 const hasJQuery = (win: Window): win is JQueryWindow =>
   hasProperty(win, 'jQuery') && typeof (win as JQueryWindow).jQuery !== 'undefined';
+
+/**
+ * jQuery Validation plugin validator instance
+ */
+interface JQueryValidatorInstance {
+  element: (el: HTMLElement) => boolean;
+}
+
+/**
+ * Type guard to check if a value is a jQuery Validation plugin validator
+ */
+const isJQueryValidator = (value: unknown): value is JQueryValidatorInstance =>
+  typeof value === 'object' &&
+  value !== null &&
+  'element' in value &&
+  typeof (value as JQueryValidatorInstance).element === 'function';
 
 /**
  * Dispatches an event on the given element
@@ -66,7 +83,7 @@ const dispatchEvent = (element: HTMLElement, eventName: string): void => {
     }
 
     // For jQuery-based sites
-    const win = window as Window;
+    const win: Window = window;
     if (hasJQuery(win) && win.jQuery) {
       try {
         win.jQuery(element).trigger(eventName);
@@ -172,7 +189,7 @@ const findRelatedRadioButtons = (radioButton: HTMLElement): HTMLElement[] => {
   }
 
   // Method 2: Find by ARIA attributes
-  if (radioButton.getAttribute('role') === 'radio') {
+  if (radioButton.getAttribute('role') === FieldTypeEnum.RADIO) {
     // Find the radiogroup container
     const radioGroup = radioButton.closest('[role="radiogroup"]');
     if (radioGroup) {
@@ -242,7 +259,7 @@ const findRelatedCheckboxes = (checkbox: HTMLElement): HTMLElement[] => {
   }
 
   // Method 2: Find by ARIA attributes
-  if (checkbox.getAttribute('role') === 'checkbox') {
+  if (checkbox.getAttribute('role') === FieldTypeEnum.CHECKBOX) {
     // Find the checkboxgroup container
     const checkboxGroup = checkbox.closest('[role="group"]');
     if (checkboxGroup) {
@@ -431,7 +448,8 @@ const findSelectOptions = (
 
 /**
  * Set a value using the native prototype setter, bypassing framework interception.
- * This is the most reliable technique for React controlled inputs.
+ * Falls back to temporarily replacing the setter via Object.defineProperty
+ * if the native prototype approach fails.
  */
 const setNativeValue = (element: HTMLElement, value: string): boolean => {
   try {
@@ -447,6 +465,34 @@ const setNativeValue = (element: HTMLElement, value: string): boolean => {
 
     if (setter) {
       setter.call(element, value);
+      return true;
+    }
+
+    // Fallback: temporarily replace the setter via Object.defineProperty
+    // This works when the prototype setter is unavailable (e.g., exotic environments)
+    if (
+      element instanceof HTMLInputElement ||
+      element instanceof HTMLTextAreaElement ||
+      element instanceof HTMLSelectElement
+    ) {
+      const originalDescriptor = Object.getOwnPropertyDescriptor(element, 'value');
+      Object.defineProperty(element, 'value', {
+        set(v: string) {
+          // Remove our temporary override so the original behavior is restored
+          if (originalDescriptor) {
+            Object.defineProperty(element, 'value', originalDescriptor);
+          } else {
+            Reflect.deleteProperty(element, 'value');
+          }
+          // Now set through the prototype chain
+          element.value = v;
+        },
+        get() {
+          return originalDescriptor?.get?.call(element) ?? '';
+        },
+        configurable: true,
+      });
+      element.value = value;
       return true;
     }
 
@@ -535,11 +581,109 @@ const createReactSyntheticEvent = (element: HTMLElement, type: string): ReactSyn
   nativeEvent: new Event(type, { bubbles: true }),
 });
 
+// ============================================================================
+// React Fiber Tree Walking - find onChange via __reactFiber$ / __reactInternalInstance$
+// ============================================================================
+
+/**
+ * Template literal type for React fiber keys attached to DOM elements.
+ */
+type ReactFiberKey = `__reactFiber$${string}`;
+type ReactInternalInstanceKey = `__reactInternalInstance$${string}`;
+
+/**
+ * React fiber node with props containing event handlers.
+ * React attaches these to DOM elements at runtime for internal bookkeeping.
+ */
+interface ReactFiberNodeWithHandlers {
+  memoizedProps?: {
+    onChange?: (event: ReactSyntheticEvent) => void;
+    onInput?: (event: ReactSyntheticEvent) => void;
+    [key: string]: unknown;
+  };
+  pendingProps?: {
+    onChange?: (event: ReactSyntheticEvent) => void;
+    onInput?: (event: ReactSyntheticEvent) => void;
+    [key: string]: unknown;
+  };
+  return?: ReactFiberNodeWithHandlers;
+}
+
+/**
+ * Element with React fiber/internal instance keys attached at runtime.
+ */
+interface ReactFiberDOMElement extends HTMLElement {
+  [key: ReactFiberKey]: ReactFiberNodeWithHandlers | undefined;
+  [key: ReactInternalInstanceKey]: ReactFiberNodeWithHandlers | undefined;
+}
+
+/**
+ * Check whether a string is a React fiber key.
+ */
+const isReactFiberKey = (key: string): key is ReactFiberKey => key.startsWith('__reactFiber$');
+
+/**
+ * Check whether a string is a React internal instance key.
+ */
+const isReactInternalInstanceKey = (key: string): key is ReactInternalInstanceKey =>
+  key.startsWith('__reactInternalInstance$');
+
+/**
+ * Type guard: check whether an element has a React fiber for the given key.
+ */
+const hasReactFiberNode = (
+  element: HTMLElement,
+  key: ReactFiberKey | ReactInternalInstanceKey,
+): element is ReactFiberDOMElement => key in element;
+
+/**
+ * Extract a React event handler from fiber props if it is a function.
+ */
+const extractFiberHandler = (
+  props: ReactFiberNodeWithHandlers['memoizedProps'],
+): ((event: ReactSyntheticEvent) => void) | null => {
+  if (!props) return null;
+  if (typeof props.onChange === 'function') return props.onChange;
+  if (typeof props.onInput === 'function') return props.onInput;
+  return null;
+};
+
+/**
+ * Walk the React fiber tree upward to find the closest onChange handler.
+ * Returns the handler if found, null otherwise.
+ */
+const findReactOnChangeInFiber = (element: HTMLElement): ((event: ReactSyntheticEvent) => void) | null => {
+  try {
+    const fiberKey = Object.keys(element).find(
+      (key): key is ReactFiberKey | ReactInternalInstanceKey => isReactFiberKey(key) || isReactInternalInstanceKey(key),
+    );
+
+    if (!fiberKey || !hasReactFiberNode(element, fiberKey)) return null;
+
+    // Walk up the fiber tree (max 15 levels to avoid infinite loops)
+    let fiber: ReactFiberNodeWithHandlers | undefined = element[fiberKey];
+    for (let i = 0; i < 15 && fiber; i++) {
+      const handler = extractFiberHandler(fiber.memoizedProps) ?? extractFiberHandler(fiber.pendingProps);
+      if (handler) return handler;
+
+      // Move to parent fiber
+      fiber = fiber.return;
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+};
+
 /**
  * Invoke React onChange directly via __reactProps$ as a fallback strategy.
+ * Also checks __reactFiber$ and __reactInternalInstance$ keys, walking
+ * the fiber tree upward to find the closest onChange handler.
  */
 const invokeReactOnChange = (element: HTMLElement): boolean => {
   try {
+    // Strategy 1: Direct __reactProps$ lookup
     const props = getReactProps(element);
     if (props?.onChange) {
       props.onChange(createReactSyntheticEvent(element, 'change'));
@@ -549,6 +693,14 @@ const invokeReactOnChange = (element: HTMLElement): boolean => {
       props.onInput(createReactSyntheticEvent(element, 'input'));
       return true;
     }
+
+    // Strategy 2: Walk fiber tree via __reactFiber$ / __reactInternalInstance$
+    const fiberHandler = findReactOnChangeInFiber(element);
+    if (fiberHandler) {
+      fiberHandler(createReactSyntheticEvent(element, 'change'));
+      return true;
+    }
+
     return false;
   } catch {
     return false;
@@ -560,8 +712,12 @@ const invokeReactOnChange = (element: HTMLElement): boolean => {
 // ============================================================================
 
 /**
- * Dispatch a full pointer+mouse click sequence as modern UI frameworks require.
- * Sequence: pointerdown → mousedown → pointerup → mouseup → click
+ * Dispatch a complete user click sequence including hover enter/leave phases.
+ * Full sequence:
+ *   Hover in: pointerover -> pointerenter -> mouseover -> mouseenter -> pointermove -> mousemove
+ *   Click:    pointerdown -> mousedown -> pointerup -> mouseup -> click
+ *   Focus:    focusin (for focusable elements)
+ *   Hover out: pointerout -> pointerleave -> mouseout -> mouseleave
  */
 const dispatchPointerClickSequence = (element: HTMLElement): void => {
   try {
@@ -579,6 +735,11 @@ const dispatchPointerClickSequence = (element: HTMLElement): void => {
       screenY: y,
     };
 
+    const nonBubblingProps = {
+      ...commonProps,
+      bubbles: false,
+    };
+
     const pointerProps = {
       ...commonProps,
       pointerId: 1,
@@ -589,14 +750,107 @@ const dispatchPointerClickSequence = (element: HTMLElement): void => {
       pressure: 0.5,
     };
 
+    const pointerNonBubblingProps = {
+      ...pointerProps,
+      bubbles: false,
+    };
+
+    // Phase 1: Hover enter (mouse moving to element)
+    element.dispatchEvent(new PointerEvent('pointerover', pointerProps));
+    element.dispatchEvent(new PointerEvent('pointerenter', pointerNonBubblingProps));
+    element.dispatchEvent(new MouseEvent('mouseover', commonProps));
+    element.dispatchEvent(new MouseEvent('mouseenter', nonBubblingProps));
+
+    // Optional quick movement over element
+    element.dispatchEvent(new PointerEvent('pointermove', pointerProps));
+    element.dispatchEvent(new MouseEvent('mousemove', commonProps));
+
+    // Phase 2: Click sequence
     element.dispatchEvent(new PointerEvent('pointerdown', pointerProps));
     element.dispatchEvent(new MouseEvent('mousedown', commonProps));
     element.dispatchEvent(new PointerEvent('pointerup', { ...pointerProps, pressure: 0 }));
     element.dispatchEvent(new MouseEvent('mouseup', commonProps));
     element.dispatchEvent(new MouseEvent('click', commonProps));
+
+    // Phase 3: Focus (for elements that should receive focus)
+    const isFocusable =
+      element instanceof HTMLInputElement ||
+      element instanceof HTMLTextAreaElement ||
+      element instanceof HTMLSelectElement ||
+      element instanceof HTMLButtonElement ||
+      element.hasAttribute('tabindex') ||
+      element.isContentEditable;
+
+    if (isFocusable) {
+      element.dispatchEvent(new FocusEvent('focusin', { bubbles: true, relatedTarget: null }));
+    }
+
+    // Phase 4: Hover leave (mouse moving away)
+    element.dispatchEvent(new PointerEvent('pointerout', pointerProps));
+    element.dispatchEvent(new PointerEvent('pointerleave', pointerNonBubblingProps));
+    element.dispatchEvent(new MouseEvent('mouseout', commonProps));
+    element.dispatchEvent(new MouseEvent('mouseleave', nonBubblingProps));
   } catch {
     // Fallback to simple click
     element.click();
+  }
+};
+
+// ============================================================================
+// Full User Interaction - comprehensive interaction simulation
+// ============================================================================
+
+/**
+ * Simulate a complete user interaction with an element:
+ * scrolls into view, hovers, clicks, and focuses.
+ */
+const dispatchFullUserInteraction = async (element: HTMLElement): Promise<void> => {
+  try {
+    // Scroll element into view
+    element.scrollIntoView({ block: 'center', behavior: 'instant' });
+    await new Promise<void>(r => setTimeout(r, 50));
+
+    // Hover over element (pointer/mouse enter events)
+    const rect = element.getBoundingClientRect();
+    const x = rect.left + rect.width / 2;
+    const y = rect.top + rect.height / 2;
+
+    const hoverProps = {
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+      clientX: x,
+      clientY: y,
+      screenX: x,
+      screenY: y,
+    };
+
+    const pointerHoverProps = {
+      ...hoverProps,
+      pointerId: 1,
+      pointerType: 'mouse' as const,
+      isPrimary: true,
+      width: 1,
+      height: 1,
+      pressure: 0,
+    };
+
+    element.dispatchEvent(new PointerEvent('pointerover', pointerHoverProps));
+    element.dispatchEvent(new PointerEvent('pointerenter', { ...pointerHoverProps, bubbles: false }));
+    element.dispatchEvent(new MouseEvent('mouseover', hoverProps));
+    element.dispatchEvent(new MouseEvent('mouseenter', { ...hoverProps, bubbles: false }));
+
+    await new Promise<void>(r => setTimeout(r, 30));
+
+    // Click the element (full pointer sequence)
+    dispatchPointerClickSequence(element);
+
+    // Focus the element
+    ensureFocus(element);
+  } catch {
+    // Fallback: just click and focus
+    element.click();
+    element.focus();
   }
 };
 
@@ -842,6 +1096,42 @@ const isElementAttached = (element: HTMLElement): boolean => {
 };
 
 // ============================================================================
+// Field Value Verification
+// ============================================================================
+
+/**
+ * Verify that a value was set correctly on an element.
+ * Flushes microtasks and a requestAnimationFrame before checking.
+ */
+const verifyFieldValueSet = async (element: HTMLElement, expected: string | boolean): Promise<boolean> => {
+  // Flush microtasks
+  await new Promise<void>(r => setTimeout(r, 0));
+  // Flush requestAnimationFrame
+  await new Promise<void>(r => requestAnimationFrame(() => r()));
+
+  if (typeof expected === 'boolean') {
+    if (element instanceof HTMLInputElement) {
+      return element.checked === expected;
+    }
+    return element.getAttribute('aria-checked') === String(expected);
+  }
+
+  if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
+    return element.value === expected;
+  }
+
+  if (element instanceof HTMLSelectElement) {
+    return element.value === expected;
+  }
+
+  if (element.isContentEditable) {
+    return (element.textContent || '').trim() === expected.trim();
+  }
+
+  return false;
+};
+
+// ============================================================================
 // Form State Snapshot for Undo
 // ============================================================================
 
@@ -921,9 +1211,103 @@ const getTypingDelay = (): number => {
   return 15 + Math.random() * 65;
 };
 
+// ============================================================================
+// Validation Triggers
+// ============================================================================
+
+/**
+ * Trigger jQuery Validation plugin validation on a field, if jQuery and the
+ * validator are available on the page.
+ */
+const triggerJQueryValidation = (element: HTMLElement): boolean => {
+  try {
+    const win: Window = window;
+    if (!hasJQuery(win) || !win.jQuery) return false;
+
+    const jq = win.jQuery;
+
+    // Trigger focusout which jQuery Validation listens to
+    jq(element).trigger('focusout');
+
+    // Try to access $.validator.element() if available
+    const closestForm = element.closest('form');
+    if (closestForm) {
+      const $form = jq(closestForm);
+      const validator = $form.data('validator');
+      if (isJQueryValidator(validator)) {
+        validator.element(element);
+        return true;
+      }
+    }
+
+    return false;
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * After filling a field, trigger the form's validation mechanisms.
+ * Handles native HTML5 validation, React Hook Form / Formik (blur-based),
+ * and jQuery Validation plugin.
+ */
+const detectAndTriggerValidation = (element: HTMLElement): void => {
+  try {
+    // 1. Dispatch blur to trigger on-blur validation (React Hook Form, Formik, etc.)
+    element.dispatchEvent(new FocusEvent('blur', { bubbles: true, relatedTarget: null }));
+    element.dispatchEvent(new FocusEvent('focusout', { bubbles: true, relatedTarget: null }));
+
+    // 2. Native HTML5 constraint validation
+    if (
+      element instanceof HTMLInputElement ||
+      element instanceof HTMLTextAreaElement ||
+      element instanceof HTMLSelectElement
+    ) {
+      if (!element.checkValidity()) {
+        element.dispatchEvent(new Event('invalid', { bubbles: false, cancelable: true }));
+      }
+    }
+
+    // 3. Check for framework-specific validation attributes
+    // data-validate, data-vv-rules (VeeValidate), data-parsley-* (Parsley.js)
+    const hasDataValidate =
+      element.hasAttribute('data-validate') ||
+      element.hasAttribute('data-vv-rules') ||
+      Array.from(element.attributes).some(attr => attr.name.startsWith('data-parsley-'));
+
+    if (hasDataValidate) {
+      // Trigger change to fire any data-attribute-based validation
+      element.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    // 4. jQuery Validation plugin
+    triggerJQueryValidation(element);
+  } catch {
+    // Validation triggering is best-effort
+  }
+};
+
+// ============================================================================
+// Typing Simulation
+// ============================================================================
+
+/**
+ * Helper to check whether the current value matches the expected value.
+ */
+const checkValueStuck = (element: HTMLElement, value: string): boolean => {
+  if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
+    return element.value === value;
+  }
+  if (element.isContentEditable) {
+    return (element.textContent || '').trim() === value.trim();
+  }
+  return false;
+};
+
 /**
  * Simulate human-like typing with proper focus events, composition, and beforeinput.
- * Enhanced with native value setter as primary strategy and natural typing delays.
+ * Enhanced with native value setter as primary strategy, value-sticking checks
+ * between each fallback, and a nuclear requestAnimationFrame + MutationObserver fallback.
  */
 const simulateTyping = async (element: HTMLElement, value: string): Promise<void> => {
   try {
@@ -945,35 +1329,28 @@ const simulateTyping = async (element: HTMLElement, value: string): Promise<void
     if (isInput || isTextarea) {
       const nativeSet = setNativeValue(element, value);
       if (nativeSet) {
-        // Dispatch beforeinput
         dispatchBeforeInput(element, value, 'insertReplacementText');
-
-        // Dispatch input event with proper inputType
         element.dispatchEvent(
           new InputEvent('input', { bubbles: true, cancelable: true, data: value, inputType: 'insertReplacementText' }),
         );
         element.dispatchEvent(new Event('change', { bubbles: true, cancelable: true }));
 
-        // Check if value persisted
-        if (element.value === value) {
+        if (checkValueStuck(element, value)) {
           element.blur();
           return;
         }
       }
 
       // ---- FALLBACK 1: Direct React props onChange ----
-      if (isInput || isTextarea) {
-        setNativeValue(element, value);
-        const invoked = invokeReactOnChange(element);
-        if (invoked && element.value === value) {
-          element.blur();
-          return;
-        }
+      setNativeValue(element, value);
+      const invoked = invokeReactOnChange(element);
+      if (invoked && checkValueStuck(element, value)) {
+        element.blur();
+        return;
       }
     }
 
-    // ---- FALLBACK 2: Composition events + direct assignment ----
-    // Start composition (proper CompositionEvent)
+    // ---- FALLBACK 2: Composition events + execCommand('insertText') ----
     dispatchCompositionEvents(element, value);
 
     // Direct property assignment
@@ -987,14 +1364,20 @@ const simulateTyping = async (element: HTMLElement, value: string): Promise<void
       element.textContent = value;
     }
 
-    // Try using document.execCommand (for contentEditable and some frameworks)
+    // Check if composition events worked
+    if (checkValueStuck(element, value)) {
+      return;
+    }
+
+    // Try execCommand('insertText') - works for contentEditable and some frameworks
     try {
-      if (element.isContentEditable || isTextarea) {
-        const selection = window.getSelection();
-        if (selection && element.contains(selection.anchorNode)) {
-          document.execCommand('selectAll', false);
-          document.execCommand('delete', false);
-          document.execCommand('insertText', false, value);
+      ensureFocus(element);
+      if (element.isContentEditable || isTextarea || isInput) {
+        document.execCommand('selectAll', false);
+        document.execCommand('delete', false);
+        const inserted = document.execCommand('insertText', false, value);
+        if (inserted && checkValueStuck(element, value)) {
+          return;
         }
       }
     } catch {
@@ -1002,15 +1385,7 @@ const simulateTyping = async (element: HTMLElement, value: string): Promise<void
     }
 
     // ---- FALLBACK 3: Character-by-character typing with natural delays ----
-    let valueSet = false;
-    if (isInput || isTextarea) {
-      valueSet = element.value === value;
-    } else if (element.isContentEditable) {
-      valueSet = element.textContent === value;
-    }
-
-    if (!valueSet && (isInput || isTextarea)) {
-      // Reset and type character by character
+    if (!checkValueStuck(element, value) && (isInput || isTextarea)) {
       setNativeValue(element, '');
       element.dispatchEvent(new InputEvent('input', { bubbles: true, data: '', inputType: 'deleteContentBackward' }));
 
@@ -1037,18 +1412,70 @@ const simulateTyping = async (element: HTMLElement, value: string): Promise<void
         );
         element.dispatchEvent(new KeyboardEvent('keyup', keyEvent));
 
-        // Natural typing delay with randomization
         await new Promise(resolve => setTimeout(resolve, getTypingDelay()));
       }
 
       element.dispatchEvent(new Event('change', { bubbles: true }));
+
+      if (checkValueStuck(element, value)) {
+        return;
+      }
     }
 
     // ---- FALLBACK 4: Paste simulation ----
-    if (isInput || isTextarea) {
-      if (element.value !== value) {
-        simulatePaste(element, value);
+    if ((isInput || isTextarea) && !checkValueStuck(element, value)) {
+      simulatePaste(element, value);
+
+      if (checkValueStuck(element, value)) {
+        return;
       }
+    }
+
+    // ---- NUCLEAR FALLBACK 5: requestAnimationFrame + MutationObserver ----
+    // Some frameworks reset the value on the next microtask/rAF. We observe
+    // for resets and re-apply the value inside a requestAnimationFrame callback.
+    if ((isInput || isTextarea) && !checkValueStuck(element, value)) {
+      await new Promise<void>(resolve => {
+        let resolved = false;
+        const finish = () => {
+          if (!resolved) {
+            resolved = true;
+            observer.disconnect();
+            resolve();
+          }
+        };
+
+        const observer = new MutationObserver(() => {
+          // Something changed the element -- re-apply value in rAF
+          if (!checkValueStuck(element, value)) {
+            requestAnimationFrame(() => {
+              setNativeValue(element, value);
+              element.dispatchEvent(new Event('input', { bubbles: true }));
+              element.dispatchEvent(new Event('change', { bubbles: true }));
+            });
+          }
+        });
+
+        observer.observe(element, {
+          attributes: true,
+          attributeFilter: ['value'],
+          characterData: true,
+          childList: true,
+        });
+
+        // Set value inside rAF
+        requestAnimationFrame(() => {
+          setNativeValue(element, value);
+          element.dispatchEvent(new Event('input', { bubbles: true }));
+          element.dispatchEvent(new Event('change', { bubbles: true }));
+
+          // Give a brief window for observers to fire
+          setTimeout(finish, 100);
+        });
+
+        // Hard timeout to prevent hanging
+        setTimeout(finish, 300);
+      });
     }
 
     // Fire standard events
@@ -1075,37 +1502,8 @@ const simulateTyping = async (element: HTMLElement, value: string): Promise<void
   }
 };
 
-/**
- * Get an XPath expression that identifies an element
- */
-const getElementXPath = (element: HTMLElement): string => {
-  if (!element.parentElement) return '';
-  const idx =
-    Array.from(element.parentElement.children)
-      .filter(child => child.tagName === element.tagName)
-      .indexOf(element) + 1;
-  return `${getElementXPath(element.parentElement)}/${element.tagName.toLowerCase()}[${idx}]`;
-};
-
-/**
- * Generate unique selectors for an element to help with identification
- */
-const generateUniqueSelectors = (element: HTMLElement): string[] => {
-  const selectors: string[] = [];
-  if (element.id) selectors.push(`#${CSS.escape(element.id)}`);
-  if (element.className) {
-    const classSelector = Array.from(element.classList)
-      .map(c => `.${CSS.escape(c)}`)
-      .join('');
-    if (classSelector) selectors.push(classSelector);
-  }
-  ['name', 'type', 'role', 'aria-label'].forEach(attr => {
-    if (element.hasAttribute(attr)) {
-      selectors.push(`[${attr}="${CSS.escape(element.getAttribute(attr)!)}"]`);
-    }
-  });
-  return selectors;
-};
+// getElementXPath and generateUniqueSelectors are imported from ../core/utils
+// and re-exported at the bottom of this file to maintain backward compatibility.
 
 /**
  * Get a unique field ID
@@ -1315,7 +1713,7 @@ export {
   safeGetLowerString,
   safeGetAttributes,
   safeHasProperty,
-  // New exports - Phase 1+
+  // Phase 1+ exports
   setNativeValue,
   getReactProps,
   invokeReactOnChange,
@@ -1331,6 +1729,12 @@ export {
   captureFormState,
   restoreFormState,
   getTypingDelay,
+  // Phase 2 exports - enhanced interaction, validation, verification
+  dispatchFullUserInteraction,
+  verifyFieldValueSet,
+  detectAndTriggerValidation,
+  triggerJQueryValidation,
+  findReactOnChangeInFiber,
 };
 
 export type { ReactProps, ReactSyntheticEvent, FormStateSnapshot };

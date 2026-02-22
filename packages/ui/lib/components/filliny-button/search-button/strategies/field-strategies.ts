@@ -7,6 +7,7 @@
 
 import { createBaseDetectedField, getFieldLabel } from '../core/field-detector';
 import { isValidFormField } from '../core/utils';
+import { FieldTypeEnum } from '@extension/shared';
 import type { FieldDetectionStrategy, DetectedField } from '../core/types';
 
 // ============================================================================
@@ -56,13 +57,13 @@ export class StandardHtmlFieldStrategy implements FieldDetectionStrategy {
 
   private getFieldType(element: HTMLElement): string {
     if (element instanceof HTMLInputElement) {
-      return element.type || 'text';
+      return element.type || FieldTypeEnum.TEXT;
     }
     if (element instanceof HTMLSelectElement) {
-      return 'select';
+      return FieldTypeEnum.SELECT;
     }
     if (element instanceof HTMLTextAreaElement) {
-      return 'textarea';
+      return FieldTypeEnum.TEXTAREA;
     }
     return 'unknown';
   }
@@ -291,16 +292,16 @@ export class CustomComponentStrategy implements FieldDetectionStrategy {
     const id = element.id.toLowerCase();
 
     // Infer type from class names or IDs
-    if (className.includes('email') || id.includes('email')) return 'email';
-    if (className.includes('password') || id.includes('password')) return 'password';
-    if (className.includes('phone') || id.includes('phone')) return 'tel';
-    if (className.includes('number') || id.includes('number')) return 'number';
-    if (className.includes('date') || id.includes('date')) return 'date';
-    if (className.includes('select') || className.includes('dropdown')) return 'select';
-    if (className.includes('checkbox')) return 'checkbox';
-    if (className.includes('radio')) return 'radio';
+    if (className.includes('email') || id.includes('email')) return FieldTypeEnum.EMAIL;
+    if (className.includes('password') || id.includes('password')) return FieldTypeEnum.PASSWORD;
+    if (className.includes('phone') || id.includes('phone')) return FieldTypeEnum.TEL;
+    if (className.includes('number') || id.includes('number')) return FieldTypeEnum.NUMBER;
+    if (className.includes('date') || id.includes('date')) return FieldTypeEnum.DATE;
+    if (className.includes('select') || className.includes('dropdown')) return FieldTypeEnum.SELECT;
+    if (className.includes('checkbox')) return FieldTypeEnum.CHECKBOX;
+    if (className.includes('radio')) return FieldTypeEnum.RADIO;
 
-    return 'text'; // Default fallback
+    return FieldTypeEnum.TEXT; // Default fallback
   }
 
   private calculateConfidence(element: HTMLElement): number {

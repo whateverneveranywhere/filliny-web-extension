@@ -7,6 +7,7 @@ import {
   DETECTION_PASS_CONFIDENCE,
   ConfidenceLevel,
   TIMING_CONSTANTS,
+  FieldTypeEnum,
   createDebugLogger,
   Framework,
   detectFrameworkForElement,
@@ -686,11 +687,6 @@ const isInsideCrossOriginIframe = (): boolean => {
     return true;
   }
 };
-
-// Remove unused function
-// function showCrossOriginIframeWarning() {
-//   debug.warn("🚨 Filliny detected it's running inside a cross-origin iframe. Form detection may be limited.");
-// }
 
 const openCrossOriginIframeInNewTabAndAlert = (): void => {
   if (isInsideCrossOriginIframe()) {
@@ -2003,7 +1999,7 @@ const ProcessedFormStepSchema = z.object({
 type ProcessedFormStep = z.infer<typeof ProcessedFormStepSchema>;
 
 // Normalized API response schema (recursive, using lazy for self-reference)
-const NormalizedAPIDataSchema: z.ZodType<{
+interface NormalizedAPIDataShape {
   fields?: RawFieldData[];
   schema?: {
     fields?: RawFieldData[];
@@ -2016,39 +2012,42 @@ const NormalizedAPIDataSchema: z.ZodType<{
   validation?: ValidationRules;
   rules?: ValidationRules;
   constraints?: ValidationRules;
-  data?: unknown;
-  result?: unknown;
-  payload?: unknown;
-  pageProps?: unknown;
-  form?: unknown;
-  formConfig?: unknown;
-  formDefinition?: unknown;
-}> = z.object({
-  fields: z.array(RawFieldDataSchema).optional(),
-  schema: z
-    .object({
-      fields: z.array(RawFieldDataSchema).optional(),
-      properties: z.record(z.string(), RawFieldDataSchema).optional(),
-    })
-    .optional(),
-  steps: z.array(RawStepDataSchema).optional(),
-  wizard: z
-    .object({
-      steps: z.array(RawStepDataSchema).optional(),
-    })
-    .optional(),
-  validation: ValidationRulesSchema.optional(),
-  rules: ValidationRulesSchema.optional(),
-  constraints: ValidationRulesSchema.optional(),
-  // Self-referential fields use z.unknown() for simplicity, validated at runtime
-  data: z.unknown().optional(),
-  result: z.unknown().optional(),
-  payload: z.unknown().optional(),
-  pageProps: z.unknown().optional(),
-  form: z.unknown().optional(),
-  formConfig: z.unknown().optional(),
-  formDefinition: z.unknown().optional(),
-});
+  data?: NormalizedAPIDataShape;
+  result?: NormalizedAPIDataShape;
+  payload?: NormalizedAPIDataShape;
+  pageProps?: NormalizedAPIDataShape;
+  form?: NormalizedAPIDataShape;
+  formConfig?: NormalizedAPIDataShape;
+  formDefinition?: NormalizedAPIDataShape;
+}
+
+const NormalizedAPIDataSchema: z.ZodType<NormalizedAPIDataShape> = z.lazy(() =>
+  z.object({
+    fields: z.array(RawFieldDataSchema).optional(),
+    schema: z
+      .object({
+        fields: z.array(RawFieldDataSchema).optional(),
+        properties: z.record(z.string(), RawFieldDataSchema).optional(),
+      })
+      .optional(),
+    steps: z.array(RawStepDataSchema).optional(),
+    wizard: z
+      .object({
+        steps: z.array(RawStepDataSchema).optional(),
+      })
+      .optional(),
+    validation: ValidationRulesSchema.optional(),
+    rules: ValidationRulesSchema.optional(),
+    constraints: ValidationRulesSchema.optional(),
+    data: NormalizedAPIDataSchema.optional(),
+    result: NormalizedAPIDataSchema.optional(),
+    payload: NormalizedAPIDataSchema.optional(),
+    pageProps: NormalizedAPIDataSchema.optional(),
+    form: NormalizedAPIDataSchema.optional(),
+    formConfig: NormalizedAPIDataSchema.optional(),
+    formDefinition: NormalizedAPIDataSchema.optional(),
+  }),
+);
 type NormalizedAPIData = z.infer<typeof NormalizedAPIDataSchema>;
 
 // Processed form definition schema
@@ -2106,13 +2105,30 @@ const processFormDefinitionData = (data: unknown, source: string): ProcessedForm
   }
 };
 
-// Schema for plain objects
-const PlainObjectSchema = z.record(z.string(), z.unknown());
+/**
+ * Recursive JSON value type for plain object validation.
+ * Covers all valid JSON types that API responses may contain.
+ */
+type PlainObjectValue = string | number | boolean | null | PlainObjectValue[] | { [key: string]: PlainObjectValue };
+
+const PlainObjectValueSchema: z.ZodType<PlainObjectValue> = z.lazy(() =>
+  z.union([
+    z.string(),
+    z.number(),
+    z.boolean(),
+    z.null(),
+    z.array(PlainObjectValueSchema),
+    z.record(z.string(), PlainObjectValueSchema),
+  ]),
+);
+
+// Schema for plain objects with typed values
+const PlainObjectSchema = z.record(z.string(), PlainObjectValueSchema);
 
 /**
  * Type guard for objects using Zod validation
  */
-const isObject = (value: unknown): value is Record<string, unknown> => {
+const isObject = (value: unknown): value is Record<string, PlainObjectValue> => {
   if (value === null || Array.isArray(value)) return false;
   return PlainObjectSchema.safeParse(value).success;
 };
@@ -2276,7 +2292,7 @@ const processFieldDefinition = (fieldData: RawFieldData, fallbackId?: string): P
     const field: ProcessedFormField = {
       id,
       name: String(fieldData.name ?? id),
-      type: normalizeFieldType(String(fieldData.type ?? fieldData.fieldType ?? 'text')),
+      type: normalizeFieldType(String(fieldData.type ?? fieldData.fieldType ?? FieldTypeEnum.TEXT)),
       label: fieldData.label ?? fieldData.title ?? fieldData.displayName,
       placeholder: fieldData.placeholder,
       required: Boolean(fieldData.required || fieldData.isRequired),
@@ -2324,29 +2340,29 @@ const normalizeFieldType = (type: string): string => {
 
   // Map common variations to standard types
   const typeMap: Record<string, string> = {
-    string: 'text',
-    varchar: 'text',
-    textarea: 'textarea',
-    longtext: 'textarea',
-    dropdown: 'select',
-    combobox: 'select',
-    checkbox: 'checkbox',
-    radio: 'radio',
-    radiobutton: 'radio',
-    file: 'file',
-    upload: 'file',
-    attachment: 'file',
-    date: 'date',
-    datetime: 'datetime-local',
-    time: 'time',
-    number: 'number',
-    integer: 'number',
-    decimal: 'number',
-    email: 'email',
-    url: 'url',
-    tel: 'tel',
-    phone: 'tel',
-    password: 'password',
+    string: FieldTypeEnum.TEXT,
+    varchar: FieldTypeEnum.TEXT,
+    textarea: FieldTypeEnum.TEXTAREA,
+    longtext: FieldTypeEnum.TEXTAREA,
+    dropdown: FieldTypeEnum.SELECT,
+    combobox: FieldTypeEnum.SELECT,
+    checkbox: FieldTypeEnum.CHECKBOX,
+    radio: FieldTypeEnum.RADIO,
+    radiobutton: FieldTypeEnum.RADIO,
+    file: FieldTypeEnum.FILE,
+    upload: FieldTypeEnum.FILE,
+    attachment: FieldTypeEnum.FILE,
+    date: FieldTypeEnum.DATE,
+    datetime: FieldTypeEnum.DATETIME_LOCAL,
+    time: FieldTypeEnum.TIME,
+    number: FieldTypeEnum.NUMBER,
+    integer: FieldTypeEnum.NUMBER,
+    decimal: FieldTypeEnum.NUMBER,
+    email: FieldTypeEnum.EMAIL,
+    url: FieldTypeEnum.URL,
+    tel: FieldTypeEnum.TEL,
+    phone: FieldTypeEnum.TEL,
+    password: FieldTypeEnum.PASSWORD,
     hidden: 'hidden',
   };
 

@@ -4,23 +4,26 @@
  */
 
 /**
- * Extended global interface for accessing process.env in both Node and browser environments
+ * Safely read process.env.NODE_ENV from globalThis.
+ * Uses bracket notation and runtime type checks to avoid ambient type declarations.
  */
-interface ExtendedGlobalThis {
-  process?: {
-    env?: {
-      NODE_ENV?: string;
-    };
-  };
-}
+const getNodeEnv = (): string | undefined => {
+  const proc = (globalThis as Record<string, unknown>)['process'];
+  if (proc && typeof proc === 'object' && 'env' in proc) {
+    const env = (proc as Record<string, unknown>)['env'];
+    if (env && typeof env === 'object') {
+      const nodeEnv = (env as Record<string, unknown>)['NODE_ENV'];
+      return typeof nodeEnv === 'string' ? nodeEnv : undefined;
+    }
+  }
+  return undefined;
+};
 
 // Static check at module load time - check process.env.NODE_ENV
 // This is safe because Vite replaces process.env.NODE_ENV at build time
 const DEBUG = (() => {
   try {
-    const extendedGlobal = globalThis as unknown as ExtendedGlobalThis;
-    const processEnv = extendedGlobal.process?.env;
-    if (processEnv?.NODE_ENV === 'development') {
+    if (getNodeEnv() === 'development') {
       return true;
     }
     // For browser environments, check if we're in dev mode
