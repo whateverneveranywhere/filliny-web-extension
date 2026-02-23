@@ -110,17 +110,6 @@ const AuthHealthCheckSchema = z.object({
   limitations: LimitationsSchema,
 });
 
-/**
- * Public health check response schema
- * Does not require authentication - used to check if API is reachable
- */
-const PublicHealthCheckSchema = z.object({
-  status: z.enum(['healthy', 'unhealthy']),
-  ok: z.boolean().optional(),
-  version: z.string().optional(),
-  timestamp: z.number(),
-});
-
 // ============================================================================
 // Dashboard Schemas
 // ============================================================================
@@ -1098,7 +1087,6 @@ type Plan = z.infer<typeof PlanSchema>;
 type User = z.infer<typeof UserSchema>;
 type Limitations = z.infer<typeof LimitationsSchema>;
 type AuthHealthCheckResponse = z.infer<typeof AuthHealthCheckSchema>;
-type PublicHealthCheckResponse = z.infer<typeof PublicHealthCheckSchema>;
 type UserStatus = z.infer<typeof UserStatusSchema>;
 
 // Dashboard types
@@ -1195,7 +1183,7 @@ type FillingWebsiteFormItem = z.infer<typeof FillingWebsiteFormItemSchema>;
 export { UrlSchema, isValidUrl };
 
 // Auth Schemas
-export { PlanSchema, UserSchema, LimitationsSchema, AuthHealthCheckSchema, PublicHealthCheckSchema, UserStatusSchema };
+export { PlanSchema, UserSchema, LimitationsSchema, AuthHealthCheckSchema, UserStatusSchema };
 
 // User Status Helpers
 export { computeIsPro, toUserStatus };
@@ -1306,7 +1294,6 @@ export type {
   User,
   Limitations,
   AuthHealthCheckResponse,
-  PublicHealthCheckResponse,
   UserStatus,
   DTOOverviewResponse,
   DTOTimeSeriesData,

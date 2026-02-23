@@ -83,9 +83,47 @@ const distanceToRect = (point: { x: number; y: number }, rect: DOMRect): number 
 interface FieldFillManagerProps {
   canFillForms?: boolean;
   disabledReason?: string | null;
+  onFieldCountChange?: (count: number) => void;
+  showButtons?: boolean;
 }
 
-export const FieldFillManager: React.FC<FieldFillManagerProps> = ({ canFillForms = true, disabledReason = null }) => {
+export const FieldFillManager: React.FC<FieldFillManagerProps> = ({
+  canFillForms = true,
+  disabledReason = null,
+  onFieldCountChange,
+  showButtons = true,
+}) => {
+  // Track whether a form overlay is active so we can hide per-field buttons
+  const [overlayActive, setOverlayActive] = useState(false);
+
+  // Track overlay active state via custom events and DOM attribute observation
+  useEffect(() => {
+    const checkOverlayActive = () => {
+      const hasActiveOverlay = document.querySelector('[data-filliny-overlay-active="true"]') !== null;
+      setOverlayActive(hasActiveOverlay);
+    };
+
+    // Initial check
+    checkOverlayActive();
+
+    // Listen for custom overlay state change events
+    const handleOverlayChange = () => checkOverlayActive();
+    document.addEventListener('filliny:overlayStateChanged', handleOverlayChange);
+
+    // Also observe DOM for attribute changes as a fallback
+    const observer = new MutationObserver(() => checkOverlayActive());
+    observer.observe(document.body, {
+      attributes: true,
+      attributeFilter: ['data-filliny-overlay-active'],
+      subtree: true,
+    });
+
+    return () => {
+      document.removeEventListener('filliny:overlayStateChanged', handleOverlayChange);
+      observer.disconnect();
+    };
+  }, []);
+
   // All detected fields (lightweight metadata only, no React components rendered yet)
   const [allFields, setAllFields] = useState<FieldButtonData[]>([]);
   // Only fields whose elements are currently visible in the viewport get rendered
@@ -110,6 +148,11 @@ export const FieldFillManager: React.FC<FieldFillManagerProps> = ({ canFillForms
   const elementToFieldIdRef = useRef<Map<Element, string>>(new Map());
   // Ref to visible IDs maintained by the IntersectionObserver callback
   const visibleIdsRef = useRef<Set<string>>(new Set());
+
+  // Notify parent of field count changes
+  useEffect(() => {
+    onFieldCountChange?.(allFields.length);
+  }, [allFields.length, onFieldCountChange]);
 
   // Enhanced visibility and interactivity check
   const isElementVisibleAndInteractive = useCallback((element: HTMLElement): boolean => {
@@ -698,6 +741,8 @@ export const FieldFillManager: React.FC<FieldFillManagerProps> = ({ canFillForms
 
   // Only render FieldFillButton for fields currently visible in the viewport
   const visibleButtons = allFields.filter(f => visibleFieldIds.has(f.field.id));
+
+  if (!showButtons || overlayActive) return null;
 
   return (
     <>

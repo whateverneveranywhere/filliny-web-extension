@@ -26,15 +26,15 @@ const DRAG_ACTIVATION_DISTANCE = 8;
 const buttonComponents: ButtonConfig[] = [
   {
     Component: FillinyVisionButton,
-    tooltipContent: 'Highlight fillable form fields',
+    tooltipContent: 'Highlight all fillable fields on this page',
   },
   {
     Component: FillinyTestModeFillerButton,
-    tooltipContent: 'Test form filling functionality',
+    tooltipContent: 'Fill form with test data (dev mode)',
   },
   {
     Component: DragButton,
-    tooltipContent: 'Drag to reposition the button',
+    tooltipContent: 'Drag to reposition',
   },
 ];
 
@@ -44,11 +44,13 @@ const DraggableButton = ({
   position,
   canFillForms,
   disabledReason,
+  hasFields,
   onDragEnd,
 }: {
   position: Position;
   canFillForms: boolean;
   disabledReason?: string | null;
+  hasFields: boolean;
   onDragEnd: (newY: number) => void;
 }) => {
   const [isHovered, setIsHovered] = useState(false);
@@ -130,6 +132,20 @@ const DraggableButton = ({
   const handleMouseEnter = useCallback(() => setIsHovered(true), []);
   const handleMouseLeave = useCallback(() => setIsHovered(false), []);
 
+  const getLogoTooltip = () => {
+    if (!canFillForms) {
+      if (disabledReason?.toLowerCase().includes('token')) {
+        return 'Token limit reached — your tokens will refresh on your next billing cycle. Upgrade for more tokens.';
+      }
+      if (disabledReason?.toLowerCase().includes('free forms') || disabledReason?.toLowerCase().includes('quota')) {
+        return "You've used all your free form fills — upgrade to Pro for unlimited AI-powered form filling.";
+      }
+      return disabledReason || 'Form filling is temporarily unavailable — please try again in a moment.';
+    }
+    if (!hasFields) return 'No forms detected on this page — navigate to a page with a form to start filling.';
+    return 'Click to auto-fill all detected form fields with AI';
+  };
+
   return (
     <div
       style={style}
@@ -169,12 +185,13 @@ const DraggableButton = ({
         })}
         {/* Main logo button - stays on the RIGHT with tooltip */}
         <div className="filliny-z-[9999999]">
-          <ButtonWrapper isHovered={true} isDragging={false} tooltipContent="Autofill with AI">
+          <ButtonWrapper isHovered={true} isDragging={false} tooltipContent={getLogoTooltip()}>
             <LogoButton
               isHovered={isHovered}
               isDragging={isDragging}
               canFillForms={canFillForms}
               disabledReason={disabledReason}
+              hasFields={hasFields}
             />
           </ButtonWrapper>
         </div>
@@ -192,10 +209,58 @@ const FillinyButton: React.FC<FillinyButtonProps> = ({ canFillForms = true, disa
   const savedPosition = useStorage(positionStorage);
   const fieldButtonSettings = useStorage(fieldButtonsStorage);
   const [position, setPosition] = useState<Position>(savedPosition);
+  const [detectedFieldCount, setDetectedFieldCount] = useState<number>(0);
+  const [isOverlayActive, setIsOverlayActive] = useState(false);
+
+  // Track overlay active state to hide the button while overlay is shown
+  useEffect(() => {
+    const checkOverlayActive = () => {
+      const hasActiveOverlay = document.querySelector('[data-filliny-overlay-active="true"]') !== null;
+      setIsOverlayActive(hasActiveOverlay);
+    };
+
+    // Initial check
+    checkOverlayActive();
+
+    // Listen for custom overlay state change events
+    document.addEventListener('filliny:overlayStateChanged', checkOverlayActive);
+
+    // Also observe DOM for attribute changes as fallback
+    const observer = new MutationObserver(checkOverlayActive);
+    observer.observe(document.body, {
+      attributes: true,
+      attributeFilter: ['data-filliny-overlay-active'],
+      subtree: true,
+    });
+
+    return () => {
+      document.removeEventListener('filliny:overlayStateChanged', checkOverlayActive);
+      observer.disconnect();
+    };
+  }, []);
+
+  const handleFieldCountChange = useCallback((count: number) => {
+    setDetectedFieldCount(count);
+  }, []);
+
+  // On first mount, if position was never set by user (y < MIN_Y), center vertically
+  useEffect(() => {
+    if (savedPosition.y < MIN_Y) {
+      const centeredY = Math.round(window.innerHeight / 2 - 28); // 28 = half of button height (56px)
+      const clampedY = clampY(centeredY);
+      const centeredPosition = { x: 0, y: clampedY };
+      setPosition(centeredPosition);
+      positionStorage.setPosition(centeredPosition);
+    }
+    // Only run on initial mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Sync position state with storage when savedPosition changes
   useEffect(() => {
-    setPosition(savedPosition);
+    if (savedPosition.y >= MIN_Y) {
+      setPosition(savedPosition);
+    }
   }, [savedPosition]);
 
   // Store preference in DOM for easy access by field buttons
@@ -216,13 +281,21 @@ const FillinyButton: React.FC<FillinyButtonProps> = ({ canFillForms = true, disa
 
   return (
     <>
-      <DraggableButton
-        position={position}
+      {!isOverlayActive && (
+        <DraggableButton
+          position={position}
+          canFillForms={canFillForms}
+          disabledReason={disabledReason}
+          hasFields={detectedFieldCount > 0}
+          onDragEnd={handleDragEnd}
+        />
+      )}
+      <FieldFillManager
         canFillForms={canFillForms}
         disabledReason={disabledReason}
-        onDragEnd={handleDragEnd}
+        onFieldCountChange={handleFieldCountChange}
+        showButtons={fieldButtonSettings?.enabled}
       />
-      {fieldButtonSettings?.enabled && <FieldFillManager canFillForms={canFillForms} disabledReason={disabledReason} />}
     </>
   );
 };

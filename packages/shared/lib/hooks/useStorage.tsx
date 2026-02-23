@@ -58,18 +58,6 @@ const wrapPromise = <R,>(promise: Promise<R>) => {
 };
 
 /**
- * Assertion function that guarantees a value is non-null/non-undefined.
- * Throws if the value is null or undefined, which should never happen
- * because wrapPromise throws (suspends) if the data is not yet available.
- */
-const assertNonNullable = <T,>(value: T, message: string): NonNullable<T> => {
-  if (value === null || value === undefined) {
-    throw new Error(message);
-  }
-  return value as NonNullable<T>;
-};
-
-/**
  * Hook for accessing storage data with React Suspense support
  * @template Storage - The storage type being used
  * @template Data - The data type stored (inferred from Storage)
@@ -87,14 +75,14 @@ export const useStorage = <
     storageMap.set(storage, wrapPromise(storage.get()));
   }
 
-  if (_data || initializedRef.current) {
+  if (_data !== null || initializedRef.current) {
     storageMap.set(storage, { read: () => _data });
     initializedRef.current = true;
   }
 
-  // wrapPromise will throw (triggering Suspense) if the data is pending or errored,
-  // so by this point the resolved value is guaranteed to be non-null.
+  // wrapPromise will throw (triggering Suspense) if the data is pending or errored.
+  // After resolution, data may legitimately be undefined (e.g. storage with undefined default).
   const storedPromise = storageMap.get(storage);
   const resolvedData = _data ?? storedPromise?.read();
-  return assertNonNullable<Data>(resolvedData as Data, 'useStorage: unexpected null data after storage resolution');
+  return resolvedData as NonNullable<Data>;
 };

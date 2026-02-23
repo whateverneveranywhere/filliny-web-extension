@@ -3,31 +3,55 @@ import { showQuotaExceededToast } from '../search-button/toastHelpers';
 import { animationClasses } from '@/lib/animations';
 import { cn } from '@/lib/utils';
 import { useDOMReady } from '@/lib/utils/dom-utils';
-import { Wand2 } from 'lucide-react';
+import { Loader2, Wand2 } from 'lucide-react';
+import { useState, useCallback } from 'react';
 import type { ButtonComponentProps } from '../button-wrapper';
 import type React from 'react';
 
 interface LogoButtonProps extends ButtonComponentProps {
   canFillForms?: boolean;
   disabledReason?: string | null;
+  hasFields?: boolean;
 }
 
-const LogoButton: React.FC<LogoButtonProps> = ({ canFillForms = true, disabledReason = null }) => {
+const LogoButton: React.FC<LogoButtonProps> = ({ canFillForms = true, disabledReason = null, hasFields = true }) => {
   const isDOMReady = useDOMReady();
-  const isDisabled = !isDOMReady || !canFillForms;
+  const [isLoading, setIsLoading] = useState(false);
+  const isDisabled = !isDOMReady || !canFillForms || !hasFields || isLoading;
 
-  const handleClick = () => {
+  const handleClick = useCallback(async () => {
     if (!canFillForms) {
       if (disabledReason?.toLowerCase().includes('quota') || disabledReason?.toLowerCase().includes('limit')) {
         showQuotaExceededToast();
       } else {
-        import('../search-button/toastHelpers').then(({ showInfoToast }) => {
-          showInfoToast('Form Filling Unavailable', disabledReason || 'Form filling is currently unavailable.');
-        });
+        const { showInfoToast } = await import('../search-button/toastHelpers');
+        showInfoToast('Form Filling Unavailable', disabledReason || 'Form filling is currently unavailable.');
       }
       return;
     }
-    highlightForms({ visionOnly: false });
+
+    setIsLoading(true);
+    try {
+      await highlightForms({ visionOnly: false });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [canFillForms, disabledReason]);
+
+  const getTitle = () => {
+    if (isLoading) return 'Scanning page for fillable fields — this may take a moment...';
+    if (!canFillForms) {
+      if (disabledReason?.toLowerCase().includes('token')) {
+        return 'Token limit reached — your tokens will refresh on your next billing cycle. Consider upgrading your plan for more tokens.';
+      }
+      if (disabledReason?.toLowerCase().includes('free forms') || disabledReason?.toLowerCase().includes('quota')) {
+        return "You've used all your free form fills this period — upgrade to Pro for unlimited AI-powered form filling.";
+      }
+      return disabledReason || 'Form filling is temporarily unavailable — please try again in a moment.';
+    }
+    if (!hasFields)
+      return "No forms detected — this page doesn't appear to have fillable forms. Try navigating to a page with a sign-up, contact, or application form.";
+    return 'Click to auto-fill all form fields on this page with AI';
   };
 
   return (
@@ -52,8 +76,12 @@ const LogoButton: React.FC<LogoButtonProps> = ({ canFillForms = true, disabledRe
         )}
         onClick={handleClick}
         disabled={isDisabled}
-        title={!canFillForms ? disabledReason || 'Form filling unavailable' : 'Autofill with AI'}>
-        <Wand2 className={cn('filliny-size-6', !canFillForms ? 'filliny-text-white/50' : 'filliny-text-white')} />
+        title={getTitle()}>
+        {isLoading ? (
+          <Loader2 className="filliny-size-6 filliny-animate-spin filliny-text-white" />
+        ) : (
+          <Wand2 className={cn('filliny-size-6', isDisabled ? 'filliny-text-white/50' : 'filliny-text-white')} />
+        )}
       </button>
     </div>
   );

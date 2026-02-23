@@ -260,9 +260,18 @@ const createUnifiedFormOverlay = async (
     observers.push(observer);
   });
 
-  // Batch DOM operations to minimize reflows
+  // Mark all forms as having overlay FIRST - this hides field buttons and floating button
+  // before the overlay appears, preventing z-index conflicts
+  forms.forEach(form => {
+    form.dataset.fillinyOverlayActive = 'true';
+  });
+
+  // Notify components that overlay state changed
+  document.dispatchEvent(new CustomEvent('filliny:overlayStateChanged'));
+
+  // Now render the overlay in the next frame
   requestAnimationFrame(() => {
-    // Add container to shadow DOM first
+    // Add container to shadow DOM
     overlaysContainer.appendChild(formOverlayContainer);
 
     const overlayRoot = createRoot(formOverlayContainer);
@@ -278,6 +287,9 @@ const createUnifiedFormOverlay = async (
           form.classList.remove('filliny-pointer-events-none');
           delete form.dataset.fillinyOverlayActive;
         });
+
+        // Notify components that overlay state changed
+        document.dispatchEvent(new CustomEvent('filliny:overlayStateChanged'));
       });
     };
 
@@ -285,26 +297,18 @@ const createUnifiedFormOverlay = async (
       <FormsOverlay formId={unifiedFormId} initialPosition={initialPosition} onDismiss={cleanup} testMode={testMode} />,
     );
 
-    // Apply form state changes after everything is rendered
+    // Scroll to the first visible form
     requestAnimationFrame(() => {
-      // Mark all forms as having overlay
-      forms.forEach(form => {
-        form.dataset.fillinyOverlayActive = 'true';
-      });
+      const primaryFormRect = primaryForm.getBoundingClientRect();
+      const isFormInView = primaryFormRect.top >= -100 && primaryFormRect.top <= window.innerHeight + 100;
 
-      // Scroll to the first visible form
-      requestAnimationFrame(() => {
-        const primaryFormRect = primaryForm.getBoundingClientRect();
-        const isFormInView = primaryFormRect.top >= -100 && primaryFormRect.top <= window.innerHeight + 100;
-
-        if (!isFormInView) {
-          const scrollPosition = window.scrollY + primaryFormRect.top - 200;
-          window.scrollTo({
-            top: Math.max(0, scrollPosition),
-            behavior: 'smooth',
-          });
-        }
-      });
+      if (!isFormInView) {
+        const scrollPosition = window.scrollY + primaryFormRect.top - 200;
+        window.scrollTo({
+          top: Math.max(0, scrollPosition),
+          behavior: 'smooth',
+        });
+      }
     });
   });
 };

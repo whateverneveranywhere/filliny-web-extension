@@ -91,6 +91,21 @@ const manifest = {
       matches: ['*://*/*'],
     },
   ],
+  content_security_policy: {
+    extension_pages: [
+      "script-src 'self'",
+      "object-src 'self'",
+      [
+        "connect-src 'self'",
+        'https://*.filliny.io',
+        'https://us.i.posthog.com',
+        'https://eu.i.posthog.com',
+        'https://us.posthog.com',
+        'https://eu.posthog.com',
+        ...(env === WebappEnvs.DEV ? ['http://localhost:*'] : []),
+      ].join(' '),
+    ].join('; '),
+  },
   side_panel: {
     default_path: 'side-panel/index.html',
   },

@@ -11,51 +11,127 @@ interface UseOverlayPositionReturn {
   isFormLikelyOutOfView: boolean;
 }
 
+const OVERLAY_PADDING = 24; // padding around the fields bounding box
+
+const FIELD_SELECTORS =
+  'input:not([type="hidden"]):not([type="submit"]):not([type="button"]):not([type="reset"]):not([type="image"]), select, textarea, [role="textbox"], [role="combobox"], [role="checkbox"], [role="radio"], [role="switch"], [contenteditable="true"], [contenteditable=""]';
+
 /**
- * Calculates the overlay position based on form position and viewport
+ * Calculate a tight bounding box around the actual form fields within the container,
+ * rather than using the entire container's rect (which may span the whole page).
+ */
+const getFieldsBoundingRect = (formElement: HTMLElement): DOMRect | null => {
+  const fields = formElement.querySelectorAll<HTMLElement>(FIELD_SELECTORS);
+  if (fields.length === 0) return null;
+
+  let minTop = Infinity;
+  let minLeft = Infinity;
+  let maxBottom = -Infinity;
+  let maxRight = -Infinity;
+  let validFieldCount = 0;
+
+  for (const field of Array.from(fields)) {
+    const rect = field.getBoundingClientRect();
+    // Skip hidden or zero-size fields
+    if (rect.width === 0 && rect.height === 0) continue;
+    const style = window.getComputedStyle(field);
+    if (style.display === 'none' || style.visibility === 'hidden') continue;
+
+    validFieldCount++;
+    minTop = Math.min(minTop, rect.top);
+    minLeft = Math.min(minLeft, rect.left);
+    maxBottom = Math.max(maxBottom, rect.bottom);
+    maxRight = Math.max(maxRight, rect.right);
+  }
+
+  if (validFieldCount === 0) return null;
+
+  // Also include labels that are associated with the fields
+  const labels = formElement.querySelectorAll<HTMLElement>('label');
+  for (const label of Array.from(labels)) {
+    const rect = label.getBoundingClientRect();
+    if (rect.width === 0 && rect.height === 0) continue;
+    minTop = Math.min(minTop, rect.top);
+    minLeft = Math.min(minLeft, rect.left);
+    maxBottom = Math.max(maxBottom, rect.bottom);
+    maxRight = Math.max(maxRight, rect.right);
+  }
+
+  // Also include submit/action buttons within the form
+  const buttons = formElement.querySelectorAll<HTMLElement>(
+    'button[type="submit"], input[type="submit"], button:not([type]), [role="button"]',
+  );
+  for (const button of Array.from(buttons)) {
+    const rect = button.getBoundingClientRect();
+    if (rect.width === 0 && rect.height === 0) continue;
+    // Only include buttons that are reasonably close to the form fields
+    if (rect.top > maxBottom + 100) continue;
+    maxBottom = Math.max(maxBottom, rect.bottom);
+    maxRight = Math.max(maxRight, rect.right);
+    minLeft = Math.min(minLeft, rect.left);
+  }
+
+  return new DOMRect(minLeft, minTop, maxRight - minLeft, maxBottom - minTop);
+};
+
+/**
+ * Calculates the overlay position based on form position and viewport.
+ * Uses a tight bounding box around actual form fields when the form container
+ * is large (e.g., <main>, <body>), preventing the overlay from covering the entire page.
  */
 const calculateOverlayPosition = (
   formElement: HTMLElement,
   lastKnownPosition: OverlayPosition,
 ): { position: OverlayPosition; isOutOfView: boolean } => {
-  const formRect = formElement.getBoundingClientRect();
   const viewportHeight = window.innerHeight;
   const viewportWidth = window.innerWidth;
 
-  // Calculate the visible portion of the form
-  const formTop = Math.max(0, formRect.top);
-  const formBottom = Math.min(viewportHeight, formRect.bottom);
-  const formLeft = Math.max(0, formRect.left);
-  const formRight = Math.min(viewportWidth, formRect.right);
+  // Try to get a tight bounding box around just the form fields
+  const formRect = formElement.getBoundingClientRect();
+  const fieldsBoundingRect = getFieldsBoundingRect(formElement);
 
-  // Calculate visible dimensions
+  // Always prefer the tighter fields bounding rect when available.
+  // This ensures the overlay covers just the form fields area, not the entire container.
+  // Falls back to the full form container rect only when no individual fields are found.
+  const effectiveRect = fieldsBoundingRect ?? formRect;
+
+  // Apply padding around the effective rect
+  const paddedTop = effectiveRect.top - OVERLAY_PADDING;
+  const paddedLeft = effectiveRect.left - OVERLAY_PADDING;
+  const paddedWidth = effectiveRect.width + OVERLAY_PADDING * 2;
+  const paddedHeight = effectiveRect.height + OVERLAY_PADDING * 2;
+
+  // Calculate the visible portion clipped to viewport
+  const formTop = Math.max(0, paddedTop);
+  const formBottom = Math.min(viewportHeight, paddedTop + paddedHeight);
+  const formLeft = Math.max(0, paddedLeft);
+  const formRight = Math.min(viewportWidth, paddedLeft + paddedWidth);
+
   const visibleWidth = Math.max(0, formRight - formLeft);
   const visibleHeight = Math.max(0, formBottom - formTop);
 
   // Check if the form is anywhere near the viewport
   const isFormNearViewport =
-    formRect.bottom > -500 &&
-    formRect.top < viewportHeight + 500 &&
-    formRect.right > -500 &&
-    formRect.left < viewportWidth + 500;
+    paddedTop + paddedHeight > -500 &&
+    paddedTop < viewportHeight + 500 &&
+    paddedLeft + paddedWidth > -500 &&
+    paddedLeft < viewportWidth + 500;
 
   if (isFormNearViewport) {
     const isFormVisible =
       visibleWidth > 0 &&
       visibleHeight > 0 &&
-      formRect.bottom > 0 &&
-      formRect.top < viewportHeight &&
-      formRect.right > 0 &&
-      formRect.left < viewportWidth;
+      paddedTop + paddedHeight > 0 &&
+      paddedTop < viewportHeight &&
+      paddedLeft + paddedWidth > 0 &&
+      paddedLeft < viewportWidth;
 
     if (isFormVisible) {
-      // Ensure minimum dimensions for the overlay
       const minWidth = Math.max(visibleWidth, 200);
       const minHeight = Math.max(visibleHeight, 100);
 
-      // If the form is larger than viewport, ensure overlay covers the visible portion properly
-      const overlayTop = formRect.top < 0 ? 0 : formRect.top;
-      const overlayLeft = formRect.left < 0 ? 0 : formRect.left;
+      const overlayTop = paddedTop < 0 ? 0 : paddedTop;
+      const overlayLeft = paddedLeft < 0 ? 0 : paddedLeft;
       const overlayWidth = Math.min(minWidth, viewportWidth - overlayLeft);
       const overlayHeight = Math.min(minHeight, viewportHeight - overlayTop);
 
@@ -71,37 +147,37 @@ const calculateOverlayPosition = (
     }
 
     // Form is near but not visible - position at edge
-    const topEdge = formRect.top < 0;
-    const bottomEdge = formRect.bottom > viewportHeight;
-    const leftEdge = formRect.left < 0;
-    const rightEdge = formRect.right > viewportWidth;
+    const topEdge = paddedTop < 0;
+    const bottomEdge = paddedTop + paddedHeight > viewportHeight;
+    const leftEdge = paddedLeft < 0;
+    const rightEdge = paddedLeft + paddedWidth > viewportWidth;
 
     let newPos: OverlayPosition;
 
     if (topEdge) {
       newPos = {
         top: 0,
-        left: Math.max(0, Math.min(viewportWidth - 200, formRect.left)),
+        left: Math.max(0, Math.min(viewportWidth - 200, paddedLeft)),
         width: 200,
         height: 100,
       };
     } else if (bottomEdge) {
       newPos = {
         top: viewportHeight - 100,
-        left: Math.max(0, Math.min(viewportWidth - 200, formRect.left)),
+        left: Math.max(0, Math.min(viewportWidth - 200, paddedLeft)),
         width: 200,
         height: 100,
       };
     } else if (leftEdge) {
       newPos = {
-        top: Math.max(0, Math.min(viewportHeight - 100, formRect.top)),
+        top: Math.max(0, Math.min(viewportHeight - 100, paddedTop)),
         left: 0,
         width: 200,
         height: 100,
       };
     } else if (rightEdge) {
       newPos = {
-        top: Math.max(0, Math.min(viewportHeight - 100, formRect.top)),
+        top: Math.max(0, Math.min(viewportHeight - 100, paddedTop)),
         left: viewportWidth - 200,
         width: 200,
         height: 100,
@@ -113,7 +189,6 @@ const calculateOverlayPosition = (
     return { position: newPos, isOutOfView: true };
   }
 
-  // Form is far from viewport - fixed position in corner
   return {
     position: {
       top: viewportHeight - 100,

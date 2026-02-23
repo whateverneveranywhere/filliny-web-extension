@@ -50,6 +50,13 @@ const storage = createStorage<AuthTokenType>('auth-token', '', {
 /** Timeout for cookie token retrieval (2 seconds) */
 const COOKIE_TOKEN_TIMEOUT_MS = 2000;
 
+// NOTE: Tokens stored in bearer_token should already be raw session tokens
+// (the part before the dot in a signed cookie). The bearer plugin accepts
+// raw tokens and signs them server-side (Path A), which is the most reliable
+// approach — it avoids encoding/verification mismatches between the cookie
+// signing path (standard base64 via btoa) and bearer verification
+// (base64urlnopad via @better-auth/utils).
+
 /**
  * Get session token from cookie via background script
  * The cookie is set by Better Auth on the FRONTEND domain (not the API domain)
@@ -93,17 +100,8 @@ const getTokenFromCookie = (): Promise<string> =>
           return;
         }
 
-        let token = parseResult.data.success?.token ?? '';
-        // URL-decode the token if it contains encoded characters
-        // Cookies may store URL-encoded values that need decoding for auth headers
-        if (token && (token.includes('%2F') || token.includes('%3D') || token.includes('%'))) {
-          try {
-            token = decodeURIComponent(token);
-            console.log('[Auth Storage] Decoded URL-encoded cookie token');
-          } catch {
-            console.warn('[Auth Storage] Failed to decode token, using as-is');
-          }
-        }
+        const token = parseResult.data.success?.token ?? '';
+        // URL-decoding is handled centrally in getWithFallback()
         if (token) {
           console.log('[Auth Storage] Got token from cookie:', `${token.substring(0, 20)}...`);
         } else {
@@ -147,7 +145,7 @@ const getBearerTokenFromStorage = (): Promise<string> =>
         return;
       }
 
-      // Bearer token from storage is stored as-is from webapp (no decoding needed)
+      // URL-decoding is handled centrally in getWithFallback()
       const token = parseResult.data.bearer_token ?? '';
       if (token) {
         console.log('[Auth Storage] Got bearer token from storage:', `${token.substring(0, 20)}...`);
@@ -168,18 +166,21 @@ export const authStorage: AuthStorage = {
    * Get auth token following Better Auth's official pattern.
    * Prioritizes bearer token (from webapp via SET_BEARER_TOKEN) as per Better Auth docs.
    * Falls back to session cookie for compatibility with existing cookie-based flows.
+   * Returns the raw session token (the bearer plugin signs it server-side).
    * @see https://www.better-auth.com/docs/plugins/bearer
    */
   getWithFallback: async () => {
-    // Per Better Auth docs: bearer token is the recommended approach for extensions
-    // The bearer token is stored by the webapp after sign-in via SET_BEARER_TOKEN message
+    // Per Better Auth docs: bearer token is the recommended approach for extensions.
+    // The raw session token is stored by the background script (already extracted
+    // from signed cookies via extractRawToken in handleGetAuthToken/SET_BEARER_TOKEN).
     const bearerToken = await getBearerTokenFromStorage();
     if (bearerToken) {
       console.log('[Auth Storage] Using bearer token from storage');
       return bearerToken;
     }
 
-    // Fallback to session cookie (for existing cookie-based flows)
+    // Fallback to session cookie via background script.
+    // handleGetAuthToken already extracts the raw token from the cookie.
     const cookieToken = await getTokenFromCookie();
     if (cookieToken) {
       console.log('[Auth Storage] Using session cookie token');

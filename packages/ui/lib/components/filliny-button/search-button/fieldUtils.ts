@@ -856,31 +856,44 @@ const getFieldLabel = (element: HTMLElement): string => {
     return `${tagName}:${inputType}`;
   }
 
-  // Multi-signal combining: combine ALL distinct candidates (no limit)
-  // to give the API maximum context about the field
-  const seen = new Set<string>();
-  const distinct: string[] = [];
-  for (const candidate of labelCandidates) {
-    const normalized = candidate.text.toLowerCase().trim();
-    if (!normalized) continue;
-    // Skip if we've already seen very similar text
-    if (seen.has(normalized)) continue;
-    // Also check if one already-added label contains this or vice versa
-    let isDuplicate = false;
-    for (const existing of seen) {
-      if (existing.includes(normalized) || normalized.includes(existing)) {
-        isDuplicate = true;
-        break;
-      }
-    }
-    if (isDuplicate) continue;
+  // Confidence-based selection: pick the best label, not all of them.
+  // The API already receives name, placeholder, and description separately,
+  // so the label should just be the label.
+  const best = labelCandidates[0];
 
-    seen.add(normalized);
-    distinct.push(candidate.text);
+  // High confidence (>= 0.7): explicit label, aria-label, etc. - use it alone
+  if (best.confidence >= 0.7) {
+    return best.text;
   }
 
-  // No truncation - return ALL combined candidates for maximum API context
-  return distinct.join(' | ');
+  // Medium confidence (>= 0.5): placeholder, name attr, etc.
+  // Optionally include one more if it's also >= 0.5 and genuinely different
+  if (best.confidence >= 0.5) {
+    const second = labelCandidates[1];
+    if (second && second.confidence >= 0.5) {
+      const bestNorm = best.text.toLowerCase().trim();
+      const secondNorm = second.text.toLowerCase().trim();
+      const isDuplicate = bestNorm === secondNorm || bestNorm.includes(secondNorm) || secondNorm.includes(bestNorm);
+      if (!isDuplicate) {
+        return `${best.text} | ${second.text}`;
+      }
+    }
+    return best.text;
+  }
+
+  // Low confidence (< 0.5): combine top 2 candidates above 0.3
+  const lowCandidates: string[] = [best.text];
+  const bestNorm = best.text.toLowerCase().trim();
+  for (let i = 1; i < labelCandidates.length && lowCandidates.length < 2; i++) {
+    const c = labelCandidates[i];
+    if (c.confidence < 0.3) break;
+    const cNorm = c.text.toLowerCase().trim();
+    const isDuplicate = bestNorm === cNorm || bestNorm.includes(cNorm) || cNorm.includes(bestNorm);
+    if (!isDuplicate) {
+      lowCandidates.push(c.text);
+    }
+  }
+  return lowCandidates.join(' | ');
 };
 
 // ============================================================================

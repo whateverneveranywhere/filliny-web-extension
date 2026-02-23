@@ -8,6 +8,7 @@ import {
   MessageType,
   unwrapApiEnvelope,
   parseApiError,
+  extractRawToken,
   AuthHealthCheckSchema,
   initPostHog,
   getPostHogConfig,
@@ -203,11 +204,13 @@ const fetchQuotaStatus = async (): Promise<QuotaStatus> => {
 
   const configToUse = getConfig();
 
-  // Get auth token: try bearer token first, fall back to session cookie
+  // Get auth token: try bearer token first, fall back to session cookie.
+  // Always extract the raw token (before the dot) — the bearer plugin
+  // signs raw tokens server-side (Path A), which is most reliable.
   let authToken = '';
   const tokenResult = await chrome.storage.local.get('bearer_token');
   if (tokenResult.bearer_token) {
-    authToken = tokenResult.bearer_token;
+    authToken = extractRawToken(tokenResult.bearer_token);
   } else {
     // Fall back to session cookie (same approach as handleGetAuthToken)
     const cookie = await chrome.cookies.get({
@@ -215,7 +218,7 @@ const fetchQuotaStatus = async (): Promise<QuotaStatus> => {
       name: configToUse.cookieName,
     });
     if (cookie?.value) {
-      authToken = cookie.value;
+      authToken = extractRawToken(cookie.value);
     }
   }
 
@@ -373,8 +376,10 @@ chrome.runtime.onMessageExternal.addListener((request, sender, sendResponse) => 
 
     const senderOrigin = sender.origin || sender.url?.split('/').slice(0, 3).join('/');
     if (senderOrigin && trustedOrigins.some(origin => senderOrigin.startsWith(origin.replace(/\/$/, '')))) {
-      // Store the token in extension storage
-      chrome.storage.local.set({ bearer_token: request.token }, () => {
+      // Store the raw session token (strip signature if present).
+      // The bearer plugin will re-sign it server-side for reliable auth.
+      const rawToken = extractRawToken(request.token);
+      chrome.storage.local.set({ bearer_token: rawToken }, () => {
         if (chrome.runtime.lastError) {
           console.error('[Background] Failed to store bearer token:', chrome.runtime.lastError);
           sendResponse({ success: false, error: chrome.runtime.lastError.message });
@@ -669,17 +674,17 @@ const handleGenerateDocumentForField = async (request: GenerateDocumentRequest):
 
   const configToUse = getConfig();
 
-  // Get auth token
+  // Get auth token — extract raw token for reliable bearer auth (Path A)
   let authToken = '';
   const tokenResult = await chrome.storage.local.get('bearer_token');
   if (tokenResult.bearer_token) {
-    authToken = tokenResult.bearer_token;
+    authToken = extractRawToken(tokenResult.bearer_token);
   } else {
     const cookie = await chrome.cookies.get({
       url: configToUse.baseURL,
       name: configToUse.cookieName,
     });
-    if (cookie?.value) authToken = cookie.value;
+    if (cookie?.value) authToken = extractRawToken(cookie.value);
   }
 
   if (!authToken) {
@@ -834,16 +839,17 @@ const handleApiRequest = async (
   delete headers['Cookie']; // Forbidden header in service workers
 
   // Safety net: if no Authorization header was provided, try to add one
+  // Extract raw token for reliable bearer auth (Path A — bearer plugin signs server-side)
   if (!headers['Authorization']) {
     const tokenResult = await chrome.storage.local.get('bearer_token');
-    let authToken = tokenResult.bearer_token || '';
+    let authToken = tokenResult.bearer_token ? extractRawToken(tokenResult.bearer_token) : '';
     if (!authToken) {
       const envConfig = getConfig();
       const cookie = await chrome.cookies.get({
         url: envConfig.baseURL,
         name: envConfig.cookieName,
       });
-      if (cookie?.value) authToken = cookie.value;
+      if (cookie?.value) authToken = extractRawToken(cookie.value);
     }
     if (authToken) {
       headers['Authorization'] = `Bearer ${authToken}`;

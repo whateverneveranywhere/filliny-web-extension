@@ -140,6 +140,32 @@ const config: Record<WebappEnvs, ConfigEntry> = {
   },
 };
 
+/**
+ * Extract the raw session token from a Better Auth cookie value.
+ *
+ * Better Auth signed cookies have the format: `token.signature` (URL-encoded).
+ * The bearer plugin accepts EITHER:
+ *   (A) A raw token (no dot) — it signs server-side, always self-consistent.
+ *   (B) A full signed cookie — but this path has encoding fragility between
+ *       signCookieValue (standard base64 via btoa) and the bearer plugin's
+ *       verification (base64urlnopad via @better-auth/utils).
+ *
+ * Sending only the raw token (Path A) is the most reliable approach:
+ * the bearer plugin signs it itself, so signing + verification always match.
+ */
+const extractRawToken = (cookieValue: string): string => {
+  // URL-decode first in case the value is percent-encoded (e.g. %3D for =)
+  let decoded: string;
+  try {
+    decoded = cookieValue.includes('%') ? decodeURIComponent(cookieValue) : cookieValue;
+  } catch {
+    decoded = cookieValue;
+  }
+  // Extract the token part before the dot (the raw session token stored in DB)
+  const dotIndex = decoded.indexOf('.');
+  return dotIndex > 0 ? decoded.substring(0, dotIndex) : decoded;
+};
+
 const handleGetAuthToken = (
   envConfig: { baseURL: string; cookieName: string },
   sendResponse: (response: GetAuthTokenResponse) => void,
@@ -151,13 +177,16 @@ const handleGetAuthToken = (
 
   chrome.cookies.get(cookieConfig, cookie => {
     if (cookie) {
+      // Extract only the raw session token (before the dot/signature).
+      // The bearer plugin will re-sign it server-side (Path A).
+      const rawToken = extractRawToken(cookie.value);
       console.log(
         '[Auth] Cookie found:',
         `name="${cookie.name}", domain="${cookie.domain}", secure=${cookie.secure}, httpOnly=${cookie.httpOnly}`,
-        `value="${cookie.value.substring(0, 30)}..."`,
+        `rawToken="${rawToken.substring(0, 20)}..."`,
       );
       sendResponse({
-        success: { token: cookie.value },
+        success: { token: rawToken },
       });
     } else {
       console.warn('[Auth] Cookie NOT found for:', `name="${cookieConfig.name}" at "${cookieConfig.url}"`);
@@ -373,8 +402,21 @@ const setupAuthTokenListener = () => {
         `name="${cookie.name}" domain="${cookie.domain}" action="${changeInfo.removed ? 'removed' : 'set'}"`,
       );
 
-      // Broadcast the change to all extension contexts so UI can update
+      // Sync bearer_token storage with the new cookie value
+      // This prevents getWithFallback() from returning a stale bearer_token
       handleGetAuthToken(envConfig, response => {
+        const token = response.success?.token;
+        if (token) {
+          chrome.storage.local.set({ bearer_token: token }, () => {
+            console.log('[Auth] bearer_token storage synced with new cookie');
+          });
+        } else {
+          chrome.storage.local.remove('bearer_token', () => {
+            console.log('[Auth] bearer_token storage cleared (cookie removed)');
+          });
+        }
+
+        // Broadcast the change to all extension contexts so UI can update
         try {
           chrome.runtime.sendMessage(
             {
@@ -404,27 +446,24 @@ const setupAuthTokenListener = () => {
 const syncAuthTokenFromCookie = () => {
   const envConfig = getConfig();
 
-  // First check if bearer_token already exists in storage
-  chrome.storage.local.get('bearer_token', result => {
-    if (result.bearer_token) {
-      console.log('[Auth] Bearer token already in storage, skipping cookie sync');
-      return;
-    }
-
-    handleGetAuthToken(envConfig, response => {
-      const token = response.success?.token;
-      if (token) {
-        // Persist cookie token as bearer_token for consistent access
-        chrome.storage.local.set({ bearer_token: token }, () => {
-          console.log('[Auth] Synced session cookie to bearer_token storage');
-        });
-      } else {
+  // Always sync cookie to bearer_token storage on startup
+  // A stale bearer_token would cause 401s since getWithFallback() prefers it
+  handleGetAuthToken(envConfig, response => {
+    const token = response.success?.token;
+    if (token) {
+      // Persist cookie token as bearer_token for consistent access
+      chrome.storage.local.set({ bearer_token: token }, () => {
+        console.log('[Auth] Synced session cookie to bearer_token storage');
+      });
+    } else {
+      // Clear stale bearer_token if cookie is gone
+      chrome.storage.local.remove('bearer_token', () => {
         console.warn(
-          '[Auth] No session cookie found on startup for:',
+          '[Auth] No session cookie found on startup, cleared bearer_token. Cookie:',
           `name="${envConfig.cookieName}" at "${envConfig.baseURL}"`,
         );
-      }
-    });
+      });
+    }
   });
 };
 
@@ -461,6 +500,7 @@ export {
   syncAuthTokenFromCookie,
   clearUserStorage,
   excludeValuesFromBaseArray,
+  extractRawToken,
   sleep,
 };
 export type { ConfigEntry };

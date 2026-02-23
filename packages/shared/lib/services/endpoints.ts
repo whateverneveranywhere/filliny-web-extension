@@ -66,6 +66,4 @@ export const apiEndpoints = {
   },
   // Health check routes
   healthCheck: '/auth-health',
-  /** Public health check endpoint - does not require authentication */
-  publicHealth: '/health',
 } as const;

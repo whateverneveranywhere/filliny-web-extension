@@ -28,14 +28,6 @@ export const queryKeys = {
   },
 
   /**
-   * System/API health-related query keys
-   */
-  system: {
-    all: ['system'] as const,
-    apiHealth: () => [...queryKeys.system.all, 'apiHealth'] as const,
-  },
-
-  /**
    * Profile-related query keys
    */
   profile: {

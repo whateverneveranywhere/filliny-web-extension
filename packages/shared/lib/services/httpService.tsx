@@ -170,13 +170,17 @@ class HttpService {
       });
       console.log('[HTTP Service] Headers:', headerObj);
 
-      // Use credentials: 'include' to send cookies for same-origin requests
-      // Combined with Authorization header for maximum compatibility
+      // When a Bearer token is present, use 'omit' to prevent browser cookies
+      // from being sent alongside the Authorization header. Sending both causes
+      // Better Auth's bearer plugin to inject a cookie via Headers.append(), which
+      // corrupts the existing Cookie header (comma vs semicolon delimiter mismatch).
+      // When no Bearer token is available, fall back to 'include' for cookie-based auth.
+      const credentials: RequestCredentials = authToken ? 'omit' : 'include';
       const response = await fetch(fullUrl, {
         ...config,
         headers,
         signal: controller.signal,
-        credentials: 'include',
+        credentials,
       });
 
       console.log('[HTTP Service] Response status:', response.status);
@@ -204,6 +208,16 @@ class HttpService {
         if (requestStatus === 401) {
           // Clear stored auth token on unauthorized responses
           await authStorage.set('');
+
+          // Also clear bearer_token from chrome.storage.local to prevent
+          // getWithFallback() from returning the stale token on next request
+          if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+            try {
+              chrome.storage.local.remove('bearer_token');
+            } catch {
+              // Ignore errors in non-extension contexts
+            }
+          }
 
           // Notify the extension that auth is invalid (only in extension context)
           if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
