@@ -314,6 +314,8 @@ export enum MessageType {
   GET_QUOTA_STATUS = 'GET_QUOTA_STATUS',
   /** Analytics event relay from content-UI to background */
   ANALYTICS_EVENT = 'ANALYTICS_EVENT',
+  /** Generate a document for a file upload field */
+  GENERATE_DOCUMENT_FOR_FIELD = 'GENERATE_DOCUMENT_FOR_FIELD',
 }
 
 // NOTE: Framework is exported from utils/frameworkDetection.ts (single source of truth)

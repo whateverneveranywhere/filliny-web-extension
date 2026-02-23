@@ -3,8 +3,10 @@ import { LocalFilesList } from './LocalFilesList';
 import { toast } from '../../hooks/use-toast';
 import { cn } from '../../utils';
 import { Button } from '../ui/button';
+import { Label } from '../ui/label';
+import { Switch } from '../ui/switch';
 import { localFilesStorage } from '@extension/storage';
-import { FolderOpen, Trash2, Loader2, Info } from 'lucide-react';
+import { FolderOpen, Trash2, Loader2, Info, Sparkles } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import type { AuthorizedFolderData } from '@extension/storage';
 
@@ -15,6 +17,7 @@ interface AuthorizedFilesSectionProps {
 const AuthorizedFilesSection = ({ profileId }: AuthorizedFilesSectionProps) => {
   const [folderData, setFolderData] = useState<AuthorizedFolderData | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
+  const [autoGenerate, setAutoGenerate] = useState(false);
 
   // Load folder data from storage when profile changes
   useEffect(() => {
@@ -29,6 +32,8 @@ const AuthorizedFilesSection = ({ profileId }: AuthorizedFilesSectionProps) => {
       try {
         const data = await localFilesStorage.getProfileFolder(profileId);
         setFolderData(data);
+        const autoGen = await localFilesStorage.getAutoGenerate(profileId);
+        setAutoGenerate(autoGen);
       } catch (err) {
         console.error('Failed to load folder data:', err);
         toast({
@@ -90,6 +95,20 @@ const AuthorizedFilesSection = ({ profileId }: AuthorizedFilesSectionProps) => {
     }
   }, [profileId]);
 
+  const handleAutoGenerateToggle = useCallback(
+    async (enabled: boolean) => {
+      if (!profileId) return;
+      setAutoGenerate(enabled);
+      try {
+        await localFilesStorage.setAutoGenerate(profileId, enabled);
+      } catch (err) {
+        console.error('Failed to save auto-generate preference:', err);
+        setAutoGenerate(!enabled);
+      }
+    },
+    [profileId],
+  );
+
   if (!profileId) {
     return (
       <div className="filliny-flex filliny-flex-col filliny-items-center filliny-justify-center filliny-py-8 filliny-text-center">
@@ -132,7 +151,7 @@ const AuthorizedFilesSection = ({ profileId }: AuthorizedFilesSectionProps) => {
       </div>
 
       {/* Folder Selector */}
-      <FolderSelector currentFolder={folderData} onFolderSelected={handleFolderSelected} />
+      <FolderSelector currentFolder={folderData} onFolderSelected={handleFolderSelected} profileId={profileId} />
 
       {/* Files List or Empty State with Guidance */}
       {folderData ? (
@@ -154,6 +173,29 @@ const AuthorizedFilesSection = ({ profileId }: AuthorizedFilesSectionProps) => {
           </p>
         </div>
       )}
+
+      {/* Auto-Generate Toggle */}
+      <div className="filliny-flex filliny-items-center filliny-justify-between filliny-rounded-md filliny-border filliny-p-3">
+        <div className="filliny-flex filliny-items-start filliny-gap-2 filliny-min-w-0">
+          <Sparkles className="filliny-h-4 filliny-w-4 filliny-text-primary filliny-shrink-0 filliny-mt-0.5" />
+          <div className="filliny-min-w-0">
+            <Label
+              htmlFor="auto-generate-toggle"
+              className="filliny-text-xs filliny-font-medium filliny-cursor-pointer">
+              Auto-generate files for upload fields
+            </Label>
+            <p className="filliny-text-xs filliny-text-muted-foreground filliny-mt-0.5">
+              When no matching file exists, AI will generate documents (resumes, cover letters) on the fly.
+            </p>
+          </div>
+        </div>
+        <Switch
+          id="auto-generate-toggle"
+          checked={autoGenerate}
+          onCheckedChange={handleAutoGenerateToggle}
+          className="filliny-shrink-0 filliny-ml-2"
+        />
+      </div>
 
       {/* Naming Tips */}
       <div className="filliny-rounded-md filliny-bg-primary/5 filliny-border filliny-border-primary/20 filliny-p-3">

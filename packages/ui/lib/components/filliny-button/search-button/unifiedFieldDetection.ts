@@ -1,4 +1,8 @@
-import { observeContainerForDynamicFields, stopAllDynamicFieldObservers } from './dynamicFieldObserver';
+import {
+  observeContainerForDynamicFields,
+  stopAllDynamicFieldObservers,
+  stopObserversForDetachedContainers,
+} from './dynamicFieldObserver';
 import { detectFields, isElementAttached, captureFormState, restoreFormState, createBaseField } from './field-types';
 import { FieldSchema, FieldTypeEnum } from '@extension/shared';
 import { z } from 'zod';
@@ -96,13 +100,116 @@ class UnifiedFieldRegistry {
     return UnifiedFieldRegistry.instance;
   }
 
-  // Clear all registry data and stop dynamic field observers
+  // Light clear: reset field data but preserve dynamic observers for live containers.
+  // Only stops observers for containers that are no longer in the DOM.
   clear(): void {
+    stopObserversForDetachedContainers();
+    this.detectedFields.clear();
+    this.containers.clear();
+    this.groupedFields.clear();
+    this.processedElements.clear();
+  }
+
+  // Full clear: destroy everything including all dynamic observers. Use on unmount.
+  fullClear(): void {
     stopAllDynamicFieldObservers();
     this.detectedFields.clear();
     this.containers.clear();
     this.groupedFields.clear();
     this.processedElements.clear();
+  }
+
+  // Remove a field by its element reference. Returns the removed fieldId or undefined.
+  removeFieldByElement(element: HTMLElement): string | undefined {
+    const fieldId = this.processedElements.get(element);
+    if (!fieldId) return undefined;
+
+    this.processedElements.delete(element);
+    this.detectedFields.delete(fieldId);
+    this.cleanupGroupedField(fieldId);
+
+    return fieldId;
+  }
+
+  // Remove a field by its fieldId. Returns true if found and removed.
+  removeField(fieldId: string): boolean {
+    const fieldInfo = this.detectedFields.get(fieldId);
+    if (!fieldInfo) return false;
+
+    this.detectedFields.delete(fieldId);
+
+    // Clean up processedElements entry
+    if (fieldInfo.element) {
+      this.processedElements.delete(fieldInfo.element);
+    }
+
+    this.cleanupGroupedField(fieldId);
+    return true;
+  }
+
+  // Look up fieldId by element
+  getFieldIdByElement(element: HTMLElement): string | undefined {
+    return this.processedElements.get(element);
+  }
+
+  // Prune all fields whose elements are no longer connected to the DOM.
+  // Returns array of removed fieldIds.
+  pruneDetachedFields(): string[] {
+    const removedIds: string[] = [];
+
+    for (const [fieldId, fieldInfo] of this.detectedFields) {
+      if (!fieldInfo.element || !fieldInfo.element.isConnected) {
+        this.detectedFields.delete(fieldId);
+        if (fieldInfo.element) {
+          this.processedElements.delete(fieldInfo.element);
+        }
+        this.cleanupGroupedField(fieldId);
+        removedIds.push(fieldId);
+      }
+    }
+
+    // Also prune containers that are no longer connected
+    for (const [containerId, container] of this.containers) {
+      if (!container.isConnected) {
+        this.containers.delete(containerId);
+      }
+    }
+
+    if (removedIds.length > 0) {
+      console.debug(`UnifiedFieldRegistry: Pruned ${removedIds.length} detached fields`);
+    }
+
+    return removedIds;
+  }
+
+  // Get current field count
+  getFieldCount(): number {
+    return this.detectedFields.size;
+  }
+
+  // Check if an element is already registered
+  hasElement(element: HTMLElement): boolean {
+    return this.processedElements.has(element);
+  }
+
+  // Clean up grouped field references for a removed fieldId
+  private cleanupGroupedField(fieldId: string): void {
+    for (const [groupId, groupInfo] of this.groupedFields) {
+      const idx = groupInfo.fields.findIndex(f => f.field.id === fieldId);
+      if (idx !== -1) {
+        groupInfo.fields.splice(idx, 1);
+        if (groupInfo.fields.length === 0) {
+          this.groupedFields.delete(groupId);
+        } else {
+          // Update primaryElement if it was the removed field
+          const removedFieldInfo = groupInfo.fields[idx - 1] ?? groupInfo.fields[0];
+          if (removedFieldInfo) {
+            groupInfo.primaryElement = removedFieldInfo.element;
+          }
+        }
+        break;
+      }
+    }
   }
 
   // Register a container and its fields
@@ -681,5 +788,9 @@ export {
   saveFormSnapshot,
   undoFormFill,
 };
-export { stopAllDynamicFieldObservers, getActiveObserverCount } from './dynamicFieldObserver';
+export {
+  stopAllDynamicFieldObservers,
+  stopObserversForDetachedContainers,
+  getActiveObserverCount,
+} from './dynamicFieldObserver';
 export type { DetectedFieldInfo, GroupedFieldInfo, DetectedContainerInfo, FieldButtonData };

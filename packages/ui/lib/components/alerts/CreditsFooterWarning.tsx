@@ -25,7 +25,7 @@ const CreditsFooterWarning = ({
   className,
 }: CreditsFooterWarningProps) => {
   const config = getConfig();
-  const { FREE_TIER_LIMITS } = usePlanLimits();
+  const { totalFreeForms } = usePlanLimits();
   const warningState: CreditWarningState = getCreditWarningState(isPro ? tokensRemaining : freeFormsRemaining, isPro);
 
   // Don't render if no warning needed
@@ -53,7 +53,7 @@ const CreditsFooterWarning = ({
 
     return {
       title: 'Running Low on Free Forms',
-      description: `Only ${freeFormsRemaining} of ${FREE_TIER_LIMITS.MAX_FREE_FORMS} free forms remaining.`,
+      description: `Only ${freeFormsRemaining} of ${totalFreeForms} free forms remaining.`,
       buttonText: 'Subscribe to Pro',
     };
   };

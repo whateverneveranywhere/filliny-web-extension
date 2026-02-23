@@ -35,7 +35,7 @@ interface NoTokensAlertProps {
  */
 export default function NoTokensAlert({ isPro = false }: NoTokensAlertProps) {
   const config = getConfig();
-  const { FREE_TIER_LIMITS } = usePlanLimits();
+  const { totalFreeForms } = usePlanLimits();
 
   if (isPro) {
     // Pro user who has exhausted their tokens
@@ -58,7 +58,7 @@ export default function NoTokensAlert({ isPro = false }: NoTokensAlertProps) {
       variant="warning"
       icon={AlertTriangle}
       title="Free Forms Used"
-      description={`Your ${FREE_TIER_LIMITS.MAX_FREE_FORMS} free form fills are used. Subscribe to Pro for unlimited AI-powered form filling.`}
+      description={`Your ${totalFreeForms} free form fills are used. Subscribe to Pro for unlimited AI-powered form filling.`}
       buttonText="Subscribe to Pro"
       buttonIcon={ExternalLink}
       onButtonClick={() => window.open(`${config.baseURL}/pricing`, '_blank')}

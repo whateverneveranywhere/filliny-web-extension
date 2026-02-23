@@ -30,6 +30,8 @@ interface AuthorizedFolderData {
   files: LocalFileInfo[];
   /** Timestamp when the folder was last scanned */
   lastScanned: number;
+  /** Whether to auto-generate documents for upload fields (defaults to false) */
+  autoGenerateEnabled?: boolean;
 }
 
 /**
@@ -49,6 +51,10 @@ type LocalFilesStorageType = BaseStorageType<LocalFilesStorageData> & {
   clearProfileFolder: (profileId: string) => Promise<void>;
   /** Get files for a specific profile */
   getProfileFiles: (profileId: string) => Promise<LocalFileInfo[]>;
+  /** Set auto-generate preference for a specific profile */
+  setAutoGenerate: (profileId: string, enabled: boolean) => Promise<void>;
+  /** Get auto-generate preference for a specific profile */
+  getAutoGenerate: (profileId: string) => Promise<boolean>;
 };
 
 const storage = createStorage<LocalFilesStorageData>(
@@ -85,6 +91,22 @@ const localFilesStorage: LocalFilesStorageType = {
   getProfileFiles: async (profileId: string) => {
     const current = await storage.get();
     return current[profileId]?.files || [];
+  },
+
+  setAutoGenerate: async (profileId: string, enabled: boolean) => {
+    const current = await storage.get();
+    const existing = current[profileId];
+    if (existing) {
+      await storage.set({
+        ...current,
+        [profileId]: { ...existing, autoGenerateEnabled: enabled },
+      });
+    }
+  },
+
+  getAutoGenerate: async (profileId: string) => {
+    const current = await storage.get();
+    return current[profileId]?.autoGenerateEnabled ?? false;
   },
 };
 

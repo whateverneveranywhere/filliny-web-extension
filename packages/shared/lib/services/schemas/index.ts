@@ -91,11 +91,13 @@ const UserSchema = z.object({
  * (required fields in the API's PlanLimitationsSchema).
  */
 const LimitationsSchema = z.object({
+  freeFormsRemaining: z.number(),
+  initialTokens: z.number(),
+  isProSubscriber: z.boolean(),
   maxFillingProfiles: z.number(),
   maxWebsitesPerProfile: z.number(),
   tokensRemaining: z.number(),
-  freeFormsRemaining: z.number(),
-  isProSubscriber: z.boolean(),
+  totalFreeForms: z.number(),
 });
 
 /**
@@ -402,6 +404,94 @@ const DTOAuthorizedFileForAISchema = z.object({
   category: AuthorizedFileCategorySchema,
   mimeType: z.string(),
   fileSize: z.number(),
+});
+
+// ============================================================================
+// Website Document Schemas
+// ============================================================================
+
+/**
+ * Document type schema
+ */
+const DocumentTypeSchema = z.enum(['cover_letter', 'resume', 'custom']);
+
+/**
+ * Document status schema
+ */
+const DocumentStatusSchema = z.enum(['draft', 'generating', 'ready', 'failed']);
+
+/**
+ * Website document schema - matches API WebsiteDocumentSchema
+ */
+const DTOWebsiteDocumentSchema = z.object({
+  id: z.number(),
+  documentType: DocumentTypeSchema,
+  status: DocumentStatusSchema,
+  title: z.string(),
+  contentMarkdown: z.string().nullable(),
+  r2Filename: z.string().nullable(),
+  r2Filesize: z.number().nullable(),
+  r2MimeType: z.string().nullable(),
+  modelName: z.string().nullable(),
+  createdAt: z.string().nullable(),
+  updatedAt: z.string().nullable(),
+});
+
+/**
+ * Document list response schema
+ */
+const DTOWebsiteDocumentListSchema = z.array(DTOWebsiteDocumentSchema);
+
+/**
+ * Create document request schema
+ */
+const DTOCreateDocumentRequestSchema = z.object({
+  documentType: DocumentTypeSchema,
+  title: z.string().min(1).max(200),
+});
+
+/**
+ * Generate document request schema
+ */
+const DTOGenerateDocumentRequestSchema = z.object({
+  documentType: DocumentTypeSchema,
+  title: z.string().min(1).max(200),
+  additionalInstructions: z.string().max(2000).optional(),
+});
+
+/**
+ * Convert document request schema
+ */
+const DTOConvertDocumentRequestSchema = z.object({
+  format: z.enum(['pdf', 'docx']),
+  filename: z.string().min(1).max(255),
+  fileContent: z.string(),
+});
+
+/**
+ * Document created response schema
+ */
+const DTODocumentCreatedResponseSchema = z.object({
+  id: z.number(),
+  title: z.string(),
+});
+
+/**
+ * Generate document for field request schema
+ */
+const DTOGenerateForFieldRequestSchema = z.object({
+  fieldLabel: z.string().min(1).max(500),
+  fieldDescription: z.string().max(1000).optional(),
+  acceptTypes: z.string().max(500).optional(),
+  additionalInstructions: z.string().max(2000).optional(),
+});
+
+/**
+ * Generate document for field response schema
+ */
+const DTOGenerateForFieldResponseSchema = z.object({
+  document: DTOWebsiteDocumentSchema,
+  wasExisting: z.boolean(),
 });
 
 // ============================================================================
@@ -1063,6 +1153,18 @@ type DTOPresignedUrlResponse = z.infer<typeof DTOPresignedUrlResponseSchema>;
 type DTOFileDownloadUrl = z.infer<typeof DTOFileDownloadUrlSchema>;
 type DTOAuthorizedFileForAI = z.infer<typeof DTOAuthorizedFileForAISchema>;
 
+// Document types
+type DocumentType = z.infer<typeof DocumentTypeSchema>;
+type DocumentStatus = z.infer<typeof DocumentStatusSchema>;
+type DTOWebsiteDocument = z.infer<typeof DTOWebsiteDocumentSchema>;
+type DTOWebsiteDocumentList = z.infer<typeof DTOWebsiteDocumentListSchema>;
+type DTOCreateDocumentRequest = z.infer<typeof DTOCreateDocumentRequestSchema>;
+type DTOGenerateDocumentRequest = z.infer<typeof DTOGenerateDocumentRequestSchema>;
+type DTOConvertDocumentRequest = z.infer<typeof DTOConvertDocumentRequestSchema>;
+type DTODocumentCreatedResponse = z.infer<typeof DTODocumentCreatedResponseSchema>;
+type DTOGenerateForFieldRequest = z.infer<typeof DTOGenerateForFieldRequestSchema>;
+type DTOGenerateForFieldResponse = z.infer<typeof DTOGenerateForFieldResponseSchema>;
+
 // API Response types
 type SuccessResponse = z.infer<typeof SuccessResponseSchema>;
 type EditProfileResponse = z.infer<typeof EditProfileResponseSchema>;
@@ -1132,6 +1234,20 @@ export {
   DTOPresignedUrlResponseSchema,
   DTOFileDownloadUrlSchema,
   DTOAuthorizedFileForAISchema,
+};
+
+// Website Document Schemas
+export {
+  DocumentTypeSchema,
+  DocumentStatusSchema,
+  DTOWebsiteDocumentSchema,
+  DTOWebsiteDocumentListSchema,
+  DTOCreateDocumentRequestSchema,
+  DTOGenerateDocumentRequestSchema,
+  DTOConvertDocumentRequestSchema,
+  DTODocumentCreatedResponseSchema,
+  DTOGenerateForFieldRequestSchema,
+  DTOGenerateForFieldResponseSchema,
 };
 
 // Field Type Schemas
@@ -1238,6 +1354,17 @@ export type {
   WebsiteEditFormValues,
   ProfileSelectorFormValues,
   FillingWebsiteFormItem,
+  // Document types
+  DocumentType,
+  DocumentStatus,
+  DTOWebsiteDocument,
+  DTOWebsiteDocumentList,
+  DTOCreateDocumentRequest,
+  DTOGenerateDocumentRequest,
+  DTOConvertDocumentRequest,
+  DTODocumentCreatedResponse,
+  DTOGenerateForFieldRequest,
+  DTOGenerateForFieldResponse,
   // Authorized files types
   AuthorizedFileCategory,
   DTOAuthorizedFile,

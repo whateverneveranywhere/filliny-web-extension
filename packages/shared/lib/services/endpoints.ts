@@ -34,6 +34,25 @@ export const apiEndpoints = {
       confirm: (profileId: string, fileId: string) => `/profiles/${profileId}/files/${fileId}/confirm`,
       download: (profileId: string, fileId: string) => `/profiles/${profileId}/files/${fileId}/download`,
     },
+    // Website documents
+    documents: {
+      list: (profileId: string, websiteId: string) => `/profiles/${profileId}/websites/${websiteId}/documents`,
+      create: (profileId: string, websiteId: string) => `/profiles/${profileId}/websites/${websiteId}/documents`,
+      generate: (profileId: string, websiteId: string) =>
+        `/profiles/${profileId}/websites/${websiteId}/documents/generate`,
+      getById: (profileId: string, websiteId: string, docId: string) =>
+        `/profiles/${profileId}/websites/${websiteId}/documents/${docId}`,
+      delete: (profileId: string, websiteId: string, docId: string) =>
+        `/profiles/${profileId}/websites/${websiteId}/documents/${docId}`,
+      upload: (profileId: string, websiteId: string, docId: string) =>
+        `/profiles/${profileId}/websites/${websiteId}/documents/${docId}/upload`,
+      download: (profileId: string, websiteId: string, docId: string) =>
+        `/profiles/${profileId}/websites/${websiteId}/documents/${docId}/download`,
+      convert: (profileId: string, websiteId: string, docId: string) =>
+        `/profiles/${profileId}/websites/${websiteId}/documents/${docId}/convert`,
+      generateForField: (profileId: string, websiteId: string) =>
+        `/profiles/${profileId}/websites/${websiteId}/documents/generate-for-field`,
+    },
   },
   // Dashboard routes (overview is at root, not under /dashboard)
   dashboard: {

@@ -1,4 +1,4 @@
-import { getScrollableAncestors } from '../overlayUtils';
+import { getSharedPositionTracker } from './SharedPositionTracker';
 import { useFormFillStore, StreamingPhase, FieldFillStatus } from '../stores';
 import { cn } from '@/lib/utils';
 import { getConfig, WebappEnvs } from '@extension/shared';
@@ -64,8 +64,6 @@ export const FieldFillButton: React.FC<FieldFillButtonProps> = ({
   const isFieldFilled = fieldStatus === FieldFillStatus.FILLED || fieldStatus === FieldFillStatus.VERIFIED;
 
   const containerRef = useRef<HTMLDivElement>(null);
-  const resizeObserverRef = useRef<ResizeObserver | null>(null);
-  const mutationObserverRef = useRef<MutationObserver | null>(null);
 
   /**
    * Find the associated label element for a form field.
@@ -161,55 +159,18 @@ export const FieldFillButton: React.FC<FieldFillButtonProps> = ({
     }
   }, [fieldElement, findLabel]);
 
-  // Set up positioning and observers
+  // Set up positioning via shared tracker (1 ResizeObserver + 1 MutationObserver for ALL buttons)
   useEffect(() => {
     if (!fieldElement?.isConnected) return;
 
     updateButtonPosition();
 
-    resizeObserverRef.current = new ResizeObserver(() => {
-      requestAnimationFrame(updateButtonPosition);
-    });
-    resizeObserverRef.current.observe(fieldElement);
-
-    // Also observe the label element if one exists
     const labelInfo = findLabel();
-    if (labelInfo?.element?.isConnected) {
-      resizeObserverRef.current.observe(labelInfo.element);
-    }
-
-    mutationObserverRef.current = new MutationObserver(() => {
-      requestAnimationFrame(updateButtonPosition);
-    });
-    mutationObserverRef.current.observe(fieldElement, {
-      attributes: true,
-      attributeFilter: ['style', 'class'],
-    });
-    if (labelInfo?.element?.isConnected) {
-      mutationObserverRef.current.observe(labelInfo.element, {
-        attributes: true,
-        attributeFilter: ['style', 'class'],
-      });
-    }
-
-    const handleWindowEvents = () => requestAnimationFrame(updateButtonPosition);
-    window.addEventListener('resize', handleWindowEvents);
-    window.addEventListener('scroll', handleWindowEvents, { passive: true });
-
-    // Track scrollable ancestor containers
-    const scrollableAncestors = getScrollableAncestors(fieldElement);
-    for (const ancestor of scrollableAncestors) {
-      ancestor.addEventListener('scroll', handleWindowEvents, { passive: true });
-    }
+    const tracker = getSharedPositionTracker();
+    tracker.track(fieldElement, updateButtonPosition, labelInfo?.element ?? null);
 
     return () => {
-      resizeObserverRef.current?.disconnect();
-      mutationObserverRef.current?.disconnect();
-      window.removeEventListener('resize', handleWindowEvents);
-      window.removeEventListener('scroll', handleWindowEvents);
-      for (const ancestor of scrollableAncestors) {
-        ancestor.removeEventListener('scroll', handleWindowEvents);
-      }
+      tracker.untrack(fieldElement);
     };
   }, [fieldElement, findLabel, updateButtonPosition]);
 

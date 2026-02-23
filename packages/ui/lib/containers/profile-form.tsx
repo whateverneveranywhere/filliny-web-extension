@@ -111,10 +111,7 @@ const ProfileForm = ({ id, onFormSubmit, onDirtyChange }: Props) => {
     (formData: ProfileFormTypes): DTOProfileFillingForm => ({
       ...formData,
       // filter out the user side isNew variable before sending to api
-      fillingWebsites: formData.fillingWebsites.map(
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars -- destructuring to omit isNew from spread
-        ({ isNew, ...rest }) => rest,
-      ),
+      fillingWebsites: formData.fillingWebsites.map(({ isNew: _, ...rest }) => rest),
       preferences: {
         ...formData.preferences,
         povId: Number(formData.preferences?.povId),

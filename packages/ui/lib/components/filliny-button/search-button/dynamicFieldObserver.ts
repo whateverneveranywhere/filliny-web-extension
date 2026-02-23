@@ -332,6 +332,18 @@ const stopAllDynamicFieldObservers = (): void => {
 };
 
 /**
+ * Stop observers only for containers that are no longer attached to the DOM.
+ * This allows live containers to keep their observers during a registry clear.
+ */
+const stopObserversForDetachedContainers = (): void => {
+  for (const [container] of activeObservers) {
+    if (!container.isConnected) {
+      stopObservingContainer(container);
+    }
+  }
+};
+
+/**
  * Get the count of actively observed containers
  */
 const getActiveObserverCount = (): number => activeObservers.size;
@@ -340,5 +352,6 @@ export {
   observeContainerForDynamicFields,
   stopObservingContainer,
   stopAllDynamicFieldObservers,
+  stopObserversForDetachedContainers,
   getActiveObserverCount,
 };

@@ -41,7 +41,7 @@ const TokenDisplay = ({
   const formattedTokens = tokens.toLocaleString();
   const abbreviatedTokens = formatToK(tokens);
   const config = getConfig();
-  const { FREE_TIER_LIMITS } = usePlanLimits();
+  const { totalFreeForms } = usePlanLimits();
 
   // Determine warning state
   const warningState: CreditWarningState = getCreditWarningState(isPro ? tokens : freeFormsRemaining, isPro);
@@ -122,7 +122,7 @@ const TokenDisplay = ({
                 </span>
                 <span className="filliny-text-xs filliny-text-muted-foreground">/</span>
                 <span className="filliny-text-xs filliny-text-muted-foreground filliny-tabular-nums">
-                  {FREE_TIER_LIMITS.MAX_FREE_FORMS}
+                  {totalFreeForms}
                 </span>
               </div>
             )}
@@ -159,7 +159,7 @@ const TokenDisplay = ({
               </span>
               <span className="filliny-text-muted-foreground">/</span>
               <span className="filliny-text-sm filliny-text-muted-foreground filliny-tabular-nums">
-                {FREE_TIER_LIMITS.MAX_FREE_FORMS}
+                {totalFreeForms}
               </span>
               <span className="filliny-ml-1 filliny-text-xs filliny-text-muted-foreground">remaining</span>
             </>

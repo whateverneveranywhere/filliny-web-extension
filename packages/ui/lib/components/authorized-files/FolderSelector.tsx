@@ -2,6 +2,7 @@ import { scanDirectoryHandle, isFileSystemAccessSupported, MAX_FILES_LIMIT } fro
 import { toast } from '../../hooks/use-toast';
 import { cn } from '../../utils';
 import { Button } from '../ui/button';
+import { setDirectoryHandle } from '@extension/storage';
 import { FolderOpen, RefreshCw, AlertCircle } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import type { AuthorizedFolderData } from '@extension/storage';
@@ -10,9 +11,10 @@ interface FolderSelectorProps {
   currentFolder: AuthorizedFolderData | undefined;
   onFolderSelected: (folderData: AuthorizedFolderData) => void;
   disabled?: boolean;
+  profileId?: string;
 }
 
-const FolderSelector = ({ currentFolder, onFolderSelected, disabled }: FolderSelectorProps) => {
+const FolderSelector = ({ currentFolder, onFolderSelected, disabled, profileId }: FolderSelectorProps) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [apiSupported] = useState(isFileSystemAccessSupported);
 
@@ -34,9 +36,25 @@ const FolderSelector = ({ currentFolder, onFolderSelected, disabled }: FolderSel
       if (!window.showDirectoryPicker) {
         throw new Error('showDirectoryPicker not available');
       }
-      const dirHandle = await window.showDirectoryPicker({
-        mode: 'read',
-      });
+      let dirHandle: FileSystemDirectoryHandle;
+      try {
+        dirHandle = await window.showDirectoryPicker({
+          mode: 'readwrite',
+        });
+      } catch (rwError) {
+        // If readwrite permission denied, fall back to read-only
+        if (rwError instanceof DOMException && rwError.name === 'NotAllowedError') {
+          dirHandle = await window.showDirectoryPicker({
+            mode: 'read',
+          });
+          toast({
+            title: 'Read-only access',
+            description: "Write access was denied. Auto-generated files won't be saved to this folder.",
+          });
+        } else {
+          throw rwError;
+        }
+      }
 
       const folderName = dirHandle.name;
 
@@ -51,6 +69,13 @@ const FolderSelector = ({ currentFolder, onFolderSelected, disabled }: FolderSel
             'No supported files (PDF, images, documents) found at the top level. Subfolders are not scanned — place files directly in the selected folder.',
         });
         return;
+      }
+
+      // Store directory handle in IndexedDB for write access later
+      if (profileId) {
+        setDirectoryHandle(profileId, dirHandle).catch(err => {
+          console.warn('Failed to store directory handle:', err);
+        });
       }
 
       onFolderSelected({
@@ -80,7 +105,7 @@ const FolderSelector = ({ currentFolder, onFolderSelected, disabled }: FolderSel
     } finally {
       setIsProcessing(false);
     }
-  }, [apiSupported, onFolderSelected]);
+  }, [apiSupported, onFolderSelected, profileId]);
 
   const hasFolder = !!currentFolder;
 

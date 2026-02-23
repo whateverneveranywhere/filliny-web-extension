@@ -9,6 +9,12 @@ import {
 } from './fieldUpdaterHelpers';
 import { highlightForms } from './highlightForms';
 import { disableOtherButtons, resetOverlays, showLoadingIndicator } from './overlayUtils';
+import {
+  setServerDocuments,
+  clearServerDocuments,
+  setSessionContext,
+  clearSessionContext,
+} from './serverDocumentContext';
 import { formFillStore, StreamingPhase } from './stores';
 import { runTestModeFill } from './testModeHelpers';
 import { showQuotaExceededToast, showAuthErrorToast, showFillErrorToast, showInfoToast } from './toastHelpers';
@@ -23,6 +29,7 @@ import {
   StreamingErrorSchema,
   track,
   AnalyticsEvent,
+  listDocumentsService,
 } from '@extension/shared';
 import { profileStorage, localFilesStorage } from '@extension/storage';
 import type { StreamMessage } from './apiTransformHelpers';
@@ -156,6 +163,9 @@ export const handleFormClick = async (
     }
     // Reset partial chunk state
     partialChunk = '';
+    // Clear server document context for this session
+    clearServerDocuments();
+    clearSessionContext();
   };
 
   try {
@@ -211,6 +221,49 @@ export const handleFormClick = async (
         debug.log(`Loaded ${authorizedFiles.length} local authorized files for AI context`);
       } catch (filesError) {
         debug.warn('Failed to load authorized files, continuing without them:', filesError);
+      }
+
+      // Fetch server-stored documents for the matching website
+      if (matchingWebsite?.id) {
+        try {
+          const serverDocs = await listDocumentsService(String(profileId), String(matchingWebsite.id));
+          const serverFiles: DTOAuthorizedFileForAI[] = serverDocs
+            .filter(doc => doc.status === 'ready' && (doc.r2Filename || doc.contentMarkdown))
+            .map(doc => ({
+              id: 10000 + doc.id,
+              filename: doc.r2Filename || `${doc.title.replace(/\s+/g, '-').toLowerCase()}.md`,
+              description: `Server document: ${doc.title} (${doc.documentType})`,
+              useCases:
+                doc.documentType === 'cover_letter'
+                  ? 'Upload as cover letter to file input fields'
+                  : doc.documentType === 'resume'
+                    ? 'Upload as resume/CV to file input fields'
+                    : `Upload as ${doc.documentType} document to file input fields`,
+              category: doc.documentType === 'resume' ? 'resume' : 'document',
+              mimeType: doc.r2MimeType || 'application/pdf',
+              fileSize: doc.r2Filesize || 0,
+            }));
+          authorizedFiles = [...authorizedFiles, ...serverFiles];
+          debug.log(`Loaded ${serverFiles.length} server documents for AI context`);
+
+          // Store session context for auto-generation in file.ts
+          setSessionContext(String(profileId), String(matchingWebsite.id));
+
+          // Store server document metadata for file injection in file.ts
+          setServerDocuments(
+            serverDocs
+              .filter(doc => doc.status === 'ready' && (doc.r2Filename || doc.contentMarkdown))
+              .map(doc => ({
+                docId: doc.id,
+                profileId: String(profileId),
+                websiteId: String(matchingWebsite.id),
+                filename: doc.r2Filename || `${doc.title.replace(/\s+/g, '-').toLowerCase()}.md`,
+                mimeType: doc.r2MimeType || 'application/pdf',
+              })),
+          );
+        } catch (docsError) {
+          debug.warn('Failed to load server documents, continuing without them:', docsError);
+        }
       }
     }
 

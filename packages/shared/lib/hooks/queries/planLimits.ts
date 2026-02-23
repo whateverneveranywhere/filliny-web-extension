@@ -9,7 +9,7 @@ import type { UserStatus } from '../../services/schemas/index.js';
  * Used to show "X/5 free forms" in UI - the total doesn't change.
  */
 const FREE_TIER_LIMITS = {
-  MAX_FREE_FORMS: 5,
+  MAX_FREE_FORMS: 15,
   MAX_PROFILES: 1,
   MAX_WEBSITES: 3,
 } as const;
@@ -92,7 +92,11 @@ export const usePlanLimits = (options?: UsePlanLimitsOptions) => {
     canFillForms,
     userStatus,
 
-    // Free tier constants (for display "X/5 free forms")
+    // Server-driven free tier totals (preferred over fallback constants)
+    totalFreeForms: limitations?.totalFreeForms ?? FREE_TIER_LIMITS.MAX_FREE_FORMS,
+    initialTokens: limitations?.initialTokens ?? 0,
+
+    // Free tier constants (fallback for display)
     FREE_TIER_LIMITS,
 
     // Helper functions

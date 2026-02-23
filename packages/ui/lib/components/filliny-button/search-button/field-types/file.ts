@@ -1,5 +1,8 @@
+import { isGeneratableDocumentType, generateFileForField, saveToAuthorizedFolder } from './fileGenerationService';
 import { createBaseField } from './utils';
-import { Framework, FieldTypeEnum } from '@extension/shared';
+import { findServerDocument, addServerDocument, getSessionContext } from '../serverDocumentContext';
+import { Framework, FieldTypeEnum, downloadDocumentService } from '@extension/shared';
+import { localFilesStorage } from '@extension/storage';
 import type { Field, FillinyFileInputElement } from '@extension/shared';
 
 /**
@@ -735,7 +738,7 @@ const updateFileInput = async (
     const triggerElement = fieldMetadata?.fileUploadData?.triggerElement || fileInput;
 
     if (isAiMode) {
-      // AI mode - handle URLs or local filenames suggested by AI
+      // AI mode - handle URLs, server documents, or local filenames suggested by AI
       for (const fileValue of fileNames) {
         try {
           // Check if this is a URL
@@ -743,10 +746,79 @@ const updateFileInput = async (
             const file = await downloadFileFromUrl(fileValue, undefined, acceptTypes);
             files.push(file);
           } else {
-            // This is a local filename suggested by AI (e.g., "Resume.pdf")
-            console.log(`AI suggested local file: ${fileValue}`);
-            const file = createRealisticFile(fileValue, getFileTypeFromExtension(fileValue));
-            files.push(file);
+            // Check if this matches a server-stored document
+            const serverDoc = findServerDocument(fileValue);
+            if (serverDoc) {
+              console.log(`Found server document match: ${serverDoc.filename} (docId: ${serverDoc.docId})`);
+              try {
+                const blob = await downloadDocumentService(
+                  serverDoc.profileId,
+                  serverDoc.websiteId,
+                  String(serverDoc.docId),
+                );
+                const file = new File([blob], serverDoc.filename, { type: serverDoc.mimeType });
+                files.push(file);
+                console.log(`Downloaded server document: ${serverDoc.filename} (${blob.size} bytes)`);
+              } catch (downloadError) {
+                console.warn(
+                  `Failed to download server document ${serverDoc.filename}, creating fallback:`,
+                  downloadError,
+                );
+                const file = createRealisticFile(fileValue, getFileTypeFromExtension(fileValue));
+                files.push(file);
+              }
+            } else {
+              // This is a local filename suggested by AI (e.g., "Resume.pdf")
+              console.log(`AI suggested local file: ${fileValue}`);
+
+              // Try auto-generation if enabled and field type is generatable
+              let generated = false;
+              const sessionCtx = getSessionContext();
+              if (sessionCtx) {
+                try {
+                  const autoGenEnabled = await localFilesStorage.getAutoGenerate(sessionCtx.profileId);
+                  const acceptString = fileInput.accept || acceptTypes.map(t => t.value).join(',');
+                  if (autoGenEnabled && isGeneratableDocumentType(acceptString)) {
+                    console.log(`Auto-generating document for field: ${fileValue}`);
+                    // Derive label from the file input element
+                    const fieldLabel =
+                      fileInput.getAttribute('aria-label') ||
+                      fileInput.labels?.[0]?.textContent?.trim() ||
+                      fileInput.name ||
+                      'file upload';
+                    const result = await generateFileForField(
+                      sessionCtx.profileId,
+                      sessionCtx.websiteId,
+                      fieldLabel,
+                      fileInput.title || undefined,
+                      acceptString || undefined,
+                    );
+                    files.push(result.file);
+                    generated = true;
+                    console.log(`Auto-generated document: ${result.filename} (${result.file.size} bytes)`);
+
+                    // Fire-and-forget: save to authorized folder
+                    saveToAuthorizedFolder(sessionCtx.profileId, result.file).catch(() => {});
+
+                    // Add to session context for reuse within the same fill session
+                    addServerDocument({
+                      docId: result.docId,
+                      profileId: sessionCtx.profileId,
+                      websiteId: sessionCtx.websiteId,
+                      filename: result.filename,
+                      mimeType: result.mimeType,
+                    });
+                  }
+                } catch (genError) {
+                  console.warn('Auto-generation failed, falling back to realistic file:', genError);
+                }
+              }
+
+              if (!generated) {
+                const file = createRealisticFile(fileValue, getFileTypeFromExtension(fileValue));
+                files.push(file);
+              }
+            }
           }
         } catch (error) {
           console.warn(`Failed to process file ${fileValue}, creating realistic file:`, error);

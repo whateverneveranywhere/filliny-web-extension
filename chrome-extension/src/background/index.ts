@@ -298,6 +298,17 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true; // Keep the message channel open for async response
   }
 
+  // Handle document generation for file upload fields
+  if (request.type === MessageType.GENERATE_DOCUMENT_FOR_FIELD) {
+    handleGenerateDocumentForField(request)
+      .then(result => sendResponse(result))
+      .catch(error => {
+        console.error('[Background] Generate document for field failed:', error);
+        sendResponse({ error: error instanceof Error ? error.message : 'Unknown error' });
+      });
+    return true; // Keep the message channel open for async response
+  }
+
   // Handle analytics event relay from content-UI
   if (request.type === MessageType.ANALYTICS_EVENT) {
     const raw = request.payload;
@@ -614,6 +625,192 @@ interface APIRequestResponse {
   data?: JSONObject | null;
   success?: boolean;
 }
+
+// Separate function to handle document generation for file upload fields
+interface GenerateDocumentRequest {
+  type: typeof MessageType.GENERATE_DOCUMENT_FOR_FIELD;
+  profileId: string;
+  websiteId: string;
+  fieldLabel: string;
+  fieldDescription?: string;
+  acceptTypes?: string;
+}
+
+interface GenerateDocumentResult {
+  arrayBuffer?: number[];
+  filename?: string;
+  mimeType?: string;
+  docId?: number;
+  error?: string;
+}
+
+const GENERATE_FETCH_TIMEOUT = 60_000; // 60s for AI generation
+const DOWNLOAD_FETCH_TIMEOUT = 30_000; // 30s for file downloads
+const MAX_DOWNLOAD_SIZE = 10 * 1024 * 1024; // 10 MB safety cap
+
+/** Fetch with an AbortController timeout. */
+const fetchWithTimeout = (url: string, init: RequestInit, timeoutMs: number): Promise<Response> => {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  return fetch(url, { ...init, signal: controller.signal }).finally(() => clearTimeout(timer));
+};
+
+/** Convert a blob to a number[] for message passing (Blob is not serializable). */
+const blobToNumberArray = async (blob: Blob): Promise<number[]> => {
+  if (blob.size > MAX_DOWNLOAD_SIZE) {
+    throw new Error(`Downloaded file too large (${blob.size} bytes, max ${MAX_DOWNLOAD_SIZE})`);
+  }
+  const buffer = await blob.arrayBuffer();
+  return Array.from(new Uint8Array(buffer));
+};
+
+const handleGenerateDocumentForField = async (request: GenerateDocumentRequest): Promise<GenerateDocumentResult> => {
+  const { profileId, websiteId, fieldLabel, fieldDescription, acceptTypes } = request;
+
+  const configToUse = getConfig();
+
+  // Get auth token
+  let authToken = '';
+  const tokenResult = await chrome.storage.local.get('bearer_token');
+  if (tokenResult.bearer_token) {
+    authToken = tokenResult.bearer_token;
+  } else {
+    const cookie = await chrome.cookies.get({
+      url: configToUse.baseURL,
+      name: configToUse.cookieName,
+    });
+    if (cookie?.value) authToken = cookie.value;
+  }
+
+  if (!authToken) {
+    return { error: 'Not authenticated' };
+  }
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${authToken}`,
+  };
+
+  // Step 1: Call the generate-for-field endpoint
+  const generateUrl = `${configToUse.apiURL}/profiles/${profileId}/websites/${websiteId}/documents/generate-for-field`;
+  const generateResponse = await fetchWithTimeout(
+    generateUrl,
+    {
+      method: 'POST',
+      headers,
+      credentials: 'include',
+      body: JSON.stringify({ fieldLabel, fieldDescription, acceptTypes }),
+    },
+    GENERATE_FETCH_TIMEOUT,
+  );
+
+  if (!generateResponse.ok) {
+    let errorMessage = 'Document generation failed';
+    try {
+      const errorJson: unknown = await generateResponse.json();
+      const structured = parseApiError(errorJson);
+      if (structured) errorMessage = structured.message;
+    } catch {
+      // ignore parse errors
+    }
+    return { error: errorMessage };
+  }
+
+  const generateJson: unknown = await generateResponse.json();
+  const unwrapped = unwrapApiEnvelope(generateJson) as {
+    document: {
+      id: number;
+      r2Filename: string | null;
+      r2MimeType: string | null;
+      contentMarkdown: string | null;
+      title: string;
+    };
+    wasExisting: boolean;
+  };
+
+  const doc = unwrapped.document;
+
+  // Step 2: If the document has an R2 file, download it directly
+  if (doc.r2Filename) {
+    const downloadUrl = `${configToUse.apiURL}/profiles/${profileId}/websites/${websiteId}/documents/${doc.id}/download`;
+    const downloadResponse = await fetchWithTimeout(
+      downloadUrl,
+      { headers, credentials: 'include' },
+      DOWNLOAD_FETCH_TIMEOUT,
+    );
+
+    if (downloadResponse.ok) {
+      const blob = await downloadResponse.blob();
+      return {
+        arrayBuffer: await blobToNumberArray(blob),
+        filename: doc.r2Filename,
+        mimeType: doc.r2MimeType || 'application/pdf',
+        docId: doc.id,
+      };
+    }
+  }
+
+  // Step 3: If document has markdown content but no R2 file, convert to PDF first
+  if (doc.contentMarkdown) {
+    const filename = `${doc.title.replace(/\s+/g, '-').toLowerCase()}.pdf`;
+
+    // Encode markdown as base64 for the convert endpoint
+    const encoder = new TextEncoder();
+    const bytes = encoder.encode(doc.contentMarkdown);
+    let binary = '';
+    for (const byte of bytes) {
+      binary += String.fromCharCode(byte);
+    }
+    const base64Content = btoa(binary);
+
+    const convertUrl = `${configToUse.apiURL}/profiles/${profileId}/websites/${websiteId}/documents/${doc.id}/convert`;
+    const convertResponse = await fetchWithTimeout(
+      convertUrl,
+      {
+        method: 'POST',
+        headers,
+        credentials: 'include',
+        body: JSON.stringify({
+          fileContent: base64Content,
+          format: 'pdf',
+          filename,
+        }),
+      },
+      DOWNLOAD_FETCH_TIMEOUT,
+    );
+
+    if (convertResponse.ok) {
+      // Now download the converted file
+      const downloadUrl = `${configToUse.apiURL}/profiles/${profileId}/websites/${websiteId}/documents/${doc.id}/download`;
+      const downloadResponse = await fetchWithTimeout(
+        downloadUrl,
+        { headers, credentials: 'include' },
+        DOWNLOAD_FETCH_TIMEOUT,
+      );
+
+      if (downloadResponse.ok) {
+        const blob = await downloadResponse.blob();
+        return {
+          arrayBuffer: await blobToNumberArray(blob),
+          filename,
+          mimeType: 'application/pdf',
+          docId: doc.id,
+        };
+      }
+    }
+
+    // If convert/download failed, return the markdown content as a text file
+    const mdBytes = encoder.encode(doc.contentMarkdown);
+    return {
+      arrayBuffer: Array.from(mdBytes),
+      filename: `${doc.title.replace(/\s+/g, '-').toLowerCase()}.md`,
+      mimeType: 'text/markdown',
+      docId: doc.id,
+    };
+  }
+
+  return { error: 'Generated document has no content' };
+};
 
 // Separate function to handle API requests
 const handleApiRequest = async (
