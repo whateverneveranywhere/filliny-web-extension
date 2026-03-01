@@ -3,6 +3,8 @@ import { DragButton } from './drag-button';
 import { FillinyVisionButton } from './filliny-vision-button';
 import { LogoButton } from './logo-button';
 import { FieldFillManager } from './search-button/components/FieldFillManager';
+import { resetOverlays } from './search-button/overlayUtils';
+import { formFillStore, useFormFillStore, StreamingPhase } from './search-button/stores';
 import { FillinyTestModeFillerButton } from './test-mode-button';
 import { useStorage } from '@extension/shared';
 import { positionStorage, fieldButtonsStorage } from '@extension/storage';
@@ -46,12 +48,14 @@ const DraggableButton = ({
   disabledReason,
   hasFields,
   onDragEnd,
+  isFilling,
 }: {
   position: Position;
   canFillForms: boolean;
   disabledReason?: string | null;
   hasFields: boolean;
   onDragEnd: (newY: number) => void;
+  isFilling: boolean;
 }) => {
   const [isHovered, setIsHovered] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -133,6 +137,7 @@ const DraggableButton = ({
   const handleMouseLeave = useCallback(() => setIsHovered(false), []);
 
   const getLogoTooltip = () => {
+    if (isFilling) return 'AI is filling in your form fields...';
     if (!canFillForms) {
       if (disabledReason?.toLowerCase().includes('token')) {
         return 'Token limit reached — your tokens will refresh on your next billing cycle. Upgrade for more tokens.';
@@ -192,6 +197,7 @@ const DraggableButton = ({
               canFillForms={canFillForms}
               disabledReason={disabledReason}
               hasFields={hasFields}
+              isFilling={isFilling}
             />
           </ButtonWrapper>
         </div>
@@ -211,6 +217,23 @@ const FillinyButton: React.FC<FillinyButtonProps> = ({ canFillForms = true, disa
   const [position, setPosition] = useState<Position>(savedPosition);
   const [detectedFieldCount, setDetectedFieldCount] = useState<number>(0);
   const [isOverlayActive, setIsOverlayActive] = useState(false);
+
+  // Track form fill phase from the global store
+  const phase = useFormFillStore(state => state.phase);
+  const isFilling = phase === StreamingPhase.STREAMING || phase === StreamingPhase.FINALIZING;
+
+  // Cleanup when form fill completes or errors
+  useEffect(() => {
+    if (phase === StreamingPhase.COMPLETE || phase === StreamingPhase.ERROR) {
+      const delay = phase === StreamingPhase.COMPLETE ? 500 : 1000;
+      const timer = setTimeout(() => {
+        resetOverlays();
+        formFillStore.getState().reset();
+      }, delay);
+      return () => clearTimeout(timer);
+    }
+    return undefined;
+  }, [phase]);
 
   // Track overlay active state to hide the button while overlay is shown
   useEffect(() => {
@@ -288,6 +311,7 @@ const FillinyButton: React.FC<FillinyButtonProps> = ({ canFillForms = true, disa
           disabledReason={disabledReason}
           hasFields={detectedFieldCount > 0}
           onDragEnd={handleDragEnd}
+          isFilling={isFilling}
         />
       )}
       <FieldFillManager

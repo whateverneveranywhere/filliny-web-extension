@@ -1,7 +1,5 @@
 import { handleFormClick } from '../handleFormClick';
-import { disableOtherButtons, resetOverlays, showLoadingIndicator } from '../overlayUtils';
-import { formFillStore, useFormFillStore, StreamingPhase } from '../stores';
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback } from 'react';
 import type React from 'react';
 
 interface UseFormFillProps {
@@ -11,51 +9,20 @@ interface UseFormFillProps {
 }
 
 interface UseFormFillReturn {
-  loading: boolean;
-  phase: StreamingPhase;
   handleFillClick: (event: React.MouseEvent<HTMLButtonElement>) => Promise<void>;
 }
 
 /**
- * Custom hook to handle form fill logic
- * Separates form fill handling from component rendering
+ * Custom hook to handle form fill logic.
+ * When the fill button is clicked, the overlay stays visible with a loading spinner.
+ * The overlay auto-dismisses when filling completes or errors (handled by FormsOverlay).
  */
 export const useFormFill = ({ formId, testMode, onDismiss }: UseFormFillProps): UseFormFillReturn => {
-  const [loading, setLoading] = useState(false);
-  const phase = useFormFillStore(state => state.phase);
-  const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Phase-based auto-dismissal.
-  // Dismiss order matters: call onDismiss first to unmount the component,
-  // then reset store state. This prevents a brief flash of the action buttons.
-  useEffect(() => {
-    if (phase === StreamingPhase.COMPLETE) {
-      dismissTimerRef.current = setTimeout(() => {
-        setLoading(false);
-        resetOverlays();
-        onDismiss();
-        formFillStore.getState().reset();
-      }, 2500);
-    } else if (phase === StreamingPhase.ERROR) {
-      dismissTimerRef.current = setTimeout(() => {
-        setLoading(false);
-        resetOverlays();
-        onDismiss();
-        formFillStore.getState().reset();
-      }, 3500);
-    }
-
-    return () => {
-      if (dismissTimerRef.current) {
-        clearTimeout(dismissTimerRef.current);
-        dismissTimerRef.current = null;
-      }
-    };
-  }, [phase, onDismiss]);
+  const [clicked, setClicked] = useState(false);
 
   const handleFillClick = useCallback(
     async (event: React.MouseEvent<HTMLButtonElement>) => {
-      if (loading) return;
+      if (clicked) return;
 
       // Check if a field-specific test is already in progress
       const fieldTestInProgress = document.querySelector('[data-filliny-loading="true"]');
@@ -65,23 +32,18 @@ export const useFormFill = ({ formId, testMode, onDismiss }: UseFormFillProps): 
         return;
       }
 
-      setLoading(true);
-      disableOtherButtons(formId);
-      showLoadingIndicator(formId);
+      setClicked(true);
 
-      try {
-        await handleFormClick(event, formId, testMode);
-      } catch {
-        // Error handling is done inside handleFormClick.
-        // Phase will be set to ERROR, triggering auto-dismiss via useEffect above.
-      }
+      // Fire and forget - handleFormClick manages its own state via formFillStore.
+      // The overlay stays visible and shows a spinner; FormsOverlay handles auto-dismiss.
+      handleFormClick(event, formId, testMode).catch(() => {
+        // Errors are handled inside handleFormClick (sets phase to ERROR, shows toasts)
+      });
     },
-    [loading, formId, testMode, onDismiss],
+    [clicked, formId, testMode, onDismiss],
   );
 
   return {
-    loading,
-    phase,
     handleFillClick,
   };
 };

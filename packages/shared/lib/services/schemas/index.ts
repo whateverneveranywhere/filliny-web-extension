@@ -851,10 +851,19 @@ const StreamingErrorSchema = z.object({
 });
 
 /**
- * Streaming data chunk containing field array
+ * Schema for individual fields in streaming chunks.
+ * The API only returns {id, value} during streaming — NOT the full FieldSchema.
+ */
+const StreamingFieldItemSchema = z.object({
+  id: z.string(),
+  value: z.union([z.string(), z.array(z.string())]).optional(),
+});
+
+/**
+ * Streaming data chunk containing partial field array
  */
 const StreamingFieldDataSchema = z.object({
-  data: z.array(FieldSchema),
+  data: z.array(StreamingFieldItemSchema),
 });
 
 /**

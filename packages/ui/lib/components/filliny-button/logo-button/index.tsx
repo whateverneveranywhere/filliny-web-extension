@@ -12,12 +12,18 @@ interface LogoButtonProps extends ButtonComponentProps {
   canFillForms?: boolean;
   disabledReason?: string | null;
   hasFields?: boolean;
+  isFilling?: boolean;
 }
 
-const LogoButton: React.FC<LogoButtonProps> = ({ canFillForms = true, disabledReason = null, hasFields = true }) => {
+const LogoButton: React.FC<LogoButtonProps> = ({
+  canFillForms = true,
+  disabledReason = null,
+  hasFields = true,
+  isFilling = false,
+}) => {
   const isDOMReady = useDOMReady();
   const [isLoading, setIsLoading] = useState(false);
-  const isDisabled = !isDOMReady || !canFillForms || !hasFields || isLoading;
+  const isDisabled = !isDOMReady || !canFillForms || !hasFields || isLoading || isFilling;
 
   const handleClick = useCallback(async () => {
     if (!canFillForms) {
@@ -39,6 +45,7 @@ const LogoButton: React.FC<LogoButtonProps> = ({ canFillForms = true, disabledRe
   }, [canFillForms, disabledReason]);
 
   const getTitle = () => {
+    if (isFilling) return 'AI is filling in your form fields...';
     if (isLoading) return 'Scanning page for fillable fields — this may take a moment...';
     if (!canFillForms) {
       if (disabledReason?.toLowerCase().includes('token')) {
@@ -77,7 +84,7 @@ const LogoButton: React.FC<LogoButtonProps> = ({ canFillForms = true, disabledRe
         onClick={handleClick}
         disabled={isDisabled}
         title={getTitle()}>
-        {isLoading ? (
+        {isLoading || isFilling ? (
           <Loader2 className="filliny-size-6 filliny-animate-spin filliny-text-white" />
         ) : (
           <Wand2 className={cn('filliny-size-6', isDisabled ? 'filliny-text-white/50' : 'filliny-text-white')} />

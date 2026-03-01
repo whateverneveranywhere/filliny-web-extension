@@ -158,7 +158,18 @@ const getBearerTokenFromStorage = (): Promise<string> =>
 
 export const authStorage: AuthStorage = {
   ...storage,
-  setToken: async (token: AuthTokenType) => await storage.set(token),
+  setToken: async (token: AuthTokenType) => {
+    await storage.set(token);
+    // Also write to bearer_token so getWithFallback() finds it immediately
+    // without needing a round-trip to the background script
+    if (typeof chrome !== 'undefined' && chrome.storage?.local && token) {
+      try {
+        chrome.storage.local.set({ bearer_token: token });
+      } catch {
+        // Ignore errors in non-extension contexts
+      }
+    }
+  },
   deleteToken: async () => {
     await storage.set('');
   },

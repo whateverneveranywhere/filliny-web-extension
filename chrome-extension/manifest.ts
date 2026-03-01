@@ -97,6 +97,7 @@ const manifest = {
       "object-src 'self'",
       [
         "connect-src 'self'",
+        'https://filliny.io',
         'https://*.filliny.io',
         'https://us.i.posthog.com',
         'https://eu.i.posthog.com',
