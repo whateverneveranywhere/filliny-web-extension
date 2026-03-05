@@ -5,7 +5,7 @@
 import { WebappEnvs } from '../types/enums.js';
 
 const POSTHOG_API_KEY = 'phc_iHUXudBl6vRwc4KcPeOxEVxbymC4nYyfEEB5MbqxpnR';
-const POSTHOG_HOST = 'https://us.i.posthog.com';
+const POSTHOG_HOST = 'https://eu.i.posthog.com';
 
 export interface PostHogConfig {
   apiKey: string;
