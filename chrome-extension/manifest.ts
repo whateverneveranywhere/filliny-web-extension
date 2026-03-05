@@ -112,8 +112,10 @@ const manifest = {
   },
   externally_connectable: {
     matches: [
-      'https://*.filliny.io/*', // Production domain
-      'https://*.filliny.com/*', // Legacy domain support
+      'https://filliny.io/*', // Production bare domain
+      'https://*.filliny.io/*', // Production subdomains (preview, www)
+      'https://filliny.com/*', // Legacy bare domain
+      'https://*.filliny.com/*', // Legacy subdomains
       ...(env === WebappEnvs.DEV ? ['http://localhost:*/*'] : []), // Local development only in DEV
     ],
   },
