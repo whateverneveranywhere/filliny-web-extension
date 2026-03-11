@@ -1425,6 +1425,38 @@ const groupRadioElements = async (elements: HTMLElement[]): Promise<Map<string, 
     }
   }
 
+  // Strategy 1.5: Group ARIA radio elements by [role="radiogroup"] container
+  // Handles Radix UI and other ARIA-compliant radio groups where elements
+  // are <button role="radio"> without a native 'name' attribute.
+  const ariaRadioElements = elements.filter(el => !processed.has(el) && el.getAttribute('role') === 'radio');
+  if (ariaRadioElements.length > 0) {
+    const radioGroupContainers = new Map<HTMLElement, HTMLElement[]>();
+
+    for (const element of ariaRadioElements) {
+      const radioGroupContainer = element.closest('[role="radiogroup"]');
+      if (radioGroupContainer instanceof HTMLElement) {
+        if (!radioGroupContainers.has(radioGroupContainer)) {
+          radioGroupContainers.set(radioGroupContainer, []);
+        }
+        radioGroupContainers.get(radioGroupContainer)!.push(element);
+        processed.add(element);
+      }
+    }
+
+    for (const [container, groupElements] of radioGroupContainers.entries()) {
+      const containerId =
+        container.id ||
+        container.getAttribute('aria-label') ||
+        container.getAttribute('aria-labelledby') ||
+        `aria-radiogroup-${groups.size}`;
+      const groupId = `radio-aria-${containerId}`;
+      groups.set(groupId, groupElements);
+      debug.log(
+        `Created ARIA radio group from [role="radiogroup"] container "${containerId}" with ${groupElements.length} elements`,
+      );
+    }
+  }
+
   // Strategy 2: Group remaining elements by semantic containers and proximity
   const unprocessedElements = elements.filter(el => !processed.has(el));
   if (unprocessedElements.length > 0) {
@@ -1484,6 +1516,33 @@ const groupCheckboxElements = async (elements: HTMLElement[]): Promise<Map<strin
       groups.set(`checkbox-name-${name}`, groupElements);
       groupElements.forEach(el => processed.add(el));
       debug.log(`Created checkbox group from name "${name}" with ${groupElements.length} elements`);
+    }
+  }
+
+  // Strategy 1.5: Group ARIA checkbox elements by semantic container
+  // Handles Radix UI checkboxes (button[role="checkbox"]) that share a container
+  const ariaCheckboxElements = elements.filter(el => !processed.has(el) && el.getAttribute('role') === 'checkbox');
+  if (ariaCheckboxElements.length > 0) {
+    const checkGroupContainers = new Map<HTMLElement, HTMLElement[]>();
+
+    for (const element of ariaCheckboxElements) {
+      const groupContainer = element.closest('[role="group"], fieldset');
+      if (groupContainer instanceof HTMLElement) {
+        if (!checkGroupContainers.has(groupContainer)) {
+          checkGroupContainers.set(groupContainer, []);
+        }
+        checkGroupContainers.get(groupContainer)!.push(element);
+      }
+    }
+
+    for (const [container, groupElements] of checkGroupContainers.entries()) {
+      if (groupElements.length > 1) {
+        const containerId = container.id || container.getAttribute('aria-label') || `aria-checkgroup-${groups.size}`;
+        const groupId = `checkbox-aria-${containerId}`;
+        groups.set(groupId, groupElements);
+        groupElements.forEach(el => processed.add(el));
+        debug.log(`Created ARIA checkbox group from container "${containerId}" with ${groupElements.length} elements`);
+      }
     }
   }
 

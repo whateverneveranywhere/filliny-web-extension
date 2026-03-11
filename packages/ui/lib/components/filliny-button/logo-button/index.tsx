@@ -4,7 +4,7 @@ import { animationClasses } from '@/lib/animations';
 import { cn } from '@/lib/utils';
 import { useDOMReady } from '@/lib/utils/dom-utils';
 import { Loader2, Wand2 } from 'lucide-react';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import type { ButtonComponentProps } from '../button-wrapper';
 import type React from 'react';
 
@@ -23,9 +23,12 @@ const LogoButton: React.FC<LogoButtonProps> = ({
 }) => {
   const isDOMReady = useDOMReady();
   const [isLoading, setIsLoading] = useState(false);
+  const isLoadingRef = useRef(false);
   const isDisabled = !isDOMReady || !canFillForms || !hasFields || isLoading || isFilling;
 
   const handleClick = useCallback(async () => {
+    if (isLoadingRef.current) return;
+
     if (!canFillForms) {
       if (disabledReason?.toLowerCase().includes('quota') || disabledReason?.toLowerCase().includes('limit')) {
         showQuotaExceededToast();
@@ -36,11 +39,24 @@ const LogoButton: React.FC<LogoButtonProps> = ({
       return;
     }
 
+    isLoadingRef.current = true;
     setIsLoading(true);
+
+    // Yield to the browser so the loading spinner renders before heavy work begins
+    await new Promise(resolve => requestAnimationFrame(resolve));
+
     try {
       await highlightForms({ visionOnly: false });
     } finally {
-      setIsLoading(false);
+      // Only reset loading if no overlay was created.
+      // When an overlay is active, the entire button unmounts (isOverlayActive hides it),
+      // so keeping loading=true prevents a brief flash of the enabled button before React
+      // processes the overlay state change and unmounts us.
+      const hasOverlay = document.querySelector('[data-filliny-overlay-active="true"]') !== null;
+      if (!hasOverlay) {
+        isLoadingRef.current = false;
+        setIsLoading(false);
+      }
     }
   }, [canFillForms, disabledReason]);
 

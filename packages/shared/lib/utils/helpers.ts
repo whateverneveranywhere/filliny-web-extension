@@ -486,11 +486,46 @@ const excludeValuesFromBaseArray = <B extends string[], E extends (string | numb
 
 const sleep = async (time: number) => new Promise(r => setTimeout(r, time));
 
+/**
+ * Check if a URL is a development/localhost URL that should not be auto-added to profiles.
+ * Matches localhost, 127.0.0.1, 0.0.0.0, and common local development patterns.
+ */
+const isDevUrl = (url: string): boolean => {
+  try {
+    const parsedUrl = new URL(url);
+    const hostname = parsedUrl.hostname.toLowerCase();
+
+    // Match common local development hostnames
+    if (
+      hostname === 'localhost' ||
+      hostname === '127.0.0.1' ||
+      hostname === '0.0.0.0' ||
+      hostname === '[::1]' ||
+      hostname.endsWith('.localhost') ||
+      hostname.endsWith('.local') ||
+      hostname.endsWith('.test') ||
+      hostname.endsWith('.example')
+    ) {
+      return true;
+    }
+
+    // Match private IP ranges (192.168.x.x, 10.x.x.x, 172.16-31.x.x)
+    if (/^(192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/.test(hostname)) {
+      return true;
+    }
+
+    return false;
+  } catch {
+    return false;
+  }
+};
+
 // All exports at end of file
 export {
   getFaviconUrl,
   cleanUrl,
   formatToK,
+  isDevUrl,
   getMatchingWebsite,
   getConfig,
   parseWebappEnv,

@@ -98,13 +98,13 @@ const OverlayContainer: React.FC<OverlayContainerProps> = ({
     height: `${overlayPosition.height}px`,
     contain: 'layout style paint' as const,
     zIndex: 999999,
-    transition: 'all 0.3s ease',
+    transition: 'background-color 0.3s ease, backdrop-filter 0.3s ease',
   };
 
   return (
     <div
       ref={overlayRef}
-      className="filliny-pointer-events-auto filliny-fixed filliny-flex filliny-items-center filliny-justify-center filliny-transition-all filliny-duration-300 filliny-rounded-lg filliny-bg-foreground/30 filliny-backdrop-blur-md hover:filliny-bg-foreground/40"
+      className="filliny-pointer-events-auto filliny-fixed filliny-flex filliny-items-center filliny-justify-center filliny-rounded-lg filliny-bg-foreground/30 filliny-backdrop-blur-md hover:filliny-bg-foreground/40"
       style={overlayStyle}
       data-highlight-overlay="true"
       data-form-id={formId}

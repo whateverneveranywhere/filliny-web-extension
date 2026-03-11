@@ -16,6 +16,7 @@ import {
   useBoolean,
   notifyProfileUpdate,
   MessageType,
+  isDevUrl,
 } from '@extension/shared';
 import { profileStorage } from '@extension/storage';
 import { useEffect, useMemo, useCallback } from 'react';
@@ -133,12 +134,15 @@ const HomePage = () => {
   const {
     activeTabUrl,
     isLoading: isLoadingUrl,
-    isValid: isUrlValid,
+    isValid: isUrlValidRaw,
     matchingWebsite,
   } = useActiveTabUrl({
     websites: activeProfile?.fillingWebsites,
     mode: 'activeTab',
   });
+
+  // Exclude localhost/development URLs from being auto-added to profiles
+  const isUrlValid = isUrlValidRaw && !isDevUrl(activeTabUrl);
 
   const {
     handleQuickAdd,

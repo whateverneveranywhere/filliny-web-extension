@@ -15,7 +15,7 @@ const AlertDialogOverlay = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <AlertDialogPrimitive.Overlay
     className={cn(
-      'filliny-fixed filliny-inset-0 filliny-z-50 filliny-bg-black/80 data-[state=open]:filliny-animate-in data-[state=closed]:filliny-animate-out data-[state=closed]:filliny-fade-out-0 data-[state=open]:filliny-fade-in-0',
+      'filliny-fixed filliny-inset-0 filliny-z-50 filliny-bg-black/50 data-[state=open]:filliny-animate-in data-[state=closed]:filliny-animate-out data-[state=closed]:filliny-fade-out-0 data-[state=open]:filliny-fade-in-0',
       className,
     )}
     {...props}
@@ -33,7 +33,7 @@ const AlertDialogContent = React.forwardRef<
     <AlertDialogPrimitive.Content
       ref={ref}
       className={cn(
-        'filliny-fixed filliny-left-[50%] filliny-top-[50%] filliny-z-50 filliny-grid filliny-w-full filliny-max-w-lg filliny-translate-x-[-50%] filliny-translate-y-[-50%] filliny-gap-4 filliny-rounded-lg filliny-border filliny-bg-background filliny-p-6 filliny-shadow-lg filliny-duration-200 data-[state=open]:filliny-animate-in data-[state=closed]:filliny-animate-out data-[state=closed]:filliny-fade-out-0 data-[state=open]:filliny-fade-in-0 data-[state=closed]:filliny-zoom-out-95 data-[state=open]:filliny-zoom-in-95 data-[state=closed]:filliny-slide-out-to-left-1/2 data-[state=closed]:filliny-slide-out-to-top-[48%] data-[state=open]:filliny-slide-in-from-left-1/2 data-[state=open]:filliny-slide-in-from-top-[48%]',
+        'filliny-fixed filliny-left-[50%] filliny-top-[50%] filliny-z-50 filliny-grid filliny-w-full filliny-max-w-lg filliny-translate-x-[-50%] filliny-translate-y-[-50%] filliny-gap-4 filliny-rounded-lg filliny-border filliny-bg-background filliny-p-6 filliny-shadow-lg filliny-duration-200 data-[state=open]:filliny-animate-in data-[state=closed]:filliny-animate-out data-[state=closed]:filliny-fade-out-0 data-[state=open]:filliny-fade-in-0 data-[state=closed]:filliny-zoom-out-95 data-[state=open]:filliny-zoom-in-95',
         className,
       )}
       {...props}

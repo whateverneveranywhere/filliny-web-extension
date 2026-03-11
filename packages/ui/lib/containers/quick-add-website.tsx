@@ -1,7 +1,7 @@
 import { Button, UpgradeBanner } from '../components';
 import { WebsitePreviewCard } from '../components/stepper-forms/WebsitePreviewCard';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../components/ui/tooltip';
-import { useActiveTabUrl } from '@extension/shared';
+import { useActiveTabUrl, isDevUrl } from '@extension/shared';
 import { Plus, Zap } from 'lucide-react';
 
 interface Props {
@@ -20,7 +20,8 @@ const QuickAddWebsiteToProfile = ({ onQuickAdd, isLoading, currentPlan, maxWebsi
     : isFirstWebsite
       ? 'One click to enable AI form filling on this site'
       : 'Add this website to your profile';
-  const { activeTabUrl, isLoading: isLoadingUrl, isValid } = useActiveTabUrl();
+  const { activeTabUrl, isLoading: isLoadingUrl, isValid: isValidRaw } = useActiveTabUrl();
+  const isValid = isValidRaw && !isDevUrl(activeTabUrl);
 
   const button = (
     <Button
