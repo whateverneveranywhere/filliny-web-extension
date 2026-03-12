@@ -25,7 +25,8 @@ export const useAuthHealthCheckQuery = (enabled: boolean = false) =>
     // Add caching configuration to prevent excessive health check requests
     staleTime: 30 * 1000, // 30 seconds - extension needs reasonably fresh data
     gcTime: 60 * 1000, // 1 minute
-    refetchOnWindowFocus: true, // Refetch when user returns to extension
+    // Global default is false — correct for extension side panels where focus
+    // events fire excessively and cause cascading refetch loops
     refetchOnMount: true,
     // Retry network errors (API down) but not auth errors (401)
     retry: (failureCount, error) => {

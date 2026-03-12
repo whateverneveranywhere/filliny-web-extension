@@ -16,7 +16,8 @@ export const useDashboardOverview = (enabled: boolean = false) =>
     enabled,
     staleTime: 15 * 1000, // 15 seconds - extension needs fresh data
     gcTime: 60 * 1000, // 1 minute - don't retain stale usage data
-    refetchOnWindowFocus: true, // Refetch when user returns to extension
+    // Global default is false — correct for extension side panels where focus
+    // events fire excessively and cause cascading refetch loops
     retry: false, // Don't retry on 401 - user likely isn't authenticated
     meta: {
       errorMessage: 'Failed to fetch dashboard overview',

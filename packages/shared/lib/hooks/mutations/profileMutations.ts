@@ -49,6 +49,8 @@ export const useDeleteProfileByIdMutation = () => {
     onSuccess: async (_data, { id }) => {
       // Remove the deleted profile from cache immediately
       queryClient.removeQueries({ queryKey: queryKeys.profile.detail(id) });
+      // Clear storage so useActiveProfile doesn't try to fetch the deleted profile (404)
+      await profileStorage.setDefaultProfile(undefined);
       // Use centralized invalidation helper
       await invalidateProfileMutationQueries(queryClient, id);
     },
@@ -96,12 +98,11 @@ export const useCreateFillingProfileMutation = () => {
         //    Content scripts need fillingWebsites to evaluate website matching.
         await profileStorage.setDefaultProfile(fullProfile);
 
-        // 3. Set as active on server so refetched list returns isActive: true
-        await changeActiveFillingProfileService(profileId).catch(err => {
-          console.warn('Failed to set new profile as active:', err);
-        });
+        // Backend already sets isActive: true on the new profile and deactivates
+        // others — no need for an extra changeActiveFillingProfileService() call
+        // which was causing request pile-up and timeouts after delete→create flows
       }
-      // 4. Invalidate for eventual consistency (list, dashboard, detail)
+      // 3. Invalidate for eventual consistency (list, dashboard, detail)
       await invalidateProfileMutationQueries(queryClient, createdProfile?.id ? String(createdProfile.id) : undefined);
     },
     onError: (error: Error) => {

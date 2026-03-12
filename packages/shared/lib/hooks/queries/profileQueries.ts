@@ -41,7 +41,8 @@ const useProfilesListQuery = (options?: ProfileQueryOptions) => {
     enabled,
     staleTime: 15 * 1000,
     gcTime: 30 * 1000,
-    refetchOnWindowFocus: true,
+    // Global default is false — correct for extension side panels where focus
+    // events fire excessively and cause cascading refetch loops
     retry: false,
     meta: {
       errorMessage: 'Failed to fetch profiles list',
@@ -87,7 +88,8 @@ const useFillingProfileById = (id: string, options?: ProfileQueryOptions) => {
     enabled: enabled && Boolean(id && id.length > 0),
     staleTime: 15 * 1000,
     gcTime: 30 * 1000,
-    refetchOnWindowFocus: true,
+    // Global default is false — correct for extension side panels where focus
+    // events fire excessively and cause cascading refetch loops
     retry: false,
     meta: {
       errorMessage: 'Failed to fetch profile details',
